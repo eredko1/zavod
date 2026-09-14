@@ -1,0 +1,6 @@
+<!doctype html><html><body><script>
+const c=document.createElement('canvas');const gl=c.getContext('webgl2');
+const ext=gl.getExtension('WEBGL_debug_renderer_info');
+window.__gpu={vendor:gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),renderer:gl.getParameter(ext.UNMASKED_RENDERER_WEBGL),maxTex:gl.getParameter(gl.MAX_TEXTURE_SIZE)};
+document.body.textContent=JSON.stringify(window.__gpu);
+</script></body></html>
