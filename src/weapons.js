@@ -180,7 +180,7 @@ function fireShot(w, opts = {}) {
   // hitscan
   S._rc = S._rc || new THREE.Raycaster(); const rc = S._rc; rc.set(origin, dir); rc.near = 0.05; rc.far = sp.range;
   let hit = null;
-  if (ctx.raycastTargets?.length) { const hits = rc.intersectObjects(ctx.raycastTargets, true); for (const h of hits) { if (h.object === S.vmRoot || !h.object.visible) continue; hit = h; break; } }
+  if (ctx.raycastTargets?.length) { const hits = rc.intersectObjects(ctx.raycastTargets, true); for (const h of hits) { if (h.object === S.vmRoot || (!h.object.visible && !h.object.userData?.soldier)) continue; hit = h; break; } } // soldier hitboxes are invisible meshes by design
   const dist = hit ? hit.distance : sp.range;
 
   // muzzle world position (visual) — used by light, brass, tracer, smoke
