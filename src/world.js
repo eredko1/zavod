@@ -1,14 +1,7 @@
-// Level, materials, lighting, weather. Owned by: WORLD agent.
-// Rainy night container yard / shipyard ("ZAVOD"). Submodules live in ./world/*.js.
+// World host: picks a map from the registry (?map=), provides shared builder helpers, exposes ctx.world. Owned by: main.
+// Map content lives in ./world/maps/<id>.js (one agent per map); shared submodules in ./world/*.js.
 import * as THREE from 'three';
-import { buildSky } from './world/sky.js';
-import { buildGround } from './world/ground.js';
-import { buildStructures } from './world/structures.js';
-import { buildContainers } from './world/containers.js';
-import { buildProps } from './world/props.js';
-import { buildLamps } from './world/lamps.js';
-import { buildRain } from './world/rain.js';
-import { buildDistant } from './world/distant.js';
+import { MAPS, DEFAULT_MAP } from './world/maps/index.js';
 
 const updaters = [];
 let W = null;
@@ -16,15 +9,22 @@ let W = null;
 export async function init(ctx) {
   const { scene, renderer } = ctx;
   const R = ctx.rng;
+  const mapId = MAPS[ctx.qs.get('map')] ? ctx.qs.get('map') : DEFAULT_MAP;
+  const map = MAPS[mapId];
   W = {
+    mapId, meta: map.meta,
+    maps: Object.values(MAPS).map(m => m.meta),           // for the HUD map selector
+    grade: map.meta.grade, ambience: map.meta.ambience,   // hints for post (color grade) and audio (ambience set)
     bounds: new THREE.Box3(new THREE.Vector3(-58, -1, -58), new THREE.Vector3(58, 30, 58)),
     poses: {}, playerSpawns: [], enemySpawns: [], coverPoints: [], navNodes: [],
-    lampPositions: [], // filled by lamps.js, read by rain.js for lit streaks
+    walkables: [],      // optional: Box3[] of elevated walkable platforms (tops are floors) for AI nav on multi-level maps
+    lampPositions: [],  // filled by lamps.js, read by rain.js for lit streaks
     groundHeight: () => 0,
     surfaceAt: (p) => (p.y > 0.2 ? 'metal' : 'ground'),
+    updaters,
   };
 
-  // shared helpers for submodules
+  // shared helpers for map builders / submodules
   const world = {
     ctx, R, W, scene, updaters,
     /** Register a solid mesh: shadows, raycast target, AABB collider. */
@@ -38,47 +38,15 @@ export async function init(ctx) {
       }
       return mesh;
     },
-    box(min, max) { ctx.colliders.push(new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max))); },
-    cover(x, z, nx, nz) { W.coverPoints.push({ position: new THREE.Vector3(x, 0, z), normal: new THREE.Vector3(nx, 0, nz).normalize() }); },
+    box(min, max) { const b = new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max)); ctx.colliders.push(b); return b; },
+    /** Elevated floor the AI may walk on (also a collider). */
+    walkable(min, max) { const b = world.box(min, max); W.walkables.push(b); return b; },
+    cover(x, z, nx, nz, y = 0) { W.coverPoints.push({ position: new THREE.Vector3(x, y, z), normal: new THREE.Vector3(nx, 0, nz).normalize() }); },
   };
 
-  renderer.toneMappingExposure = 1.25;
-  ctx.progress(0.13, 'sky');
-  buildSky(world);
-  ctx.progress(0.15, 'ground');
-  buildGround(world);
-  ctx.progress(0.17, 'structures');
-  buildStructures(world);
-  ctx.progress(0.19, 'containers');
-  buildContainers(world);
-  ctx.progress(0.21, 'props');
-  buildProps(world);
-  ctx.progress(0.22, 'lamps');
-  buildLamps(world);
-  ctx.progress(0.23, 'distant');
-  buildDistant(world);
-  ctx.progress(0.24, 'rain');
-  buildRain(world);
-
-  // ---- gameplay data --------------------------------------------------------
-  const v = (x, z) => new THREE.Vector3(x, 0, z);
-  W.playerSpawns = [v(-4, 46), v(6, 44), v(-14, 48)];
-  W.enemySpawns = [
-    v(-40, -10), v(-30, -30), v(-50, 5), v(-20, -45), v(14, -44), v(40, -42), v(52, -20), v(52, 10), v(46, 34), v(30, 42),
-    v(20, -8), v(34, 8), v(-8, -40), v(2, -46), v(44, -8), v(-36, 30), v(-48, 40), v(24, 26),
-  ];
-  W.poses = {
-    spawn: [-4, 0, 46, 0.05, 0.0],
-    hero: [15.4, 0, 39, 0.12, 0.0],
-    containers: [21.5, 0, -2, -1.2, 0.05],
-    crane: [22, 0, 44, -0.35, 0.42],
-    warehouse: [-46, 0, -25, -0.9, 0.08],
-    overview: [-14, 22, 66, 0.28, -0.42],
-    puddles: [-3, 0, 14, 0.55, -0.22],
-    dock: [-4, 0, -34, 1.2, 0.04],
-    tanks: [-30, 0, 36, 1.9, 0.1],
-    gate: [8, 0, 52, 2.6, 0.05],
-  };
+  ctx.progress(0.12, `map: ${map.meta.name}`);
+  map.build(world);
+  if (!W.poses.spawn && W.playerSpawns[0]) { const s = W.playerSpawns[0]; W.poses.spawn = [s.x, s.y, s.z, 0, 0]; }
   return W;
 }
 
@@ -87,4 +55,4 @@ export function update(dt, ctx) {
   for (let i = 0; i < updaters.length; i++) updaters[i](dt, ctx);
 }
 
-export function reset(ctx) { /* nothing dynamic to reset: weather/lights are stateless */ }
+export function reset(ctx) { /* maps are static; dynamic state lives in other modules */ }

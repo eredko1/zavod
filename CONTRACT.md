@@ -85,3 +85,25 @@ Web Audio, procedural synthesis + optional CC0 samples under assets/audio (< 20 
 - `?qa=1` auto-starts in 'playing' with no pointer lock; `?pose=<name>` teleports the player to a world pose after boot; `?seed=N`; `?quality=`.
 - `window.__game`: `ready`, `stats()`, `pose(name)`, `teleport()`, `fire(n)`, `freezeAI(v)`, `killAll()`, `timeScale(s)`, `quality(q)`.
 - Screenshot: `node qa/shot.mjs "http://localhost:8790/?qa=1&pose=hero" qa/shots/x.png --console [--eval "js"] [--settle ms]`.
+
+---
+# Addendum 2 — Maps, loadouts, multi-level (2026-09-16)
+
+## Maps
+- Registry: `src/world/maps/index.js` → `MAPS = { zavod, railyard, terminal }`. Each map module exports `meta` `{ id, name, subtitle, time:'night'|'day', weather, description, grade:'night'|'day', ambience, thumb }` and `build(world)`. `src/world.js` (owned by main) picks `?map=<id>` (default zavod), calls `build`, exposes `ctx.world.mapId`, `.meta`, `.maps` (all metas, for the selector), `.grade`, `.ambience`.
+- A map is chosen by **reloading with `?map=<id>`** (the HUD map selector sets `location.search`, preserving other params like `primary=`/`secondary=`). No runtime map swapping.
+- Map builders get the `world` helper: `solid(mesh, surface, {collide, shadow, box})`, `box(min,max)`, `walkable(min,max)` (elevated floor for AI + collider), `cover(x,z,nx,nz,y=0)`, `R` (seeded rng), `W` (the ctx.world object to fill: bounds, playerSpawns, enemySpawns, coverPoints, poses, surfaceAt, groundHeight), `updaters` (per-frame fns), `scene`, `ctx`.
+- Multi-level rule: any surface the player/AI can stand on that is above y=0 MUST be a collider AABB whose top is the floor (stairs = stacked AABB steps ≤ 0.45 m rise; ramps = many thin steps) AND, if the AI should path over it, also registered via `world.walkable(min,max)`. Railings/edges need colliders so nobody walks off unintentionally unless it's a deliberate drop (drops ≤ 4 m are fine). Every map: ≥ 3 player spawns, ≥ 12 enemy spawns on walkable ground (any level), ≥ 40 cover points, poses incl. `spawn`, `hero`, `overview` + 4 more cinematic ones.
+- Day maps: sun DirectionalLight with 4096 shadow map tightly fitted to the play area (`ctx.lights.key`), sky via HDRI PMREM (Poly Haven 2k, e.g. `kloppenheim_06_puresky`, `belfast_sunset_puresky`, `overcast_soil_puresky`) as `scene.background` + `scene.environment`, exposure ≈ 1.0, fog light and distant. Interior maps: sun through windows (SpotLights/RectArea-like emissive panels + baked-looking light shafts), warm interior bulbs, `scene.environment` from a neutral interior PMREM.
+- Post reads `ctx.world.grade` ('night' → current teal/orange; 'day' → neutral filmic, slightly warm, less vignette/grain); audio reads `ctx.world.ambience` ('rain-industrial' | 'railyard-day' | 'terminal-day').
+
+## Weapons arsenal & loadout
+- `ctx.weapons.arsenal`: `[{ id, name, class:'AR'|'SMG'|'Shotgun'|'Sniper'|'LMG'|'Pistol', slot:0|1, desc, stats:{ damage, rpm, range, mag, mobility } }]`.
+- `ctx.weapons.setLoadout({ primary:id, secondary:id })` swaps the two slots immediately (rebuilds/attaches viewmodels, full ammo). Defaults from `ctx.qs.get('primary') || 'm4a1'`, `ctx.qs.get('secondary') || 'm9'`; `ctx.settings.loadout = {primary, secondary}` mirrors the current choice.
+- Sniper: ADS shows a scope (rendered by weapons: scope-view render or a high-zoom fov + reticle mesh/overlay + lens vignette), fov to ~settings.fov*0.22, heavy sway reduced when holding Shift... keep simple: hold-breath not required. Shotgun: 8 pellets/shot, spread cone, damage falloff, pump animation. SMG: fast rpm, low damage, fast ADS. LMG optional.
+
+## HUD additions
+- Main menu gains **SELECT MAP** (cards: name, subtitle, time-of-day tag, description, thumbnail from `meta.thumb` with a CSS fallback gradient if the image 404s; selecting reloads with `?map=`) and **LOADOUT** (primary list + secondary list from `ctx.weapons.arsenal`, stat bars, calls `setLoadout`, and rewrites `?primary=&secondary=` into the URL via history.replaceState so a map reload keeps it). Current map name + loadout shown on the menu and the death/victory screens.
+
+## AI on multi-level maps
+- Nav must be height-aware: build the walkable grid from `ctx.world.bounds`, `ctx.colliders` and `ctx.world.walkables` (cell 0.5 m; a cell's floor = highest collider top ≤ 2.0 m above the base floor that has ≥ 1.8 m clearance above it; neighbors connect if |Δfloor| ≤ 0.5 m). Soldiers stand on their cell floor; enemySpawns/coverPoints may have y>0. LOS rays as before. Use the new maps for testing (`?map=railyard`, `?map=terminal`).
