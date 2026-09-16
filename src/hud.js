@@ -33,7 +33,7 @@ export async function init(ctx) {
     wpn: $('.wpn'), wName: $('.wpn .nm'), wMode: $('.wpn .mode'), wMag: $('.wpn .mag'), wRes: $('.wpn .res'), wGr: $('.wpn .gr b'), wSlots: $$('.wpn .slot i'),
     prompt: $('.prompt'), lock: $('.lock'), toastEl: $('.toast'), pops: $('.pops'), wave: $('.wave'), waveT: $('.wave .t'), waveS: $('.wave .s'),
     board: $('.board'), bKills: $('.board .bk'), bWave: $('.board .bw'), bScore: $('.board .bs'), bAcc: $('.board .ba'), bTime: $('.board .bt'),
-    panels: { settings: $('.panel.settings'), controls: $('.panel.controls') },
+    panels: { settings: $('.panel.settings'), controls: $('.panel.controls'), maps: $('.panel.maps') },
     // caches (write DOM only on change)
     c: { bearing: null, wave: null, score: null, host: null, hp: null, low: null, hpOn: null, name: null, mode: null, mag: null, res: null, gr: null, slot: null, lowAmmo: null, empty: null, prompt: null, ads: null, gap: null, vig: null, hb: null, lock: null, board: null },
     heading: 0, headingDrawn: NaN, pingsDrawn: -1,
@@ -57,6 +57,7 @@ export async function init(ctx) {
   bindMenus(H);
   buildSettings(H);
   buildControls(H);
+  buildMaps(H);
 
   // ---- state ----
   ctx.bus.on('state', ({ state, prev }) => onState(H, state, prev));
@@ -380,6 +381,7 @@ function bindMenus(H) {
     switch (a) {
       case 'deploy': ctx.setState('playing'); break;
       case 'resume': ctx.setState('playing'); break;
+      case 'maps': openPanel(H, H.panel === 'maps' ? null : 'maps'); break;
       case 'settings': openPanel(H, H.panel === 'settings' ? null : 'settings'); break;
       case 'controls': openPanel(H, H.panel === 'controls' ? null : 'controls'); break;
       case 'menu': ctx.setState('menu'); break;
@@ -458,6 +460,28 @@ function buildSettings(H) {
   });
 }
 
+function buildMaps(H) {
+  const ctx = H.ctx, body = H.panels.maps.querySelector('.body');
+  const maps = ctx.world?.maps || [{ id: 'zavod', name: 'ZAVOD', subtitle: 'Night ops · Container yard', time: 'night', weather: 'rain', description: '' }];
+  const cur = ctx.world?.mapId || 'zavod';
+  const grid = document.createElement('div'); grid.className = 'mapcards';
+  maps.forEach((m, i) => {
+    const el = document.createElement('button'); el.className = 'mapcard' + (m.id === cur ? ' cur' : '') + ` t-${m.time}`; el.style.setProperty('--i', i);
+    el.innerHTML = `<div class="thumb"><img alt="" src="./${m.thumb || ''}"><span class="pill">${(m.time || '').toUpperCase()} · ${(m.weather || 'clear').toUpperCase()}</span>${m.id === cur ? '<span class="cur">Selected</span>' : ''}</div><div class="nm">${m.name}</div><div class="sb">${m.subtitle || ''}</div><div class="ds">${m.description || ''}</div>`;
+    const img = el.querySelector('img'); img.onerror = () => { img.remove(); };
+    el.addEventListener('click', () => {
+      ctx.bus.emit('ui', { type: 'click', action: 'map:' + m.id }); if (m.id === cur) { openPanel(H, null); return; }
+      const q = new URLSearchParams(location.search); q.set('map', m.id); q.delete('qa'); q.delete('pose'); q.delete('seed');
+      el.classList.add('go'); setTimeout(() => location.assign(location.pathname + '?' + q.toString()), 180);
+    });
+    grid.appendChild(el);
+  });
+  body.appendChild(grid);
+  const curMeta = maps.find(m => m.id === cur); H.panels.maps.querySelector('.curmap').textContent = curMeta ? `Current: ${curMeta.name}` : '';
+  // title block reflects the loaded map
+  if (curMeta) { const t = H.root.querySelector('.mainmenu .title'), st = H.root.querySelector('.mainmenu .subtitle'); if (t) t.textContent = curMeta.name; if (st) st.textContent = curMeta.subtitle || ''; }
+}
+
 function buildControls(H) {
   const body = H.panels.controls.querySelector('.body');
   const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim down sights', 'RMB / E'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
@@ -517,7 +541,7 @@ function buildDOM() {
       <div class="eyebrow in" style="--i:0">Special operations</div>
       <h1 class="title in" style="--i:1">Zavod</h1>
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
-      <nav class="menu">${mi('deploy', 0, 'Deploy', 'primary')}${mi('settings', 1, 'Settings')}${mi('controls', 2, 'Controls')}</nav>
+      <nav class="menu">${mi('deploy', 0, 'Deploy', 'primary')}${mi('maps', 1, 'Select map')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}</nav>
     </div>
     <div class="tag-tr in" style="--i:2"><i></i>Operator <b>Online</b><br>Sector <b>Zavod-7</b></div>
     <div class="tag-bl in up" style="--i:6">Build <b>${VERSION}</b> · three r186 · webgl2<br>Zavod is a non-commercial tech demo</div>
@@ -558,6 +582,7 @@ function buildDOM() {
     </div>
   </div>
 
+  ${panel('maps', 'Select map', 'Selecting reloads the mission', '<span class="curmap"></span>')}
   ${panel('settings', 'Settings', 'Applied live', '<button class="reset">Restore defaults</button>')}
   ${panel('controls', 'Controls', 'Keyboard &amp; mouse', '<span>Rebinding not available</span>')}
   `;
