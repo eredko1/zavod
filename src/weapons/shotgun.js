@@ -7,17 +7,17 @@ import { orient } from './rifle.js';
 export const SHOTGUN_SPEC = {
   id: 'r870', name: 'R870', class: 'Shotgun', slot: 0, mode: 'PUMP',
   desc: '12 ga pump-action. Devastating inside 12 m, useless past 30. Tube-fed, shell by shell.',
-  mag: 6, reserve: 36, rpm: 75, auto: false, damage: 12, headMul: 1.6, range: 30, pellets: 8, pelletSpread: 4.0, falloff: [12, 30, 0],
+  mag: 6, reserve: 36, rpm: 75, auto: false, damage: 13, headMul: 1.6, range: 30, pellets: 8, pelletSpread: 2.6, falloff: [12, 30, 0],
   action: 'pump', actionTime: 0.8, actionDelay: 0.12,
   reloadStyle: 'shell', shellTime: 0.52, reloadStart: 0.35, reloadEnd: 0.32,
   hipSpread: 1.2, adsSpread: 0.4, spreadPerShot: 0.2, spreadMax: 3, moveSpread: 1.0,
   recoilPitch: 2.4, recoilYaw: 0.7, kickBack: 0.11, kickUp: 0.22, kickRoll: 0.08,
   reloadTime: 3.5, reloadTimeTac: 3.5, swapTime: 0.5, adsTime: 0.26, adsDist: 0.26, adsFovMul: 0.8,
-  flashSize: 0.26, flashStrength: 1.8, brassScale: 1.7,
+  flashSize: 0.21, flashStrength: 1.8, brassScale: 1.7,
   hip: { pos: [0.085, -0.105, -0.25], rot: [0.0, 0.05, 0.01] },
   sprint: { pos: [0.16, -0.17, -0.30], rot: [-0.25, 0.75, 0.35] },
   lower: { pos: [0.12, -0.36, -0.28], rot: [-0.9, 0.35, 0.2] },
-  stats: { damage: 96, rpm: 75, range: 30, mag: 6, mobility: 72, accuracy: 30 },
+  stats: { damage: 100, rpm: 75, range: 30, mag: 6, mobility: 72, accuracy: 30 },
 };
 
 /** A 12 ga shell: red hull + brass head, axis along -Z (crimp forward). */
