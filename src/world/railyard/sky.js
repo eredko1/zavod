@@ -17,12 +17,14 @@ export function buildSky(world) {
 
   // world sun direction = R_y(SKY_ROT_Y) · HDRI_SUN
   const sunDir = HDRI_SUN.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), SKY_ROT_Y);
+  // pull the key light down to ~38° elevation (longer, more shaping shadows than the HDRI's 48° disc; the disc sits in cloud so the mismatch is invisible)
+  { const az = Math.atan2(sunDir.z, sunDir.x), el = 38 * Math.PI / 180; sunDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); }
   scene.backgroundRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.environmentRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
 
   // placeholder until the HDRI arrives (build() is sync)
   scene.background = FOG_COLOR.clone();
-  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0022);
+  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0032);
 
   const hemi = new THREE.HemisphereLight(0xa9c0dc, 0x6b655c, 0.5);
   scene.add(hemi); ctx.lights.hemi = hemi;
@@ -33,7 +35,7 @@ export function buildSky(world) {
   const sm = sun.shadow;
   sm.mapSize.set(4096, 4096);
   sm.camera.left = -80; sm.camera.right = 80; sm.camera.top = 80; sm.camera.bottom = -80;
-  sm.camera.near = 40; sm.camera.far = 300;
+  sm.camera.near = 30; sm.camera.far = 320;
   sm.bias = -0.00025; sm.normalBias = 0.035; sm.radius = 1.5;
   sm.camera.updateProjectionMatrix();
   scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;

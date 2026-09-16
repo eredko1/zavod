@@ -74,11 +74,20 @@ export function boxcar(B, world, x, zc, { mat = 'wagonRed', L = 15, doors = { we
       B.box(mat, [ox0, y0 + 0.05, zc - doorHalf], [ox1, y1 - 0.1, zc + doorHalf], { collide: true, uvScale: 0.42 });
       B.box('steelDark', [sx > 0 ? x + W + 0.02 : x - W - 0.12, y1 - 0.12, zc - doorHalf - 1.6], [sx > 0 ? x + W + 0.12 : x - W - 0.02, y1 - 0.05, zc + doorHalf + 1.6], { collide: false });
     }
-    // side ribs (corrugation posts)
-    for (let k = -3; k <= 3; k++) {
-      const rz = zc + k * (L / 7); if (Math.abs(rz - zc) < doorHalf + 0.3) continue;
-      B.box('steelDark', [sx > 0 ? x + W : x - W - 0.05, y0, rz - 0.05], [sx > 0 ? x + W + 0.05 : x - W, y1 - 0.15, rz + 0.05], { collide: false });
+    // side ribs (pressed-steel posts), waist rail, corner posts, door hardware
+    const ox = sx > 0 ? x + W : x - W - 0.09, ox1 = sx > 0 ? x + W + 0.09 : x - W;
+    for (let k = -6; k <= 6; k++) {
+      const rz = zc + k * (L / 13); if (Math.abs(rz - zc) < doorHalf + 0.35) continue;
+      B.box('steel', [ox, y0 + 0.05, rz - 0.06], [ox1, y1 - 0.12, rz + 0.06], { collide: false, uvScale: 1 });
     }
+    for (const rz of [zc - L / 2 + 0.06, zc + L / 2 - 0.06]) B.box('steel', [ox, y0, rz - 0.07], [ox1, y1, rz + 0.07], { collide: false, uvScale: 1 });
+    B.box('steel', [ox, y0 + 0.22, zc - L / 2], [ox1 - (sx > 0 ? 0.03 : 0), y0 + 0.34, zc + L / 2], { collide: false, uvScale: 1 });   // sill
+    B.box('steel', [ox, y1 - 0.3, zc - L / 2], [ox1 - (sx > 0 ? 0.03 : 0), y1 - 0.2, zc + L / 2], { collide: false, uvScale: 1 });    // eave rail
+    // door: handle, hasp, lower guide, hinge/latch plates
+    const dz = open ? zc + doorHalf + 0.1 : zc - doorHalf; const dx0 = sx > 0 ? x + W + 0.1 : x - W - 0.14, dx1 = sx > 0 ? x + W + 0.14 : x - W - 0.1;
+    B.box('steelDark', [dx0, y0 + 1.1, dz + 0.15], [dx1, y0 + 1.16, dz + 0.55], { collide: false }); B.box('steelDark', [dx0, y0 + 0.9, dz + 0.3], [dx1, y0 + 1.3, dz + 0.36], { collide: false });
+    B.box('steelDark', [dx0, y0 + 0.1, dz], [dx1, y0 + 0.2, dz + 2.7], { collide: false });
+    B.box('rustSheet', [dx0 - 0.01, y0 + 2.0, dz + 0.1], [dx1 + 0.01, y0 + 2.45, dz + 0.4], { collide: false, uvScale: 2 });
   }
   // end walls + roof (slightly peaked with a centre ridge cap)
   B.box(mat, [x - W, y0, zc - L / 2], [x + W, y1, zc - L / 2 + t], { uvScale: 0.42 });

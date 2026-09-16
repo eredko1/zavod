@@ -13,8 +13,8 @@ export function buildSky(world) {
   const hdr = ctx.assets?.hdr;
   if (hdr) {
     const env = pmrem.fromEquirectangular(hdr).texture;
-    scene.environment = env; scene.environmentIntensity = 0.55;
-    hdr.dispose();
+    scene.environment = env; scene.environmentIntensity = 0.35;
+    // keep hdr alive: the sky dome samples it for the city skyline
   } else {
     const env = pmrem.fromScene(makeGradientEnvScene(), 0.04).texture;
     scene.environment = env; scene.environmentIntensity = 0.6;
@@ -27,10 +27,11 @@ export function buildSky(world) {
   // ---- sky dome: overcast night with sodium light-pollution glow at horizon ---
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { uTime: { value: 0 }, uFog: { value: FOG_COLOR.clone() } },
+    uniforms: { uTime: { value: 0 }, uFog: { value: FOG_COLOR.clone() }, uSky: { value: hdr || null }, uSkyOn: { value: hdr ? 1 : 0 }, uSkyExp: { value: 0.22 }, uSkyRot: { value: 0.8 } },
     vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }`,
     fragmentShader: `
-      varying vec3 vDir; uniform float uTime; uniform vec3 uFog;
+      varying vec3 vDir; uniform float uTime; uniform vec3 uFog; uniform sampler2D uSky; uniform float uSkyOn; uniform float uSkyExp; uniform float uSkyRot;
+      #define PI 3.14159265
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
       float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
@@ -50,6 +51,16 @@ export function buildSky(world) {
         float clouds = smoothstep(0.35, 0.8, c);
         vec3 cloudCol = mix(vec3(0.03,0.035,0.05), vec3(0.16,0.11,0.07)*city, hz*0.8 + 0.15);
         col = mix(col, cloudCol, clouds * smoothstep(0.02, 0.25, h) * 0.85);
+        // city skyline from the HDRI, only along the horizon band, dimmed + tinted by the rain haze so it sits behind the fogged geometry
+        if (uSkyOn > 0.5) {
+          vec3 d = normalize(vDir); float ca = cos(uSkyRot), sa = sin(uSkyRot); d = vec3(d.x*ca - d.z*sa, d.y, d.x*sa + d.z*ca);
+          vec2 uv = vec2(atan(d.z, d.x) / (2.0*PI) + 0.5, acos(clamp(d.y, -1.0, 1.0)) / PI);
+          vec3 cityCol = texture2D(uSky, uv).rgb * uSkyExp;
+          float lum = dot(cityCol, vec3(0.3, 0.6, 0.1));
+          cityCol = mix(vec3(lum), cityCol, 0.8);
+          float band = smoothstep(-0.02, 0.01, vDir.y) * (1.0 - smoothstep(0.05, 0.16, vDir.y)); // horizon band only
+          col = mix(col, col + cityCol, band);
+        }
         col = mix(uFog, col, smoothstep(-0.05, 0.12, vDir.y));
         gl_FragColor = vec4(col, 1.0);
       }`,

@@ -53,7 +53,7 @@ export function build(world) {
   W.poses = {
     spawn: [-7.5, 0, 58, 0.06, 0.0],
     hero: [-10.5, 0, 34, 0.02, 0.01],                 // down the open lane: boxcars left, flatcars right, gantry + overpass ahead
-    overview: [-96, 44, 92, 0.78, -0.42],
+    overview: [-88, 42, 86, -0.78, -0.42],
     tracks: [-13.2, 0, -10, -0.55, 0.02],             // between the tank cars and the lane, looking NE across the yard
     overpass: [8, OVERPASS.top, -44.5, -2.35, -0.18], // on the deck, looking back SE over the yard and platform
     office_roof: [-37, OFFICE.roof, 12.5, -1.15, -0.12],

@@ -61,9 +61,9 @@ export function buildStructures(world, M) {
 // ---- loading platform + canopy ----------------------------------------------------------------------
 function buildPlatform(B, world, M) {
   const P = PLATFORM;
-  B.box('concrete', [P.x0, 0, P.z0], [P.x1, P.h, P.z1], { walkable: true, uvScale: 0.4 });
+  B.box('concreteCracked', [P.x0, 0, P.z0], [P.x1, P.h, P.z1], { walkable: true, uvScale: 0.4 });
   // coping + safety line along the yard edge
-  B.box('paintedConcrete', [P.x0 - 0.02, P.h - 0.3, P.z0], [P.x0 + 0.45, P.h + 0.015, P.z1], { collide: false, uvScale: 0.5 });
+  B.box('concreteWall', [P.x0 - 0.02, P.h - 0.3, P.z0], [P.x0 + 0.45, P.h + 0.015, P.z1], { collide: false, uvScale: 0.5 });
   B.box('yellow', [P.x0 + 0.6, P.h, P.z0], [P.x0 + 0.72, P.h + 0.012, P.z1], { collide: false, uv: false });
   // end stairs (north / south) and the mid stair down to the yard
   B.stairs('concrete', { x: 19.6, z: P.z1 + 3.3, y0: 0, rise: P.h, run: 3.3, width: 3.2, axis: 'z', dir: -1, n: 4, uvScale: 0.5 });
@@ -93,7 +93,7 @@ function buildPlatform(B, world, M) {
 // ---- goods shed behind the platform ---------------------------------------------------------------------
 function buildShed(B, world, M) {
   const S = SHED; const t = 0.4, top = S.roof;
-  B.box('concrete', [S.x0, 0, S.z0], [S.x1, S.floor, S.z1], { walkable: true, uvScale: 0.4 });
+  B.box('concreteCracked', [S.x0, 0, S.z0], [S.x1, S.floor, S.z1], { walkable: true, uvScale: 0.4 });
   // west (platform) wall with three shutter openings: z = -20 (closed), 0 (open), 20 (closed)
   const segs = [[S.z0, -22.2], [-17.8, -2.2], [2.2, 17.8], [22.2, S.z1]];
   for (const [a, b] of segs) B.box('brick', [S.x0, S.floor, a], [S.x0 + t, top, b], { uvScale: 0.42 });
@@ -124,11 +124,11 @@ function buildShed(B, world, M) {
   for (let z = -30; z <= 30; z += 6) window_(B, 'x', S.x1 - 0.1, z - 1.2, z + 1.2, 4.8, 5.9, { mullions: 2, frame: 'steelDark' });
   for (const z of [-8, 0, 8]) { B.box('steel', [S.x0 + t, top - 0.5, z - 0.1], [S.x1 - t, top - 0.2, z + 0.1], { collide: false }); }
   // interior: pallet racks (steel uprights + plank shelves) along the back wall of the open bay, a workbench
-  for (const z of [-9, -5, -1, 3, 7]) {
+  for (const z of [-9, -5.5, -2, 1.5, 4.5]) {
     for (const x of [S.x1 - t - 1.2, S.x1 - t - 0.1]) B.box('steelDark', [x, S.floor, z - 0.05], [x + 0.1, S.floor + 3.6, z + 0.05], { collide: false });
   }
-  for (const y of [S.floor + 0.05, S.floor + 1.3, S.floor + 2.5]) B.box('plank', [S.x1 - t - 1.2, y, -9], [S.x1 - t, y + 0.08, 7], { collide: false, uvScale: 1 });
-  world.box([S.x1 - t - 1.2, S.floor, -9], [S.x1 - t, S.floor + 3.6, 7]);
+  for (const y of [S.floor + 0.05, S.floor + 1.3, S.floor + 2.5]) B.box('plank', [S.x1 - t - 1.2, y, -9], [S.x1 - t, y + 0.08, 4.5], { collide: false, uvScale: 1 });
+  world.box([S.x1 - t - 1.2, S.floor, -9], [S.x1 - t, S.floor + 3.6, 4.5]);
   B.box('plank', [S.x0 + t + 0.4, S.floor + 0.85, -10.5], [S.x0 + t + 2.4, S.floor + 0.92, -8.0], { uvScale: 1 }); B.box('steelDark', [S.x0 + t + 0.5, S.floor, -10.4], [S.x0 + t + 2.3, S.floor + 0.85, -8.1], { collide: false });
   world.cover(S.x1 - t - 2.2, -6, 1, 0, S.floor); world.cover(S.x1 - t - 2.2, 2, 1, 0, S.floor); world.cover(S.x0 + t + 3.2, -9.2, -1, 0, S.floor);
   world.cover(S.x1 + 2.6, 7, 1, 0, 0); world.cover(S.x0 - 1.4, -4, 1, 0, PLATFORM.h); world.cover(S.x0 - 1.4, 4, 1, 0, PLATFORM.h);
@@ -178,13 +178,13 @@ function buildOffice(B, world, M) {
   B.box('shutter', [O.x0 + t, f1, O.z0 + t + 3.0], [O.x0 + t + 0.5, f1 + 2.0, O.z0 + t + 6.0], { uvScale: 0.6 });
   world.cover(O.x1 - t - 1.7, 9, 1, 0, f1); world.cover(O.x1 - t - 1.7, 13, 1, 0, f1); world.cover(O.x0 + t + 1.2, 10.5, -1, 0, f1);
   // roof slab + parapet (gap on the south edge where the stair lands, x -43.8..-42.2), plant box, antenna mast
-  B.box('concrete', [O.x0 - 0.2, roof - 0.25, O.z0 - 0.2], [O.x1 + 0.2, roof, O.z1 + 0.2], { walkable: true, uvScale: 0.5 });
+  B.box('concreteCracked', [O.x0 - 0.2, roof - 0.25, O.z0 - 0.2], [O.x1 + 0.2, roof, O.z1 + 0.2], { walkable: true, uvScale: 0.5 });
   const pp = 0.3, ph = O.parapet;
   B.box('brick', [O.x0 - 0.2, roof, O.z0 - 0.2], [O.x1 + 0.2, ph, O.z0 - 0.2 + pp], { uvScale: 0.42 });      // north
   B.box('brick', [O.x0 - 0.2, roof, O.z0 - 0.2], [O.x0 - 0.2 + pp, ph, O.z1 + 0.2], { uvScale: 0.42 });      // west
   B.box('brick', [O.x1 + 0.2 - pp, roof, O.z0 - 0.2], [O.x1 + 0.2, ph, O.z1 + 0.2], { uvScale: 0.42 });      // east
   B.box('brick', [-42.2, roof, O.z1 + 0.2 - pp], [O.x1 + 0.2, ph, O.z1 + 0.2], { uvScale: 0.42 });           // south (with stair gap at the west end)
-  B.box('paintedConcrete', [O.x0 - 0.22, ph, O.z0 - 0.22], [O.x1 + 0.22, ph + 0.06, O.z1 + 0.22], { collide: false, uvScale: 0.5 }); // coping (thin, sits on the parapet)
+  for (const [a, b] of [[[O.x0 - 0.22, ph, O.z0 - 0.22], [O.x1 + 0.22, ph + 0.06, O.z0 - 0.2 + pp + 0.02]], [[O.x0 - 0.22, ph, O.z0 - 0.22], [O.x0 - 0.2 + pp + 0.02, ph + 0.06, O.z1 + 0.22]], [[O.x1 + 0.2 - pp - 0.02, ph, O.z0 - 0.22], [O.x1 + 0.22, ph + 0.06, O.z1 + 0.22]], [[-42.22, ph, O.z1 + 0.2 - pp - 0.02], [O.x1 + 0.22, ph + 0.06, O.z1 + 0.22]]]) B.box('concreteCracked', a, b, { collide: false, uvScale: 0.5 }); // coping strips
   B.box('corrugated', [O.x0 + 1.0, roof, 7.0], [O.x0 + 3.4, roof + 1.5, 9.4], { uvScale: 0.6 });             // plant room / stair head
   B.cyl('steelDark', O.x0 + 6, O.z0 + 2, roof, roof + 6.5, 0.06, 6); B.box('steelDark', [O.x0 + 5.4, roof + 5.2, O.z0 + 1.95], [O.x0 + 6.6, roof + 5.3, O.z0 + 2.05], { collide: false });
   world.cover(O.x1 - 0.9, 8, 1, 0, roof); world.cover(O.x1 - 0.9, 14, 1, 0, roof); world.cover(-38, O.z0 + 0.9, 0, -1, roof); world.cover(O.x0 + 4.2, 8.2, 1, 0, roof);
@@ -208,7 +208,7 @@ function buildOffice(B, world, M) {
 function buildOverpass(B, world, M) {
   const V = OVERPASS; const top = V.top, under = top - V.slab;
   // deck slab (walkable), asphalt wearing course, kerbs, parapets (gaps over the ramp footprints on the south side)
-  B.box('concrete', [V.x0, under, V.z0], [V.x1, top, V.z1], { walkable: true, uvScale: 0.4 });
+  B.box('concreteCracked', [V.x0, under, V.z0], [V.x1, top, V.z1], { walkable: true, uvScale: 0.4 });
   B.box('asphalt', [V.x0, top, V.z0 + 0.7], [V.x1, top + 0.04, V.z1 - 0.7], { collide: false, uvScale: 0.3 });
   B.box('concrete', [V.x0, top, V.z0 + 0.3], [V.x1, top + 0.15, V.z0 + 0.7], { collide: false, uvScale: 0.5 });
   B.box('concrete', [V.x0, top, V.z1 - 0.7], [V.x1, top + 0.15, V.z1 - 0.3], { collide: false, uvScale: 0.5 });

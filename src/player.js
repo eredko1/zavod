@@ -8,6 +8,10 @@ import { ColliderGrid, capsuleOverlaps, resolveCapsule, supportBelow } from './p
 const RADIUS = 0.35, H_STAND = 1.7, H_CROUCH = 1.15, EYE_DROP = 0.12;
 const STEP = 0.45, MANTLE_MIN = 0.45, MANTLE_MAX = 1.3, MANTLE_TIME = 0.4;
 const GRAVITY = 20, JUMP_V = 6.5, COYOTE = 0.12, JUMP_BUFFER = 0.12;
+// chained jumps: jump again within CHAIN_WINDOW of landing to build a chain; the 3rd jump is a super jump
+const CHAIN_WINDOW = 0.35, CHAIN_FOR_SUPER = 3, SUPER_MUL = 1.75, SUPER_HMUL = 1.35, SUPER_COOLDOWN = 2.5;
+// ladders: registered by maps via world.ladder(); climb speed m/s
+const LADDER_SPEED = 2.8, LADDER_GRAB = 0.75;
 const SPD = { walk: 4.4, sprint: 6.6, crouch: 2.2, ads: 2.6 };
 const STRAFE_MUL = 0.9, BACK_MUL = 0.8, AIR_CONTROL = 0.3;
 const ACCEL_L = 30, STOP_L = 20;                 // damp lambdas: ~0.1 s to speed, ~0.15 s to stop
@@ -33,6 +37,7 @@ const S = {
   mantle: null, // { t, from:Vector3, to:Vector3 }
   sprintOut: 0, bobPhase: 0, bobBlend: 0, stepSide: 1, lastStepPhase: 0,
   landY: 0, landV: 0, landImpulseRaw: 0, roll: 0,
+  lastLandT: -9, chain: 0, superReadyT: 0, superT: -9, ladder: null, ladderT: 0, lastStepT: -9,
   lastDamage: -99, deathT: 0, deathRoll: 1, hover: false,
   qa: null, qaTrace: [],
   noFallDamageUntil: 0, physMs: 0,
@@ -44,7 +49,7 @@ export async function init(ctx) {
   const p = {
     position: new THREE.Vector3(0, 0, 20), velocity: new THREE.Vector3(), yaw: 0, pitch: 0,
     height: H_STAND, radius: RADIUS, health: 100, maxHealth: 100,
-    onGround: true, crouching: false, sprinting: false, sliding: false, mantling: false, ads: false, dead: false,
+    onGround: true, crouching: false, sprinting: false, sliding: false, mantling: false, ads: false, dead: false, climbing: false, jumpChain: 0, superJump: false, superBlend: 0,
     speed: 0, moveState: 'idle',
     bob: { x: 0, y: 0, roll: 0 }, landImpulse: 0, sprintBlend: 0, slideBlend: 0, crouchBlend: 0,
     sprintOutTime: 0, sprintOutDuration: SPRINT_OUT, canFire: true, mantleEnabled: true,
@@ -102,7 +107,7 @@ function groundY(x, z) { const w = ctxRef.world; const g = w?.groundHeight ? w.g
 function die() {
   const p = ctxRef.player; if (p.dead) return;
   p.dead = true; p.health = 0; S.deathT = 0; S.deathRoll = (ctxRef.rng ? ctxRef.rng() : Math.random()) < 0.5 ? -1 : 1;
-  S.sliding = false; S.mantle = null; p.sprinting = false; p.ads = false; p.canFire = false;
+  S.sliding = false; S.mantle = null; S.ladder = null; p.climbing = false; S.chain = 0; p.sprinting = false; p.ads = false; p.canFire = false;
   p.velocity.set(0, 0, 0);
   ctxRef.bus.emit('playerDied', { position: p.position.clone() });
   ctxRef.setState('dead');
@@ -169,6 +174,33 @@ export function update(dt, ctx) {
   // ---- mantle in progress: scripted motion ----
   if (S.mantle) { updateMantle(p, ctx, dt); finishFrame(p, ctx, dt, ix, iy, il); return; }
 
+  // ---- ladders (world.ladder registrations): grab when moving into one, climb with forward/back, jump to let go ----
+  {
+    const ladders = ctx.world?.ladders || [];
+    if (S.ladder) {
+      const L = S.ladder; const climb = iy; // forward = up, back = down
+      p.velocity.set(0, climb * LADDER_SPEED, 0); p.position.y += p.velocity.y * dt;
+      // hold the body on the ladder face
+      p.position.x = damp(p.position.x, L.x + L.nx * LADDER_GRAB * 0.7, 18, dt); p.position.z = damp(p.position.z, L.z + L.nz * LADDER_GRAB * 0.7, 18, dt);
+      p.onGround = true; p.sprinting = false; p.crouching = false; p.height = damp(p.height, H_STAND, 16, dt); p.climbing = true; S.ladderT += dt;
+      if (jumpPress && S.ladderT > 0.15) { S.ladder = null; p.climbing = false; p.velocity.set(-L.nx * 2.5, 2.5, -L.nz * 2.5); p.onGround = false; S.wasGround = false; }
+      else if (p.position.y >= L.y1 - 0.05 && climb > 0) { // top: step onto the platform behind the ladder
+        S.ladder = null; p.climbing = false; p.position.set(L.x - L.nx * 0.75, L.y1 + 0.02, L.z - L.nz * 0.75); p.velocity.set(0, 0, 0); p.onGround = true; S.wasGround = true; S.groundTime = S.time; S.eyeSmooth = -0.08; emitFootstep(p, ctx, false);
+      } else if (p.position.y <= L.y0 + 0.02 && climb < 0) { S.ladder = null; p.climbing = false; p.position.y = L.y0; p.onGround = true; S.wasGround = true; S.groundTime = S.time; }
+      else if (Math.abs(climb) > 0.3 && S.time - S.lastStepT > 0.42) { S.lastStepT = S.time; emitFootstep(p, ctx, false); }
+      finishFrame(p, ctx, dt, ix, iy, il); return;
+    } else if (ladders.length && iy > 0.3 && !S.sliding && !S.hover) {
+      const fwd = forwardVec(p.yaw, _f);
+      for (const L of ladders) {
+        const dx = p.position.x - (L.x + L.nx * LADDER_GRAB * 0.7), dz = p.position.z - (L.z + L.nz * LADDER_GRAB * 0.7);
+        if (dx * dx + dz * dz > 0.55 * 0.55) continue;
+        if (p.position.y < L.y0 - 0.6 || p.position.y > L.y1 - 0.3) continue;
+        if (fwd.x * -L.nx + fwd.z * -L.nz < 0.35) continue; // must face the ladder
+        S.ladder = L; S.ladderT = 0; p.climbing = true; p.velocity.set(0, 0, 0); S.sliding = false; break;
+      }
+    }
+  }
+
   const gy = groundY(p.position.x, p.position.z);
   const wasGround = S.wasGround;
   const coyote = S.time - S.groundTime <= COYOTE;
@@ -234,7 +266,11 @@ export function update(dt, ctx) {
   // ---- jump / gravity ----
   let jumped = false;
   if (jumpWanted && (wasGround || coyote) && v.y <= 0.5 && !S.hover) {
-    v.y = JUMP_V; jumped = true; S.jumpBufferT = -9; S.jumpedAt = S.time; S.groundTime = -9;
+    const chained = S.time - S.lastLandT <= CHAIN_WINDOW; S.chain = chained ? S.chain + 1 : 1;
+    const superJump = S.chain >= CHAIN_FOR_SUPER && S.time >= S.superReadyT;
+    v.y = superJump ? JUMP_V * SUPER_MUL : JUMP_V; jumped = true; S.jumpBufferT = -9; S.jumpedAt = S.time; S.groundTime = -9;
+    if (superJump) { v.x *= SUPER_HMUL; v.z *= SUPER_HMUL; S.chain = 0; S.superReadyT = S.time + SUPER_COOLDOWN; S.noFallDamageUntil = S.time + 3; S.superT = S.time; ctx.bus.emit('superjump', { position: p.position.clone() }); }
+    p.jumpChain = S.chain; p.superJump = superJump;
     S.takeoffSpeed = Math.hypot(v.x, v.z);
     if (S.sliding) { S.sliding = false; p.sliding = false; }
   }
@@ -295,6 +331,7 @@ export function update(dt, ctx) {
 function forwardVec(yaw, out) { return out.set(-Math.sin(yaw), 0, -Math.cos(yaw)); }
 
 function onLand(p, ctx, fallSpeed) {
+  S.lastLandT = S.time; p.superJump = false;
   const dip = clamp(fallSpeed * 0.013, 0.02, 0.24);
   S.landV -= dip * 16;
   S.landImpulseRaw = Math.max(S.landImpulseRaw, clamp(fallSpeed / 12, 0.15, 1));
@@ -334,6 +371,8 @@ function updateDeath(p, ctx, dt) {
 /** bob, springs, footsteps, regen, blends, camera. Runs at the end of every live frame. */
 function finishFrame(p, ctx, dt, ix, iy, il) {
   const v = p.velocity;
+  if (p.onGround && S.time - S.lastLandT > CHAIN_WINDOW && S.chain) { S.chain = 0; p.jumpChain = 0; }
+  p.superBlend = clamp(1 - (S.time - S.superT) / 1.2, 0, 1);
   p.speed = Math.hypot(v.x, v.z);
   p.sprintOutTime = S.sprintOut;
   p.canFire = !p.sprinting && S.sprintOut <= 0 && !p.mantling && !p.dead;

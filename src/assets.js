@@ -34,7 +34,7 @@ export const MODELS = [
   'ladder_sectioned_01', 'metal_toolbox', 'overhead_crane', 'industrial_pastic_container',
 ];
 
-export const HDRI = 'hdri/moonless_golf_2k.hdr';
+export const HDRI = 'hdri/shanghai_bund_2k.hdr'; // night city skyline: used for reflections and blended into the sky dome horizon
 
 let api_fit = (t) => t;
 export async function init(ctx) {

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { groundMaskTexture, weedTexture } from './mats.js';
 import { TRACK_X, PLATFORM, SHED, OFFICE, OVERPASS, DEPOT, ROAD_E, ROAD_W, FENCE } from './layout.js';
 
-export const GROUND_SIZE = 220;
+export const GROUND_SIZE = 360;
 
 export function buildGround(world, M) {
   const { ctx, scene, R } = world;
@@ -22,8 +22,9 @@ export function buildGround(world, M) {
     // oil / grease: along track centres (drip lines), fuel depot, under wagons
     m.g.globalCompositeOperation = 'lighter';
     for (const tx of TRACK_X) {
-      m.g.strokeStyle = 'rgba(0,255,0,0.32)'; m.g.lineWidth = 0.9 * m.pxm; m.g.lineCap = 'round';
-      m.g.beginPath(); m.g.moveTo(m.toPx(tx), m.toPx(-66)); m.g.lineTo(m.toPx(tx), m.toPx(66)); m.g.stroke();
+      m.g.lineCap = 'round';
+      m.g.strokeStyle = 'rgba(0,255,0,0.45)'; m.g.lineWidth = 1.3 * m.pxm; m.g.beginPath(); m.g.moveTo(m.toPx(tx), m.toPx(-66)); m.g.lineTo(m.toPx(tx), m.toPx(66)); m.g.stroke();
+      m.g.strokeStyle = 'rgba(0,255,0,0.35)'; m.g.lineWidth = 0.5 * m.pxm; m.g.beginPath(); m.g.moveTo(m.toPx(tx), m.toPx(-66)); m.g.lineTo(m.toPx(tx), m.toPx(66)); m.g.stroke();
     }
     m.g.globalCompositeOperation = 'source-over';
     for (let i = 0; i < 90; i++) { const tx = TRACK_X[(R() * TRACK_X.length) | 0]; m.blob('g', tx + (R() - 0.5) * 1.6, (R() - 0.5) * 120, 1 + R() * 3, 2 + R() * 6, 0.35 + R() * 0.45, 5); }
@@ -50,7 +51,9 @@ export function buildGround(world, M) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         varying vec3 vWPos; uniform sampler2D uMask, uAsMap, uAsNor, uAsArm, uBalMap; uniform float uWorld;
-        vec4 gMask; float gAsph;`)
+        vec4 gMask; float gAsph;
+        float gh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float gnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gh(i), gh(i + vec2(1, 0)), f.x), mix(gh(i + vec2(0, 1)), gh(i + vec2(1, 1)), f.x), f.y); }`)
       .replace('#include <map_fragment>', `
         vec2 muv = vWPos.xz / uWorld + 0.5;
         gMask = texture2D(uMask, muv);
@@ -60,11 +63,17 @@ export function buildGround(world, M) {
         vec4 bal = texture2D(uBalMap, vMapUv * 1.7);
         // anti-tiling blend + pale dust patches + a hint of loose ballast stones everywhere
         vec4 dirt = mix(dirtA, dirtB, 0.5);
-        dirt.rgb = mix(dirt.rgb, bal.rgb * 1.05, 0.35);
+        dirt.rgb = mix(dirt.rgb, bal.rgb * 1.05, 0.5);
         dirt.rgb = mix(dirt.rgb, dirt.rgb * vec3(1.18, 1.14, 1.05), gMask.b * 0.8);
         vec4 asph = texture2D(uAsMap, vMapUv * 0.55);
         vec4 texelColor = mix(dirt, asph * vec4(1.15, 1.15, 1.15, 1.0), gAsph);
         texelColor.rgb *= 1.0 - gMask.g * 0.62;
+        // waste ground beyond the fence: patchy dry grass / scrub tint
+        { float outside = max(smoothstep(60.0, 68.0, abs(vWPos.x)), smoothstep(60.0, 68.0, abs(vWPos.z)));
+          float n1 = gnoise(vWPos.xz * 0.045) * 0.6 + gnoise(vWPos.xz * 0.19) * 0.4;
+          float grass = outside * smoothstep(0.32, 0.62, n1);
+          texelColor.rgb = mix(texelColor.rgb, texelColor.rgb * vec3(0.62, 0.66, 0.42) + vec3(0.02, 0.04, 0.0), grass * 0.85);
+          texelColor.rgb *= 1.0 - outside * 0.12; }
         diffuseColor *= texelColor;`)
       .replace('#include <normal_fragment_maps>', `
         vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;

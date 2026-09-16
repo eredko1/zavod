@@ -31,6 +31,7 @@ try {
   await page.waitForTimeout(settle);
   const stats = await page.evaluate(() => (window.__game && window.__game.stats) ? window.__game.stats() : null).catch(() => null);
   await page.screenshot({ path: out });
+  if (stats && stats.errors && stats.errors.length) console.log('BOOT ERRORS: ' + stats.errors.join(' | '));
   console.log(JSON.stringify({ ok: true, out: path.resolve(out), stats, errors: logs.filter(l => l.startsWith('[pageerror]') || l.startsWith('[error]')) }));
 } catch (e) {
   console.log(JSON.stringify({ ok: false, error: String(e.message || e), logs: logs.slice(-40) }));

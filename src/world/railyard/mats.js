@@ -54,8 +54,8 @@ export function makeMats(world) {
 
   const M = {};
   // ---- ground / ballast ---------------------------------------------------------
-  M.ballast = pbr('ballast', 'rail_gravel_stones', '2k', { color: 0xd6d2ca, normalScale: 0.9, envMapIntensity: 0.6 });
-  M.dirt = pbr('dirt', 'rail_gravel_road', '2k', { color: 0xe4d9c6, normalScale: 0.8, envMapIntensity: 0.5 });
+  M.ballast = pbr('ballast', 'rail_gravel_stones', '2k', { color: 0xbdb9b0, normalScale: 1.3, envMapIntensity: 0.5 });
+  M.dirt = pbr('dirt', 'rail_gravel_road', '2k', { color: 0xc6c0b6, normalScale: 1.1, envMapIntensity: 0.5 });
   M.asphalt = pbr('asphalt', 'worn_asphalt', '2k', { color: 0xb5b5b5, normalScale: 0.6, envMapIntensity: 0.6 });
   // ---- concrete -------------------------------------------------------------------
   M.concrete = pbr('concrete', 'concrete_floor_02', '1k', { color: 0xcfcbc3, normalScale: 0.6, envMapIntensity: 0.6, grime: { strength: 0.55, height: 1.4, wet: 0.0, tint: [0.45, 0.42, 0.36] } });
@@ -68,7 +68,7 @@ export function makeMats(world) {
   // ---- metals -----------------------------------------------------------------------
   M.steel = pbr('steel', 'rail_metal_plate_02', '1k', { color: 0x6d6a66, normalScale: 0.7, envMapIntensity: 0.9 });          // underframes, bogies, gantries
   M.steelDark = pbr('steelDark', 'rail_metal_plate_02', '1k', { color: 0x3b3a38, normalScale: 0.6, envMapIntensity: 0.8 });  // rails web, masts, fence posts
-  M.railHead = new THREE.MeshStandardMaterial({ color: 0xb8b4ac, roughness: 0.32, metalness: 1.0, envMapIntensity: 1.2, name: 'railHead' }); // polished running surface
+  M.railHead = new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.22, metalness: 1.0, envMapIntensity: 1.5, name: 'railHead' }); // polished running surface
   M.rustSheet = pbr('rustSheet', 'rusty_metal_sheet', '1k', { color: 0xcfc6ba, normalScale: 0.8, envMapIntensity: 0.7 });
   M.rustPlate = pbr('rustPlate', 'rail_rusty_painted_metal', '1k', { color: 0xd8d2ca, normalScale: 0.8, envMapIntensity: 0.7, grime: { strength: 0.5, height: 2.4, wet: 0.0, tint: [0.4, 0.3, 0.22] } });
   M.metalPlate = pbr('metalPlate', 'metal_plate', '1k', { color: 0x9d9a94, normalScale: 0.7, envMapIntensity: 0.8 });
@@ -81,8 +81,8 @@ export function makeMats(world) {
   M.wagonRust = pbr('wagonRust', 'rail_rusty_painted_metal', '1k', { color: 0xc9bfb3, normalScale: 0.9, envMapIntensity: 0.7, grime: { strength: 0.7, height: 2.6, wet: 0.0, tint: [0.36, 0.26, 0.18] } });
   M.wagonBlue = pbr('wagonBlue', 'rail_blue_metal_plate', '1k', { color: 0xbcc6d4, normalScale: 0.9, envMapIntensity: 0.7, grime: { strength: 0.65, height: 2.6, wet: 0.0, tint: [0.3, 0.3, 0.3] } });
   // tinted painted metal (grayscale corrugated base) for containers / boxcar colour variety
-  const tint = (hex, key) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.62, metalness: 0.35, envMapIntensity: 0.7, name: key }); addGrime(m, R, { key, strength: 0.7, height: 2.4, wet: 0.0, tint: [0.4, 0.33, 0.26] }); return m; };
-  M.contOrange = tint(0xb2521e, 'contOrange'); M.contBlue = tint(0x1f3f74, 'contBlue'); M.contGreen = tint(0x2f5a3a, 'contGreen'); M.contMaroon = tint(0x6e2a22, 'contMaroon'); M.contGrey = tint(0x8a8d8f, 'contGrey'); M.contYellow = tint(0xb8951f, 'contYellow');
+  const tint = (hex, key) => { const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.62, metalness: 0.35, envMapIntensity: 0.7, name: key }); addGrime(m, R, { key, strength: 0.95, height: 2.6, wet: 0.0, tint: [0.38, 0.3, 0.22] }); return m; };
+  M.contOrange = tint(0x9a5a30, 'contOrange'); M.contBlue = tint(0x2f4a66, 'contBlue'); M.contGreen = tint(0x46584a, 'contGreen'); M.contMaroon = tint(0x6a3d34, 'contMaroon'); M.contGrey = tint(0x7f8386, 'contGrey'); M.contYellow = tint(0x9d8a45, 'contYellow');
   const contMats = [M.contOrange, M.contBlue, M.contGreen, M.contMaroon, M.contGrey, M.contYellow];
   const contSet = set('container', 'container_side', '2k');
   for (const m of contMats) { m.normalMap = contSet.normalMap; m.normalScale.set(0.9, 0.9); m.roughnessMap = contSet.arm; m.metalnessMap = contSet.arm; m.aoMap = contSet.arm; m.roughness = 1; m.metalness = 1; }
@@ -99,6 +99,7 @@ export function makeMats(world) {
   M.white = new THREE.MeshStandardMaterial({ color: 0xe6e3dc, roughness: 0.75, metalness: 0.1, name: 'white' });
   M.lampRed = new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff2010, emissiveIntensity: 4, roughness: 0.3, name: 'lampRed' });
   M.lampGreen = new THREE.MeshStandardMaterial({ color: 0x002a00, emissive: 0x20ff50, emissiveIntensity: 3, roughness: 0.3, name: 'lampGreen' });
+  M.drumBlue = tint(0x2e4460, 'drumBlue'); M.drumRed = tint(0x7a3a2c, 'drumRed'); M.drumGrey = tint(0x6e6f6a, 'drumGrey'); M.cabinet = tint(0x6f7a6e, 'cabinet');
   M.tarp = new THREE.MeshStandardMaterial({ color: 0x3f5a8a, roughness: 0.9, metalness: 0.0, name: 'tarp' });
   M.rubber = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95, metalness: 0.0, name: 'rubber' });
 
@@ -107,7 +108,7 @@ export function makeMats(world) {
     ballast: 'ground', dirt: 'ground', asphalt: 'concrete', concrete: 'concrete', concreteWall: 'concrete', concreteCracked: 'concrete', paintedConcrete: 'concrete',
     brick: 'concrete', brickDark: 'concrete', steel: 'metal', steelDark: 'metal', railHead: 'metal', rustSheet: 'metal', rustPlate: 'metal', metalPlate: 'metal', grid: 'metal', corrugated: 'metal', shutter: 'metal',
     wagonRed: 'metal', wagonGreen: 'metal', wagonRust: 'metal', wagonBlue: 'metal', contOrange: 'metal', contBlue: 'metal', contGreen: 'metal', contMaroon: 'metal', contGrey: 'metal', contYellow: 'metal',
-    sleeper: 'wood', plank: 'wood', distant: 'concrete', distantDark: 'concrete', glass: 'metal', black: 'metal', yellow: 'metal', white: 'metal', lampRed: 'metal', lampGreen: 'metal', tarp: 'wood', rubber: 'metal',
+    sleeper: 'wood', plank: 'wood', drumBlue: 'metal', drumRed: 'metal', drumGrey: 'metal', cabinet: 'metal', distant: 'concrete', distantDark: 'concrete', glass: 'metal', black: 'metal', yellow: 'metal', white: 'metal', lampRed: 'metal', lampGreen: 'metal', tarp: 'wood', rubber: 'metal',
   };
   return M;
 }

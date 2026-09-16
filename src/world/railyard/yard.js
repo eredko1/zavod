@@ -11,6 +11,7 @@ export function buildYard(world, M) {
   buildGantries(B, world, M);
   buildCatenary(B, world, M);
   buildStacks(B, world, M);
+  buildClutter(B, world, M);
   buildFencePosts(B, world, M);
   B.flush();
   buildFenceMesh(world, M);
@@ -191,10 +192,79 @@ function buildStacks(B, world, M) {
   concreteSleepers(-8.2, 22); concreteSleepers(-8.2, 24.2); concreteSleepers(33, 40); concreteSleepers(-36, -10);
   wheelset(-12.5, -44, 0.2); wheelset(-12.5, -46.5, 0.1); wheelset(9.5, 46, 0.05); wheelset(-34, -14, 1.5);
   drum(-9.5, 56); drum(-11.8, 56.2, 0.75, 0.8); drum(37, 56); drum(-36.5, 22);
+  // container stacks: west fence strip (2-high), north yard, SE corner — big readable cover blocks
+  const cont = (x, z, len, mat, y = 0, ry = 0) => {
+    const g = new THREE.BoxGeometry(2.44, 2.59, len); g.rotateY(ry); g.translate(x, y + 2.59 / 2, z); B.add(mat, g, { uvScale: 0.41 });
+    const c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry)); const hx = (2.44 * c + len * sn) / 2, hz = (2.44 * sn + len * c) / 2;
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.box('steelDark', [x + dx * hx - (dx > 0 ? 0.2 : 0), y, z + dz * hz - (dz > 0 ? 0.2 : 0)], [x + dx * hx + (dx > 0 ? 0 : 0.2), y + 0.25, z + dz * hz + (dz > 0 ? 0 : 0.2)], { collide: false });
+    world.box([x - hx, y, z - hz], [x + hx, y + 2.59, z + hz]);
+    if (y === 0) { world.cover(x - hx - 0.9, z, -1, 0); world.cover(x + hx + 0.9, z, 1, 0); world.cover(x, z - hz - 0.9, 0, -1); world.cover(x, z + hz + 0.9, 0, 1); }
+  };
+  cont(-58, -52, 12.19, 'contMaroon'); cont(-58, -52, 12.19, 'contGrey', 2.59); cont(-58, -38, 12.19, 'contBlue'); cont(-58, -24, 6.06, 'contOrange'); cont(-58, -24, 6.06, 'contGreen', 2.59); cont(-58, -16, 6.06, 'contYellow');
+  cont(-54.6, -45, 6.06, 'contGreen', 0, 0.08);
+  cont(24, -56, 12.19, 'contBlue', 0, 1.571); cont(24, -56, 12.19, 'contMaroon', 2.59, 1.571); cont(40, -56, 6.06, 'contOrange', 0, 1.571); cont(-6, -62.5, 6.06, 'contGrey', 0, 1.571);
+  cont(30, 44, 6.06, 'contGreen', 0, 1.571); cont(30, 44, 6.06, 'contYellow', 2.59, 1.571); cont(26, 56, 12.19, 'contBlue', 0, 0.02); cont(56, 40, 12.19, 'contMaroon'); cont(56, 40, 12.19, 'contOrange', 2.59); cont(56, 56, 6.06, 'contGrey');
   // cable trough lids along the west lane + a short retaining kerb near the office
   for (let z = -60; z < 0; z += 1.0) B.box('paintedConcrete', [-29.75, 0, z], [-29.25, 0.16, z + 0.96], { collide: false, uvScale: 1 });
   B.box('concreteWall', [OFFICE.x1 + 0.4, 0, OFFICE.z0 - 3.2], [OFFICE.x1 + 6.0, 0.55, OFFICE.z0 - 2.9], { uvScale: 0.5 });
   world.cover(OFFICE.x1 + 3.2, OFFICE.z0 - 2.0, 0, 1); world.cover(OFFICE.x1 + 3.2, OFFICE.z0 - 4.1, 0, -1);
+}
+
+// ---- small clutter: procedural oil drums, pallets, relay cabinets, floodlight masts, yard lamps ------------------------
+function buildClutter(B, world, M) {
+  const { R } = world;
+  const drum = (x, z, mat, { lying = false, ry = 0 } = {}) => {
+    const r = 0.29, h = 0.88;
+    if (!lying) {
+      B.cyl(mat, x, z, 0, h, r, 14, { uvScale: 0.8 });
+      for (const y of [0.2, 0.62]) { const rg = new THREE.TorusGeometry(r + 0.01, 0.018, 5, 16); rg.rotateX(Math.PI / 2); rg.translate(x, y, z); B.add('steelDark', rg, { uv: false }); }
+      B.cyl('steelDark', x, z, h, h + 0.02, r - 0.03, 14);
+      world.box([x - r, 0, z - r], [x + r, h, z + r]);
+    } else {
+      const g = new THREE.CylinderGeometry(r, r, h, 14); g.rotateZ(Math.PI / 2); g.rotateY(ry); g.translate(x, r, z); B.add(mat, g, { uv: false });
+      world.box([x - 0.45, 0, z - 0.45], [x + 0.45, 2 * r, z + 0.45]);
+    }
+  };
+  const drumCluster = (x, z, n, spread = 0.75) => {
+    const mats = ['drumBlue', 'drumRed', 'drumGrey', 'rustPlate', 'wagonGreen'];
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2 + R(); const rr = i === 0 ? 0 : spread * (0.8 + R() * 0.4); drum(x + Math.cos(a) * rr, z + Math.sin(a) * rr, mats[(R() * mats.length) | 0], { lying: i === n - 1 && R() < 0.4, ry: R() * 3 }); }
+    world.cover(x - spread - 0.9, z, -1, 0); world.cover(x + spread + 0.9, z, 1, 0);
+  };
+  drumCluster(-8.2, 36, 4); drumCluster(3.4, -8, 3); drumCluster(-13.4, -36, 5, 0.9); drumCluster(-34.5, 6, 3); drumCluster(37, 56, 6, 1.0); drumCluster(-56, 40, 4); drumCluster(9.6, 50, 3); drumCluster(-30.5, -52, 4); drumCluster(41, 20, 3); drumCluster(22.5, -37.5, 3);
+  drum(-10.5, 22.5, 'drumRed', { lying: true, ry: 0.4 }); drum(9.6, -26, 'drumGrey'); drum(-31.2, 40, 'drumBlue'); drum(30.5, 37.8, 'rustPlate');
+  // pallets (stacked, some leaning)
+  const pallet = (x, z, n = 1, ry = 0) => {
+    for (let k = 0; k < n; k++) {
+      const y = k * 0.145;
+      for (const dz of [-0.55, 0, 0.55]) { const g = new THREE.BoxGeometry(1.2, 0.1, 0.1); g.rotateY(ry); g.translate(x, y + 0.05, z + dz); B.add('plank', g, { uvScale: 1 }); }
+      for (const dx of [-0.5, 0, 0.5]) { const g = new THREE.BoxGeometry(0.12, 0.02, 1.2); g.rotateY(ry); g.translate(x + dx, y + 0.11, z); B.add('plank', g, { uvScale: 1 }); }
+      const g = new THREE.BoxGeometry(1.2, 0.02, 1.2); g.rotateY(ry); g.translate(x, y + 0.13, z); B.add('plank', g, { uvScale: 1 });
+    }
+    world.box([x - 0.65, 0, z - 0.65], [x + 0.65, n * 0.145, z + 0.65]);
+  };
+  pallet(-8.5, 40, 6, 0.1); pallet(-7.2, 41.4, 3, 0.4); pallet(23.5, 14, 4, 0.05); pallet(-33.5, 15.5, 5, 0.2); pallet(30, 8, 3, 0.1); pallet(36, 50.5, 8, 0.0); pallet(37.5, 50.5, 5, 0.1); pallet(-46, 36, 2, 0.5); pallet(3.6, -50, 7, 0.02);
+  world.cover(-9.7, 40, -1, 0); world.cover(36.7, 52.0, 0, 1); world.cover(3.6, -48.7, 0, 1);
+  // relay / signalling cabinets beside the tracks (grey-green steel, concrete plinth)
+  const cabinet = (x, z, w = 1.2, d = 0.6, h = 1.5, ry = 0) => {
+    B.box('concreteWall', [x - w / 2 - 0.1, 0, z - d / 2 - 0.1], [x + w / 2 + 0.1, 0.25, z + d / 2 + 0.1], { uvScale: 0.5 });
+    B.box('cabinet', [x - w / 2, 0.25, z - d / 2], [x + w / 2, 0.25 + h, z + d / 2], { uvScale: 0.8 });
+    B.box('steelDark', [x - w / 2 - 0.02, 0.25 + h, z - d / 2 - 0.05], [x + w / 2 + 0.02, 0.25 + h + 0.05, z + d / 2 + 0.05], { collide: false });
+    B.box('steelDark', [x - 0.03, 0.25 + h * 0.45, z + d / 2], [x + 0.03, 0.25 + h * 0.6, z + d / 2 + 0.03], { collide: false });
+    world.cover(x, z - d / 2 - 0.8, 0, -1); world.cover(x, z + d / 2 + 0.8, 0, 1);
+  };
+  cabinet(-13.0, -20); cabinet(-13.0, 38); cabinet(9.6, -12, 1.6, 0.7, 1.7); cabinet(-31.8, -34); cabinet(-31.8, 18, 2.2, 0.8, 1.9); cabinet(9.6, 32); cabinet(17.5, -40, 1.0, 0.6, 1.3); cabinet(-8.6, -60, 1.4);
+  // floodlight masts (tall, lattice-ish with a lamp head cluster) — strong daytime silhouettes
+  const flood = (x, z) => {
+    B.cyl('steelDark', x, z, 0, 14, 0.22, 10, { collide: true, uvScale: 1 }); B.cyl('steelDark', x, z, 14, 16.5, 0.15, 8);
+    B.box('concreteWall', [x - 0.8, 0, z - 0.8], [x + 0.8, 0.6, z + 0.8], { uvScale: 0.5 });
+    B.box('steelDark', [x - 1.4, 16.2, z - 0.08], [x + 1.4, 16.35, z + 0.08], { collide: false }); B.box('steelDark', [x - 1.4, 15.3, z - 0.08], [x + 1.4, 15.45, z + 0.08], { collide: false });
+    for (const dx of [-1.1, -0.55, 0, 0.55, 1.1]) for (const y of [15.45, 16.35]) { B.box('black', [x + dx - 0.22, y, z - 0.25], [x + dx + 0.22, y + 0.35, z + 0.05], { collide: false, uv: false }); B.box('white', [x + dx - 0.18, y + 0.03, z + 0.05], [x + dx + 0.18, y + 0.32, z + 0.07], { collide: false, uv: false }); }
+    for (let y = 1; y < 14; y += 0.35) B.box('steelDark', [x + 0.2, y, z - 0.18], [x + 0.26, y + 0.03, z + 0.18], { collide: false });
+    world.cover(x - 1.0, z, -1, 0); world.cover(x + 1.0, z, 1, 0);
+  };
+  flood(-31.5, 60); flood(9.7, -30); flood(-31.5, -8); flood(41, 12); flood(9.7, 60);
+  // yard lamps along the platform back lane and the depot apron
+  for (const [x, z] of [[38, -20], [38, 10], [-42, 30], [-58, 30], [-40, 58]]) { B.cyl('steelDark', x, z, 0, 7.5, 0.09, 8, { collide: true }); B.box('steelDark', [x - 0.06, 7.3, z - 0.06], [x + 0.06, 7.5, z + 1.6], { collide: false }); B.box('white', [x - 0.3, 7.15, z + 1.1], [x + 0.3, 7.3, z + 2.0], { collide: false, uv: false }); }
 }
 
 // ---- perimeter fence: posts (merged), rails, gate frames -----------------------------------------------------------------
@@ -260,22 +330,31 @@ function buildFenceMesh(world, M) {
 // ---- distant: silos, grain elevator, cranes, warehouses, skyline, pylons, continuing tracks with parked stock -------------
 function buildDistant(world, M) {
   const { scene, R, ctx } = world;
-  const geos = [], dark = [];
+  const geos = [], dark = [], plain = [];
   const box = (list, w, h, d, x, y, z, ry = 0) => { const g = new THREE.BoxGeometry(w, h, d); if (ry) g.rotateY(ry); g.translate(x, y, z); list.push(g); };
   const cyl = (list, r, h, x, y, z, seg = 14) => { const g = new THREE.CylinderGeometry(r, r, h, seg); g.translate(x, y, z); list.push(g); };
   // grain silos + elevator head house (north-west, beyond the fence)
-  for (let i = 0; i < 7; i++) cyl(geos, 4.2, 30, -52 + i * 8.6, 15, -128, 18);
-  box(geos, 62, 3, 10, -26, 31.5, -128); box(geos, 14, 44, 12, -60, 22, -120); box(geos, 6, 6, 60, -26, 34, -132);
-  for (let i = 0; i < 5; i++) cyl(geos, 3.6, 24, 40 + i * 7.6, 12, -140, 16);
+  for (let i = 0; i < 7; i++) cyl(plain, 4.2, 30, -52 + i * 8.6, 15, -128, 18);
+  box(plain, 62, 3, 10, -26, 31.5, -128); box(geos, 14, 44, 12, -60, 22, -120); box(plain, 6, 6, 60, -26, 34, -132);
+  for (let i = 0; i < 5; i++) cyl(plain, 3.6, 24, 40 + i * 7.6, 12, -140, 16);
   // marshalling yard beyond: continuing tracks (steel), parked dark wagons (silhouettes) north and south
   for (const tx of TRACK_X) for (const [z0, z1] of [[TRACK_Z0 - 60, TRACK_Z0], [TRACK_Z1, TRACK_Z1 + 60]]) { box(dark, 0.08, 0.16, z1 - z0, tx - 0.72, 0.3, (z0 + z1) / 2); box(dark, 0.08, 0.16, z1 - z0, tx + 0.72, 0.3, (z0 + z1) / 2); }
   for (const [ti, z, L] of [[0, -95, 15], [0, -111, 15], [2, -84, 13], [4, -100, 15], [5, -78, 15], [7, -90, 15], [1, 90, 12], [3, 84, 15], [3, 100, 15], [6, 92, 15], [7, 108, 15]]) {
     const tx = TRACK_X[ti]; box(dark, 3.0, 3.3, L, tx, 1.2 + 1.65, z); box(dark, 2.7, 0.9, L - 1, tx, 0.7, z);
   }
-  // warehouses / factory blocks east, with saw-tooth roofs
-  box(geos, 60, 12, 30, 105, 6, -20); box(geos, 40, 9, 26, 100, 4.5, 20, 0.05); box(geos, 34, 15, 28, 120, 7.5, 60, -0.1); cyl(geos, 2.2, 42, 118, 21, -36, 12);
-  for (let i = 0; i < 6; i++) box(geos, 9, 3, 30, 80 + i * 10, 13.5, -20, 0);
-  box(geos, 30, 10, 60, -110, 5, -10, 0.1); box(geos, 26, 8, 24, -100, 4, 60, -0.2); box(geos, 14, 20, 14, -115, 10, 40);
+  // midground sheds just outside the fence: real materials (corrugated walls, dark roofs) so they hold up at 40–80 m
+  const MB = new Batch(world, M, 'midground');
+  const shed = (x, z, w, d, h, ry = 0) => {
+    const g = new THREE.BoxGeometry(w, h, d); g.rotateY(ry); g.translate(x, h / 2, z); MB.add('corrugated', g, { uvScale: 0.6 });
+    const r = new THREE.BoxGeometry(w + 0.8, 0.4, d + 0.8); r.rotateY(ry); r.translate(x, h + 0.2, z); MB.add('steelDark', r, { uvScale: 0.5 });
+    const ridge = new THREE.BoxGeometry(w * 0.9, 1.6, 3); ridge.rotateY(ry); ridge.translate(x, h + 0.9, z); MB.add('rustPlate', ridge, { uvScale: 0.5 });
+    const base = new THREE.BoxGeometry(w + 0.2, 1.2, d + 0.2); base.rotateY(ry); base.translate(x, 0.6, z); MB.add('concreteWall', base, { uvScale: 0.5 });
+  };
+  shed(100, -20, 56, 28, 11); shed(98, 22, 40, 24, 8.5, 0.05); shed(118, 60, 34, 28, 14, -0.1); shed(-105, -10, 28, 58, 9.5, 0.1); shed(-98, 60, 26, 24, 8, -0.2);
+  const chim = new THREE.CylinderGeometry(2.0, 2.6, 42, 14); chim.translate(118, 21, -36); MB.add('brickDark', chim, { uvScale: 0.5 }); MB.add('steelDark', new THREE.CylinderGeometry(2.2, 2.2, 1.2, 14).translate(118, 42.2, -36), { uv: false });
+  MB.add('brick', new THREE.BoxGeometry(14, 20, 14).translate(-115, 10, 40), { uvScale: 0.42 });
+  MB.flush({ shadow: false });
+  for (let i = 0; i < 6; i++) box(dark, 9, 3, 30, 80 + i * 10, 13.5, -20, 0);
   // container gantry cranes far east (port) and a couple of luffing cranes
   for (const [x, z, ry] of [[165, -60, 0.1], [180, 10, -0.05], [175, 70, 0.2]]) {
     const H = 38; const g = [];
@@ -287,12 +366,22 @@ function buildDistant(world, M) {
   // city skyline (blocks) far north + south, water tower, chimneys, pylons on the west
   for (let i = 0; i < 16; i++) { const w = 18 + R() * 30, h = 20 + R() * 45; box(geos, w, h, 16 + R() * 14, -180 + i * 24 + (R() - 0.5) * 10, h / 2, -230 - R() * 40, (R() - 0.5) * 0.3); }
   for (let i = 0; i < 9; i++) { const w = 16 + R() * 26, h = 14 + R() * 30; box(geos, w, h, 14 + R() * 12, -120 + i * 30 + (R() - 0.5) * 10, h / 2, 200 + R() * 40, (R() - 0.5) * 0.3); }
-  cyl(geos, 1.6, 60, -150, 30, -150, 10); cyl(geos, 2.0, 50, 150, 25, -170, 10); cyl(geos, 5, 8, -90, 32, -90, 12); cyl(geos, 0.8, 28, -90, 14, -90, 8);
+  cyl(plain, 1.6, 60, -150, 30, -150, 10); cyl(plain, 2.0, 50, 150, 25, -170, 10); cyl(plain, 5, 8, -90, 32, -90, 12); cyl(plain, 0.8, 28, -90, 14, -90, 8);
   for (let i = 0; i < 5; i++) { const z = -140 + i * 60; box(dark, 2, 44, 2, -160, 22, z); box(dark, 24, 1.4, 1.4, -160, 38, z); box(dark, 18, 1.4, 1.4, -160, 32, z); }
   // treeline: a low broken band of dark blobs along the far west and north-east
-  for (let i = 0; i < 40; i++) { const x = -175 + R() * 40, z = -120 + R() * 240; const g = new THREE.SphereGeometry(4 + R() * 6, 7, 5); g.scale(1, 0.75, 1); g.translate(x, 4 + R() * 3, z); dark.push(g); }
-  for (let i = 0; i < 24; i++) { const x = 60 + R() * 100, z = -140 - R() * 30; const g = new THREE.SphereGeometry(4 + R() * 6, 7, 5); g.scale(1, 0.75, 1); g.translate(x, 4 + R() * 3, z); dark.push(g); }
-  const m1 = new THREE.Mesh(BGU.mergeGeometries(geos.map(g => g.index ? g.toNonIndexed() : g), false), M.distant); m1.frustumCulled = false; m1.name = 'distant'; m1.castShadow = false; m1.receiveShadow = false; scene.add(m1);
+  // treeline: clusters of tapered cones (poplars) well beyond the fence
+  for (let i = 0; i < 70; i++) { const west = i < 40; const x = west ? -150 + R() * 30 : 70 + R() * 90, z = west ? -120 + R() * 240 : -150 - R() * 25; const h = 9 + R() * 8; const g = new THREE.CylinderGeometry(0.4, 2.6 + R() * 1.5, h, 6); g.translate(x, h / 2 + 0.5, z); dark.push(g); }
+  // windows pattern for the skyline blocks (unlit daytime glazing on precast panels)
+  const wc = document.createElement('canvas'); wc.width = 128; wc.height = 128; const wg = wc.getContext('2d');
+  wg.fillStyle = '#7a838b'; wg.fillRect(0, 0, 128, 128); wg.fillStyle = '#6a737b'; wg.fillRect(0, 60, 128, 8);
+  for (let yy = 8; yy < 128; yy += 32) for (let xx = 6; xx < 128; xx += 21) { wg.fillStyle = R() < 0.85 ? '#3a4650' : '#9aa4ab'; wg.fillRect(xx, yy, 12, 16); }
+  const winTex = new THREE.CanvasTexture(wc); winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping; winTex.colorSpace = THREE.SRGBColorSpace;
+  const skyMat = new THREE.MeshStandardMaterial({ map: winTex, color: 0xa8aeb4, roughness: 0.95, metalness: 0, name: 'skyline' });
+  const skyGeo = BGU.mergeGeometries(geos.map(g => g.index ? g.toNonIndexed() : g), false);
+  // uv: 1 window column per 3.5 m, one storey per 4 m (world-space by dominant axis)
+  { const pos = skyGeo.attributes.position, nor = skyGeo.attributes.normal, uv = skyGeo.attributes.uv; for (let i = 0; i < pos.count; i++) { const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i)); if (ny > nx && ny > nz) uv.setXY(i, 0.02, 0.02); else if (nx > nz) uv.setXY(i, pos.getZ(i) / 3.5, pos.getY(i) / 4.0); else uv.setXY(i, pos.getX(i) / 3.5, pos.getY(i) / 4.0); } uv.needsUpdate = true; }
+  const m1 = new THREE.Mesh(skyGeo, skyMat); m1.frustumCulled = false; m1.name = 'distant'; m1.castShadow = false; m1.receiveShadow = false; scene.add(m1);
+  const m3 = new THREE.Mesh(BGU.mergeGeometries(plain.map(g => g.index ? g.toNonIndexed() : g), false), M.distant); m3.frustumCulled = false; m3.name = 'distant-plain'; m3.castShadow = false; m3.receiveShadow = false; scene.add(m3); m3.userData.surface = 'concrete'; ctx.raycastTargets.push(m3);
   const m2 = new THREE.Mesh(BGU.mergeGeometries(dark.map(g => g.index ? g.toNonIndexed() : g), false), M.distantDark); m2.frustumCulled = false; m2.name = 'distant-dark'; m2.castShadow = false; m2.receiveShadow = false; scene.add(m2);
   for (const m of [m1, m2]) { m.userData.surface = 'concrete'; ctx.raycastTargets.push(m); }
 }

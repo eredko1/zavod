@@ -16,7 +16,7 @@ export const meta = {
 };
 
 export function build(world) {
-  const { ctx, W } = world;
+  const { ctx, W, scene } = world;
   ctx.renderer.toneMappingExposure = 1.25;
   W.bounds.set(new THREE.Vector3(-58, -1, -58), new THREE.Vector3(58, 30, 58));
   ctx.progress(0.13, 'sky'); buildSky(world);
@@ -28,6 +28,20 @@ export function build(world) {
   ctx.progress(0.23, 'distant'); buildDistant(world);
   ctx.progress(0.24, 'rain'); buildRain(world);
 
+  // ---- steel observation platform + ladder near spawn (also the ladder test rig) ----
+  {
+    const px = -12, pz = 40, top = 3.0, hw = 2.0;
+    const steel = new THREE.MeshStandardMaterial({ color: 0x4a4f57, roughness: 0.6, metalness: 0.8 });
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(hw * 2, 0.12, hw * 2), steel); deck.position.set(px, top - 0.06, pz); deck.name = 'platform'; scene.add(deck);
+    world.solid(deck, 'metal', { collide: false }); world.walkable([px - hw, top - 0.12, pz - hw], [px + hw, top, pz + hw]);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, top, 0.16), steel); leg.position.set(px + sx * (hw - 0.1), top / 2, pz + sz * (hw - 0.1)); leg.name = 'leg'; scene.add(leg); world.solid(leg, 'metal'); }
+    // railing on three sides (thin colliders), open on the ladder side (+z)
+    for (const [x0, z0, x1, z1] of [[px - hw, pz - hw, px + hw, pz - hw + 0.05], [px - hw, pz - hw, px - hw + 0.05, pz + hw], [px + hw - 0.05, pz - hw, px + hw, pz + hw]]) {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 1.05, z1 - z0), steel); r.position.set((x0 + x1) / 2, top + 0.52, (z0 + z1) / 2); r.name = 'rail'; scene.add(r); world.solid(r, 'metal');
+    }
+    world.ladder(px, pz + hw, 0, top, 0, 1);
+    world.cover(px, pz - 1, 0, -1, top); W.poses.platform = [px, top, pz, 0.3, -0.15];
+  }
   const v = (x, z) => new THREE.Vector3(x, 0, z);
   W.playerSpawns = [v(-4, 46), v(6, 44), v(-14, 48)];
   W.enemySpawns = [

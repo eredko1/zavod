@@ -14,9 +14,37 @@ function railGeos(x, z0, z1, y0 = SLEEPER_TOP) {
   return { foot, web, head };
 }
 
+function mergePair(a, b) {
+  const g = new THREE.BufferGeometry(); const pos = [], nor = [], uv = [];
+  for (const q of [a, b]) { const n = q.toNonIndexed(); pos.push(...n.attributes.position.array); nor.push(...n.attributes.normal.array); uv.push(...n.attributes.uv.array); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+
 export function buildTracks(world, M) {
   const { ctx, scene, R } = world;
   const B = new Batch(world, M, 'tracks');
+
+  // oily / brake-dust darkening along each track centre, baked into the ballast shader (world-space)
+  {
+    const mat = M.ballast; const tx = new Float32Array(8); TRACK_X.forEach((v, i) => { tx[i] = v; });
+    const prev = mat.onBeforeCompile;
+    mat.onBeforeCompile = (sh, r) => {
+      if (prev) prev(sh, r);
+      sh.uniforms.uTrackX = { value: tx };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vBPos;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvBPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vBPos; uniform float uTrackX[8]; float gOil;\nfloat oilHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          { float d = 99.0; for (int i = 0; i < 8; i++) d = min(d, abs(vBPos.x - uTrackX[i]));
+            float n = oilHash(floor(vBPos.xz * vec2(3.0, 0.7))) * 0.5 + oilHash(floor(vBPos.xz * vec2(9.0, 2.3))) * 0.5;
+            gOil = (1.0 - smoothstep(0.35, 1.05, d)) * (0.45 + 0.55 * n) * step(vBPos.y, 0.6);
+            gOil += (1.0 - smoothstep(1.0, 1.7, d)) * 0.18 * step(vBPos.y, 0.6);
+            diffuseColor.rgb *= 1.0 - gOil * 0.62; }`)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor - gOil * 0.3, 0.25, 1.0);');
+    };
+    const prevKey = mat.customProgramCacheKey; mat.customProgramCacheKey = () => (prevKey ? prevKey.call(mat) : '') + '|oil';
+  }
 
   // ---- ballast mounds: trapezoid prism per track -------------------------------------
   for (const tx of TRACK_X) {
@@ -45,6 +73,13 @@ export function buildTracks(world, M) {
     world.box([tx - 1.25, 0, TRACK_Z0], [tx + 1.25, SLEEPER_TOP, TRACK_Z1]);
   }
   sleepers.count = i; sleepers.instanceMatrix.needsUpdate = true;
+  // base plates (two per sleeper) as one instanced mesh sharing the sleeper matrices
+  const plate = new THREE.BoxGeometry(0.34, 0.03, 0.3); const pl = plate.clone().translate(-HALF_G, SLEEPER_H / 2 + 0.015, 0), pr = plate.clone().translate(HALF_G, SLEEPER_H / 2 + 0.015, 0);
+  const plateGeo = mergePair(pl, pr); worldUV(plateGeo, 1.5);
+  const plates = new THREE.InstancedMesh(plateGeo, M.rustSheet, i);
+  for (let k = 0; k < i; k++) { sleepers.getMatrixAt(k, m); plates.setMatrixAt(k, m); }
+  plates.instanceMatrix.needsUpdate = true; plates.castShadow = false; plates.receiveShadow = true; plates.userData.surface = 'metal'; plates.name = 'baseplates'; plates.frustumCulled = false;
+  scene.add(plates); ctx.raycastTargets.push(plates);
   sleepers.castShadow = true; sleepers.receiveShadow = true; sleepers.userData.surface = 'wood'; sleepers.name = 'sleepers'; sleepers.frustumCulled = false;
   scene.add(sleepers); ctx.raycastTargets.push(sleepers);
 
@@ -77,7 +112,7 @@ export function buildTracks(world, M) {
     }
     // point machine boxes at both switch ends
     for (const [x, z] of [[xa + dir * 1.35, zc - len / 2 - 1], [xb - dir * 1.35, zc + len / 2 + 1]]) {
-      B.box('yellow', [x - 0.3, BALLAST_H, z - 0.36], [x + 0.3, BALLAST_H + 0.42, z + 0.36], { collide: true, uvScale: 1 });
+      B.box('cabinet', [x - 0.3, BALLAST_H, z - 0.36], [x + 0.3, BALLAST_H + 0.42, z + 0.36], { collide: true, uvScale: 1 }); B.box('yellow', [x - 0.31, BALLAST_H + 0.42, z - 0.37], [x + 0.31, BALLAST_H + 0.46, z + 0.37], { collide: false, uv: false });
       B.box('steelDark', [Math.min(x, x - dir * 1.0), SLEEPER_TOP, z - 0.05], [Math.max(x, x - dir * 1.0), SLEEPER_TOP + 0.06, z + 0.05], { collide: false });
     }
   }

@@ -11,8 +11,8 @@ export function buildProps(world) {
   // barrels: depot, behind the office, platform ends, SE yard, under the overpass
   const barrels = [];
   const cluster = (x, z, n, r = 1.2, y) => { for (let i = 0; i < n; i++) barrels.push(P(x + j(r * 2), z + j(r * 2), { ry: rot(), y })); };
-  cluster(-45.5, 47, 6, 1.5); cluster(-56, 52, 4, 1.2); cluster(-37, 41, 3, 1.0); cluster(-30, 10, 4, 1.2); cluster(38, 52, 5, 1.4); cluster(30, -46, 4, 1.2); cluster(-46, -44, 5, 1.4); cluster(46, 30, 3, 1.0);
-  barrels.push(P(24.5, -32, { ry: rot(), y: ph }), P(24.5, -31.1, { ry: rot(), y: ph }), P(24.6, 32.5, { ry: rot(), y: ph }), P(-6.5, -40, { rx: Math.PI / 2, y: 0.32, ry: 0.4 }), P(-12, 30, { rx: Math.PI / 2, y: 0.32, ry: 1.3 }));
+  cluster(-45.5, 47, 4, 1.3); cluster(-37, 41, 2, 0.8); cluster(30, -46, 3, 1.0); cluster(-46, -44, 3, 1.2);
+  barrels.push(P(24.5, -32, { ry: rot(), y: ph }), P(24.5, -31.1, { ry: rot(), y: ph }), P(24.6, 32.5, { ry: rot(), y: ph }), P(-6.5, -40, { rx: Math.PI / 2, y: 0.32, ry: 0.4 }));
   instanceModel(world, 'barrel_03', barrels, 'metal');
   for (const b of barrels.slice(0, 10)) world.cover(b.x + 0.9, b.z, 1, 0);
 
