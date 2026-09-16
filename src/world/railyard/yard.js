@@ -28,7 +28,7 @@ function buildDepot(B, world, M) {
   B.box('concreteWall', [bx1 - bt, 0, bz0], [bx1, bh, 42], { uvScale: 0.5 }); B.box('concreteWall', [bx1 - bt, 0, 44.4], [bx1, bh, bz1], { uvScale: 0.5 });
   B.box('concrete', [bx0, 0, bz0], [bx1, 0.08, bz1], { collide: false, uvScale: 0.4 });
   // three horizontal tanks on concrete saddles
-  const tanks = [[-56.2, 'wagonGreen'], [-50, 'rustPlate'], [-43.8, 'wagonRed']];
+  const tanks = [[-56.2, 'wagonGreen'], [-50, 'contGrey'], [-43.8, 'rustPlate']];
   for (const [x, mat] of tanks) {
     const r = 1.9, cy = 0.9 + r, z0 = 33, z1 = 45;
     for (const sz of [z0 + 1.6, z1 - 1.6]) B.box('concreteWall', [x - 1.5, 0, sz - 0.5], [x + 1.5, cy - 1.0, sz + 0.5], { uvScale: 0.5 });

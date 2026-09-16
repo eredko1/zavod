@@ -56,6 +56,16 @@ export function buildStructures(world, M) {
   buildOverpass(B, world, M);
   B.flush();
   buildSigns(world, M);
+  // interior fill lights (daylight spill + high-bay lamps) so the shed / office interiors are not black holes
+  const lamp = (x, y, z, i = 120, d = 22, color = 0xffe6c4) => { const l = new THREE.PointLight(color, i, d, 2); l.position.set(x, y, z); scene.add(l); ctx.lights.spots.push(l); return l; };
+  lamp(30, 5.6, -6, 70); lamp(30, 5.6, 6, 70); lamp(28, 4.5, 0, 40, 12, 0xd8e4ff);
+  lamp(-38, 3.0, 11, 70, 14); lamp(-38, 6.6, 11, 70, 14); lamp(-36.5, 2.9, 36.3, 40, 10);
+  // high-bay fixtures (visual) in the shed
+  for (const z of [-6, 6]) { B2(world, M, [29.7, 5.75, z - 0.35], [30.3, 6.1, z + 0.35]); }
+}
+function B2(world, M, min, max) {
+  const g = new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2]); g.translate((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff2dc, emissiveIntensity: 3, roughness: 0.6 })); m.name = 'structures:lamp'; world.scene.add(m);
 }
 
 // ---- loading platform + canopy ----------------------------------------------------------------------

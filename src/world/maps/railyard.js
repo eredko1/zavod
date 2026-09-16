@@ -58,7 +58,7 @@ export function build(world) {
     overpass: [8, OVERPASS.top, -44.5, -2.35, -0.18], // on the deck, looking back SE over the yard and platform
     office_roof: [-37, OFFICE.roof, 12.5, -1.15, -0.12],
     platform: [21.2, PLATFORM.h, 24, 0.35, 0.0],      // along the platform under the canopy, boxcars beside
-    depot: [-37.5, 0, 46.5, 1.62, 0.02],              // toward the tank farm
+    depot: [-30.5, 0, 48.5, 1.78, 0.03],              // toward the tank farm
     office_int: [-34.5, OFFICE.floor1, 12, 1.2, -0.05],
     ramp: [48.5, 3.0, -20, 0.55, -0.05],
     boxcar: [-27, CAR_FLOOR, -18.4, 1.55, 0.0],

@@ -68,7 +68,7 @@ export function makeMats(world) {
   // ---- metals -----------------------------------------------------------------------
   M.steel = pbr('steel', 'rail_metal_plate_02', '1k', { color: 0x6d6a66, normalScale: 0.7, envMapIntensity: 0.9 });          // underframes, bogies, gantries
   M.steelDark = pbr('steelDark', 'rail_metal_plate_02', '1k', { color: 0x3b3a38, normalScale: 0.6, envMapIntensity: 0.8 });  // rails web, masts, fence posts
-  M.railHead = new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.22, metalness: 1.0, envMapIntensity: 1.5, name: 'railHead' }); // polished running surface
+  M.railHead = new THREE.MeshStandardMaterial({ color: 0xa9a6a0, roughness: 0.3, metalness: 1.0, envMapIntensity: 1.2, name: 'railHead' }); // polished running surface
   M.rustSheet = pbr('rustSheet', 'rusty_metal_sheet', '1k', { color: 0xcfc6ba, normalScale: 0.8, envMapIntensity: 0.7 });
   M.rustPlate = pbr('rustPlate', 'rail_rusty_painted_metal', '1k', { color: 0xd8d2ca, normalScale: 0.8, envMapIntensity: 0.7, grime: { strength: 0.5, height: 2.4, wet: 0.0, tint: [0.4, 0.3, 0.22] } });
   M.metalPlate = pbr('metalPlate', 'metal_plate', '1k', { color: 0x9d9a94, normalScale: 0.7, envMapIntensity: 0.8 });
