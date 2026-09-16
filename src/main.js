@@ -16,7 +16,7 @@ window.__ctx = ctx;
 // ---------- renderer / scene / camera ----------
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, logarithmicDepthBuffer: false });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, ctx.settings.renderScale));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -42,7 +42,7 @@ const input = {
   consume(code) { const h = this.pressed.has(code); this.pressed.delete(code); return h; },
   // named actions
   get fire() { return (this.mouse.buttons & 1) !== 0; },
-  get ads() { return (this.mouse.buttons & 2) !== 0; },
+  get ads() { return (this.mouse.buttons & 2) !== 0 || this.down('KeyE'); }, // RMB or hold E
   get forward() { return this.down('KeyW') || this.down('ArrowUp'); },
   get back() { return this.down('KeyS') || this.down('ArrowDown'); },
   get left() { return this.down('KeyA') || this.down('ArrowLeft'); },

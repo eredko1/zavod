@@ -42,9 +42,10 @@ export function createCtx() {
     time: { dt: 0, elapsed: 0, frame: 0, scale: 1 },
     perf: { fps: 60, frameMs: 16, drawCalls: 0, triangles: 0 },
     settings: {
-      quality: qs.get('quality') || 'ultra', // 'ultra' | 'high' | 'medium' | 'low'
+      quality: qs.get('quality') || 'high', // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
       fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6,
-      shadows: true, rain: true, motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
+      shadows: true, rain: qs.get('rain') === '1', // rain off by default (toggle in Settings)
+      renderScale: +(qs.get('scale') || 1), // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
       masterVolume: 1,
     },
     input: null,     // main
