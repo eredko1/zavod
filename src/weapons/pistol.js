@@ -5,7 +5,12 @@ import { buildArm } from './arms.js';
 import { orient } from './rifle.js';
 
 export const PISTOL_SPEC = {
-  name: 'M9', slot: 1, mag: 15, reserve: 60, rpm: 420, auto: false, damage: 30, headMul: 2.0, range: 80,
+  id: 'm9', name: 'M9', class: 'Pistol', slot: 1, mode: 'SEMI',
+  desc: '9 mm service pistol. Fast draw, 15 rounds, quick ADS.',
+  mag: 15, reserve: 60, rpm: 420, auto: false, damage: 30, headMul: 2.0, range: 80, falloff: [25, 80, 0.6],
+  reloadStyle: 'mag', reloadKeys: { magGrab: [-0.02, -0.14, 0.03], down: [-0.08, -0.36, 0.08], rack: [-0.02, 0.05, 0.04], tiltK: 0.8 },
+  flashSize: 0.11, flashStrength: 0.7, brassScale: 0.8,
+  stats: { damage: 30, rpm: 420, range: 80, mag: 15, mobility: 95, accuracy: 60 },
   hipSpread: 2.2, adsSpread: 0.35, spreadPerShot: 1.1, spreadMax: 7, moveSpread: 1.8,
   recoilPitch: 0.75, recoilYaw: 0.28, kickBack: 0.04, kickUp: 0.16, kickRoll: 0.05,
   reloadTime: 1.7, reloadTimeTac: 1.45, swapTime: 0.32, adsTime: 0.16, adsDist: 0.30,

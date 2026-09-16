@@ -4,7 +4,12 @@ import { Builder, rbox, box, cylZ, cylY, cylX, torus, extrude, lathe, sphere, ad
 import { buildArm } from './arms.js';
 
 export const RIFLE_SPEC = {
-  name: 'M4A1', slot: 0, mag: 30, reserve: 180, rpm: 800, auto: true, damage: 34, headMul: 2.2, range: 200,
+  id: 'm4a1', name: 'M4A1', class: 'AR', slot: 0, mode: 'AUTO',
+  desc: '5.56 carbine. Balanced damage, controllable full-auto, T2 red dot.',
+  mag: 30, reserve: 180, rpm: 800, auto: true, damage: 34, headMul: 2.2, range: 200, falloff: [40, 160, 0.6],
+  reloadStyle: 'mag', reloadKeys: { magGrab: [-0.02, -0.18, -0.02], down: [-0.1, -0.42, 0.06], rack: [-0.02, 0.055, 0.12], tiltK: 1 },
+  flashSize: 0.15, flashStrength: 1, brassScale: 1,
+  stats: { damage: 34, rpm: 800, range: 200, mag: 30, mobility: 70, accuracy: 72 },
   hipSpread: 1.6, adsSpread: 0.12, spreadPerShot: 0.55, spreadMax: 6.5, moveSpread: 1.8,
   recoilPitch: 0.34, recoilYaw: 0.16, kickBack: 0.028, kickUp: 0.055, kickRoll: 0.03,
   reloadTime: 2.1, reloadTimeTac: 1.75, swapTime: 0.42, adsTime: 0.22, adsDist: 0.215,

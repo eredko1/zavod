@@ -107,3 +107,6 @@ Web Audio, procedural synthesis + optional CC0 samples under assets/audio (< 20 
 
 ## AI on multi-level maps
 - Nav must be height-aware: build the walkable grid from `ctx.world.bounds`, `ctx.colliders` and `ctx.world.walkables` (cell 0.5 m; a cell's floor = highest collider top ≤ 2.0 m above the base floor that has ≥ 1.8 m clearance above it; neighbors connect if |Δfloor| ≤ 0.5 m). Soldiers stand on their cell floor; enemySpawns/coverPoints may have y>0. LOS rays as before. Use the new maps for testing (`?map=railyard`, `?map=terminal`).
+
+## Real-place maps (wsp, sbu) — research standard
+- `wsp` = Washington Square Park (Manhattan) and `sbu` = Stony Brook University (Long Island). Before building, the agent RESEARCHES with WebSearch/WebFetch: satellite/plan layout and dimensions, landmark positions and proportions, materials (stone/brick/concrete/paving patterns), vegetation, street furniture, surrounding facades and skyline, typical light. Write findings to `src/world/<id>/RESEARCH.md` (sources listed) before coding, and build to that plan. Recognizable but not a survey: no real logos, signage text may be generic. Same multi-level/gameplay rules as every map (spawns, cover, poses, walkables), day lighting per Addendum 2.

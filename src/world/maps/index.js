@@ -2,5 +2,7 @@
 import * as zavod from './zavod.js';
 import * as railyard from './railyard.js';
 import * as terminal from './terminal.js';
-export const MAPS = { zavod, railyard, terminal };
+import * as wsp from './wsp.js';
+import * as sbu from './sbu.js';
+export const MAPS = { zavod, railyard, terminal, wsp, sbu };
 export const DEFAULT_MAP = 'zavod';
