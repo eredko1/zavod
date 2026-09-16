@@ -19,7 +19,7 @@ const CSS = `
 #touch .reload{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:56px;height:56px;font-size:12px}
 #touch .swap{right:calc(env(safe-area-inset-right,0px) + 112px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:52px;height:52px;font-size:11px}
 #touch .nade{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 100px);width:54px;height:54px;font-size:11px}
-#touch .pause{left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:30px;margin-left:-22px;border-radius:6px;font-size:12px}
+#touch .pause{right:calc(env(safe-area-inset-right,0px) + 16px);top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:30px;border-radius:6px;font-size:12px}
 #touch .fireL{left:calc(env(safe-area-inset-left,0px) + 30px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);width:70px;height:70px;background:rgba(160,40,30,.3);border-color:rgba(255,120,100,.45)}
 `;
 

@@ -46,7 +46,9 @@ export function createCtx() {
       quality: qs.get('quality') || (isTouch ? 'medium' : 'high'), // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
       fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6,
       shadows: true, rain: qs.get('rain') === '1', // rain off by default (toggle in Settings)
-      renderScale: +(qs.get('scale') || 1), // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
+      renderScale: +(qs.get('scale') || 1),
+      texMax: +(qs.get('texmax') || (isTouch ? 512 : 4096)), // mobile GPUs: cap texture edge (VRAM), see assets.js fit()
+      shadowMax: isTouch ? 2048 : 4096, // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
       masterVolume: 1,
     },
     input: null,     // main

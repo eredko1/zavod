@@ -86,7 +86,9 @@ export async function init(ctx) {
       const grd = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({ color: 0x141618 })); grd.position.y = -3; grd.rotation.x = -Math.PI / 2; es.add(grd);
       fallbackEnv = pm.fromScene(es, 0.04).texture; pm.dispose();
     }
-    for (const m of Object.values(mats)) { const want = useScene ? null : fallbackEnv; if (m.envMap !== want && 'envMap' in m) { m.envMap = want; m.needsUpdate = true; } }
+    // day maps: the bright sky PMREM turns phosphate steel into chrome — pull the viewmodel's reflection strength down
+    const dayK = ctx.world?.grade === 'day' ? 0.4 : 1;
+    for (const m of Object.values(mats)) { const want = useScene ? null : fallbackEnv; if (m.envMap !== want && 'envMap' in m) { m.envMap = want; m.needsUpdate = true; } if (m.envMapIntensity !== undefined) { if (m.userData.baseEnv === undefined) { m.userData.baseEnv = m.envMapIntensity; m.userData.baseRough = m.roughness; } m.envMapIntensity = m.userData.baseEnv * dayK; if (m.userData.baseMetal === undefined) m.userData.baseMetal = m.metalness; if (m.userData.baseMetal > 0.5) { m.roughness = Math.min(1, m.userData.baseRough + (dayK < 1 ? 0.26 : 0)); m.metalness = m.userData.baseMetal * (dayK < 1 ? 0.8 : 1); } } }
     fx.brassMesh.material.envMap = useScene ? null : fallbackEnv;
   };
   ensureEnv();
@@ -160,6 +162,7 @@ function getWeapon(id) {
   const f2 = new THREE.Mesh(new THREE.PlaneGeometry(sz * 1.35, sz * 0.8), fm); f2.rotation.y = Math.PI / 2; f2.rotation.x = Math.PI / 2; f2.position.z = -sz * 0.5; flash.add(f2);
   for (const f of [f0, f1, f2]) { f.renderOrder = 30; f.frustumCulled = false; }
   if (!w.parts.mag) { w.parts.mag = new THREE.Group(); w.group.add(w.parts.mag); }
+  if (w.parts.chargingHandle) { const ch = w.parts.chargingHandle; ch.userData.homeZ = ch.position.z; ch.userData.travel ??= 0.04; }
   w.parts.mag.userData.home = w.parts.mag.position.clone();
   const inst = { ...w, id, flash, flashMat: fm, ammo: w.spec.mag, reserve: w.spec.reserve, fireTimer: 0, shots: 0, lastShot: -9, boltT: 9, trigT: 9, actionT: 9, needsAction: false, slideLocked: false, cur: { id, name: w.spec.name, mode: w.spec.mode || (w.spec.auto ? 'AUTO' : 'SEMI'), class: w.spec.class, ammo: w.spec.mag, mag: w.spec.mag, reserve: w.spec.reserve, slot: w.spec.slot } };
   S.cache[id] = inst; return inst;
@@ -169,6 +172,7 @@ function resetWeapon(w) {
   w.cur.ammo = w.ammo; w.cur.reserve = w.reserve;
   w.parts.mag.visible = true; w.parts.mag.position.copy(w.parts.mag.userData.home); w.parts.mag.rotation.set(0, 0, 0);
   if (w.parts.pump) w.parts.pump.position.copy(w.parts.pump.userData.home);
+  if (w.parts.chargingHandle) w.parts.chargingHandle.position.z = w.parts.chargingHandle.userData.homeZ;
   if (w.parts.boltHandle) { w.parts.boltHandle.position.copy(w.parts.boltHandle.userData.home); w.parts.boltHandle.rotation.set(0, 0, 0); }
   if (w.parts.shell) w.parts.shell.visible = false;
   for (const a of [w.parts.armL, w.parts.armR]) if (a) { a.position.copy(a.userData.home.pos); a.rotation.set(0, 0, 0); }
@@ -213,7 +217,7 @@ function endReload(complete) {
   const r = S.reload; if (!r) return; const w = r.w;
   if (complete) S.ctx.bus.emit('reload', { stage: 'end', weapon: w.spec.name });
   w.parts.mag.visible = true; w.parts.mag.position.copy(w.parts.mag.userData.home); w.parts.mag.rotation.set(0, 0, 0);
-  if (w.parts.chargingHandle) w.parts.chargingHandle.position.z = 0.098;
+  if (w.parts.chargingHandle) w.parts.chargingHandle.position.z = w.parts.chargingHandle.userData.homeZ;
   if (w.parts.shell) w.parts.shell.visible = false;
   S.reload = null;
 }
@@ -360,6 +364,7 @@ export function update(dt, ctx) {
   // ---------- ADS ----------
   const adsSpeed = 1 / sp.adsTime;
   S.adsT = clamp(S.adsT + (S.adsTarget ? dt * adsSpeed : -dt * adsSpeed * 1.15), 0, 1);
+  if (S.qaAds != null && S.qaAds > 0 && S.qaAds < 1) S.adsT = S.qaAds; // QA: hold a mid-transition pose
   S.ads = S.adsTarget ? 1 - (1 - S.adsT) ** 2.2 : S.adsT ** 1.8; // ease-out in, ease-in out
   const adsOn = S.adsT > 0.5; if (adsOn !== S.adsOn) { S.adsOn = adsOn; ctx.bus.emit('ads', { on: adsOn, scope: !!sp.scope }); }
   if (p) p.ads = S.adsTarget === 1;
@@ -425,7 +430,8 @@ export function update(dt, ctx) {
     // weapon tilt: roll left + nose down while the hand works the mag, back at the end
     const tiltK = rk.tiltK ?? 1;
     const settle = u > 0.72 ? 1 - sstep((u - 0.72) / 0.28) : 1;
-    reloadOff.rot.set(-0.14 * tiltK * settle, 0.12 * settle, -0.42 * tiltK * settle); reloadOff.pos.set(0.012 * settle, -0.02 * settle, 0.01 * settle);
+    const ro = sp.reloadOff || { rot: [-0.14 * tiltK, 0.12, -0.42 * tiltK], pos: [0.012, -0.02, 0.01] };
+    reloadOff.rot.set(ro.rot[0] * settle, ro.rot[1] * settle, ro.rot[2] * settle); reloadOff.pos.set(ro.pos[0] * settle, ro.pos[1] * settle, ro.pos[2] * settle);
     // left hand track (weapon space, relative to home)
     const magHome = mag.userData.home; const wrist = armL.userData.home.pos;
     const magGrab = rk.magGrab, down = rk.down, rack = rk.rack;
@@ -451,7 +457,7 @@ export function update(dt, ctx) {
     // charging handle / slide rack on empty reload
     if (rackAtEnd) {
       const rkk = u > 0.86 && u < 0.98 ? pulse((u - 0.86) / 0.12, 0.45, 0.55) : 0;
-      if (w.parts.chargingHandle) w.parts.chargingHandle.position.z = 0.098 + rkk * 0.04;
+      if (w.parts.chargingHandle) { const ch = w.parts.chargingHandle; ch.position.z = ch.userData.homeZ + rkk * ch.userData.travel; }
       if (w.parts.bolt) w.parts.bolt.position.z = -0.02 + rkk * 0.05;
       if (!r.racked && u > 0.94) { r.racked = true; w.slideLocked = false; w.boltT = 0.02; S.rrv.x -= 0.8; S.rpv.z += 0.3; if (isLong) w.boltT = 9; }
       if (w.parts.slide) w.slideLocked = w.slideLocked && u < 0.93;
@@ -523,7 +529,7 @@ export function update(dt, ctx) {
         if (!w.actionLocked && u >= 0.9) { w.actionLocked = true; S.rrv.z -= 1.2; S.rrv.x += 0.8; }
         if (u < 0.02 && p && !w.actionNudged) { w.actionNudged = true; const np = -0.25 * DEG, ny = 0.35 * DEG; p.pitch += np; p.yaw += ny; cam.rotation.x += np; cam.rotation.y += ny; S.recPitch += np; S.recYaw += ny; S.rrv.z -= 2.0; S.rrv.x -= 0.8; }
         const dip = Math.sin(clamp(u, 0, 1) * Math.PI);
-        reloadOff.rot.x += 0.04 * dip; reloadOff.rot.z += -0.16 * dip; reloadOff.rot.y += 0.06 * dip; reloadOff.pos.x += 0.012 * dip; reloadOff.pos.y += -0.025 * dip; reloadOff.pos.z += 0.02 * dip;
+        reloadOff.rot.x += 0.06 * dip; reloadOff.rot.z += 0.30 * dip; reloadOff.rot.y += -0.22 * dip; reloadOff.pos.x += -0.05 * dip; reloadOff.pos.y += 0.01 * dip; reloadOff.pos.z += -0.02 * dip; // bring the receiver into view, roll so the lifted handle shows
       }
     }
     if (u >= 1 || u < 0) { w.actionLocked = false; if (u >= 1) w.actionNudged = false; }

@@ -77,7 +77,7 @@ export function buildTracks(world, M) {
     }
     // point machine boxes at both switch ends
     for (const [x, z] of [[xa + dir * 1.35, zc - len / 2 - 1], [xb - dir * 1.35, zc + len / 2 + 1]]) {
-      B.box('yellow', [x - 0.35, BALLAST_H, z - 0.4], [x + 0.35, BALLAST_H + 0.55, z + 0.4], { collide: true, uvScale: 1 });
+      B.box('yellow', [x - 0.3, BALLAST_H, z - 0.36], [x + 0.3, BALLAST_H + 0.42, z + 0.36], { collide: true, uvScale: 1 });
       B.box('steelDark', [Math.min(x, x - dir * 1.0), SLEEPER_TOP, z - 0.05], [Math.max(x, x - dir * 1.0), SLEEPER_TOP + 0.06, z + 0.05], { collide: false });
     }
   }

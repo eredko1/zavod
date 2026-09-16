@@ -54,8 +54,8 @@ export function makeMats(world) {
 
   const M = {};
   // ---- ground / ballast ---------------------------------------------------------
-  M.ballast = pbr('ballast', 'rail_gravel_stones', '2k', { color: 0xb9b5ad, normalScale: 0.9, envMapIntensity: 0.6 });
-  M.dirt = pbr('dirt', 'rail_gravel_road', '2k', { color: 0xc9bfae, normalScale: 0.8, envMapIntensity: 0.5 });
+  M.ballast = pbr('ballast', 'rail_gravel_stones', '2k', { color: 0xd6d2ca, normalScale: 0.9, envMapIntensity: 0.6 });
+  M.dirt = pbr('dirt', 'rail_gravel_road', '2k', { color: 0xe4d9c6, normalScale: 0.8, envMapIntensity: 0.5 });
   M.asphalt = pbr('asphalt', 'worn_asphalt', '2k', { color: 0xb5b5b5, normalScale: 0.6, envMapIntensity: 0.6 });
   // ---- concrete -------------------------------------------------------------------
   M.concrete = pbr('concrete', 'concrete_floor_02', '1k', { color: 0xcfcbc3, normalScale: 0.6, envMapIntensity: 0.6, grime: { strength: 0.55, height: 1.4, wet: 0.0, tint: [0.45, 0.42, 0.36] } });
@@ -91,11 +91,11 @@ export function makeMats(world) {
   M.sleeper = pbr('sleeper', 'rail_dark_wooden_planks', '1k', { color: 0x8a7d6c, normalScale: 0.9, envMapIntensity: 0.4 });
   M.plank = pbr('plank', 'rail_dark_wooden_planks', '1k', { color: 0xb3a692, normalScale: 0.9, envMapIntensity: 0.4 });
   // ---- misc -------------------------------------------------------------------------
-  M.distant = new THREE.MeshStandardMaterial({ color: 0x7d8790, roughness: 0.95, metalness: 0.0, name: 'distant' });
-  M.distantDark = new THREE.MeshStandardMaterial({ color: 0x555b60, roughness: 0.95, metalness: 0.0, name: 'distantDark' });
+  M.distant = new THREE.MeshStandardMaterial({ color: 0x5f6870, roughness: 0.95, metalness: 0.0, name: 'distant' });
+  M.distantDark = new THREE.MeshStandardMaterial({ color: 0x3d4248, roughness: 0.95, metalness: 0.0, name: 'distantDark' });
   M.glass = new THREE.MeshStandardMaterial({ color: 0x9fb4c4, roughness: 0.08, metalness: 0.9, envMapIntensity: 1.4, transparent: true, opacity: 0.55, name: 'glass', depthWrite: false });
   M.black = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8, metalness: 0.2, name: 'black' });
-  M.yellow = new THREE.MeshStandardMaterial({ color: 0xd9b23a, roughness: 0.7, metalness: 0.2, name: 'yellow' });
+  M.yellow = new THREE.MeshStandardMaterial({ color: 0xa8892c, roughness: 0.75, metalness: 0.25, name: 'yellow' }); addGrime(M.yellow, R, { key: 'yellow', strength: 0.8, height: 0.8, wet: 0.0, tint: [0.4, 0.33, 0.24] });
   M.white = new THREE.MeshStandardMaterial({ color: 0xe6e3dc, roughness: 0.75, metalness: 0.1, name: 'white' });
   M.lampRed = new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff2010, emissiveIntensity: 4, roughness: 0.3, name: 'lampRed' });
   M.lampGreen = new THREE.MeshStandardMaterial({ color: 0x002a00, emissive: 0x20ff50, emissiveIntensity: 3, roughness: 0.3, name: 'lampGreen' });

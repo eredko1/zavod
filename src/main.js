@@ -49,7 +49,7 @@ const input = {
   get back() { return this.down('KeyS') || this.down('ArrowDown') || this.touch.axis.y > 0.3; },
   get left() { return this.down('KeyA') || this.down('ArrowLeft') || this.touch.axis.x < -0.3; },
   get right() { return this.down('KeyD') || this.down('ArrowRight') || this.touch.axis.x > 0.3; },
-  get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight') || this.touch.sprint; },
+  get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight') || (this.touch.sprint && !this.touch.fire && !this.touch.ads); }, // on touch, firing/aiming cancels auto-sprint
   get crouch() { return this.down('KeyC') || this.down('ControlLeft'); },
   get jump() { return this.down('Space'); },
 };
@@ -99,6 +99,8 @@ async function boot() {
     catch (e) { console.error(`[boot] ${name} failed`, e); ctx.bootErrors = (ctx.bootErrors || []).concat(`${name}: ${e.message}`); }
     i++;
   }
+  // memory budget for phones: cap shadow maps after the map built its lights
+  if (ctx.settings.shadowMax < 4096) scene.traverse((o) => { if (o.isLight && o.shadow && o.shadow.mapSize.x > ctx.settings.shadowMax) { o.shadow.mapSize.set(ctx.settings.shadowMax, ctx.settings.shadowMax); if (o.shadow.map) { o.shadow.map.dispose(); o.shadow.map = null; } } });
   ctx.progress(1, 'ready');
   document.getElementById('boot').classList.add('hide');
   setState(ctx.qa ? 'playing' : 'menu');

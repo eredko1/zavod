@@ -14,6 +14,7 @@ export const SNIPER_SPEC = {
   recoilPitch: 3.2, recoilYaw: 0.9, kickBack: 0.14, kickUp: 0.28, kickRoll: 0.1,
   reloadTime: 3.0, reloadTimeTac: 2.6, swapTime: 0.6, adsTime: 0.5, adsDist: 0.20, adsFovMul: 0.22,
   flashSize: 0.17, flashStrength: 1.4, brassScale: 1.4, wallReach: 1.0,
+  reloadOff: { rot: [-0.08, 0.22, -0.5], pos: [-0.03, 0.07, -0.01] }, // the hip pose sits low: lift the rifle so the magwell is on screen
   hip: { pos: [0.10, -0.15, -0.33], rot: [0.0, 0.06, 0.01] },
   sprint: { pos: [0.17, -0.18, -0.32], rot: [-0.25, 0.8, 0.35] },
   lower: { pos: [0.12, -0.37, -0.28], rot: [-0.9, 0.35, 0.2] },

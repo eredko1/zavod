@@ -8,11 +8,12 @@ const HDRI_SUN = new THREE.Vector3(0.553, 0.743, 0.376).normalize();
 // Rotate the sky so the sun sits WSW of the yard (long shadows across the tracks, platform faces lit).
 const SKY_ROT_Y = -2.08;
 export const FOG_COLOR = new THREE.Color(0xc9d4de);
+const ENV_SUN_CAP = 3.0; // sky texels are ~0.3–2; the sun disc is ~5e4
 
 export function buildSky(world) {
   const { ctx, scene } = world;
   const { renderer } = ctx;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 0.9;
 
   // world sun direction = R_y(SKY_ROT_Y) · HDRI_SUN
   const sunDir = HDRI_SUN.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), SKY_ROT_Y);
@@ -23,10 +24,10 @@ export function buildSky(world) {
   scene.background = FOG_COLOR.clone();
   scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0022);
 
-  const hemi = new THREE.HemisphereLight(0xa9c0dc, 0x6b655c, 0.55);
+  const hemi = new THREE.HemisphereLight(0xa9c0dc, 0x6b655c, 0.5);
   scene.add(hemi); ctx.lights.hemi = hemi;
 
-  const sun = new THREE.DirectionalLight(0xffe9cf, 3.4); // ≈5600 K
+  const sun = new THREE.DirectionalLight(0xffe6c8, 11.0); // sun ≈ 4–5× sky irradiance → real contrast; exposure compensates // ≈5600 K
   sun.position.copy(sunDir).multiplyScalar(160); sun.target.position.set(0, 0, -6);
   sun.castShadow = true;
   const sm = sun.shadow;
@@ -34,17 +35,23 @@ export function buildSky(world) {
   sm.camera.left = -80; sm.camera.right = 80; sm.camera.top = 80; sm.camera.bottom = -80;
   sm.camera.near = 40; sm.camera.far = 300;
   sm.bias = -0.00025; sm.normalBias = 0.035; sm.radius = 1.5;
+  sm.camera.updateProjectionMatrix();
   scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
 
-  const fill = new THREE.DirectionalLight(0xbfd0e8, 0.18);
+  const fill = new THREE.DirectionalLight(0xbfd0e8, 0.5);
   fill.position.set(-sunDir.x * 100, 60, -sunDir.z * 100); scene.add(fill); ctx.lights.fill = fill;
 
-  const loader = new HDRLoader();
+  const loader = new HDRLoader(); loader.setDataType(THREE.FloatType);
   loader.load(HDRI_URL, (hdr) => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
+    // Environment: the same sky with the sun disc clamped out, so direct sun (and its shadows) come only from the DirectionalLight.
+    const src = hdr.image.data, w = hdr.image.width, h = hdr.image.height;
+    const clamped = new Float32Array(src.length); const cap = ENV_SUN_CAP;
+    for (let i = 0; i < src.length; i += 4) { clamped[i] = Math.min(src[i], cap); clamped[i + 1] = Math.min(src[i + 1], cap); clamped[i + 2] = Math.min(src[i + 2], cap); clamped[i + 3] = 1; }
+    const envTex = new THREE.DataTexture(clamped, w, h, THREE.RGBAFormat, THREE.FloatType); envTex.mapping = THREE.EquirectangularReflectionMapping; envTex.flipY = hdr.flipY; envTex.needsUpdate = true;
     const pmrem = new THREE.PMREMGenerator(renderer); pmrem.compileEquirectangularShader();
-    const env = pmrem.fromEquirectangular(hdr).texture; pmrem.dispose();
-    scene.environment = env; scene.environmentIntensity = 0.85;
+    const env = pmrem.fromEquirectangular(envTex).texture; pmrem.dispose(); envTex.dispose();
+    scene.environment = env; scene.environmentIntensity = 1.0;
     scene.background = hdr; scene.backgroundIntensity = 1.0;
     ctx.bus?.emit?.('skyReady', { map: 'railyard' });
   }, undefined, (e) => console.warn('[railyard] HDRI failed', e));

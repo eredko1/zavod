@@ -44,10 +44,10 @@ export function buildScope(camera) {
   // black surround (huge rect with a circular hole)
   const shape = new THREE.Shape(); shape.moveTo(-40, -40); shape.lineTo(40, -40); shape.lineTo(40, 40); shape.lineTo(-40, 40); shape.closePath();
   const hole = new THREE.Path(); hole.absarc(0, 0, R, 0, Math.PI * 2, true); shape.holes.push(hole);
-  const surround = new THREE.Mesh(new THREE.ShapeGeometry(shape, 96), new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, depthWrite: false, toneMapped: false }));
+  const surround = new THREE.Mesh(new THREE.ShapeGeometry(shape, 96), new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, depthWrite: true, transparent: true, toneMapped: false })); // writes near depth + draws late so the world's transparent light shafts/particles can't bleed over the housing
   surround.renderOrder = 1000; surround.frustumCulled = false; rig.add(surround);
   // eyepiece rim (dark grey bevel with a faint highlight ring)
-  const rim = new THREE.Mesh(new THREE.RingGeometry(R * 0.985, R * 1.03, 96), new THREE.MeshBasicMaterial({ color: 0x0b0c0e, depthTest: false, depthWrite: false, toneMapped: false }));
+  const rim = new THREE.Mesh(new THREE.RingGeometry(R * 0.985, R * 1.03, 96), new THREE.MeshBasicMaterial({ color: 0x0b0c0e, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
   rim.renderOrder = 1001; rim.frustumCulled = false; rig.add(rim);
   const rim2 = new THREE.Mesh(new THREE.RingGeometry(R * 0.972, R * 0.99, 96), new THREE.MeshBasicMaterial({ color: 0x2a2c30, depthTest: false, depthWrite: false, toneMapped: false, transparent: true, opacity: 0.55 }));
   rim2.renderOrder = 1002; rim2.frustumCulled = false; rig.add(rim2);

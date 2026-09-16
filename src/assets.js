@@ -36,16 +36,26 @@ export const MODELS = [
 
 export const HDRI = 'hdri/moonless_golf_2k.hdr';
 
+let api_fit = (t) => t;
 export async function init(ctx) {
   const texLoader = new THREE.TextureLoader();
   const gltfLoader = new GLTFLoader();
   const hdrLoader = new RGBELoader();
-  const maxAniso = Math.min(16, ctx.renderer?.capabilities?.getMaxAnisotropy?.() ?? 8);
+  const maxAniso = Math.min(ctx.isTouch ? 4 : 16, ctx.renderer?.capabilities?.getMaxAnisotropy?.() ?? 8);
   const cache = new Map();
   const models = new Map();
   let hdr = null;
 
-  const loadTex = (url) => new Promise((res, rej) => texLoader.load(url, res, undefined, () => { console.warn('[assets] missing texture', url); res(null); }));
+  // Downscale oversized images on memory-constrained devices (iOS Safari kills tabs near ~1 GB of GPU memory).
+  const TEX_MAX = ctx.settings.texMax || 4096;
+  const fit = (t) => {
+    const im = t && t.image; if (!im || !im.width) return t;
+    const w = im.width, h = im.height, m = Math.max(w, h); if (m <= TEX_MAX) return t;
+    const k = TEX_MAX / m, c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); t.image = c; t.needsUpdate = true; return t;
+  };
+  api_fit = fit;
+  const loadTex = (url) => new Promise((res, rej) => texLoader.load(url, (t) => res(fit(t)), undefined, () => { console.warn('[assets] missing texture', url); res(null); }));
 
   const api = {
     maxAniso,
@@ -53,7 +63,7 @@ export async function init(ctx) {
     texture(url, { srgb = false, repeat = 1, aniso = maxAniso } = {}) {
       const full = url.startsWith('./') || url.startsWith('http') ? url : BASE + url;
       if (cache.has(full)) return cache.get(full);
-      const t = texLoader.load(full);
+      const t = texLoader.load(full, fit);
       t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = aniso;
       if (srgb) t.colorSpace = THREE.SRGBColorSpace;
       cache.set(full, t); return t;
@@ -113,7 +123,7 @@ export async function init(ctx) {
         if (o.isMesh) {
           o.castShadow = true; o.receiveShadow = true;
           const mats = Array.isArray(o.material) ? o.material : [o.material];
-          for (const m of mats) { if (m.map) m.map.anisotropy = maxAniso; if (m.normalMap) m.normalMap.anisotropy = maxAniso; m.envMapIntensity = 1; }
+          for (const m of mats) { for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (m[k]) { fit(m[k]); m[k].anisotropy = Math.min(maxAniso, ctx.isTouch ? 4 : 16); } m.envMapIntensity = 1; }
         }
       });
       models.set(id, g); tick(id); res(g);
