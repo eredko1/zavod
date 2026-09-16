@@ -3,3 +3,4 @@ qa/shots/
 qa/blind/
 qa/refs/
 .DS_Store
+.vercel
