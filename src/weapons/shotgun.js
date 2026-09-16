@@ -137,8 +137,9 @@ export function buildShotgun(mats) {
   // a loose shell carried by the left hand during reloads (hidden otherwise)
   {
     const sb = new Builder(); addShell(sb, [0, 0, 0]);
-    parts.shell = sb.build(mats, 'shell'); parts.shell.visible = false; parts.shell.position.set(0.0, 0.055, 0.0); parts.shell.rotation.set(0.2, 0.9, 0);
-    left.add(parts.shell);
+    parts.shell = sb.build(mats, 'shell'); parts.shell.visible = false; parts.shell.rotation.set(1.25, 0.15, 0.1); // base in the palm, crimp pointing up-forward into the port
+    parts.shell.userData.off = new THREE.Vector3(0.012, 0.048, -0.012); // offset from the left wrist (weapon space)
+    group.add(parts.shell);
   }
 
   group.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true; } });

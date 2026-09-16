@@ -460,9 +460,9 @@ export function update(dt, ctx) {
   } else if (S.reload && S.reload.style === 'shell') {
     // shell-by-shell tube reload: start (hand to the pouch) → N × [pouch → loading port → push] → end (hand back to the forend)
     const r = S.reload; r.t += dt; const wrist = armL.userData.home.pos;
-    const sk = sp.shellKeys || {}; const pouchA = sk.pouch || [-0.06, -0.30, 0.10], portA = sk.port || [-0.03, -0.11, -0.04];
-    const pouch = [pouchA[0] - wrist.x, pouchA[1] - wrist.y, pouchA[2] - wrist.z], port = [portA[0] - wrist.x, portA[1] - wrist.y, portA[2] - wrist.z], pushed = [port[0] + 0.012, port[1] + 0.035, port[2] + 0.005];
-    const rotPouch = sk.rotPouch || [-0.4, 0.3, 0.4], rotPort = sk.rotPort || [1.1, 0.5, 1.3];
+    const sk = sp.shellKeys || {}; const pouchA = sk.pouch || [-0.07, -0.34, 0.12], portA = sk.port || [-0.008, -0.15, -0.045];
+    const pouch = [pouchA[0] - wrist.x, pouchA[1] - wrist.y, pouchA[2] - wrist.z], port = [portA[0] - wrist.x, portA[1] - wrist.y, portA[2] - wrist.z], pushed = [port[0] + 0.01, port[1] + 0.04, port[2] - 0.01];
+    const rotPouch = sk.rotPouch || [-0.3, 0.2, 0.3], rotPort = sk.rotPort || [0.55, 0.25, 0.85];
     const shell = w.parts.shell; let hand = null, handRot = null, k = 0;
     if (r.phase === 'start') {
       const u = clamp(r.t / sp.reloadStart, 0, 1); k = sstep(u);
@@ -483,8 +483,9 @@ export function update(dt, ctx) {
       if (u >= 1) { const cycle = r.empty; endReload(true); if (cycle) startAction(w, 0.05); }
     }
     if (hand) { armL.position.add(hand); armL.rotation.set(handRot[0], handRot[1], handRot[2]); }
+    if (shell && shell.visible && shell.userData.off) shell.position.copy(armL.position).add(shell.userData.off);
     // weapon rolls left / tips up a bit to present the loading port
-    const so = sp.shellOff || { rot: [0.14, 0.30, -0.62], pos: [-0.015, 0.045, -0.03] };
+    const so = sp.shellOff || { rot: [0.16, 0.22, -0.5], pos: [-0.02, 0.05, -0.02] };
     reloadOff.rot.set(so.rot[0] * k, so.rot[1] * k, so.rot[2] * k); reloadOff.pos.set(so.pos[0] * k, so.pos[1] * k, so.pos[2] * k);
   }
 

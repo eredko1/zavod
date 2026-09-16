@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 
 export const meta = {
-  id: 'terminal', name: 'TERMINAL', subtitle: 'DAY OPS · GRAND CONCOURSE', time: 'day', weather: 'clear',
-  description: 'A Grand Central-style terminal: vaulted main concourse, mezzanine balconies, staircases and subway platforms below.',
+  id: 'terminal', name: 'GRAND CENTRAL', subtitle: 'DAY OPS · MAIN CONCOURSE', time: 'day', weather: 'clear',
+  description: 'Grand Central Terminal, Manhattan: the Main Concourse under the celestial ceiling, the opal clock, marble staircases and balconies, Vanderbilt Hall, the Dining Concourse ramps and the subway platforms below.',
   grade: 'day', ambience: 'terminal-day', thumb: 'assets/thumbs/terminal.jpg',
 };
 
