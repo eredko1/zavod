@@ -108,7 +108,7 @@ function playerVisibleFrom(ctx, p) {
 }
 
 function pickSpawns(ctx, count) {
-  let spawns = (ctx.world?.enemySpawns || []).filter(v => v && isFinite(v.x));
+  let spawns = (ctx.world?.enemySpawns || []).filter(v => v && isFinite(v.x) && (v.y || 0) < 0.15); // TODO multi-level nav: elevated spawns skipped until nav knows floors
   if (spawns.length < count) { for (let i = 0; i < count * 3 && spawns.length < count + 4; i++) { const p = S.nav.randomFreeNear(0, 0, 55, ctx.rng); if (p && p.distanceTo(ctx.player.position) > 25) spawns.push(p); } }
   const pp = ctx.player?.position || new THREE.Vector3();
   // prefer spawns hidden from the player at 35–65 m; fall back to the farthest ones
@@ -147,7 +147,7 @@ function startWave(ctx, n) {
 // ---------- cover ----------
 function coverPoints(ctx) {
   const w = ctx.world?.coverPoints;
-  if (w && w.length >= 8) { if (S.coverSrc !== w) { S.coverSrc = w; S.cover = w.map(c => ({ position: c.position, normal: c.normal || new THREE.Vector3(0, 0, 1), height: c.height ?? 1.3, claimedBy: null })); } }
+  if (w && w.length >= 8) { if (S.coverSrc !== w) { S.coverSrc = w; S.cover = w.filter(c => (c.position?.y || 0) < 0.15).map(c => ({ position: c.position, normal: c.normal || new THREE.Vector3(0, 0, 1), height: c.height ?? 1.3, claimedBy: null })); } }
   else if (!S.cover || S.coverSrc !== 'gen' || S.coverN !== ctx.colliders.length) { S.coverSrc = 'gen'; S.coverN = ctx.colliders.length; S.cover = generateCover(ctx, S.nav).map(c => ({ ...c, claimedBy: null })); }
   return S.cover;
 }

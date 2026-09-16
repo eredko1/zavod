@@ -193,9 +193,9 @@ export function update(dt, ctx) {
       const fwd = forwardVec(p.yaw, _f);
       for (const L of ladders) {
         const dx = p.position.x - (L.x + L.nx * LADDER_GRAB * 0.7), dz = p.position.z - (L.z + L.nz * LADDER_GRAB * 0.7);
-        if (dx * dx + dz * dz > 0.55 * 0.55) continue;
+        if (dx * dx + dz * dz > 0.85 * 0.85) continue;
         if (p.position.y < L.y0 - 0.6 || p.position.y > L.y1 - 0.3) continue;
-        if (fwd.x * -L.nx + fwd.z * -L.nz < 0.35) continue; // must face the ladder
+        if (fwd.x * -L.nx + fwd.z * -L.nz < 0.2) continue; // must roughly face the ladder
         S.ladder = L; S.ladderT = 0; p.climbing = true; p.velocity.set(0, 0, 0); S.sliding = false; break;
       }
     }

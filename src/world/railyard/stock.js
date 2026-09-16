@@ -34,7 +34,9 @@ function underframe(B, x, zc, L, { world }) {
   world.box([x - 1.45, 0, zc - L / 2], [x + 1.45, CAR_FLOOR, zc + L / 2]);
 }
 
-function ladder(B, x0, x1, y0, y1, z, along = 'x') {
+function ladder(B, x0, x1, y0, y1, z, along = 'x', world = null, top = null) {
+  // climbable registration (player ladder system): climber stands on the +z side, steps onto `top` behind the ladder
+  if (world && world.ladder && along === 'x') world.ladder((x0 + x1) / 2, z, 0, top ?? y1, 0, 1, { mesh: false });
   const n = Math.floor((y1 - y0) / 0.32);
   const rails = along === 'x' ? [[x0, z - 0.02, x0 + 0.04, z + 0.02], [x1 - 0.04, z - 0.02, x1, z + 0.02]] : [[x0 - 0.02, x1, x0 + 0.02, x1 + 0.04], [x0 - 0.02, z - 0.04, x0 + 0.02, z]];
   for (const [a, b, c, d] of rails) B.box('steelDark', [a, y0, b], [c, y1, d], { collide: false });
@@ -95,7 +97,7 @@ export function boxcar(B, world, x, zc, { mat = 'wagonRed', L = 15, doors = { we
   B.box('corrugated', [x - W - 0.08, y1, zc - L / 2 - 0.08], [x + W + 0.08, y1 + 0.1, zc + L / 2 + 0.08], { collide: true, uvScale: 0.6 });
   B.box('corrugated', [x - 0.8, y1 + 0.1, zc - L / 2], [x + 0.8, y1 + 0.2, zc + L / 2], { collide: false, uvScale: 0.6 });
   // ladder + brake wheel at the +z end
-  ladder(B, x + W - 0.5, x + W - 0.1, y0 + 0.2, y1 + 0.1, zc + L / 2 + 0.06, 'x');
+  ladder(B, x + W - 0.5, x + W - 0.1, y0 + 0.2, y1 + 0.1, zc + L / 2 + 0.06, 'x', world, y1 + 0.1);
   const bw = new THREE.TorusGeometry(0.28, 0.025, 6, 16); bw.translate(x - 0.9, y0 + 1.4, zc + L / 2 + 0.16); B.add('steelDark', bw, { uv: false });
   B.box('steelDark', [x - 0.92, y0 + 0.3, zc + L / 2], [x - 0.88, y0 + 1.4, zc + L / 2 + 0.16], { collide: false });
   // dock plate (bridge to the platform) — walkable
@@ -145,7 +147,7 @@ export function tankcar(B, world, x, zc, { L = 13, mat = 'wagonGreen', domeMat =
     B.box('steelDark', [x + sx - 0.02, cy + r, zc - tl / 2 + 0.6], [x + sx + 0.02, cy + r + 0.9, zc + tl / 2 - 0.6], { collide: false });
     for (let k = -2; k <= 2; k++) B.box('steelDark', [x + sx - 0.02, cy + r, zc + k * 2.5 - 0.02], [x + sx + 0.02, cy + r + 0.9, zc + k * 2.5 + 0.02], { collide: false });
   }
-  ladder(B, x + 0.3, x + 0.7, CAR_FLOOR + 0.1, cy + r, zc + tl / 2 + 0.5, 'x');
+  ladder(B, x + 0.3, x + 0.7, CAR_FLOOR + 0.1, cy + r, zc + tl / 2 + 0.5, 'x', world, cy + r + 0.05);
   world.box([x - r, CAR_FLOOR, zc - L / 2], [x + r, cy + r + 0.05, zc + L / 2]);
   world.cover(x - r - 0.9, zc, -1, 0); world.cover(x + r + 0.9, zc, 1, 0); world.cover(x, zc - L / 2 - 1.2, 0, -1); world.cover(x, zc + L / 2 + 1.2, 0, 1);
 }
