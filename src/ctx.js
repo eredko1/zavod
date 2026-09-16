@@ -28,9 +28,10 @@ export function createCtx() {
   const qs = new URLSearchParams(location.search);
   const qa = qs.get('qa') === '1';
   const seed = +(qs.get('seed') || 1337);
+  const isTouch = qs.get('touch') === '1' || (qs.get('touch') !== '0' && (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1));
   const ctx = {
     THREE,
-    qs, qa,
+    qs, qa, isTouch,
     seed,
     rng: mulberry32(seed),
     bus: new Bus(),
@@ -42,7 +43,7 @@ export function createCtx() {
     time: { dt: 0, elapsed: 0, frame: 0, scale: 1 },
     perf: { fps: 60, frameMs: 16, drawCalls: 0, triangles: 0 },
     settings: {
-      quality: qs.get('quality') || 'high', // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
+      quality: qs.get('quality') || (isTouch ? 'medium' : 'high'), // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
       fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6,
       shadows: true, rain: qs.get('rain') === '1', // rain off by default (toggle in Settings)
       renderScale: +(qs.get('scale') || 1), // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,

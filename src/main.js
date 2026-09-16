@@ -9,6 +9,7 @@ import * as ai from './ai.js';
 import * as post from './post.js';
 import * as hud from './hud.js';
 import * as audio from './audio.js';
+import * as touch from './touch.js';
 
 const ctx = createCtx();
 window.__ctx = ctx;
@@ -36,18 +37,19 @@ ctx.camera = camera;
 // ---------- input ----------
 const input = {
   keys: new Set(), mouse: { dx: 0, dy: 0, buttons: 0, wheel: 0 }, locked: false,
+  touch: { axis: { x: 0, y: 0 }, fire: false, ads: false, sprint: false }, // written by touch.js
   // edge-triggered action flags, consumed by player/weapons each frame via consume()
   pressed: new Set(),
   down(code) { return this.keys.has(code); },
   consume(code) { const h = this.pressed.has(code); this.pressed.delete(code); return h; },
   // named actions
-  get fire() { return (this.mouse.buttons & 1) !== 0; },
-  get ads() { return (this.mouse.buttons & 2) !== 0 || this.down('KeyE'); }, // RMB or hold E
-  get forward() { return this.down('KeyW') || this.down('ArrowUp'); },
-  get back() { return this.down('KeyS') || this.down('ArrowDown'); },
-  get left() { return this.down('KeyA') || this.down('ArrowLeft'); },
-  get right() { return this.down('KeyD') || this.down('ArrowRight'); },
-  get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight'); },
+  get fire() { return (this.mouse.buttons & 1) !== 0 || this.touch.fire; },
+  get ads() { return (this.mouse.buttons & 2) !== 0 || this.down('KeyE') || this.touch.ads; }, // RMB, hold E, or touch
+  get forward() { return this.down('KeyW') || this.down('ArrowUp') || this.touch.axis.y < -0.3; },
+  get back() { return this.down('KeyS') || this.down('ArrowDown') || this.touch.axis.y > 0.3; },
+  get left() { return this.down('KeyA') || this.down('ArrowLeft') || this.touch.axis.x < -0.3; },
+  get right() { return this.down('KeyD') || this.down('ArrowRight') || this.touch.axis.x > 0.3; },
+  get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight') || this.touch.sprint; },
   get crouch() { return this.down('KeyC') || this.down('ControlLeft'); },
   get jump() { return this.down('Space'); },
 };
@@ -67,6 +69,7 @@ ctx.requestPointerLock = () => { try { renderer.domElement.requestPointerLock({ 
 function setState(s) {
   const prev = ctx.state; if (prev === s) return;
   ctx.state = s; ctx.bus.emit('state', { state: s, prev });
+  if (ctx.isTouch) { input.locked = s === 'playing'; ctx.bus.emit('pointerlock', input.locked); return; }
   if (s === 'playing' && !input.locked && !ctx.qa) ctx.requestPointerLock();
   if (s !== 'playing' && input.locked) document.exitPointerLock();
 }
@@ -84,8 +87,8 @@ addEventListener('keydown', e => {
 const bootbar = document.getElementById('bootbar'), boottxt = document.getElementById('boottxt');
 ctx.progress = (frac, txt) => { bootbar.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`; if (txt) boottxt.textContent = txt; };
 
-const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud]];
-const UPDATE_ORDER = ['player', 'weapons', 'ai', 'world', 'audio', 'hud']; // post.render() runs last
+const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch]];
+const UPDATE_ORDER = ['touch', 'player', 'weapons', 'ai', 'world', 'audio', 'hud']; // post.render() runs last
 const mods = Object.fromEntries(MODULES);
 
 async function boot() {
