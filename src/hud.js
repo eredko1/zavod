@@ -33,7 +33,7 @@ export async function init(ctx) {
     wpn: $('.wpn'), wName: $('.wpn .nm'), wMode: $('.wpn .mode'), wMag: $('.wpn .mag'), wRes: $('.wpn .res'), wGr: $('.wpn .gr b'), wSlots: $$('.wpn .slot i'),
     prompt: $('.prompt'), lock: $('.lock'), toastEl: $('.toast'), pops: $('.pops'), wave: $('.wave'), waveT: $('.wave .t'), waveS: $('.wave .s'),
     board: $('.board'), bKills: $('.board .bk'), bWave: $('.board .bw'), bScore: $('.board .bs'), bAcc: $('.board .ba'), bTime: $('.board .bt'),
-    panels: { settings: $('.panel.settings'), controls: $('.panel.controls'), maps: $('.panel.maps') },
+    panels: { settings: $('.panel.settings'), controls: $('.panel.controls'), maps: $('.panel.maps'), loadout: $('.panel.loadout') },
     // caches (write DOM only on change)
     c: { bearing: null, wave: null, score: null, host: null, hp: null, low: null, hpOn: null, name: null, mode: null, mag: null, res: null, gr: null, slot: null, lowAmmo: null, empty: null, prompt: null, ads: null, gap: null, vig: null, hb: null, lock: null, board: null },
     heading: 0, headingDrawn: NaN, pingsDrawn: -1,
@@ -58,6 +58,7 @@ export async function init(ctx) {
   buildSettings(H);
   buildControls(H);
   buildMaps(H);
+  buildLoadout(H);
 
   // ---- state ----
   ctx.bus.on('state', ({ state, prev }) => onState(H, state, prev));
@@ -382,6 +383,7 @@ function bindMenus(H) {
       case 'deploy': ctx.setState('playing'); break;
       case 'resume': ctx.setState('playing'); break;
       case 'maps': openPanel(H, H.panel === 'maps' ? null : 'maps'); break;
+      case 'loadout': openPanel(H, H.panel === 'loadout' ? null : 'loadout'); break;
       case 'settings': openPanel(H, H.panel === 'settings' ? null : 'settings'); break;
       case 'controls': openPanel(H, H.panel === 'controls' ? null : 'controls'); break;
       case 'menu': ctx.setState('menu'); break;
@@ -482,6 +484,38 @@ function buildMaps(H) {
   if (curMeta) { const t = H.root.querySelector('.mainmenu .title'), st = H.root.querySelector('.mainmenu .subtitle'); if (t) t.textContent = curMeta.name; if (st) st.textContent = curMeta.subtitle || ''; }
 }
 
+function buildLoadout(H) {
+  const ctx = H.ctx, body = H.panels.loadout.querySelector('.body');
+  const FALLBACK = [{ id: 'm4a1', name: 'M4A1', class: 'AR', slot: 0, desc: '', bars: { damage: 34, fireRate: 89, range: 70, accuracy: 70, mobility: 60 } }, { id: 'm9', name: 'M9', class: 'Pistol', slot: 1, desc: '', bars: { damage: 30, fireRate: 47, range: 45, accuracy: 60, mobility: 90 } }];
+  const render = () => {
+    const ars = (ctx.weapons?.arsenal?.length ? ctx.weapons.arsenal : FALLBACK);
+    const cur = ctx.settings.loadout || { primary: 'm4a1', secondary: 'm9' };
+    body.innerHTML = '';
+    for (const [slot, label] of [[0, 'Primary'], [1, 'Secondary']]) {
+      const col = document.createElement('div'); col.className = 'lcol'; col.innerHTML = `<h3>${label}</h3>`;
+      ars.filter(w => w.slot === slot).forEach((w, i) => {
+        const sel = (slot === 0 ? cur.primary : cur.secondary) === w.id;
+        const el = document.createElement('button'); el.className = 'wrow' + (sel ? ' cur' : ''); el.style.setProperty('--i', i);
+        const bars = w.bars || {}; const bar = (k, t) => `<div class="b"><label>${t}</label><i style="--v:${(bars[k] ?? 50)}%"></i></div>`;
+        el.innerHTML = `<div class="hd"><span class="cls">${w.class}</span><span class="nm">${w.name}</span>${sel ? '<span class="tick">Equipped</span>' : ''}</div><div class="bars">${bar('damage', 'DMG')}${bar('fireRate', 'RPM')}${bar('range', 'RNG')}${bar('accuracy', 'ACC')}${bar('mobility', 'MOB')}</div><div class="ds">${w.desc || ''}</div>`;
+        el.addEventListener('click', () => {
+          const next = { primary: slot === 0 ? w.id : cur.primary, secondary: slot === 1 ? w.id : cur.secondary };
+          try { ctx.weapons?.setLoadout?.(next); } catch (e) { console.warn('[hud] setLoadout', e); }
+          ctx.settings.loadout = next; ctx.bus.emit('ui', { type: 'click', action: 'loadout' });
+          const q = new URLSearchParams(location.search); q.set('primary', next.primary); q.set('secondary', next.secondary); history.replaceState(null, '', location.pathname + '?' + q.toString());
+          render();
+        });
+        col.appendChild(el);
+      });
+      body.appendChild(col);
+    }
+    const names = (id) => (ars.find(w => w.id === id) || {}).name || id;
+    H.panels.loadout.querySelector('.curload').textContent = `${names(cur.primary)} · ${names(cur.secondary)}`;
+    const ls = H.root.querySelector('.mainmenu .loadsum'); if (ls) ls.textContent = `${names(cur.primary)} · ${names(cur.secondary)}`;
+  };
+  render(); ctx.bus.on('loadout', render); ctx.bus.on('boot', render);
+}
+
 function buildControls(H) {
   const body = H.panels.controls.querySelector('.body');
   const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim down sights', 'RMB / E'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
@@ -541,7 +575,8 @@ function buildDOM() {
       <div class="eyebrow in" style="--i:0">Special operations</div>
       <h1 class="title in" style="--i:1">Zavod</h1>
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
-      <nav class="menu">${mi('deploy', 0, 'Deploy', 'primary')}${mi('maps', 1, 'Select map')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}</nav>
+      <div class="loadsum in" style="--i:2"></div>
+      <nav class="menu">${mi('deploy', 0, 'Deploy', 'primary')}${mi('maps', 1, 'Select map')}${mi('loadout', 2, 'Loadout')}${mi('settings', 3, 'Settings')}${mi('controls', 4, 'Controls')}</nav>
     </div>
     <div class="tag-tr in" style="--i:2"><i></i>Operator <b>Online</b><br>Sector <b>Zavod-7</b></div>
     <div class="tag-bl in up" style="--i:6">Build <b>${VERSION}</b> · three r186 · webgl2<br>Zavod is a non-commercial tech demo</div>
@@ -554,6 +589,7 @@ function buildDOM() {
       <div class="eyebrow in" style="--i:0">Mission suspended</div>
       <h1 class="title sm in" style="--i:1">Paused</h1>
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
+      <div class="loadsum in" style="--i:2"></div>
       <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('settings', 1, 'Settings')}${mi('menu', 2, 'Quit to menu')}</nav>
     </div>
     <div class="tag-br in up" style="--i:6"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Resume</span></div>
@@ -583,6 +619,7 @@ function buildDOM() {
   </div>
 
   ${panel('maps', 'Select map', 'Selecting reloads the mission', '<span class="curmap"></span>')}
+  ${panel('loadout', 'Loadout', 'Applied immediately', '<span class="curload"></span>')}
   ${panel('settings', 'Settings', 'Applied live', '<button class="reset">Restore defaults</button>')}
   ${panel('controls', 'Controls', 'Keyboard &amp; mouse', '<span>Rebinding not available</span>')}
   `;

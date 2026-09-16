@@ -306,3 +306,22 @@
 #hud .mapcard .nm { font: 700 calc(22px * var(--hs))/1.1 var(--fc); letter-spacing: .16em; text-transform: uppercase; color: var(--fg); padding: calc(12px * var(--hs)) calc(12px * var(--hs)) 2px; }
 #hud .mapcard .sb { font: 500 var(--xs)/1.2 var(--fb); letter-spacing: .2em; text-transform: uppercase; color: var(--acc); padding: 0 calc(12px * var(--hs)); }
 #hud .mapcard .ds { font: 400 calc(13px * var(--hs))/1.4 var(--fb); color: var(--dim); padding: calc(8px * var(--hs)) calc(12px * var(--hs)) calc(14px * var(--hs)); }
+
+/* ---------- loadout ---------- */
+#hud .mainmenu .loadsum { font: 500 var(--xs)/1 var(--fb); letter-spacing: .28em; text-transform: uppercase; color: var(--dim); margin-top: calc(6px * var(--hs)); }
+#hud .panel.loadout { width: min(calc(820px * var(--hs)), calc(100vw - var(--safe-x) - 470px * var(--hs) - 24px)); }
+#hud .panel.loadout .body { display: grid; grid-template-columns: 1.15fr 1fr; gap: calc(18px * var(--hs)); }
+#hud .lcol h3 { font: 600 var(--s)/1 var(--fb); letter-spacing: .3em; text-transform: uppercase; color: var(--dim); margin: calc(10px * var(--hs)) 0 calc(8px * var(--hs)); }
+#hud .wrow { all: unset; display: block; cursor: pointer; width: 100%; box-sizing: border-box; padding: calc(10px * var(--hs)) calc(12px * var(--hs)); margin-bottom: calc(8px * var(--hs)); border: 1px solid rgba(233,236,239,.12); background: rgba(255,255,255,.025); transition: border-color .18s, background .18s; opacity: 0; animation: cardIn .4s var(--ease) forwards; animation-delay: calc(50ms * var(--i)); }
+#hud .wrow:hover, #hud .wrow.sel { border-color: var(--acc); background: rgba(233,162,59,.08); }
+#hud .wrow.cur { border-color: rgba(233,162,59,.6); }
+#hud .wrow .hd { display: flex; align-items: baseline; gap: calc(10px * var(--hs)); }
+#hud .wrow .cls { font: 600 var(--xs)/1 var(--fb); letter-spacing: .2em; padding: 3px 6px; border: 1px solid rgba(233,236,239,.25); color: var(--dim); text-transform: uppercase; }
+#hud .wrow .nm { font: 700 calc(20px * var(--hs))/1 var(--fc); letter-spacing: .14em; text-transform: uppercase; color: var(--fg); }
+#hud .wrow .tick { margin-left: auto; font: 700 var(--xs)/1 var(--fb); letter-spacing: .18em; text-transform: uppercase; color: var(--acc); }
+#hud .wrow .bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: calc(8px * var(--hs)); margin-top: calc(8px * var(--hs)); }
+#hud .wrow .b label { display: block; font: 600 calc(9.5px * var(--hs))/1 var(--fb); letter-spacing: .2em; color: var(--faint); margin-bottom: 3px; }
+#hud .wrow .b i { display: block; height: 3px; background: rgba(233,236,239,.12); position: relative; }
+#hud .wrow .b i::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--v); background: var(--fg); }
+#hud .wrow.cur .b i::after { background: var(--acc); }
+#hud .wrow .ds { font: 400 calc(12px * var(--hs))/1.35 var(--fb); color: var(--dim); margin-top: calc(6px * var(--hs)); }
