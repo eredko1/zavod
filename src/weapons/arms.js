@@ -17,24 +17,24 @@ export function buildHand(side, pose = {}) {
 
   // palm: beveled block, thicker at the heel, slight taper toward the wrist
   const palmW = 0.082, palmL = 0.09, palmT = 0.031;
-  add(g, rbox(palmW, palmL, palmT, 0.012, 3), 'glove', [0, palmL / 2 - 0.004, 0]);
-  add(g, rbox(palmW * 0.78, 0.042, palmT * 0.92, 0.011, 2), 'glove', [0, 0.006, 0]); // wrist taper
-  add(g, rbox(palmW * 0.8, palmL * 0.78, 0.006, 0.003, 1), 'glove', [0, palmL / 2 + 0.002, -palmT / 2 - 0.001], [0, 0, 0], { palm: 1 }); // dark pebbled palm patch
-  add(g, sphere(0.021, 10), 'glove', [sgn * 0.027, 0.03, -0.006], [0, 0, 0], { palm: 1 }); // thenar pad
-  add(g, sphere(0.014, 8), 'glove', [-sgn * 0.03, 0.035, -0.008], [0, 0, 0], { palm: 1 }); // hypothenar pad
+  add(g, rbox(palmW, palmL, palmT, 0.012, 2), 'glove', [0, palmL / 2 - 0.004, 0]);
+  add(g, rbox(palmW * 0.78, 0.042, palmT * 0.92, 0.011, 1), 'glove', [0, 0.006, 0]); // wrist taper
+  add(g, box(palmW * 0.8, palmL * 0.78, 0.006), 'glove', [0, palmL / 2 + 0.002, -palmT / 2 - 0.001], [0, 0, 0], { palm: 1 }); // dark pebbled palm patch
+  add(g, sphere(0.021, 8), 'glove', [sgn * 0.027, 0.03, -0.006], [0, 0, 0], { palm: 1 }); // thenar pad
+  add(g, sphere(0.014, 6), 'glove', [-sgn * 0.03, 0.035, -0.008], [0, 0, 0], { palm: 1 }); // hypothenar pad
   // glove wrist strap (black band + buckle tab) and the cuff
-  add(g, cylY(0.038, 0.037, 0.018, 16, true), 'rubber', [0, -0.006, 0], [0, 0, 0], { sx: 1.1, sz: 0.46 });
-  add(g, rbox(0.03, 0.012, 0.006, 0.002, 1), 'rubber', [-sgn * 0.02, -0.006, palmT / 2 + 0.006], [0, 0, 0.2]); // strap tab
-  add(g, rbox(0.012, 0.014, 0.008, 0.002, 1), 'knuckle', [-sgn * 0.006, -0.006, palmT / 2 + 0.007]); // buckle
+  add(g, cylY(0.038, 0.037, 0.018, 12, true), 'rubber', [0, -0.006, 0], [0, 0, 0], { sx: 1.1, sz: 0.46 });
+  add(g, box(0.03, 0.012, 0.006), 'rubber', [-sgn * 0.02, -0.006, palmT / 2 + 0.006], [0, 0, 0.2]); // strap tab
+  add(g, box(0.012, 0.014, 0.008), 'knuckle', [-sgn * 0.006, -0.006, palmT / 2 + 0.007]); // buckle
   // hard knuckle plate (raised, follows the MCP line) + individual finger knuckle caps
-  add(g, rbox(0.074, 0.03, 0.011, 0.005, 3), 'knuckle', [0, palmL - 0.012, palmT / 2 + 0.003], [0.3, 0, 0]);
-  add(g, rbox(0.06, 0.012, 0.006, 0.003, 2), 'knuckle', [0, palmL - 0.03, palmT / 2 + 0.004], [0.15, 0, 0]); // rear plate segment
+  add(g, rbox(0.074, 0.03, 0.011, 0.005, 2), 'knuckle', [0, palmL - 0.012, palmT / 2 + 0.003], [0.3, 0, 0]);
+  add(g, rbox(0.06, 0.012, 0.006, 0.003, 1), 'knuckle', [0, palmL - 0.03, palmT / 2 + 0.004], [0.15, 0, 0]); // rear plate segment
   // watch on the left wrist: strap ring, case, dark face, crown
   if (pose.watch) {
-    add(g, torus(0.039, 0.0045, 6, 18), 'rubber', [0, -0.02, 0], [Math.PI / 2, 0, 0], { sx: 1.1, sy: 0.46 });
-    add(g, cylZ(0.019, 0.019, 0.01, 18), 'knuckle', [0.0, -0.02, palmT / 2 + 0.012]);
-    add(g, cylZ(0.0155, 0.0155, 0.003, 18), 'rubber', [0.0, -0.02, palmT / 2 + 0.017]); // face (dark)
-    add(g, torus(0.0165, 0.0018, 5, 18), 'knuckle', [0.0, -0.02, palmT / 2 + 0.0175]); // bezel
+    add(g, torus(0.039, 0.0045, 5, 14), 'rubber', [0, -0.02, 0], [Math.PI / 2, 0, 0], { sx: 1.1, sy: 0.46 });
+    add(g, cylZ(0.019, 0.019, 0.01, 14), 'knuckle', [0.0, -0.02, palmT / 2 + 0.012]);
+    add(g, cylZ(0.0155, 0.0155, 0.003, 14), 'rubber', [0.0, -0.02, palmT / 2 + 0.017]); // face (dark)
+    add(g, torus(0.0165, 0.0018, 4, 14), 'knuckle', [0.0, -0.02, palmT / 2 + 0.0175]); // bezel
     add(g, cylY(0.003, 0.003, 0.005, 8), 'knuckle', [0.0195, -0.02, palmT / 2 + 0.012], [0, 0, Math.PI / 2]); // crown
   }
 
@@ -55,9 +55,8 @@ export function buildHand(side, pose = {}) {
     for (let s = 0; s < 3; s++) {
       const L = lens[f][s], r = rads[f] * (1 - s * 0.09);
       const seg = new THREE.Group(); seg.position.set(0, s === 0 ? 0 : lens[f][s - 1], 0); seg.rotation.x = s === 0 ? 0 : -c * (s === 1 ? 1.35 : 0.9); parent.add(seg);
-      add(seg, capsule(r, L - r * 0.6, 3, 8), 'glove', [0, L / 2, 0], [0, 0, 0], s === 2 ? { wear: 'rim', wearAmt: 1.6 } : {});
-      if (s === 0) add(seg, rbox(r * 1.9, L * 0.55, 0.005, 0.002, 1), 'knuckle', [0, L * 0.45, r * 0.95], [0.1, 0, 0]); // proximal knuckle cap
-      if (s === 1) add(seg, rbox(r * 1.5, L * 0.4, 0.004, 0.0015, 1), 'knuckle', [0, L * 0.4, r * 0.9]); // middle knuckle cap
+      add(seg, capsule(r, L - r * 0.6, 2, 6), 'glove', [0, L / 2, 0], [0, 0, 0], s === 2 ? { wear: 'rim', wearAmt: 1.6 } : {});
+      if (s === 0) add(seg, box(r * 1.9, L * 0.55, 0.005), 'knuckle', [0, L * 0.45, r * 0.95], [0.1, 0, 0]); // proximal knuckle cap
       parent = seg;
     }
   }
@@ -68,10 +67,10 @@ export function buildHand(side, pose = {}) {
     base.rotation.set(-(0.3 + c * 0.9) * (pose.thumbUp ?? 1), 0, sgn * (-0.95 + c * 0.6), 'ZXY');
     g.add(base);
     const L1 = 0.047, L2 = 0.034;
-    add(base, capsule(0.013, L1 - 0.01, 3, 8), 'glove', [0, L1 / 2, 0]);
-    add(base, rbox(0.018, 0.02, 0.005, 0.002, 1), 'knuckle', [0, L1 * 0.55, 0.011], [0, 0, 0]); // thumb plate
+    add(base, capsule(0.013, L1 - 0.01, 2, 7), 'glove', [0, L1 / 2, 0]);
+    add(base, box(0.018, 0.02, 0.005), 'knuckle', [0, L1 * 0.55, 0.011], [0, 0, 0]); // thumb plate
     const tip = new THREE.Group(); tip.position.set(0, L1, 0); tip.rotation.x = -c * 0.9; base.add(tip);
-    add(tip, capsule(0.011, L2 - 0.008, 3, 8), 'glove', [0, L2 / 2, 0], [0, 0, 0], { wear: 'rim', wearAmt: 1.6 });
+    add(tip, capsule(0.011, L2 - 0.008, 2, 7), 'glove', [0, L2 / 2, 0], [0, 0, 0], { wear: 'rim', wearAmt: 1.6 });
   }
   return g;
 }
@@ -80,9 +79,9 @@ export function buildHand(side, pose = {}) {
 export function buildForearm(len = 0.3) {
   const g = new THREE.Group(); g.name = 'forearm';
   const prof = [[0.03, 0.0], [0.037, 0.02], [0.043, 0.09], [0.048, 0.18], [0.052, len * 0.8], [0.054, len], [0.0, len]];
-  const m = new THREE.Mesh(lathe(prof, 18)); m.userData.key = 'sleeve'; m.position.y = -0.005; g.add(m);
-  const cuff = new THREE.Mesh(torus(0.037, 0.012, 8, 18)); cuff.userData.key = 'sleeve'; cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.02; cuff.userData.wear = 'all'; cuff.userData.wearAmt = 0.25; g.add(cuff); // rolled cuff
-  const cuff2 = new THREE.Mesh(torus(0.041, 0.008, 6, 18)); cuff2.userData.key = 'sleeve'; cuff2.rotation.x = Math.PI / 2; cuff2.position.y = 0.032; g.add(cuff2); // second roll
+  const m = new THREE.Mesh(lathe(prof, 14)); m.userData.key = 'sleeve'; m.position.y = -0.005; g.add(m);
+  const cuff = new THREE.Mesh(torus(0.037, 0.012, 6, 14)); cuff.userData.key = 'sleeve'; cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.02; cuff.userData.wear = 'all'; cuff.userData.wearAmt = 0.25; g.add(cuff); // rolled cuff
+  const cuff2 = new THREE.Mesh(torus(0.041, 0.008, 5, 14)); cuff2.userData.key = 'sleeve'; cuff2.rotation.x = Math.PI / 2; cuff2.position.y = 0.032; g.add(cuff2); // second roll
   return g;
 }
 

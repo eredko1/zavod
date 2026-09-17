@@ -65,7 +65,7 @@ export function buildProps(world, M) {
     for (const dx of [-0.45, 0.45]) for (const dz of [-0.3, 0.3]) { const w = new THREE.CylinderGeometry(0.12, 0.12, 0.06, 10); w.rotateX(Math.PI / 2); w.translate(dx, 0.12, dz); parts.push(w); }
     const case1 = new THREE.BoxGeometry(0.6, 0.45, 0.35); case1.translate(0.1, 0.62, 0.1); parts.push(case1); const case2 = new THREE.BoxGeometry(0.5, 0.3, 0.3); case2.translate(-0.2, 0.55, -0.2); parts.push(case2);
     const geo = mergeSimple(parts);
-    const spots = [[-9, -12, 0.3, 0], [10, 12.5, -1.2, 0], [26, 8, 2.2, 0], [-27, -9, 1.0, 0], [-34, -6, 0.4, 6], [34, 8, 2.6, 6], [0, -15.5, 1.6, 6], [-40, 26, 0.2, 0], [40, 22, 3.0, 0]];
+    const spots = [[-9, -12, 0.3, 0], [10, 12.5, -1.2, 0], [26, 8, 2.2, 0], [-27, -9, 1.0, 0], [-34, -6, 0.4, 6], [34, 8, 2.6, 6], [0, -15.5, 1.6, 6], [-52.5, 27.5, 0.2, 0], [52.5, 20.5, 3.0, 0]];
     instanced(world, geo, M.ironDark, spots.map(([x, z, ry, y]) => mat4(x, y, z, 0, ry)), 'metal', { name: 'carts' });
     for (const [x, z, ry, y] of spots) { world.ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.75, y, z - 0.75), new THREE.Vector3(x + 0.75, y + 1.5, z + 0.75))); world.cover(x + 1.2, z, 1, 0, y); }
   }
@@ -94,7 +94,7 @@ export function buildProps(world, M) {
   // ---- trash cans (Poly Haven model, instanced) --------------------------------------------------------------------------
   {
     const src = ctx.assets?.modelSource?.('metal_trash_can');
-    const extra = [[-12, 0, 14], [12, 0, -11.2], [-30, 0, 12.5], [30, 0, -12.5], [2.5, 6, -13], [-38, 6, 4], [-2, 0, 21], [-44, 0, 21], [44, 0, 21]];
+    const extra = [[-12, 0, 14], [12, 0, -11.2], [-30, 0, 12.5], [30, 0, -12.5], [2.5, 6, -13], [-38, 6, 4], [-6.6, 0, 21], [-44, 0, 20.1], [44, 0, 20.1]];
     const all = [...world.termTrash, ...extra];
     if (src) { const root = src.scene; root.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(root); instanceModel(world, 'metal_trash_can', all.map(([x, y, z]) => ({ x, z, y: y - bb.min.y, ry: R() * 6.28 })), 'metal'); }
     else for (const [x, y, z] of all) B.add(M.ironDark, new THREE.CylinderGeometry(0.32, 0.28, 0.9, 12), mat4(x, y + 0.45, z));

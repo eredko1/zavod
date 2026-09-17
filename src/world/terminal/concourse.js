@@ -168,7 +168,7 @@ export function buildConcourse(world, M, Z) {
     B.box(M.marble, [-BAL_X, y0, Z0], [BAL_X, y1, P.BAL_NZ], { uvScale: uv(M.marble) });
     world.walkable([-BAL_X, y0, Z0], [BAL_X, y1, P.BAL_NZ]);
     Z.push({ x0: -BAL_X, x1: BAL_X, z0: Z0, z1: P.BAL_NZ, h: BAL_Y });
-    balustrade(B, M.marble, M.marble, [-BAL_X, P.BAL_NZ], [BAL_X, P.BAL_NZ], { y: BAL_Y, instBal: world.termBal }); world.box([-BAL_X, BAL_Y, P.BAL_NZ - 0.15], [BAL_X, BAL_Y + 1.1, P.BAL_NZ + 0.15]);
+    balustrade(B, M.marble, M.marble, [P.UP_X0, P.BAL_NZ], [-P.UP_X0, P.BAL_NZ], { y: BAL_Y, instBal: world.termBal }); world.box([P.UP_X0, BAL_Y, P.BAL_NZ - 0.15], [-P.UP_X0, BAL_Y + 1.1, P.BAL_NZ + 0.15]);
     B.box(M.plaster, [-BAL_X, y0 - 0.3, Z0], [BAL_X, y0, P.BAL_NZ], { uvScale: 0.5 });
     // north arcade: track gates (11 arches) with grilles, lit platforms glow behind
     {

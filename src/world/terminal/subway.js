@@ -104,7 +104,8 @@ export function buildSubway(world, M, Z) {
 
   // ---- stopped train on the track (4 cars, doors open onto the platform; interior walkable) --------------------------
   {
-    const carL = 15.6, carW = 2.9, carH = 3.5; const floorY = SUB - 0.05; const cz = TRACK.z0 + 1.95; // car center over the track
+    const carL = 15.6, carW = 2.9, carH = 3.5; const floorY = SUB - 0.05; const cz = TRACK.z0 + 1.8; // car center over the track (doors 0.35 m off the platform edge)
+    world.box([PLAT.x0, SUB - 0.6, z1 - 1.5], [PLAT.x1, SUB, z1 + 0.25]);   // platform edge slab so the step into the train is supported
     const roll = M.rollSign('4  WOODLAWN');
     for (let c = 0; c < 4; c++) {
       const cx = -30 + c * (carL + 0.6);
