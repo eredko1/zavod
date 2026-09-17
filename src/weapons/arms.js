@@ -17,13 +17,15 @@ export function buildHand(side, pose = {}) {
 
   // palm: beveled block, thicker at the heel, slight taper toward the wrist
   const palmW = 0.082, palmL = 0.09, palmT = 0.031;
-  add(g, rbox(palmW, palmL, palmT, 0.012, 2), 'glove', [0, palmL / 2 - 0.004, 0]);
-  add(g, rbox(palmW * 0.78, 0.042, palmT * 0.92, 0.011, 1), 'glove', [0, 0.006, 0]); // wrist taper
+  const sm = (v, a, b) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // baked occlusion (adds to the grime channel): palm side, finger roots under the knuckle plate, wrist/cuff junction
+  add(g, rbox(palmW, palmL, palmT, 0.012, 2), 'glove', [0, palmL / 2 - 0.004, 0], [0, 0, 0], { ao: (x, y, z) => 0.5 * sm(-z, 0.004, 0.012) + 0.55 * sm(y, 0.022, 0.04) * sm(z, 0.0, 0.01) + 0.5 * sm(-y, 0.02, 0.04) });
+  add(g, rbox(palmW * 0.78, 0.042, palmT * 0.92, 0.011, 1), 'glove', [0, 0.006, 0], [0, 0, 0], { ao: () => 0.6 }); // wrist taper (in the cuff shadow)
   add(g, box(palmW * 0.8, palmL * 0.78, 0.006), 'glove', [0, palmL / 2 + 0.002, -palmT / 2 - 0.001], [0, 0, 0], { palm: 1 }); // dark pebbled palm patch
-  add(g, sphere(0.021, 8), 'glove', [sgn * 0.027, 0.03, -0.006], [0, 0, 0], { palm: 1 }); // thenar pad
-  add(g, sphere(0.014, 6), 'glove', [-sgn * 0.03, 0.035, -0.008], [0, 0, 0], { palm: 1 }); // hypothenar pad
+  add(g, sphere(0.021, 8), 'glove', [sgn * 0.027, 0.03, -0.006], [0, 0, 0], { palm: 1, ao: () => 0.45 }); // thenar pad
+  add(g, sphere(0.014, 6), 'glove', [-sgn * 0.03, 0.035, -0.008], [0, 0, 0], { palm: 1, ao: () => 0.45 }); // hypothenar pad
   // glove wrist strap (black band + buckle tab) and the cuff
-  add(g, cylY(0.038, 0.037, 0.018, 12, true), 'rubber', [0, -0.006, 0], [0, 0, 0], { sx: 1.1, sz: 0.46 });
+  add(g, cylY(0.035, 0.034, 0.016, 12, true), 'rubber', [0, -0.004, 0], [0, 0, 0], { sx: 1.05, sz: 0.44 });
   add(g, box(0.03, 0.012, 0.006), 'rubber', [-sgn * 0.02, -0.006, palmT / 2 + 0.006], [0, 0, 0.2]); // strap tab
   add(g, box(0.012, 0.014, 0.008), 'knuckle', [-sgn * 0.006, -0.006, palmT / 2 + 0.007]); // buckle
   // hard knuckle plate (raised, follows the MCP line) + individual finger knuckle caps
@@ -31,11 +33,11 @@ export function buildHand(side, pose = {}) {
   add(g, rbox(0.06, 0.012, 0.006, 0.003, 1), 'knuckle', [0, palmL - 0.03, palmT / 2 + 0.004], [0.15, 0, 0]); // rear plate segment
   // watch on the left wrist: strap ring, case, dark face, crown
   if (pose.watch) {
-    add(g, torus(0.039, 0.0045, 5, 14), 'rubber', [0, -0.02, 0], [Math.PI / 2, 0, 0], { sx: 1.1, sy: 0.46 });
-    add(g, cylZ(0.019, 0.019, 0.01, 14), 'knuckle', [0.0, -0.02, palmT / 2 + 0.012]);
-    add(g, cylZ(0.0155, 0.0155, 0.003, 14), 'rubber', [0.0, -0.02, palmT / 2 + 0.017]); // face (dark)
-    add(g, torus(0.0165, 0.0018, 4, 14), 'knuckle', [0.0, -0.02, palmT / 2 + 0.0175]); // bezel
-    add(g, cylY(0.003, 0.003, 0.005, 8), 'knuckle', [0.0195, -0.02, palmT / 2 + 0.012], [0, 0, Math.PI / 2]); // crown
+    add(g, torus(0.0325, 0.004, 5, 14), 'rubber', [0, -0.014, 0], [Math.PI / 2, 0, 0], { sx: 1.05, sy: 0.42 }); // strap hugs the wrist oval
+    add(g, cylZ(0.018, 0.018, 0.009, 14), 'knuckle', [0.0, -0.014, palmT / 2 + 0.006]);
+    add(g, cylZ(0.0145, 0.0145, 0.003, 14), 'rubber', [0.0, -0.014, palmT / 2 + 0.0105]); // face (dark)
+    add(g, torus(0.0155, 0.0018, 4, 14), 'knuckle', [0.0, -0.014, palmT / 2 + 0.011]); // bezel
+    add(g, cylY(0.003, 0.003, 0.005, 8), 'knuckle', [0.0185, -0.014, palmT / 2 + 0.006], [0, 0, Math.PI / 2]); // crown
   }
 
   const curl = pose.curl || [0.6, 0.55, 0.85, 0.9, 0.95];
@@ -55,7 +57,8 @@ export function buildHand(side, pose = {}) {
     for (let s = 0; s < 3; s++) {
       const L = lens[f][s], r = rads[f] * (1 - s * 0.09);
       const seg = new THREE.Group(); seg.position.set(0, s === 0 ? 0 : lens[f][s - 1], 0); seg.rotation.x = s === 0 ? 0 : -c * (s === 1 ? 1.35 : 0.9); parent.add(seg);
-      add(seg, capsule(r, L - r * 0.6, 2, 6), 'glove', [0, L / 2, 0], [0, 0, 0], s === 2 ? { wear: 'rim', wearAmt: 1.6 } : {});
+      const fao = (x, y, z) => 0.45 * sm(-z, 0.0, r * 0.6) + 0.35 * sm(Math.abs(x), r * 0.45, r * 0.95) * sm(z, -r, r * 0.2) + (s > 0 ? 0.45 : 0.6) * sm(-y, L * 0.15, L * 0.45); // palm side, between fingers, joint creases
+      add(seg, capsule(r, L - r * 0.6, 2, 6), 'glove', [0, L / 2, 0], [0, 0, 0], s === 2 ? { wear: 'rim', wearAmt: 1.4, ao: fao } : { ao: fao, wear: s === 0 ? 'box' : 'none', wearAmt: 0.5 });
       if (s === 0) add(seg, box(r * 1.9, L * 0.55, 0.005), 'knuckle', [0, L * 0.45, r * 0.95], [0.1, 0, 0]); // proximal knuckle cap
       parent = seg;
     }
@@ -67,7 +70,7 @@ export function buildHand(side, pose = {}) {
     base.rotation.set(-(0.3 + c * 0.9) * (pose.thumbUp ?? 1), 0, sgn * (-0.95 + c * 0.6), 'ZXY');
     g.add(base);
     const L1 = 0.047, L2 = 0.034;
-    add(base, capsule(0.013, L1 - 0.01, 2, 7), 'glove', [0, L1 / 2, 0]);
+    add(base, capsule(0.013, L1 - 0.01, 2, 7), 'glove', [0, L1 / 2, 0], [0, 0, 0], { ao: (x, y, z) => 0.45 * sm(-z, 0, 0.008) + 0.6 * sm(-y, L1 * 0.15, L1 * 0.45) });
     add(base, box(0.018, 0.02, 0.005), 'knuckle', [0, L1 * 0.55, 0.011], [0, 0, 0]); // thumb plate
     const tip = new THREE.Group(); tip.position.set(0, L1, 0); tip.rotation.x = -c * 0.9; base.add(tip);
     add(tip, capsule(0.011, L2 - 0.008, 2, 7), 'glove', [0, L2 / 2, 0], [0, 0, 0], { wear: 'rim', wearAmt: 1.6 });
@@ -94,6 +97,7 @@ export function bakeGroup(root, builder, wear = 'none') {
     if (!o.isMesh) return;
     const geo = o.geometry.clone();
     if (o.userData.sx || o.userData.sy || o.userData.sz) geo.scale(o.userData.sx || 1, o.userData.sy || 1, o.userData.sz || 1); // flattened bands (wrist is an oval)
+    if (o.userData.ao) { const p = geo.attributes.position, a = new Float32Array(p.count); for (let i = 0; i < p.count; i++) a[i] = Math.min(1, o.userData.ao(p.getX(i), p.getY(i), p.getZ(i))); geo.setAttribute('ao', new THREE.BufferAttribute(a, 1)); }
     geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(_m, o.matrixWorld));
     const key = o.userData.key || 'glove';
     builder.add(geo, key, { wear: o.userData.wear || (key === 'knuckle' ? 'box' : wear), wearAmt: o.userData.wearAmt ?? 0.8, grime: key === 'sleeve' ? 0.6 : 0.45, palm: o.userData.palm || 0 });
@@ -109,6 +113,7 @@ export function buildArm(side, pose, place, mats) {
   const hand = buildHand(side, { watch: side === 'left', ...pose }); const fore = buildForearm(pose.forearmLen ?? 0.32);
   root.add(hand); root.add(fore);
   place(hand, fore);
+  hand.scale.setScalar(pose.scale ?? (side === 'left' ? 1.08 : 1.0));
   // Elbow off-screen: whatever the weapon pose asked for, bend the forearm steeply down and away from the eye (weapon space: -y down, +z toward the camera).
   { const d = new THREE.Vector3(0, 1, 0).applyQuaternion(fore.quaternion); d.y -= 0.55; d.z -= 0.15; d.x *= 0.9; d.normalize(); fore.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); }
   const b = new Builder();

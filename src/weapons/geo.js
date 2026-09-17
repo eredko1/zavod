@@ -57,7 +57,7 @@ export function lathe(profile, seg = 16) { return new THREE.LatheGeometry(profil
  * For box-like parts, bevel vertices have off-axis normals → worn edges. For round parts, only the end rims wear.
  */
 export function bakeWear(geom, mode = 'box', amount = 1, grime = 0.5, palm = 0) {
-  const n = geom.attributes.normal, pos = geom.attributes.position;
+  const n = geom.attributes.normal, pos = geom.attributes.position, ao = geom.attributes.ao || null;
   const count = pos.count; const col = new Float32Array(count * 3);
   geom.computeBoundingBox(); const bb = geom.boundingBox; const size = new THREE.Vector3(); bb.getSize(size);
   for (let i = 0; i < count; i++) {
@@ -74,7 +74,7 @@ export function bakeWear(geom, mode = 'box', amount = 1, grime = 0.5, palm = 0) 
     // pseudo-random per-vertex grime so it isn't uniform
     const h = Math.sin(pos.getX(i) * 913.1 + pos.getY(i) * 471.7 + pos.getZ(i) * 233.9) * 43758.5453; const r = h - Math.floor(h);
     col[i * 3] = Math.min(1, wear * amount * (0.55 + 0.45 * r));
-    col[i * 3 + 1] = grime * (0.6 + 0.4 * r);
+    col[i * 3 + 1] = Math.min(1, grime * (0.6 + 0.4 * r) + (ao ? ao.getX(i) : 0)); // + optional per-vertex baked occlusion ('ao' attribute)
     col[i * 3 + 2] = palm; // b: palm/pad mask (glove material darkens + pebbles it)
   }
   geom.setAttribute('color', new THREE.BufferAttribute(col, 3));

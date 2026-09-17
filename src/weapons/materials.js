@@ -95,7 +95,7 @@ export function makeTextures() {
   const gloveNormal = normalFromHeight(gloveH, S, 2.6);
   const gloveMap = canvasTex(S, (g) => {
     const img = g.createImageData(S, S); const d = img.data;
-    for (let i = 0; i < S * S; i++) { const v = 0.66 + crease[i] * 0.3 + (weave[i] - 0.5) * 0.22 - seam[i] * 0.42; const ro = 0.8 + crease[i] * 0.2 - seam[i] * 0.1; d[i * 4] = Math.max(0, Math.min(255, v * 255)); d[i * 4 + 1] = Math.max(0, Math.min(255, ro * 255)); d[i * 4 + 2] = 255; d[i * 4 + 3] = 255; }
+    for (let i = 0; i < S * S; i++) { const cr = crease[i]; const v = 0.5 + cr * 0.55 + (weave[i] - 0.5) * 0.3 - seam[i] * 0.55 - (cr < 0.35 ? (0.35 - cr) * 0.9 : 0); const ro = 0.85 + cr * 0.15 - seam[i] * 0.1; d[i * 4] = Math.max(0, Math.min(255, v * 255)); d[i * 4 + 1] = Math.max(0, Math.min(255, ro * 255)); d[i * 4 + 2] = 255; d[i * 4 + 3] = 255; }
     g.putImageData(img, 0, 0);
   });
   // --- palm: pebbled synthetic leather (small dimple grid + noise), used through the glove material's vertex-color b channel
@@ -106,7 +106,7 @@ export function makeTextures() {
   const cA = noiseField(S, 51, 3, 5, 0.5), cB = noiseField(S, 52, 4, 7, 0.55), cC = noiseField(S, 53, 5, 11, 0.5), cD = noiseField(S, 54, 2, 4, 0.5);
   const camoMap = canvasTex(S, (g) => {
     const img = g.createImageData(S, S); const d = img.data;
-    const tones = [[0x6e, 0x66, 0x44], [0x46, 0x50, 0x2c], [0x4a, 0x38, 0x24], [0x2c, 0x34, 0x20], [0x8c, 0x84, 0x62]];
+    const tones = [[0x6c, 0x67, 0x4e], [0x4b, 0x52, 0x38], [0x4c, 0x40, 0x30], [0x32, 0x37, 0x28], [0x86, 0x81, 0x68]]; // multicam, desaturated ~25%
     for (let i = 0; i < S * S; i++) {
       const a = cA[i], b2 = cB[i], c = cC[i], dd = cD[i]; let t;
       if (c > 0.7 && a > 0.5) t = 4; else if (b2 > 0.58) t = 1; else if (a > 0.56 && c < 0.5) t = 2; else if (dd < 0.44 && b2 < 0.46) t = 3; else t = 0;
@@ -179,11 +179,11 @@ export function makeMaterials(tex) {
     blackout: new THREE.MeshBasicMaterial({ color: 0x030303 }),
     dot: new THREE.MeshBasicMaterial({ color: 0xff1a10, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }),
     // coyote-tan tactical glove: nylon/leather weave with stitched seams; palm patches darker & pebbled (vertex color b); fingertip dirt via edge wear
-    glove: injectWear(new THREE.MeshStandardMaterial({ color: 0x7a5c3c, roughness: 0.86, metalness: 0.0, map: rep(tex.gloveMap, 2.2), roughnessMap: rep(tex.gloveMap, 2.2), normalMap: rep(tex.gloveNormal, 2.2), normalScale: new THREE.Vector2(0.9, 0.9), envMapIntensity: 0.5 }), { wearColor: [0.3, 0.25, 0.2], wearRough: 0.95, wearMetal: 0, grimeDark: 0.3, wearScale: 0.9, palmColor: [0.2, 0.185, 0.17] }),
+    glove: injectWear(new THREE.MeshStandardMaterial({ color: 0x6b5236, roughness: 0.9, metalness: 0.0, map: rep(tex.gloveMap, 3.0), roughnessMap: rep(tex.gloveMap, 3.0), normalMap: rep(tex.gloveNormal, 3.0), normalScale: new THREE.Vector2(1.1, 1.1), envMapIntensity: 0.0 }), { wearColor: [0.62, 0.55, 0.42], wearRough: 0.92, wearMetal: 0, grimeDark: 0.6, wearScale: 0.8, palmColor: [0.17, 0.155, 0.14] }),
     // hard knuckle plate: slightly glossy dark grey polymer
     knuckle: injectWear(new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.5, metalness: 0.05, normalMap: rep(tex.polymerNormal, 3), normalScale: new THREE.Vector2(0.4, 0.4), envMapIntensity: 0.7 }), { wearColor: [0.5, 0.5, 0.48], wearRough: 0.35, wearMetal: 0, wearScale: 0.8 }),
     // multicam sleeve with creases (bump) and a rolled cuff
-    sleeve: injectWear(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.93, metalness: 0.0, map: rep(tex.camoMap, 1.6), bumpMap: rep(tex.camoBump, 1.6), bumpScale: 0.006, normalMap: rep(tex.gloveNormal, 5), normalScale: new THREE.Vector2(0.35, 0.35), envMapIntensity: 0.35 }), { wearColor: [0.55, 0.52, 0.42], wearRough: 0.95, wearMetal: 0, grimeDark: 0.35, wearScale: 0.3 }),
+    sleeve: injectWear(new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.95, metalness: 0.0, map: rep(tex.camoMap, 1.6), bumpMap: rep(tex.camoBump, 1.6), bumpScale: 0.012, normalMap: rep(tex.gloveNormal, 6), normalScale: new THREE.Vector2(0.8, 0.8), envMapIntensity: 0.0 }), { wearColor: [0.55, 0.52, 0.42], wearRough: 0.95, wearMetal: 0, grimeDark: 0.35, wearScale: 0.3 }),
     // grenade body
     olive: injectWear(new M({ color: 0x3c4a2e, roughness: 0.6, metalness: 0.3, map: rep(tex.grunge, 2), roughnessMap: rep(tex.grunge, 2), normalMap: rep(tex.metalNormal, 2), normalScale: nsMetal }), { wearColor: [0.6, 0.6, 0.58], wearRough: 0.35, wearMetal: 0.9 }),
   };

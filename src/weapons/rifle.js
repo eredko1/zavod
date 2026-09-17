@@ -204,8 +204,8 @@ export function buildRifle(mats, opts = {}) {
   group.add(right); parts.armR = right;
   // Left hand under the handguard, C-clamp on the hand stop. Fingers → right, palm → up.
   const left = buildArm('left', { curl: [0.5, 0.8, 0.9, 0.95, 1.0], spread: 0.02, thumbUp: 0.55, forearmLen: 0.32 }, (hand, fore) => {
-    hand.position.set(-0.052, 0.026, -0.245);
-    orient(hand, [0, 0, -1], [0.55, -0.83, 0]); // thumb forward over the top-left, fingers diagonal down-right, wrapping under to the right face
+    hand.position.set(-0.053, 0.03, -0.215);
+    orient(hand, [0.05, 0.06, -1], [0.42, -0.9, 0]); // C-clamp: palm on the left face, thumb forward over the top, fingers wrap under to the right; back of the hand faces the eye
     fore.position.copy(hand.position); fore.lookAt(-0.21, -0.34, -0.12); fore.rotateX(Math.PI / 2);
   }, mats);
   group.add(left); parts.armL = left;
