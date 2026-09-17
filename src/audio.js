@@ -124,6 +124,8 @@ export function update(dt, ctx) {
     // rain toggle: mute the rain bed and its drips when settings.rain is off (wind/hum/thunder stay)
     const rainOn = ctx.settings?.rain !== false; if (rainOn !== update._rainOn) { update._rainOn = rainOn; try { E.ambience.rain.gain.setTargetAtTime(rainOn ? 1 : 0, now, 0.25); } catch (e) {} }
     E.ambience.rainOff = !rainOn;
+    // per-map ambience hints: dry day maps get no storm; interiors get no wind (proper day/interior beds are a later block)
+    const amb = ctx.world?.ambience || 'rain-industrial'; if (amb !== update._amb) { update._amb = amb; const indoor = /terminal/.test(amb), dry = amb !== 'rain-industrial'; E.ambience.indoor = indoor; if (dry) { try { E.ambience.rain.gain.setTargetAtTime(0, now, 0.2); } catch (e) {} E.ambience.rainOff = true; } try { E.ambience.wind.gain.setTargetAtTime(indoor ? 0.05 : 1, now, 0.3); } catch (e) {} }
     E.ambience.schedule(now + 0.8);
     const p = ctx.player;
     E.updateVitals(now, { health: p?.health ?? 100, maxHealth: p?.maxHealth ?? 100, playing: ctx.state === 'playing', paused: ctx.state === 'paused' });

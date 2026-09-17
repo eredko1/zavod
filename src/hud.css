@@ -339,3 +339,6 @@
   #hud .wrow .ds { display: none; }
   #hud .wrow .nm { font-size: 15px; }
 }
+
+/* sniper scope view: the scope overlay owns the reticle */
+#hud.scoped .xh, #hud.scoped .compass, #hud.scoped .obj { opacity: 0 !important; }

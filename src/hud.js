@@ -188,6 +188,7 @@ export function update(dt, ctx) {
   const ads = typeof w?.ads === 'number' ? w.ads : (w?.ads || p?.ads ? 1 : 0);
   const adsOn = ads > 0.5;
   if (adsOn !== c.ads) { c.ads = adsOn; H.xh.classList.toggle('ads', adsOn); }
+  const scoped = !!w?.scoped; if (scoped !== c.scoped) { c.scoped = scoped; H.root.classList.toggle('scoped', scoped); } // sniper scope: weapons draws the reticle
   if (!adsOn) {
     let gap;
     if (typeof w?.spread === 'number') {

@@ -87,7 +87,7 @@ export class Ambience {
       nx.drip += -Math.log(1 - r()) * 0.42 + 0.03;                           // exponential inter-arrival, mean ~0.45 s
     }
     if (!opts.noEvents) {
-      while (nx.thunder < until) { this.play('thunder', { t: nx.thunder, near: r(), pan: r() * 1.4 - 0.7 }); nx.thunder += 25 + r() * 45; }
+      while (nx.thunder < until) { if (!this.rainOff && !this.indoor) this.play('thunder', { t: nx.thunder, near: r(), pan: r() * 1.4 - 0.7 }); nx.thunder += 25 + r() * 45; } // no storms on dry/indoor maps
       while (nx.gunfire < until) { this.play('dist_gunfire', { t: nx.gunfire, pan: r() * 1.8 - 0.9, volume: 0.5 + r() * 0.5 }); nx.gunfire += 8 + r() * 18; }
       while (nx.siren < until) { this.play('siren', { t: nx.siren, len: 6 + r() * 8, pan: r() * 1.8 - 0.9 }); nx.siren += 120 + r() * 200; }
     }
