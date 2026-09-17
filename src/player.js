@@ -93,7 +93,7 @@ export async function init(ctx) {
     qaClearTrace() { S.qaTrace.length = 0; },
   };
   ctx.player = p;
-  const spawn = ctx.world?.playerSpawns?.[0]; if (spawn) p.position.copy(spawn);
+  { const sp = ctx.world?.playerSpawns || []; const spawn = sp.length ? sp[Math.floor(Math.random() * sp.length)] : null; if (spawn) p.position.copy(spawn); } // random initial spawn (unseeded on purpose: varies every play)
   applyCamera(p, ctx);
   return p;
 }
@@ -117,12 +117,10 @@ function respawn(silent = false) {
   const ctx = ctxRef, p = ctx.player;
   const spawns = ctx.world?.playerSpawns?.length ? ctx.world.playerSpawns : [p.position.clone()];
   const enemies = (ctx.ai?.soldiers ?? []).filter(s => s && s.position && s.state !== 'dead' && (s.health ?? 1) > 0);
-  let best = spawns[0], bestD = -1;
-  for (const s of spawns) {
-    let d = Infinity; for (const e of enemies) d = Math.min(d, s.distanceTo(e.position));
-    if (enemies.length === 0) d = ctx.rng ? ctx.rng() : Math.random();
-    if (d > bestD) { bestD = d; best = s; }
-  }
+  // random among the safer half of spawns (far from live enemies) so respawns vary but never drop you into a squad
+  const scored = spawns.map(s => { let d = Infinity; for (const e of enemies) d = Math.min(d, s.distanceTo(e.position)); return { s, d: enemies.length ? d : 1 }; }).sort((a, b) => b.d - a.d);
+  const pool = scored.slice(0, Math.max(1, Math.ceil(scored.length / 2))).filter(x => x.d > 12 || x === scored[0]);
+  let best = (pool[Math.floor(Math.random() * pool.length)] || scored[0]).s;
   const wasDead = p.dead;
   p.dead = false; p.health = p.maxHealth; S.lastDamage = -99; S.deathT = 0;
   p.teleport(best.x, best.y, best.z, p.yaw, 0);
