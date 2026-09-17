@@ -1,5 +1,11 @@
-// MAP: TERMINAL — STUB. Owned by: TERMINAL agent (this file plus ../terminal/*.js helpers and assets/models/terminal/).
+// MAP: GRAND CENTRAL — real Grand Central Terminal (Manhattan), four levels. Owned by: TERMINAL agent (helpers in ../terminal/*). See ../terminal/RESEARCH.md.
 import * as THREE from 'three';
+import { P } from '../terminal/plan.js';
+import { makeMats } from '../terminal/mats.js';
+import { buildLighting } from '../terminal/lighting.js';
+import { buildConcourse } from '../terminal/concourse.js';
+import { buildSouth } from '../terminal/south.js';
+import { buildSubway } from '../terminal/subway.js';
 
 export const meta = {
   id: 'terminal', name: 'GRAND CENTRAL', subtitle: 'DAY OPS · MAIN CONCOURSE', time: 'day', weather: 'clear',
@@ -8,22 +14,44 @@ export const meta = {
 };
 
 export function build(world) {
-  const { ctx, W, scene } = world;
-  ctx.renderer.toneMappingExposure = 1.0;
-  W.bounds.set(new THREE.Vector3(-70, -1, -70), new THREE.Vector3(70, 40, 70));
-  scene.background = new THREE.Color(0x9fb3c8);
-  scene.fog = new THREE.FogExp2(0x9fb3c8, 0.004);
-  const hemi = new THREE.HemisphereLight(0xbfd4ee, 0x5a5348, 0.9); scene.add(hemi); ctx.lights.hemi = hemi;
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.0); sun.position.set(40, 60, 20); sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096); sun.shadow.camera.left = -80; sun.shadow.camera.right = 80; sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80; sun.shadow.camera.far = 200; sun.shadow.bias = -0.0005;
-  scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x6d6a63, roughness: 0.95 }));
-  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.name = 'ground'; scene.add(floor); world.solid(floor, 'concrete', { collide: false });
-  for (let i = 0; i < 16; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 3), new THREE.MeshStandardMaterial({ color: 0x8a4a3a, roughness: 0.7 })); b.position.set((world.R() - 0.5) * 100, 1.5, (world.R() - 0.5) * 100); b.name = 'stub'; scene.add(b); world.solid(b, 'metal'); }
-  const v = (x, z) => new THREE.Vector3(x, 0, z);
-  W.playerSpawns = [v(0, 55), v(8, 55), v(-8, 55)];
-  W.enemySpawns = [v(-40, -40), v(0, -50), v(40, -40), v(-55, 0), v(55, 0), v(-40, 30), v(40, 30), v(20, -20), v(-20, -20), v(0, -20), v(50, -50), v(-50, -50)];
-  for (let i = 0; i < 40; i++) world.cover((world.R() - 0.5) * 100, (world.R() - 0.5) * 100, 0, 1);
-  W.poses = { spawn: [0, 0, 55, 0, 0], hero: [0, 0, 30, 0, 0], overview: [0, 30, 90, 0, -0.4] };
-  W.surfaceAt = () => 'concrete';
+  const { ctx, W } = world;
+  const B = P.BOUNDS; W.bounds.set(new THREE.Vector3(B.x0, B.y0, B.z0), new THREE.Vector3(B.x1, B.y1, B.z1));
+  const Z = [];                                   // height zones {x0,x1,z0,z1,h|h(x,z)} pushed by the builders
+  world.termLamps = []; world.termBal = []; world.termTrash = []; world.termTurnstiles = []; world.termZones = Z; // shared lists the terminal builders append to (props instances them)
+  const M = makeMats(ctx, world.R, null);
+  ctx.progress(0.13, 'lighting'); buildLighting(world, M);
+  ctx.progress(0.15, 'main concourse'); buildConcourse(world, M, Z);
+  ctx.progress(0.19, 'vanderbilt hall · ramps · dining'); try { buildSouth(world, M, Z); } catch (e) { console.error('[terminal] south', e); }
+  ctx.progress(0.22, 'subway'); try { buildSubway(world, M, Z); } catch (e) { console.error('[terminal] subway', e); }
+  ctx.progress(0.235, 'props'); import('../terminal/props.js').then((m) => m.buildProps(world, M)).catch((e) => console.warn('[terminal] props skipped', e?.message || e));
+
+  W.groundHeight = (x, z) => {
+    let h = 0;
+    for (let i = 0; i < Z.length; i++) { const q = Z[i]; if (x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1) h = typeof q.h === 'function' ? q.h(x, z) : q.h; }
+    return h;
+  };
+  W.surfaceAt = (p) => (p.y < -1 && p.z > 55 ? 'concrete' : 'concrete');
+
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+  W.playerSpawns = [v(-36, 0, 0), v(-34, 0, 8), v(-34, 0, -8)];
+  // concourse-floor spawns only until the AI nav is height-aware (balcony/lower-level spawns come with that block)
+  W.enemySpawns = [v(36, 0, 0), v(34, 0, 10), v(34, 0, -10), v(20, 0, 14), v(20, 0, -14), v(0, 0, -15), v(-8, 0, 15), v(14, 0, 4), v(14, 0, -4), v(26, 0, 0), v(6, 0, -12), v(6, 0, 12), v(-14, 0, -15), v(30, 0, 16)];
+  if (W.coverPoints.length < 40) {
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; world.cover(Math.cos(a) * 4.2, Math.sin(a) * 4.2, Math.cos(a), Math.sin(a)); }   // info booth ring
+    for (const x of [-30, -18, -6, 6, 18, 30]) { world.cover(x, 16.5, 0, -1); world.cover(x, -16.5, 0, 1); }                                          // wall piers
+    for (const [x, z] of [[-20, 0], [20, 0], [-26, 5], [-26, -5], [26, 5], [26, -5]]) world.cover(x, z, Math.sign(-x), 0);                          // stair feet
+  }
+  W.poses = {
+    spawn: [-36, 0, 0, -Math.PI / 2, 0.02],
+    hero: [-30, 0, 6, -1.35, 0.14],
+    overview: [-38, 6, 0, -Math.PI / 2, -0.12],
+    clock: [7, 0, 5, 0.95, 0.12],
+    stairs: [-16, 0, 0, Math.PI / 2, 0.18],
+    mezzanine: [36, 6, 0, Math.PI / 2, -0.05],
+    vanderbilt: [0, 0, 44, 0, 0.1],
+    ramp: [-40, 0, 25, -Math.PI / 2, -0.05],
+    dining: [-16, -6, 36, 1.2, 0.05],
+    platform: [-20, -12, 63, -Math.PI / 2, 0.05],
+    ceiling: [0, 0, 0, 0, 1.2],
+  };
 }

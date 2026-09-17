@@ -1,0 +1,291 @@
+// TERMINAL — Main Concourse shell: floor, walls, windows, celestial vault, balconies, Garnier stairs, info booth + clock, ticket offices, boards. TERMINAL agent.
+import * as THREE from 'three';
+import { Bucket, archPath, wallGeo, placeXY, mat4, lathe, balustrade, instanced, stairSteps } from './kit.js';
+import { P } from './plan.js';
+
+function archHole(cx, y0, w, h) { const p = new THREE.Path(); const r = w / 2, yc = y0 + h - r; p.moveTo(cx - r, y0); p.lineTo(cx + r, y0); p.lineTo(cx + r, yc); p.absarc(cx, yc, r, 0, Math.PI, false); p.lineTo(cx - r, y0); p.closePath(); return p; }
+function rectHole(x0, y0, x1, y1) { const p = new THREE.Path(); p.moveTo(x0, y0); p.lineTo(x1, y0); p.lineTo(x1, y1); p.lineTo(x0, y1); p.closePath(); return p; }
+
+/** Elliptical vault section height at z (|z| ≤ half). */
+export function vaultY(z) { const t = Math.min(1, Math.abs(z) / -P.Z0); return P.CORNICE + (P.APEX - P.CORNICE) * Math.sqrt(Math.max(0, 1 - t * t)); }
+
+export function buildConcourse(world, M, Z) {
+  const { ctx, scene, R } = world;
+  const B = new Bucket(world);
+  const uv = (m) => m.userData.uv ?? 0.5;
+  const { X0, X1, Z0, Z1, CORNICE, APEX, WALL_T: T, BAL_Y, BAL_X } = P;
+
+  // ---- floor (Tennessee pink marble) --------------------------------------------------
+  B.box(M.marbleFloor, [X0 - 2, -0.6, Z0 - 2], [X1 + 2, 0, Z1 + 2], { uvScale: uv(M.marbleFloor) });
+
+  // ---- long walls (N/S) to the cornice, with pilasters -------------------------------------
+  // south wall: central arch (bridge), two corner openings (ramps), clerestory arches, tall grilled windows
+  {
+    const holesS = [archHole(0, 0, P.BRIDGE_HX * 2 - 1, 9)];
+    for (const s of [-1, 1]) holesS.push(archHole(s * (P.OPEN_X0 + P.OPEN_X1) / 2, 0, P.OPEN_X1 - P.OPEN_X0, 6));
+    for (const cx of [-24, -12, 0, 12, 24]) holesS.push(archHole(cx, 13.5, 6.4, 8));      // clerestory
+    for (const cx of [-30, -18, -6, 6, 18, 30]) holesS.push(rectHole(cx - 1.6, 6.5, cx + 1.6, 12));   // tall grilled windows
+    const shape = new THREE.Shape(); shape.moveTo(X0 - T, 0); shape.lineTo(X1 + T, 0); shape.lineTo(X1 + T, CORNICE); shape.lineTo(X0 - T, CORNICE); shape.closePath();
+    const g = wallGeo(shape, holesS, T); B.add(M.stone, g, placeXY(0, 0, Z1), { uvScale: uv(M.stone) });
+    // glass behind clerestory + tall windows (bright daylight), grilles over tall windows
+    for (const cx of [-24, -12, 0, 12, 24]) { const gl = new THREE.ShapeGeometry(archShapeAt(cx, 13.5, 6.4, 8)); B.add(M.glass, gl, placeXY(0, 0, Z1 + T * 0.55), { uvScale: uv(M.glass) }); }
+    for (const cx of [-30, -18, -6, 6, 18, 30]) { const gl = new THREE.PlaneGeometry(3.2, 5.5); B.add(M.glassDim, gl, mat4(cx, 9.25, Z1 + T * 0.6), { uvScale: uv(M.glassDim) }); B.add(M.bronze, grilleGeo(3.2, 5.5), mat4(cx, 9.25, Z1 + 0.25)); }
+    // colliders: wall segments (leave the 3 openings)
+    world.box([X0 - 2, 0, Z1], [-P.OPEN_X1, 40, Z1 + T]); world.box([-P.OPEN_X0, 0, Z1], [-P.BRIDGE_HX + 0.5, 40, Z1 + T]);
+    world.box([P.BRIDGE_HX - 0.5, 0, Z1], [P.OPEN_X0, 40, Z1 + T]); world.box([P.OPEN_X1, 0, Z1], [X1 + 2, 40, Z1 + T]);
+    world.box([X0 - 2, 6, Z1], [X1 + 2, 40, Z1 + T]); // lintels over openings
+  }
+  // north wall: solid with arched niches (closed doors to the MetLife passage) above the north balcony
+  {
+    const holesN = [];
+    for (const cx of [-24, -12, 0, 12, 24]) holesN.push(archHole(cx, 13.5, 6.4, 8));
+    const shape = new THREE.Shape(); shape.moveTo(X0 - T, 0); shape.lineTo(X1 + T, 0); shape.lineTo(X1 + T, CORNICE); shape.lineTo(X0 - T, CORNICE); shape.closePath();
+    const g = wallGeo(shape, holesN, T); B.add(M.stone, g, placeXY(0, 0, Z0 - T), { uvScale: uv(M.stone) });
+    for (const cx of [-24, -12, 0, 12, 24]) { const gl = new THREE.ShapeGeometry(archShapeAt(cx, 13.5, 6.4, 8)); B.add(M.glassDim, gl, placeXY(0, 0, Z0 - T * 0.55), { uvScale: uv(M.glassDim) }); }
+    world.box([X0 - 2, 0, Z0 - T], [X1 + 2, 40, Z0]);
+    // doors on the north balcony back wall (dark bronze, recessed look)
+    for (const cx of [-20, 0, 20]) B.box(M.bronze, [cx - 1.6, BAL_Y, Z0 - 0.1], [cx + 1.6, BAL_Y + 3.6, Z0 + 0.05], { uvScale: 1 });
+  }
+  // pilasters on long walls (paired, rising to the cornice) + cornice band + bulb strings
+  {
+    const pil = [];
+    for (const x of [-36, -24, -12, 0, 12, 24, 36]) for (const zz of [Z1, Z0]) {
+      const dir = zz > 0 ? -1 : 1;
+      pil.push([x - 3.6, zz + dir * 0.35], [x + 3.6, zz + dir * 0.35]);
+    }
+    for (const [x, z] of pil) { B.box(M.stone, [x - 0.6, 0, Math.min(z, z + (z > 0 ? -0.7 : 0.7))], [x + 0.6, CORNICE - 1.2, Math.max(z, z + (z > 0 ? -0.7 : 0.7))], { uvScale: uv(M.stone) }); }
+    // cornice (long walls + end walls), a projecting band under the vault spring
+    B.box(M.marble, [X0 - T, CORNICE - 1.2, Z1 - 1.0], [X1 + T, CORNICE + 0.3, Z1 + 0.2], { uvScale: uv(M.marble) });
+    B.box(M.marble, [X0 - T, CORNICE - 1.2, Z0 - 0.2], [X1 + T, CORNICE + 0.3, Z0 + 1.0], { uvScale: uv(M.marble) });
+    // frieze band above the balcony arcade
+    B.box(M.marble, [X0, BAL_Y + 3.9, Z1 - 0.7], [X1, BAL_Y + 4.6, Z1 + 0.1], { uvScale: uv(M.marble) });
+    B.box(M.marble, [X0, BAL_Y + 3.9, Z0 - 0.1], [X1, BAL_Y + 4.6, Z0 + 0.7], { uvScale: uv(M.marble) });
+  }
+
+  // ---- end walls (E/W): lunette to the vault with three 18 m arched windows ------------------------
+  for (const side of [-1, 1]) {
+    const shape = new THREE.Shape(); const hw = -Z0 + T; // local x = world z (mirrored for one side; symmetric)
+    shape.moveTo(-hw, 0); shape.lineTo(hw, 0); shape.lineTo(hw, CORNICE); shape.absellipse(0, CORNICE, hw, APEX - CORNICE + 0.6, 0, Math.PI, false); shape.lineTo(-hw, 0); shape.closePath();
+    const holes = [];
+    for (const cz of [-12.5, 0, 12.5]) holes.push(archHole(cz, 11, 9, 18));
+    // ground-level arcade niches (passages to Vanderbilt Ave / Lexington Ave) — closed with grilles
+    for (const cz of [-12.5, 0, 12.5]) holes.push(archHole(cz, 0, 5, 6));
+    // balcony-level arched openings (shops behind)
+    for (const cz of [-12.5, 0, 12.5]) holes.push(archHole(cz, BAL_Y, 4.6, 5.2));
+    const g = wallGeo(shape, holes, T);
+    const x = side < 0 ? X0 - T : X1 + T; const yaw = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+    B.add(M.stone, g, placeXY(x, 0, 0, yaw), { uvScale: uv(M.stone) });
+    // glass panes + catwalk bands + mullion posts
+    for (const cz of [-12.5, 0, 12.5]) {
+      const gl = new THREE.ShapeGeometry(archShapeAt(cz, 11, 9, 18));
+      const gx = side < 0 ? X0 - T * 0.45 : X1 + T * 0.45;
+      B.add(M.glass, gl, placeXY(gx, 0, 0, yaw), { uvScale: uv(M.glass) });
+      for (const yy of [17, 23]) B.box(M.bronze, [Math.min(gx, gx - side * 0.5), yy - 0.25, cz - 4.5], [Math.max(gx, gx - side * 0.5), yy + 0.25, cz + 4.5], { uvScale: 1 });
+      for (const dz of [-3, -1, 1, 3]) B.box(M.bronze, [Math.min(gx, gx - side * 0.3), 11, cz + dz - 0.12], [Math.max(gx, gx - side * 0.3), 24.5, cz + dz + 0.12], { uvScale: 1 });
+      // dim glass in the ground niches + balcony openings (interior spaces beyond)
+      B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(cz, 0, 5, 6)), placeXY(gx - side * 0.2, 0, 0, yaw), { uvScale: uv(M.glassDim) });
+      B.add(M.plasterDark, new THREE.ShapeGeometry(archShapeAt(cz, BAL_Y, 4.6, 5.2)), placeXY(gx - side * 0.2, 0, 0, yaw), { uvScale: 0.5 });
+    }
+    world.box(side < 0 ? [X0 - T - 1, 0, Z0 - 2] : [X1, 0, Z0 - 2], side < 0 ? [X0, 44, Z1 + 2] : [X1 + T + 1, 44, Z1 + 2]);
+    // end arch: deep coffered band following the vault edge
+    const pts = []; for (let i = 0; i <= 40; i++) { const zz = Z0 + (Z1 - Z0) * i / 40; pts.push(new THREE.Vector3(side < 0 ? X0 + 1.2 : X1 - 1.2, vaultY(zz) - 0.6, zz)); }
+    const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.9, 10, false);
+    B.add(M.marble, tube, null, { uvScale: uv(M.marble) });
+  }
+
+  // ---- celestial vault -----------------------------------------------------------------------
+  {
+    const NX = 84, NZ = 48; const pos = [], uvs = [], idx = [];
+    for (let i = 0; i <= NX; i++) for (let j = 0; j <= NZ; j++) {
+      const x = X0 - T + (X1 - X0 + 2 * T) * i / NX; const th = Math.PI * j / NZ; // th: 0 at z=Z1 → π at z=Z0
+      const z = Math.cos(th) * (Z1 + 0.05); const y = CORNICE + Math.sin(th) * (APEX - CORNICE);
+      pos.push(x, y, z); uvs.push(i / NX, j / NZ);
+    }
+    for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) { const a = i * (NZ + 1) + j, b = a + NZ + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); g.setIndex(idx); g.computeVertexNormals();
+    // ensure normals face inward (down)
+    const n = g.attributes.normal; if (n.getY(Math.floor(n.count / 2)) > 0) { const ix = g.index.array; for (let k = 0; k < ix.length; k += 3) { const t = ix[k + 1]; ix[k + 1] = ix[k + 2]; ix[k + 2] = t; } g.computeVertexNormals(); }
+    const vaultMat = M.vault.clone(); vaultMat.side = THREE.FrontSide; vaultMat.name = 'vault';
+    const mesh = new THREE.Mesh(g, vaultMat); mesh.name = 'vault'; mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh); world.solid(mesh, 'concrete', { collide: false, shadow: false });
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    // roof slab above the vault so no sun leaks through the top (shadow caster)
+    B.box(M.plasterDark, [X0 - 3, APEX + 0.6, Z0 - 3], [X1 + 3, APEX + 1.2, Z1 + 3], { uvScale: 0.2 });
+    // longitudinal gilded ribs at the vault spring + mid
+    for (const zz of [Z1 - 0.4, Z0 + 0.4]) B.box(M.brassDark, [X0, CORNICE + 0.2, zz - 0.25], [X1, CORNICE + 0.7, zz + 0.25], { uvScale: 1 });
+  }
+
+  // ---- balconies (+6): W/E full width, north strip; slabs, undersides, balustrades, arcade with grilles -----
+  {
+    const y0 = BAL_Y - 0.6, y1 = BAL_Y;
+    for (const side of [-1, 1]) {
+      const bx0 = side < 0 ? X0 : BAL_X, bx1 = side < 0 ? -BAL_X : X1;
+      B.box(M.marble, [bx0, y0, Z0], [bx1, y1, Z1], { uvScale: uv(M.marble) });
+      world.walkable([bx0, y0, Z0], [bx1, y1, Z1]);
+      Z.push({ x0: bx0, x1: bx1, z0: Z0, z1: Z1, h: BAL_Y });
+      // balustrade on the balcony front, except where the stair landing/flights meet it (|z| < UP_Z1)
+      const fx = side < 0 ? -BAL_X : BAL_X;
+      for (const [za, zb] of [[Z0 + 0.2, -P.UP_Z1], [P.UP_Z1, Z1 - 0.2]]) { balustrade(B, M.marble, M.marble, [fx, za], [fx, zb], { y: BAL_Y, instBal: world.termBal }); world.box([fx - 0.15, BAL_Y, Math.min(za, zb)], [fx + 0.15, BAL_Y + 1.1, Math.max(za, zb)]); }
+      balustrade(B, M.marble, M.marble, [fx, -P.LAND_Z], [fx, P.LAND_Z], { y: BAL_Y, instBal: world.termBal }); world.box([fx - 0.15, BAL_Y, -P.LAND_Z], [fx + 0.15, BAL_Y + 1.1, P.LAND_Z]);
+      // arcade under the balcony front (|z| > UP_Z1): piers + arches + bronze grilles (closed passages)
+      const arcX0 = Math.min(fx, fx - side * 0.9), arcX1 = Math.max(fx, fx - side * 0.9);
+      for (const s2 of [-1, 1]) {
+        const za = s2 * P.UP_Z1, zb = s2 * Z1; const zc = (za + zb) / 2; // one 5 m arch per corner span (7 m)
+        const shape = new THREE.Shape(); const lo = Math.min(za, zb), hi = Math.max(za, zb);
+        shape.moveTo(lo, 0); shape.lineTo(hi, 0); shape.lineTo(hi, y0 + 0.01); shape.lineTo(lo, y0 + 0.01); shape.closePath();
+        const g = wallGeo(shape, [archHole(zc, 0, 4.6, 5.0)], 0.9);
+        B.add(M.stone, g, placeXY(side < 0 ? arcX1 : arcX0, 0, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2), { uvScale: uv(M.stone) });
+        B.add(M.bronze, grilleGeo(4.6, 5.0, { arch: true }), placeXY(fx, 0, zc, side < 0 ? Math.PI / 2 : -Math.PI / 2));
+        world.box([arcX0 - 0.1, 0, lo], [arcX1 + 0.1, y0, hi]);
+        // lit passage behind: back wall glow + a warm bulb strip
+        B.box(M.bulb, [side < 0 ? X0 + 1 : X1 - 5, 3.4, zc - 1.5], [side < 0 ? X0 + 5 : X1 - 1, 3.5, zc + 1.5], { uvScale: 1 });
+      }
+      // under-balcony ceiling (coffered look) + solid mass filling behind the stair (under landing) is done in stairs
+      B.box(M.plaster, [bx0, y0 - 0.3, Z0], [bx1, y0, Z1], { uvScale: 0.5 });
+      // sign band on the arcade lintel
+      const sgn = M.sign(side < 0 ? 'VANDERBILT AVENUE  ·  SHUTTLE  ·  42 ST' : 'LEXINGTON AVENUE  ·  GRAYBAR PASSAGE', { bg: '#3a2c18', fg: '#e8c56a', font: 'bold 60px Georgia, serif' });
+      const sg = new THREE.PlaneGeometry(14, 0.9); B.add(sgn, sg, mat4(fx - side * 0.01, y0 - 0.55, side < 0 ? 0 : 0, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2));
+    }
+    // north balcony
+    B.box(M.marble, [-BAL_X, y0, Z0], [BAL_X, y1, P.BAL_NZ], { uvScale: uv(M.marble) });
+    world.walkable([-BAL_X, y0, Z0], [BAL_X, y1, P.BAL_NZ]);
+    Z.push({ x0: -BAL_X, x1: BAL_X, z0: Z0, z1: P.BAL_NZ, h: BAL_Y });
+    balustrade(B, M.marble, M.marble, [-BAL_X, P.BAL_NZ], [BAL_X, P.BAL_NZ], { y: BAL_Y, instBal: world.termBal }); world.box([-BAL_X, BAL_Y, P.BAL_NZ - 0.15], [BAL_X, BAL_Y + 1.1, P.BAL_NZ + 0.15]);
+    B.box(M.plaster, [-BAL_X, y0 - 0.3, Z0], [BAL_X, y0, P.BAL_NZ], { uvScale: 0.5 });
+    // north arcade: track gates (11 arches) with grilles, lit platforms glow behind
+    {
+      const shape = new THREE.Shape(); shape.moveTo(-BAL_X, 0); shape.lineTo(BAL_X, 0); shape.lineTo(BAL_X, y0 + 0.01); shape.lineTo(-BAL_X, y0 + 0.01); shape.closePath();
+      const holes = []; const gates = [];
+      for (let i = 0; i < 11; i++) { const cx = -28 + i * 5.6; holes.push(archHole(cx, 0, 3.6, 4.6)); gates.push(cx); }
+      const g = wallGeo(shape, holes, 0.9); B.add(M.stone, g, placeXY(0, 0, P.BAL_NZ - 0.9), { uvScale: uv(M.stone) });
+      for (const cx of gates) { B.add(M.bronze, grilleGeo(3.6, 4.6, { arch: true }), placeXY(cx, 0, P.BAL_NZ - 0.45)); }
+      world.box([-BAL_X - 0.1, 0, P.BAL_NZ - 1.0], [BAL_X + 0.1, y0, P.BAL_NZ]);
+      // gate numbers (generic)
+      let tn = 42; for (const cx of gates) { const s = M.sign(`TRACK ${tn}`, { w: 512, h: 128, bg: '#1a1a1a', fg: '#f2e6c8', font: 'bold 64px Georgia, serif' }); B.add(s, new THREE.PlaneGeometry(1.8, 0.45), mat4(cx, 4.85, P.BAL_NZ + 0.01)); tn -= 3; }
+      B.box(M.bulb, [-BAL_X + 1, 3.6, Z0 + 0.6], [BAL_X - 1, 3.7, Z0 + 0.7], { uvScale: 1 });
+      // platform-ish glow surfaces behind the gates (train shed hint)
+      B.box(M.plasterDark, [-BAL_X, 0, Z0], [BAL_X, y0, Z0 + 0.4], { uvScale: 0.5 });
+    }
+  }
+
+  // ---- Garnier stairs (west and east) -----------------------------------------------------------------
+  for (const side of [-1, 1]) {
+    const sx = (x) => side * x; // mirror helper (west uses negative x)
+    // lower flight: from x=-20 to -26 (west) rising 0→3, width 8
+    const lower = stairSteps(world, B, M.marble, { x: sx(P.ST_X0), z: 0, dir: [side < 0 ? -1 : 1, 0], width: P.ST_HALF * 2, run: Math.abs(P.ST_X1 - P.ST_X0), rise: 3, n: 16, depthUnder: 0.6, uvScale: uv(M.marble) });
+    Z.push({ x0: Math.min(sx(P.ST_X0), sx(P.ST_X1)), x1: Math.max(sx(P.ST_X0), sx(P.ST_X1)), z0: -P.ST_HALF, z1: P.ST_HALF, h: (x) => { const a = Math.abs(x - sx(P.ST_X0)); const i = Math.min(15, Math.floor(a / lower.stepRun)); return (i + 1) * lower.stepRise; } });
+    // landing y=3: x∈[-26,-31], z∈[-5.5,5.5]
+    const lx0 = Math.min(sx(P.ST_X1), sx(-P.BAL_X)), lx1 = Math.max(sx(P.ST_X1), sx(-P.BAL_X));
+    B.box(M.marble, [lx0, -0.6, -P.LAND_Z], [lx1, 3, P.LAND_Z], { uvScale: uv(M.marble) }); world.walkable([lx0, -0.6, -P.LAND_Z], [lx1, 3, P.LAND_Z]);
+    Z.push({ x0: lx0, x1: lx1, z0: -P.LAND_Z, z1: P.LAND_Z, h: 3 });
+    // upper return flights: x∈[-31,-28.5], from |z|=5.5 to 11.5 rising 3→6
+    for (const s2 of [-1, 1]) {
+      const ux0 = Math.min(sx(-P.BAL_X), sx(P.UP_X0)), ux1 = Math.max(sx(-P.BAL_X), sx(P.UP_X0));
+      const up = stairSteps(world, B, M.marble, { x: (ux0 + ux1) / 2, z: s2 * P.LAND_Z, dir: [0, s2], width: ux1 - ux0, run: P.UP_Z1 - P.LAND_Z, rise: 3, y0: 3, n: 16, depthUnder: 3.6, uvScale: uv(M.marble) });
+      Z.push({ x0: ux0, x1: ux1, z0: Math.min(s2 * P.LAND_Z, s2 * P.UP_Z1), z1: Math.max(s2 * P.LAND_Z, s2 * P.UP_Z1), h: (x, z) => { const a = Math.abs(z - s2 * P.LAND_Z); const i = Math.min(15, Math.floor(a / up.stepRun)); return 3 + (i + 1) * up.stepRise; } });
+      // sloped outer parapet along the flight (x = UP_X0 side) + end cap at the top
+      slopedParapet(B, world, M.marble, [sx(P.UP_X0) - side * 0.15, 3, s2 * P.LAND_Z], [sx(P.UP_X0) - side * 0.15, 6, s2 * P.UP_Z1], 0.3, 1.0);
+      world.box([Math.min(sx(P.UP_X0), sx(P.UP_X0) - side * 0.3), 3, Math.min(s2 * P.LAND_Z, s2 * P.UP_Z1)], [Math.max(sx(P.UP_X0), sx(P.UP_X0) - side * 0.3), 7.0, Math.max(s2 * P.LAND_Z, s2 * P.UP_Z1)]);
+      // landing edge balustrade (z = ±5.5, between x=-26 and -28.5)
+      const bz = s2 * P.LAND_Z; balustrade(B, M.marble, M.marble, [Math.min(sx(P.ST_X1), sx(P.UP_X0)), bz], [Math.max(sx(P.ST_X1), sx(P.UP_X0)), bz], { y: 3, instBal: world.termBal });
+      world.box([Math.min(sx(P.ST_X1), sx(P.UP_X0)), 3, bz - 0.15], [Math.max(sx(P.ST_X1), sx(P.UP_X0)), 4.1, bz + 0.15]);
+      // small jog balustrade at x=-26 between |z| 4 → 5.5
+      const jx = sx(P.ST_X1); balustrade(B, M.marble, M.marble, [jx, s2 * P.ST_HALF], [jx, bz], { y: 3, instBal: world.termBal }); world.box([jx - 0.15, 3, Math.min(s2 * P.ST_HALF, bz)], [jx + 0.15, 4.1, Math.max(s2 * P.ST_HALF, bz)]);
+      // lower flight cheek walls (sloped) at z=±4
+      slopedParapet(B, world, M.marble, [sx(P.ST_X0), 0, s2 * (P.ST_HALF + 0.15)], [sx(P.ST_X1), 3, s2 * (P.ST_HALF + 0.15)], 0.3, 1.0, 'z');
+      const cx0 = Math.min(sx(P.ST_X0), sx(P.ST_X1)), cx1 = Math.max(sx(P.ST_X0), sx(P.ST_X1));
+      world.box([cx0, 0, Math.min(s2 * P.ST_HALF, s2 * (P.ST_HALF + 0.3))], [cx1, 4.0, Math.max(s2 * P.ST_HALF, s2 * (P.ST_HALF + 0.3))]);
+      // newel posts with brass lamps at the flight bottom
+      const nx = sx(P.ST_X0) + side * 0.15, nz = s2 * (P.ST_HALF + 0.15);
+      B.box(M.marble, [nx - 0.35, 0, nz - 0.35], [nx + 0.35, 1.5, nz + 0.35], { uvScale: uv(M.marble) });
+      B.add(M.brass, new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8), mat4(nx, 2.1, nz));
+      B.add(M.lampGlass, new THREE.SphereGeometry(0.28, 14, 10), mat4(nx, 2.85, nz));
+      world.termLamps.push([nx, 2.85, nz]);
+    }
+    // solid mass under the upper flights/landing gap (x∈[-31,-28.5], |z|<5.5 is landing; fine)
+    // wall closing the under-balcony space behind the landing (|z| < UP_Z1), with an arched niche on the landing
+    const wx0 = Math.min(sx(-P.BAL_X), sx(-P.BAL_X - 0.9)), wx1 = Math.max(sx(-P.BAL_X), sx(-P.BAL_X - 0.9));
+    B.box(M.stone, [wx0, -0.6, -P.UP_Z1], [wx1, BAL_Y - 0.6, P.UP_Z1], { uvScale: uv(M.stone) }); world.box([wx0 - 0.1, -0.6, -P.UP_Z1], [wx1 + 0.1, BAL_Y - 0.6, P.UP_Z1]);
+    const fxw = sx(-P.BAL_X) - side * 0.03, yaww = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+    B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(0, 3, 3, 2.3)), placeXY(fxw, 0, 0, yaww), { uvScale: uv(M.glassDim) });
+    B.add(M.bronze, grilleGeo(3, 2.3, { arch: true }), placeXY(fxw - side * 0.05, 3, 0, yaww));
+    const sgn = M.sign(side < 0 ? 'VANDERBILT AVENUE  ·  DINING CONCOURSE  ·  SUBWAY' : 'LEXINGTON AVENUE  ·  EAST BALCONY  ·  SUBWAY', { bg: '#2a1e10', fg: '#e8c56a', font: 'bold 52px Georgia, serif' });
+    B.add(sgn, new THREE.PlaneGeometry(9, 0.45), mat4(fxw - side * 0.05, BAL_Y - 0.3, 0, 0, yaww, 0));
+  }
+
+  // ---- information booth + four-faced clock -------------------------------------------------------------
+  {
+    const r = 3.1;
+    B.add(M.marble, new THREE.CylinderGeometry(r, r + 0.15, 1.1, 18), mat4(0, 0.55, 0), { uvScale: uv(M.marble) });
+    B.add(M.darkGlass, new THREE.CylinderGeometry(r - 0.08, r - 0.08, 1.5, 18), mat4(0, 1.85, 0));
+    for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; B.box(M.brass, [-0.06, 1.1, -0.06], [0.06, 2.65, 0.06], { uvScale: 1 }); const g = B.parts.get(M.brass); const last = g[g.length - 1]; last.applyMatrix4(mat4(Math.cos(a) * r, 0, Math.sin(a) * r, 0, -a)); }
+    B.add(M.brass, new THREE.CylinderGeometry(r + 0.25, r + 0.1, 0.25, 18), mat4(0, 2.75, 0));
+    B.add(M.brassDark, lathe([[r + 0.1, 0], [r - 0.3, 0.35], [r * 0.6, 0.62], [0.55, 0.85], [0.3, 0.9]], 36), mat4(0, 2.88, 0));
+    // clock: pedestal, four opal faces, acorn finial
+    B.add(M.brass, new THREE.CylinderGeometry(0.22, 0.3, 0.6, 16), mat4(0, 4.05, 0));
+    B.add(M.brass, new THREE.BoxGeometry(0.78, 0.78, 0.78), mat4(0, 4.72, 0));
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; const fx = Math.sin(a) * 0.4, fz = Math.cos(a) * 0.4; B.add(M.clockFace, new THREE.CylinderGeometry(0.31, 0.31, 0.03, 32), mat4(fx, 4.72, fz, Math.PI / 2, a, 0)); B.add(M.brass, new THREE.TorusGeometry(0.33, 0.03, 8, 32), mat4(fx, 4.72, fz, 0, a, 0)); }
+    B.add(M.brass, lathe([[0, 0], [0.12, 0.05], [0.16, 0.2], [0.08, 0.36], [0, 0.45]], 16), mat4(0, 5.11, 0));
+    world.box([-r - 0.15, 0, -r - 0.15], [r + 0.15, 2.9, r + 0.15]);
+    Z.booth = { x: 0, z: 0, r };
+    world.termLamps.push([0, 4.4, 0]);
+    // the "information" sign band
+    const sgn = M.sign('INFORMATION', { bg: '#151515', fg: '#f0e2c0', w: 1024, h: 96, font: 'bold 64px Georgia, serif' });
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; B.add(sgn, new THREE.PlaneGeometry(2.4, 0.3), mat4(Math.sin(a) * (r + 0.27), 2.75, Math.cos(a) * (r + 0.27), 0, a, 0)); }
+  }
+
+  // ---- ticket offices along the south wall + departure boards ------------------------------------------------
+  for (const side of [-1, 1]) {
+    const x0 = Math.min(side * P.TICK_X0, side * P.TICK_X1), x1 = Math.max(side * P.TICK_X0, side * P.TICK_X1);
+    B.box(M.marble, [x0, 0, P.TICK_Z0], [x1, P.TICK_H, Z1], { uvScale: uv(M.marble), collide: true });
+    B.box(M.brassDark, [x0, P.TICK_H - 0.5, P.TICK_Z0 - 0.06], [x1, P.TICK_H, P.TICK_Z0 - 0.02], { uvScale: 1 });
+    const sgn = M.sign('TICKETS   ·   METRO-NORTH   ·   TICKETS', { bg: '#1b1611', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
+    B.add(sgn, new THREE.PlaneGeometry(x1 - x0 - 0.4, 0.45), mat4((x0 + x1) / 2, P.TICK_H - 0.25, P.TICK_Z0 - 0.07, 0, Math.PI, 0));
+    for (let x = x0 + 1.2; x < x1 - 0.8; x += 2.4) { B.add(M.bronze, grilleGeo(1.4, 1.5), mat4(x, 1.85, P.TICK_Z0 - 0.04, 0, Math.PI, 0)); B.box(M.darkGlass, [x - 0.7, 1.1, P.TICK_Z0 - 0.02], [x + 0.7, 2.6, P.TICK_Z0], { uvScale: 1 }); B.box(M.marbleDark, [x - 0.8, 0.95, P.TICK_Z0 - 0.35], [x + 0.8, 1.1, P.TICK_Z0], { uvScale: 1 }); }
+    // departure board above (canvas emissive) framed in brass
+    const bd = M.board(side < 0 ? 'DEPARTURES' : 'ARRIVALS');
+    B.box(M.brassDark, [x0 + 1.5, 4.6, Z1 - 0.32], [x1 - 1.5, 9.2, Z1 - 0.05], { uvScale: 1 });
+    B.add(bd, new THREE.PlaneGeometry(x1 - x0 - 3.4, 4.2), mat4((x0 + x1) / 2, 6.9, Z1 - 0.34, 0, Math.PI, 0));
+    for (let i = 0; i < 3; i++) world.cover(x0 + 2 + i * (x1 - x0 - 4) / 2, P.TICK_Z0 - 0.7, 0, -1);
+  }
+
+  const meshes = B.flush((m) => (m === M.brass || m === M.brassDark || m === M.bronze || m === M.ironDark ? 'metal' : m === M.wood ? 'wood' : 'concrete'), { name: 'concourse' });
+  return meshes;
+}
+
+// ---- helpers ------------------------------------------------------------------------------------------------
+export function archShapeAt(cx, y0, w, h) { const s = new THREE.Shape(); const r = w / 2, yc = y0 + h - r; s.moveTo(cx - r, y0); s.lineTo(cx + r, y0); s.lineTo(cx + r, yc); s.absarc(cx, yc, r, 0, Math.PI, false); s.lineTo(cx - r, y0); s.closePath(); return s; }
+
+/** Bronze grille: lattice of thin bars filling w×h (base at y=0 local, centered on x), optional arched top. */
+export function grilleGeo(w, h, { arch = false, pitch = 0.32 } = {}) {
+  const geos = []; const r = w / 2; const bar = 0.035;
+  const topAt = (x) => arch ? (h - r + Math.sqrt(Math.max(0, r * r - x * x))) : h;
+  for (let x = -r + pitch / 2; x < r; x += pitch) { const t = topAt(x); const g = new THREE.BoxGeometry(bar, t, bar); g.translate(x, t / 2, 0); geos.push(g); }
+  for (let y = pitch / 2; y < h; y += pitch) { const g = new THREE.BoxGeometry(w, bar, bar); g.translate(0, y, 0); geos.push(g); }
+  const g = new THREE.BoxGeometry(w, 0.12, 0.08); g.translate(0, 1.0, 0); geos.push(g); // mid rail
+  const out = mergeGeos(geos); return out;
+}
+function mergeGeos(geos) { const ng = geos.map(g => g.index ? g.toNonIndexed() : g); let total = 0; for (const g of ng) total += g.attributes.position.count; const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), uv = new Float32Array(total * 2); let off = 0; for (const g of ng) { pos.set(g.attributes.position.array, off * 3); nor.set(g.attributes.normal.array, off * 3); uv.set(g.attributes.uv.array, off * 2); off += g.attributes.position.count; } const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); out.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); return out; }
+
+/** Sloped parapet (box whose top follows from→to). axis: 'x' if it runs along x, 'z' along z. thickness t, height h above the slope. */
+export function slopedParapet(B, world, mat, from, to, t, h, axis = null) {
+  axis = axis || (Math.abs(to[0] - from[0]) > Math.abs(to[2] - from[2]) ? 'x' : 'z');
+  const p = []; const push = (x, y, z) => p.push(x, y, z);
+  const y0a = from[1] - 0.05, y1a = from[1] + h, y0b = to[1] - 0.05, y1b = to[1] + h;
+  const base = Math.min(from[1], to[1]) - 3.5; // extend below to hide the stair mass edge
+  if (axis === 'x') {
+    const z0 = from[2] - t / 2, z1 = from[2] + t / 2, xa = from[0], xb = to[0];
+    const v = [[xa, base, z0], [xb, base, z0], [xb, y1b, z0], [xa, y1a, z0], [xa, base, z1], [xb, base, z1], [xb, y1b, z1], [xa, y1a, z1]];
+    boxFaces(v, push);
+  } else {
+    const x0 = from[0] - t / 2, x1 = from[0] + t / 2, za = from[2], zb = to[2];
+    const v = [[x0, base, za], [x0, base, zb], [x0, y1b, zb], [x0, y1a, za], [x1, base, za], [x1, base, zb], [x1, y1b, zb], [x1, y1a, za]];
+    boxFaces(v, push);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.computeVertexNormals();
+  B.add(mat, g, null, { uvScale: mat.userData.uv ?? 0.5 });
+  void y0a; void y0b;
+}
+function boxFaces(v, push) {
+  const q = (a, b, c, d) => { for (const i of [a, c, b, a, d, c]) push(...v[i]); };
+  q(0, 1, 2, 3); q(5, 4, 7, 6); q(4, 0, 3, 7); q(1, 5, 6, 2); q(3, 2, 6, 7); q(4, 5, 1, 0);
+}
