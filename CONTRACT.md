@@ -120,3 +120,6 @@ Web Audio, procedural synthesis + optional CC0 samples under assets/audio (< 20 
 ## Ladders & chained jumps (2026-09-16)
 - `world.ladder(x, z, y0, y1, nx, nz)` registers a climbable ladder (face at x,z; normal nx,nz points away from the wall toward the climber) and builds a simple rail+rung mesh. The platform behind the top MUST be a collider whose top is `y1` (player steps onto `(x - nx*0.75, y1, z - nz*0.75)`). Every multi-level map should offer ladders as an alternative to stairs onto roofs/containers/catwalks.
 - Player: 3 jumps chained within 0.35 s of each landing → super jump (×1.75 height, ×1.35 horizontal, 2.5 s cooldown; emits `superjump`). `ctx.player.jumpChain`, `.superJump`, `.superBlend`, `.climbing` are readable by HUD/weapons/audio.
+
+## Map 6 (queued): Coney Island (`coney`)
+Boardwalk + beach + amusement area (Wonder Wheel, Cyclone silhouette, Parachute Jump tower), Nathan's-style stands, Stillwell Ave station, MCU Park — same real-place research/accuracy standard. Day, summer light. Note: user already has a Coney Island Three.js scene in ~/Code/SurfersCode (coney.js) that can be mined for layout/landmarks.
