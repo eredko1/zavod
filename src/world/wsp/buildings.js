@@ -36,7 +36,7 @@ export function buildBuildings(world, T) {
       ctx.colliders.push(box3(x0, 0, z0, x1, 92, z1));
       continue;
     }
-    push(style, facadeBox(x0, x1, z0, z1, 0, h, 4 * BAY_W, style === 'row' ? 17.2 : style === 'sandstone' ? 4 * 3.6 : 4 * FLOOR_H));
+    push(style, facadeBox(x0, x1, z0, z1, 0, h, 4 * BAY_W, style === 'row' ? 17.2 : style === 'sandstone' ? 4 * 3.6 : style === 'church' ? 20 : 4 * FLOOR_H));
     roofs.push(roofGeo(x0, x1, z0, z1, h));
     // parapet / cornice ledge
     push(style, cornice(x0, x1, z0, z1, h));
@@ -136,7 +136,7 @@ function buildStoops(B, stone, iron, doors, ctx) {
 /** Judson Memorial Church campanile (≈ 40 m, yellow brick, open belfry, pyramid roof) at the church's NE corner. */
 function buildJudsonTower(world) {
   const { ctx, scene } = world;
-  const mat = new THREE.MeshStandardMaterial({ color: 0xc9aa6c, roughness: 0.85 });
+  const mat = new THREE.MeshStandardMaterial({ map: facadeTexture(world.R, 'church', { bays: 2 }), roughness: 0.85 }); mat.map.repeat.set(1, 1);
   const cx = -18.5, cz = 91, w = 7.5;
   const shaft = new THREE.Mesh(new THREE.BoxGeometry(w, 34, w), mat); shaft.position.set(cx, 17, cz); scene.add(shaft); world.solid(shaft, 'concrete');
   // belfry: corner piers + dark arched openings

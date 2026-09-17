@@ -15,7 +15,7 @@ export function buildSky(world) {
   scene.background = FOG_COLOR.clone();
   scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0022);
 
-  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6b6a5e, 0.45); scene.add(hemi); ctx.lights.hemi = hemi;
+  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6b6a5e, 0.7); scene.add(hemi); ctx.lights.hemi = hemi;
   const sun = new THREE.DirectionalLight(0xfff0d8, 5.5);
   sun.position.copy(sunDir).multiplyScalar(220); sun.target.position.set(0, 0, 0);
   sun.castShadow = true; const sm = sun.shadow;

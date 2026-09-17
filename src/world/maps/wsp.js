@@ -52,18 +52,18 @@ export function build(world) {
   ];
   W.poses = {
     spawn: [-13, 0, 80, 0.05, 0.0],
-    hero: [-12, 0, 33, -0.14, 0.03],            // from the S rim of the fountain plaza: basin + jets, arch behind, One Fifth through it
-    overview: [-150, 80, 150, -0.78, -0.48],
+    hero: [-17, 0, 15, -0.24, 0.05],            // from the S rim of the fountain plaza: basin + jets, arch behind, One Fifth through it
+    overview: [-215, 95, 135, -0.95, -0.5],
     arch: [1.5, 0, -22, 0, 0.12],               // on the axis, looking north through the arch up Fifth Avenue
     attic: [A.cx + 5, roofY, A.cz - 1, 0.25, -0.35],
-    fountain: [0, FOUNTAIN.floor, 8, 0, 0.05],
+    fountain: [-6, FOUNTAIN.floor, 9, -0.55, 0.04],
     chess: [-118, 0, 42, 1.25, 0.0],
     mounds: [-92, 0, 40, 1.3, 0.05],
     row: [30, 0, -70, 0.15, 0.12],              // The Row from the north walk
     bobst: [28, 0, 76.5, -1.75, 0.12],          // along Washington Sq S: Bobst ahead-right, Kimmel right
     macdougal: [-168, 0, 90, 0.0, 0.05],
-    kimmel: [-4, 0, 66, -0.5, 0.14],
-    judson: [-14, 0, 62, 0.35, 0.16],
+    kimmel: [-10, 0, 62, -2.6, 0.16],
+    judson: [-2, 0, 75.5, 2.2, 0.22],
     garibaldi: [48, 0, 4, -1.2, 0.05],
     fifth: [0, 0, -100, 0, 0.08],
   };

@@ -24,13 +24,13 @@ const rnd = (R, a, b) => a + R() * (b - a);
 /** Hexagonal asphalt pavers (WSP paths): dark blue-grey hex tiles, pale mortar joints. Tile = 512 px covers ~2.0 m (hex ≈ 30 cm across flats). */
 export function hexPaverTexture(R) {
   const S = 512; const [c, g] = canvas(S, S);
-  g.fillStyle = '#5e6165'; g.fillRect(0, 0, S, S);                 // mortar (dark, low contrast)
+  g.fillStyle = '#66676a'; g.fillRect(0, 0, S, S);                 // mortar (dark, low contrast)
   const cols = 8; const a = S / (cols * 1.5);                       // hex circumradius so the tile wraps: width per column = 1.5a
   const hgt = Math.sqrt(3) * a; const rows = Math.round(S / hgt);   // approximately wrap in y
   const aY = S / rows / Math.sqrt(3);
   for (let r = -1; r <= rows + 1; r++) for (let q = -1; q <= cols + 1; q++) {
     const cx = q * 1.5 * a, cy = r * Math.sqrt(3) * aY + (q & 1 ? Math.sqrt(3) * aY / 2 : 0);
-    const v = rnd(R, -12, 12); const base = [78 + v, 81 + v, 86 + v];
+    const v = rnd(R, -12, 12); const base = [86 + v, 87 + v, 90 + v];
     g.fillStyle = `rgb(${base[0] | 0},${base[1] | 0},${base[2] | 0})`;
     g.beginPath(); for (let i = 0; i < 6; i++) { const t = Math.PI / 3 * i; const px = cx + (a - 2.2) * Math.cos(t), py = cy + (aY - 2.2) * Math.sin(t); i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill();
     // wear highlights
@@ -123,15 +123,29 @@ export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {})
     g.fillStyle = P.glass; g.fillRect(0, 0, S, S);
     for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(${150 + R() * 80 | 0},${170 + R() * 60 | 0},${190 + R() * 50 | 0},${R() * 0.25})`; g.fillRect(R() * S, R() * S, 30 + R() * 90, 3 + R() * 8); }
   }
+  if (style === 'church') {
+    // yellow Roman brick courses + a big round-arched window per bay on the upper half, small arched openings below, corbel band
+    g.fillStyle = P.wall2; for (let y = 0; y < S; y += 5) g.fillRect(0, y, S, 1);
+    for (let b = 0; b < bays; b++) {
+      const x0 = b * (S / bays), bw2 = S / bays; const wx = x0 + bw2 * 0.25, ww = bw2 * 0.5;
+      const arch = (y, h) => { g.beginPath(); g.moveTo(wx, y + h); g.lineTo(wx, y + ww / 2); g.arc(wx + ww / 2, y + ww / 2, ww / 2, Math.PI, 0); g.lineTo(wx + ww, y + h); g.closePath(); };
+      g.fillStyle = P.trim; g.save(); g.translate(0, -6); arch(60, 190); g.fill(); g.restore(); g.fillStyle = 'rgba(0,0,0,0.55)'; arch(60, 190); g.fill(); g.fillStyle = P.glass; g.save(); g.translate(0, 4); arch(60, 182); g.fill(); g.restore();
+      const gr = g.createLinearGradient(0, 60, 0, 250); gr.addColorStop(0, 'rgba(180,140,120,0.35)'); gr.addColorStop(1, 'rgba(40,30,50,0.1)'); g.fillStyle = gr; arch(60, 190); g.fill();
+      g.fillStyle = P.frame; g.fillRect(wx + ww / 2 - 2, 60, 4, 190); g.fillRect(wx, 150, ww, 4);
+      for (const sx of [0.12, 0.62]) { const ax = x0 + bw2 * sx, aw = bw2 * 0.26; g.fillStyle = 'rgba(0,0,0,0.5)'; g.beginPath(); g.moveTo(ax, 500); g.lineTo(ax, 340 + aw / 2); g.arc(ax + aw / 2, 340 + aw / 2, aw / 2, Math.PI, 0); g.lineTo(ax + aw, 500); g.closePath(); g.fill(); }
+    }
+    g.fillStyle = P.trim; g.fillRect(0, 290, S, 8); g.fillRect(0, 12, S, 6); for (let x = 0; x < S; x += 24) g.fillRect(x, 18, 12, 10);
+    return finish(c);
+  }
   const bw = S / bays, fh = S / floors;
   for (let f = 0; f < floors; f++) for (let b = 0; b < bays; b++) {
     const x0 = b * bw, y0 = f * fh;
-    if (style === 'glass') { g.fillStyle = 'rgba(210,214,218,0.85)'; g.fillRect(x0, y0 + fh - 4, bw, 4); g.fillRect(x0, y0, 3, fh); continue; }
+    if (style === 'glass') { g.fillStyle = '#b9bcbf'; g.fillRect(x0, y0 + fh * 0.72, bw, fh * 0.28); g.fillStyle = '#8e9296'; g.fillRect(x0, y0, 4, fh); g.fillRect(x0 + bw / 2 - 1, y0, 2, fh * 0.72); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x0, y0 + fh * 0.72, bw, 3); continue; }
     if (style === 'sandstone') {
       // deep-set narrow window in a grid: pier | window | pier
-      g.fillStyle = P.trim; g.fillRect(x0, y0, bw, 6); g.fillRect(x0, y0, 10, fh);
-      g.fillStyle = P.glass; g.fillRect(x0 + bw * 0.3, y0 + fh * 0.18, bw * 0.4, fh * 0.7);
-      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0 + bw * 0.3, y0 + fh * 0.18, bw * 0.4, 4); g.fillRect(x0 + bw * 0.3, y0 + fh * 0.18, 4, fh * 0.7);
+      // Bobst: two narrow slot windows per bay between deep sandstone piers, spandrel band
+      g.fillStyle = P.trim; g.fillRect(x0, y0, bw, 10); g.fillRect(x0, y0, 12, fh); g.fillRect(x0 + bw / 2 - 5, y0, 10, fh);
+      for (const sx of [0.16, 0.6]) { const wx = x0 + bw * sx, ww = bw * 0.24; g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(wx - 3, y0 + 10, ww + 6, fh - 10); g.fillStyle = P.glass; g.fillRect(wx, y0 + 14, ww, fh - 18); g.fillStyle = 'rgba(120,150,170,0.25)'; g.fillRect(wx, y0 + 14, ww, (fh - 18) * 0.4); }
       continue;
     }
     // punched window with sill + lintel, 2-over-2 sash

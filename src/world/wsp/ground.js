@@ -23,7 +23,7 @@ export function groundHeight(x, z) {
 
 export function buildGround(world, T) {
   const { ctx, scene, R } = world;
-  const hex = hexPaverTexture(R), side = sidewalkTexture(R), granite = graniteTexture(R);
+  const hex = hexPaverTexture(R), side = sidewalkTexture(R), granite = graniteTexture(R, { tone: 176 });
   world.tex = Object.assign(world.tex || {}, { hex, side, granite });
 
   // ---- mask (R hex pavers · G asphalt · B sidewalk · R+G rubber · R+B gravel) ------------------------------------------
@@ -118,11 +118,14 @@ export function buildGround(world, T) {
   };
 
   // ---- outer apron beyond the core (flat, cheap) ------------------------------------------------------------------
-  const apron = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshStandardMaterial({ map: T.asphalt, roughness: 0.9, color: 0x9a9a98 }));
-  apron.material.map.repeat.set(200, 200); apron.rotation.x = -Math.PI / 2; apron.position.y = -0.03; apron.receiveShadow = true; apron.name = 'apron'; scene.add(apron);
+  const apShape = new THREE.Shape(); apShape.moveTo(-700, -700); apShape.lineTo(700, -700); apShape.lineTo(700, 700); apShape.lineTo(-700, 700); apShape.closePath();
+  const apHole = new THREE.Path(); apHole.moveTo(CORE.x0 + 0.5, CORE.z0 + 0.5); apHole.lineTo(CORE.x1 - 0.5, CORE.z0 + 0.5); apHole.lineTo(CORE.x1 - 0.5, CORE.z1 - 0.5); apHole.lineTo(CORE.x0 + 0.5, CORE.z1 - 0.5); apHole.closePath(); apShape.holes.push(apHole);
+  const apGeo = new THREE.ShapeGeometry(apShape); apGeo.rotateX(-Math.PI / 2); const apUV = apGeo.attributes.uv, apP = apGeo.attributes.position; for (let i = 0; i < apUV.count; i++) apUV.setXY(i, apP.getX(i) / 7, apP.getZ(i) / 7);
+  const apron = new THREE.Mesh(apGeo, new THREE.MeshStandardMaterial({ map: T.asphalt, roughness: 0.9, color: 0x9a9a98 }));
+  apron.position.y = -0.03; apron.receiveShadow = true; apron.name = 'apron'; scene.add(apron);
 
   // ---- fountain: floor slab, steps, coping, basin, water ---------------------------------------------------------
-  const granMat = new THREE.MeshStandardMaterial({ map: granite, roughness: 0.6, metalness: 0.02, color: 0xbdbcb8, side: THREE.DoubleSide });
+  const granMat = new THREE.MeshStandardMaterial({ map: granite, roughness: 0.6, metalness: 0.02, color: 0xbfbdb6, side: THREE.DoubleSide });
   granite.repeat.set(1, 1);
   const parts = [];
   const ring = (r0, r1, y) => { const g = new THREE.RingGeometry(r0, r1, 96, 1); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); worldUV(g, 2); parts.push(g); };
@@ -138,7 +141,7 @@ export function buildGround(world, T) {
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(F.basinR + 0.45, F.basinR + 0.45, F.basinH, 64, 1, false), granMat);
   rim.position.y = F.floor + F.basinH / 2; rim.castShadow = rim.receiveShadow = true; rim.userData.surface = 'concrete'; scene.add(rim); ctx.raycastTargets.push(rim);
   ctx.colliders.push(new THREE.Box3(new THREE.Vector3(-F.basinR - 0.45, F.floor - 0.1, -F.basinR - 0.45), new THREE.Vector3(F.basinR + 0.45, F.floor + F.basinH, F.basinR + 0.45)));
-  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x3a5f6e, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.86, envMapIntensity: 1.2, clearcoat: 1, clearcoatRoughness: 0.05 });
+  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x4f8797, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.9, envMapIntensity: 1.4, clearcoat: 1, clearcoatRoughness: 0.04 });
   const water = new THREE.Mesh(new THREE.CircleGeometry(F.basinR, 48), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = F.floor + F.basinH + 0.005; water.name = 'water'; water.userData.surface = 'water'; scene.add(water); ctx.raycastTargets.push(water);
   // jets: a ring of spray quads (crossed, additive-ish alpha) merged into one mesh; scaled in updaters via uniform time
   const sprTex = sprayTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: sprTex, color: 0xf4f8fa, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: true });

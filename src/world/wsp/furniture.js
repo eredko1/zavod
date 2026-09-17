@@ -9,7 +9,7 @@ const M = {};
 const mat = (k, o) => M[k] || (M[k] = new THREE.MeshStandardMaterial(o));
 const BLACK = () => mat('iron', { color: 0x15161a, roughness: 0.55, metalness: 0.6 });
 const WOOD = () => mat('slat', { color: 0x4a3626, roughness: 0.85 });
-const CONC = () => mat('conc', { color: 0xa9a49a, roughness: 0.9 });
+const CONC = () => mat('conc', { color: 0x8f8a82, roughness: 0.9 });
 
 /** Instance a merged geometry at placements [{x,y,z,ry,s}] → InstancedMesh (raycastable, optional per-instance AABB collider). */
 export function instance(world, geo, material, places, { surface = 'metal', collide = null, shadow = true, name = 'inst', colors = null } = {}) {
@@ -173,13 +173,13 @@ function sph(r, x, y, z) { const g = new THREE.SphereGeometry(r, 10, 8); g.trans
 function buildStreet(world, T) {
   const { ctx, scene, R } = world; const V = world.maskSample;
   // ---- car: body + cabin + wheels (one InstancedMesh with per-instance colour) --------------------------------------
-  const body = new THREE.BoxGeometry(4.5, 0.55, 1.8); body.translate(0, 0.55, 0);
-  const cabin = new THREE.BoxGeometry(2.4, 0.55, 1.65); cabin.translate(-0.2, 1.1, 0);
-  const hood = new THREE.BoxGeometry(1.1, 0.12, 1.7); hood.translate(1.5, 0.85, 0);
-  const carGeo = mergeGeos([body, cabin, hood]);
+  // sedan side profile extruded across the width; cabin glass as a second, slightly wider extrusion band
+  const prof = new THREE.Shape(); [[-2.25, 0.32], [2.25, 0.32], [2.3, 0.72], [1.75, 0.82], [0.95, 1.32], [-0.75, 1.38], [-1.85, 0.92], [-2.3, 0.85]].forEach(([x, y], i) => i ? prof.lineTo(x, y) : prof.moveTo(x, y)); prof.closePath();
+  const carGeo = new THREE.ExtrudeGeometry(prof, { depth: 1.76, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 1 }); carGeo.translate(0, 0, -0.88);
+  const gl = new THREE.Shape(); [[0.9, 0.86], [1.55, 0.84], [0.85, 1.28], [-0.7, 1.33], [-1.7, 0.92], [-1.0, 0.86]].forEach(([x, y], i) => i ? gl.lineTo(x, y) : gl.moveTo(x, y)); gl.closePath();
+  const glassG = new THREE.ExtrudeGeometry(gl, { depth: 1.8, bevelEnabled: false }); glassG.translate(0, 0.02, -0.9);
   const wheelG = []; for (const [x, z] of [[1.45, 0.85], [1.45, -0.85], [-1.45, 0.85], [-1.45, -0.85]]) { const w = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12); w.rotateX(Math.PI / 2); w.translate(x, 0.33, z); wheelG.push(w); }
   const wheels = mergeGeos(wheelG);
-  const glassG = new THREE.BoxGeometry(2.2, 0.5, 1.7); glassG.translate(-0.2, 1.12, 0);
   const cars = []; const carCols = [0x1a1a1c, 0xd8d8d8, 0x8a8f96, 0x2b3a6b, 0x6b1f1f, 0xe8e6e0, 0x3a3a3a, 0xf1c232, 0x232323, 0xb5b8bd].map(c => new THREE.Color(c));
   for (const s of STREETS) {
     if (s.cobble) continue;

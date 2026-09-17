@@ -27,7 +27,7 @@ export function buildTrees(world, T) {
     let acc = 0, next = 4;
     for (let i = 0; i + 1 < p.pts.length; i++) {
       const [x0, z0] = p.pts[i], [x1, z1] = p.pts[i + 1]; const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L;
-      while (next <= acc + L) { const d = next - acc; const x = x0 + ux * d, z = z0 + uz * d; for (const sd of [-1, 1]) { const tx = x - uz * sd * (p.w / 2 + 3.2), tz = z + ux * sd * (p.w / 2 + 3.2); if (!blocked(tx, tz) && tx > PARK.x0 + 2 && tx < PARK.x1 - 2 && tz > PARK.z0 + 2 && tz < PARK.z1 - 2) put(tx, tz, 0.9 + R() * 0.35); } next += 9 + R() * 3; }
+      while (next <= acc + L) { const d = next - acc; const x = x0 + ux * d, z = z0 + uz * d; for (const sd of [-1, 1]) { const tx = x - uz * sd * (p.w / 2 + 3.2), tz = z + ux * sd * (p.w / 2 + 3.2); if (!blocked(tx, tz) && tx > PARK.x0 + 2 && tx < PARK.x1 - 2 && tz > PARK.z0 + 2 && tz < PARK.z1 - 2) put(tx, tz, 0.9 + R() * 0.35); } next += 11 + R() * 4; }
       acc += L;
     }
   }
@@ -35,7 +35,7 @@ export function buildTrees(world, T) {
   for (let i = 0; i < 14; i++) { const a = (i + 0.3) / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < 0.2 && Math.cos(a) < 0) continue; if (Math.abs(Math.cos(a)) < 0.16) continue; const x = Math.cos(a) * 26, z = Math.sin(a) * 26; if (!blocked(x, z)) put(x, z, 1.1 + R() * 0.25); }
   for (const x of [-20, 23]) for (const z of [-40, -50, -66]) put(x, z, 1.0 + R() * 0.3);
   // lawn scatter
-  for (let i = 0; i < 900 && trees.length < 230; i++) {
+  for (let i = 0; i < 900 && trees.length < 165; i++) {
     const x = PARK.x0 + 3 + R() * (PARK.x1 - PARK.x0 - 6), z = PARK.z0 + 3 + R() * (PARK.z1 - PARK.z0 - 6);
     if (blocked(x, z) || V(x, z) !== 'lawn') continue; put(x, z, 0.8 + R() * 0.5, R() < 0.25 ? 1 : 0);
   }
@@ -49,11 +49,17 @@ export function buildTrees(world, T) {
   for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.4; const l = new THREE.CylinderGeometry(0.08, 0.18, 4.5, 7); l.translate(0, 2.25, 0); l.rotateZ(0.55); l.rotateY(a); l.translate(0, 7.6, 0); trunkG.push(l); }
   const trunkGeo = mergeGeos(trunkG); scaleUV2(trunkGeo, 1.2, 0.4);
   const canG = [];
-  for (let i = 0; i < 4; i++) { const q = new THREE.PlaneGeometry(15, 12.5); q.translate(0, 11.8, 0); q.rotateY(i / 4 * Math.PI + 0.3); canG.push(q); }
-  for (const [y, s] of [[10.6, 13]]) { const q = new THREE.PlaneGeometry(s, s); q.rotateX(-Math.PI / 2); q.translate(0, y, 0); canG.push(q); }
+  for (let i = 0; i < 4; i++) { const q = new THREE.PlaneGeometry(15, 12.5); q.translate(0, 11.8, 0); q.rotateX((i & 1) ? 0.35 : -0.35); q.rotateY(i / 4 * Math.PI + 0.3); canG.push(q); }
+  { const q = new THREE.PlaneGeometry(11, 11); q.rotateX(-Math.PI / 2 + 0.5); q.translate(0, 12.5, 0); q.rotateY(1.1); canG.push(q); }
   const canopyGeo = mergeGeos(canG);
   const trunkMat = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.9, color: 0xc9c2b0 });
-  const leafMat = (tex) => new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, metalness: 0, color: 0xb9c19c, emissive: 0x16220e, transparent: false });
+  const leafMat = (tex) => {
+    const m = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, metalness: 0, color: 0xaebb93, emissive: 0x0c1408, transparent: false });
+    // foliage cards: light them as if the canopy normal points up (no dark back faces), with a little geometric variation
+    m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, 0.25)); nonPerturbedNormal = normal;'); };
+    m.customProgramCacheKey = () => 'wsp-leaf';
+    return m;
+  };
   const kinds = [trees.filter(t => t.kind === 0), trees.filter(t => t.kind === 1)];
   instance(world, trunkGeo, trunkMat, trees, { surface: 'wood', name: 'trunks', collide: [0.4, 6.5, 0.4] });
   const c0 = instance(world, canopyGeo, leafMat(leafA), kinds[0], { surface: 'wood', name: 'canopyA', shadow: true });
