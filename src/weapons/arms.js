@@ -78,7 +78,8 @@ export function buildHand(side, pose = {}) {
 /** Forearm from wrist point back toward the elbow: length along +Y of the returned group. Tapered camo sleeve + rolled cuff. */
 export function buildForearm(len = 0.3) {
   const g = new THREE.Group(); g.name = 'forearm';
-  const prof = [[0.03, 0.0], [0.037, 0.02], [0.043, 0.09], [0.048, 0.18], [0.052, len * 0.8], [0.054, len], [0.0, len]];
+  len = Math.min(len, 0.26); // keep the elbow off-screen: a long fat sleeve was covering ~20% of the frame (Tarkov shows hand + wrist + a little sleeve)
+  const prof = [[0.03, 0.0], [0.033, 0.02], [0.036, 0.08], [0.039, 0.16], [0.041, len * 0.85], [0.042, len], [0.0, len]];
   const m = new THREE.Mesh(lathe(prof, 14)); m.userData.key = 'sleeve'; m.position.y = -0.005; g.add(m);
   const cuff = new THREE.Mesh(torus(0.037, 0.012, 6, 14)); cuff.userData.key = 'sleeve'; cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.02; cuff.userData.wear = 'all'; cuff.userData.wearAmt = 0.25; g.add(cuff); // rolled cuff
   const cuff2 = new THREE.Mesh(torus(0.041, 0.008, 5, 14)); cuff2.userData.key = 'sleeve'; cuff2.rotation.x = Math.PI / 2; cuff2.position.y = 0.032; g.add(cuff2); // second roll
@@ -108,6 +109,8 @@ export function buildArm(side, pose, place, mats) {
   const hand = buildHand(side, { watch: side === 'left', ...pose }); const fore = buildForearm(pose.forearmLen ?? 0.32);
   root.add(hand); root.add(fore);
   place(hand, fore);
+  // Elbow off-screen: whatever the weapon pose asked for, bend the forearm steeply down and away from the eye (weapon space: -y down, +z toward the camera).
+  { const d = new THREE.Vector3(0, 1, 0).applyQuaternion(fore.quaternion); d.y -= 0.55; d.z -= 0.15; d.x *= 0.9; d.normalize(); fore.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); }
   const b = new Builder();
   bakeGroup(root, b, 'none');
   const g = b.build(mats, `arm_${side}`);
