@@ -13,7 +13,7 @@ export const DEAGLE_SPEC = {
   recoilPitch: 2.3, recoilYaw: 0.7, kickBack: 0.09, kickUp: 0.36, kickRoll: 0.09,
   reloadTime: 2.0, reloadTimeTac: 1.7, swapTime: 0.36, adsTime: 0.2, adsDist: 0.32,
   flashSize: 0.19, flashStrength: 1.3, brassScale: 1.25,
-  hip: { pos: [0.10, -0.13, -0.25], rot: [0.0, 0.06, 0.0] },
+  hip: { pos: [0.06, -0.07, -0.35], rot: [0.02, 0.04, 0.0] },
   sprint: { pos: [0.14, -0.16, -0.27], rot: [-0.3, 0.55, 0.3] },
   lower: { pos: [0.11, -0.35, -0.27], rot: [-0.9, 0.3, 0.2] },
   stats: { damage: 58, rpm: 190, range: 100, mag: 7, mobility: 84, accuracy: 52 },

@@ -81,26 +81,56 @@ export function makeTextures() {
     g.putImageData(img, 0, 0);
   });
 
-  // --- glove: woven fabric + leather creases
-  const weave = new Float32Array(S * S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) weave[y * S + x] = 0.5 + 0.25 * Math.sin(x * 0.9) * Math.sin(y * 0.9) + 0.25 * Math.sin((x + y) * 0.45);
+  // --- glove: coarse nylon weave + leather creases + stitched seams (double dashed lines on a grid)
+  const weave = new Float32Array(S * S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) weave[y * S + x] = 0.5 + 0.22 * Math.sin(x * 1.1) * Math.sin(y * 1.1) + 0.18 * Math.sin((x + y) * 0.5) + 0.1 * Math.sin(x * 0.23) * Math.sin(y * 0.19);
   const crease = noiseField(S, 31, 4, 4, 0.6);
-  const gloveH = new Float32Array(S * S); for (let i = 0; i < S * S; i++) gloveH[i] = weave[i] * 0.45 + crease[i] * 0.55;
-  const gloveNormal = normalFromHeight(gloveH, S, 2.2);
+  const seam = new Float32Array(S * S);
+  {
+    const r2 = prng(77);
+    const lines = [[0, 96], [0, 300], [1, 128], [1, 400], [1, 260]]; // [axis, offset]
+    for (const [ax, off] of lines) for (let t = 0; t < S; t++) { const dash = (Math.floor(t / 9) % 2) === 0; for (let k = -1; k <= 1; k++) for (const side of [-4, 4]) { const u = (off + side + k + S) % S; const i = ax === 0 ? t * S + u : u * S + t; seam[i] = Math.max(seam[i], dash ? 0.9 : 0.25); } }
+    for (let i = 0; i < 900; i++) { const x = (r2() * S) | 0, y = (r2() * S) | 0; seam[y * S + x] = Math.max(seam[y * S + x], r2() * 0.5); } // pilling
+  }
+  const gloveH = new Float32Array(S * S); for (let i = 0; i < S * S; i++) gloveH[i] = weave[i] * 0.4 + crease[i] * 0.5 - seam[i] * 0.35;
+  const gloveNormal = normalFromHeight(gloveH, S, 2.6);
   const gloveMap = canvasTex(S, (g) => {
     const img = g.createImageData(S, S); const d = img.data;
-    for (let i = 0; i < S * S; i++) { const v = 0.7 + crease[i] * 0.3 + (weave[i] - 0.5) * 0.15; d[i * 4] = v * 255; d[i * 4 + 1] = (0.85 + crease[i] * 0.15) * 255; d[i * 4 + 2] = 255; d[i * 4 + 3] = 255; }
+    for (let i = 0; i < S * S; i++) { const v = 0.66 + crease[i] * 0.3 + (weave[i] - 0.5) * 0.22 - seam[i] * 0.42; const ro = 0.8 + crease[i] * 0.2 - seam[i] * 0.1; d[i * 4] = Math.max(0, Math.min(255, v * 255)); d[i * 4 + 1] = Math.max(0, Math.min(255, ro * 255)); d[i * 4 + 2] = 255; d[i * 4 + 3] = 255; }
     g.putImageData(img, 0, 0);
   });
-  return { grunge, metalNormal, polymerNormal, polymerGrunge, gloveNormal, gloveMap };
+  // --- palm: pebbled synthetic leather (small dimple grid + noise), used through the glove material's vertex-color b channel
+  const palmN = noiseField(S, 41, 3, 24, 0.55);
+  const palmH = new Float32Array(S * S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const gx = ((x % 14) - 7) / 7, gy = ((y % 14) - 7) / 7; palmH[y * S + x] = Math.max(0, 1 - (gx * gx + gy * gy)) * 0.6 + palmN[y * S + x] * 0.4; }
+  const palmNormal = normalFromHeight(palmH, S, 2.0);
+  // --- camo sleeve: multicam-style blotches in 4 tones + cream speckle; creases as a bump map
+  const cA = noiseField(S, 51, 3, 5, 0.5), cB = noiseField(S, 52, 4, 7, 0.55), cC = noiseField(S, 53, 5, 11, 0.5), cD = noiseField(S, 54, 2, 4, 0.5);
+  const camoMap = canvasTex(S, (g) => {
+    const img = g.createImageData(S, S); const d = img.data;
+    const tones = [[0x6e, 0x66, 0x44], [0x46, 0x50, 0x2c], [0x4a, 0x38, 0x24], [0x2c, 0x34, 0x20], [0x8c, 0x84, 0x62]];
+    for (let i = 0; i < S * S; i++) {
+      const a = cA[i], b2 = cB[i], c = cC[i], dd = cD[i]; let t;
+      if (c > 0.7 && a > 0.5) t = 4; else if (b2 > 0.58) t = 1; else if (a > 0.56 && c < 0.5) t = 2; else if (dd < 0.44 && b2 < 0.46) t = 3; else t = 0;
+      const k = 0.9 + c * 0.2; const col = tones[t]; d[i * 4] = Math.min(255, col[0] * k); d[i * 4 + 1] = Math.min(255, col[1] * k); d[i * 4 + 2] = Math.min(255, col[2] * k); d[i * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }, { srgb: true });
+  const creaseN = noiseField(S, 61, 4, 6, 0.6);
+  const camoBump = canvasTex(S, (g) => {
+    const img = g.createImageData(S, S); const d = img.data;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const i = y * S + x; const fold = 0.5 + 0.5 * Math.sin(x * 0.045 + creaseN[i] * 9.0) * Math.sin(y * 0.02 + creaseN[i] * 4.0); const v = (0.35 + fold * 0.45 + weave[i] * 0.2) * 255; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; }
+    g.putImageData(img, 0, 0);
+  });
+  return { grunge, metalNormal, polymerNormal, polymerGrunge, gloveNormal, gloveMap, palmNormal, camoMap, camoBump };
 }
 
 /**
  * Injects edge-wear (vertex color .r) + grime (vertex color .g) into a physical material:
  * albedo → wearColor at worn edges, roughness/metalness shift; grime darkens.
  */
-function injectWear(mat, { wearColor = [0.62, 0.6, 0.56], wearRough = 0.32, wearMetal = 1.0, grimeDark = 0.35, wearScale = 1 } = {}) {
+function injectWear(mat, { wearColor = [0.62, 0.6, 0.56], wearRough = 0.32, wearMetal = 1.0, grimeDark = 0.35, wearScale = 1, palmColor = null, palmMap = null } = {}) {
   mat.vertexColors = true;
-  mat.customProgramCacheKey = () => `wear:${wearColor.join(',')}:${wearRough}:${wearMetal}:${grimeDark}`;
+  mat.customProgramCacheKey = () => `wear:${wearColor.join(',')}:${wearRough}:${wearMetal}:${grimeDark}:${palmColor ? palmColor.join(',') : ''}`;
+  if (palmMap) mat.userData.palmMap = palmMap;
   mat.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <color_fragment>', `
@@ -112,10 +142,16 @@ function injectWear(mat, { wearColor = [0.62, 0.6, 0.56], wearRough = 0.32, wear
         float vmGrime = vColor.g;
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${wearColor.map(v => v.toFixed(3)).join(',')}), vmWear);
         diffuseColor.rgb *= mix(1.0, ${(1 - grimeDark).toFixed(3)}, vmGrime * (1.0 - vmMask * 0.5));
+        ${palmColor ? `float vmPalm = vColor.b; float vmPebble = 1.0;
+        #ifdef USE_MAP
+          vmPebble = 0.7 + 0.6 * texture2D( map, vMapUv * 3.1 ).r;
+        #endif
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${palmColor.map(v => v.toFixed(3)).join(',')}) * vmPebble, vmPalm);` : ''}
       `)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, ${wearRough.toFixed(3)}, vmWear);
         roughnessFactor = mix(roughnessFactor, min(1.0, roughnessFactor + 0.25), vmGrime * 0.6);
+        ${palmColor ? 'roughnessFactor = mix(roughnessFactor, 0.92, vColor.b);' : ''}
       `)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
         metalnessFactor = mix(metalnessFactor, ${wearMetal.toFixed(3)}, vmWear);
@@ -130,9 +166,9 @@ export function makeMaterials(tex) {
   const rep = (t, n) => { const c = t.clone(); c.repeat.set(n, n); c.needsUpdate = true; return c; };
   const mats = {
     // anodized aluminum receiver / rails (matte black type-III)
-    metal: injectWear(new M({ color: 0x1c1d1f, roughness: 0.62, metalness: 0.8, map: rep(tex.grunge, 1.5), roughnessMap: rep(tex.grunge, 1.5), normalMap: rep(tex.metalNormal, 1.5), normalScale: nsMetal, envMapIntensity: 0.75 }), { wearColor: [0.62, 0.61, 0.58], wearRough: 0.32, wearMetal: 1, wearScale: 1.0 }),
+    metal: injectWear(new M({ color: 0x08090a, roughness: 0.66, metalness: 0.6, map: rep(tex.grunge, 1.5), roughnessMap: rep(tex.grunge, 1.5), normalMap: rep(tex.metalNormal, 1.5), normalScale: nsMetal, envMapIntensity: 0.55 }), { wearColor: [0.4, 0.4, 0.39], wearRough: 0.35, wearMetal: 1.0, wearScale: 0.9 }),
     // parkerized steel: barrel, flash hider, bolt, charging handle
-    steel: injectWear(new M({ color: 0x232527, roughness: 0.46, metalness: 0.95, map: rep(tex.grunge, 2.5), roughnessMap: rep(tex.grunge, 2.5), normalMap: rep(tex.metalNormal, 2.5), normalScale: nsMetal, envMapIntensity: 1.0 }), { wearColor: [0.66, 0.64, 0.6], wearRough: 0.28, wearMetal: 1, wearScale: 1.1 }),
+    steel: injectWear(new M({ color: 0x0b0c0e, roughness: 0.5, metalness: 0.6, map: rep(tex.grunge, 2.5), roughnessMap: rep(tex.grunge, 2.5), normalMap: rep(tex.metalNormal, 2.5), normalScale: nsMetal, envMapIntensity: 0.6 }), { wearColor: [0.45, 0.44, 0.42], wearRough: 0.3, wearMetal: 1.0, wearScale: 1.0 }),
     // glass-filled polymer: grip, stock, mag, handstop
     polymer: injectWear(new M({ color: 0x141416, roughness: 0.68, metalness: 0.0, map: rep(tex.polymerGrunge, 2), roughnessMap: rep(tex.polymerGrunge, 2), normalMap: rep(tex.polymerNormal, 2), normalScale: nsPoly, envMapIntensity: 0.8 }), { wearColor: [0.36, 0.36, 0.35], wearRough: 0.45, wearMetal: 0, grimeDark: 0.25, wearScale: 0.8 }),
     // FDE polymer accents (mag)
@@ -142,21 +178,12 @@ export function makeMaterials(tex) {
     glass: new M({ color: 0x1a2c58, roughness: 0.02, metalness: 0.0, transparent: true, opacity: 0.42, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2, depthWrite: false, side: THREE.DoubleSide, iridescence: 0.8, iridescenceIOR: 1.5, iridescenceThicknessRange: [200, 500], specularIntensity: 1.5, ior: 1.7, reflectivity: 0.9 }),
     blackout: new THREE.MeshBasicMaterial({ color: 0x030303 }),
     dot: new THREE.MeshBasicMaterial({ color: 0xff1a10, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }),
-    glove: injectWear(new M({ color: 0x2a2b2c, roughness: 0.86, metalness: 0.0, map: rep(tex.gloveMap, 3), roughnessMap: rep(tex.gloveMap, 3), normalMap: rep(tex.gloveNormal, 3), normalScale: nsGlove, envMapIntensity: 0.6, sheen: 0.4, sheenRoughness: 0.8, sheenColor: new THREE.Color(0x444444) }), { wearColor: [0.4, 0.38, 0.35], wearRough: 0.7, wearMetal: 0, grimeDark: 0.2, wearScale: 0.4 }),
-    knuckle: injectWear(new M({ color: 0x1e1f21, roughness: 0.55, metalness: 0.05, normalMap: rep(tex.polymerNormal, 3), normalScale: nsPoly }), { wearColor: [0.35, 0.35, 0.34], wearRough: 0.4, wearMetal: 0 }),
-    sleeve: injectWear(new M({ color: 0x3b4034, roughness: 0.95, metalness: 0.0, map: rep(tex.gloveMap, 4), normalMap: rep(tex.gloveNormal, 4), normalScale: nsGlove, envMapIntensity: 0.4 }), { wearColor: [0.45, 0.46, 0.4], wearRough: 0.9, wearMetal: 0, grimeDark: 0.3, wearScale: 0.3 }),
-    // shotgun shell hulls (red polyethylene) — side-saddle carrier + reload shells
-    shellRed: injectWear(new M({ color: 0x8a1410, roughness: 0.55, metalness: 0.0, map: rep(tex.polymerGrunge, 3), roughnessMap: rep(tex.polymerGrunge, 3), normalMap: rep(tex.polymerNormal, 3), normalScale: nsPoly, envMapIntensity: 0.9, clearcoat: 0.3, clearcoatRoughness: 0.5 }), { wearColor: [0.7, 0.3, 0.25], wearRough: 0.4, wearMetal: 0, grimeDark: 0.3, wearScale: 0.5 }),
-    // bare blued/oiled gun steel with more sheen (sniper barrel/receiver, shotgun receiver)
-    blued: injectWear(new M({ color: 0x1b1d22, roughness: 0.36, metalness: 0.95, map: rep(tex.grunge, 2.2), roughnessMap: rep(tex.grunge, 2.2), normalMap: rep(tex.metalNormal, 2.2), normalScale: new THREE.Vector2(0.4, 0.4), envMapIntensity: 1.15, clearcoat: 0.25, clearcoatRoughness: 0.3 }), { wearColor: [0.7, 0.68, 0.64], wearRough: 0.25, wearMetal: 1, wearScale: 1.2 }),
-    // olive-drab fibreglass sniper stock (HS Precision style, slightly speckled)
-    stockOD: injectWear(new M({ color: 0x2d3324, roughness: 0.62, metalness: 0.0, map: rep(tex.polymerGrunge, 2.5), roughnessMap: rep(tex.polymerGrunge, 2.5), normalMap: rep(tex.polymerNormal, 2.5), normalScale: new THREE.Vector2(0.6, 0.6), envMapIntensity: 0.8 }), { wearColor: [0.5, 0.52, 0.44], wearRough: 0.45, wearMetal: 0, grimeDark: 0.3, wearScale: 0.8 }),
-    // plum/bakelite AK furniture
-    bakelite: injectWear(new M({ color: 0x4a2a24, roughness: 0.45, metalness: 0.0, map: rep(tex.polymerGrunge, 2), roughnessMap: rep(tex.polymerGrunge, 2), normalMap: rep(tex.polymerNormal, 2), normalScale: new THREE.Vector2(0.35, 0.35), envMapIntensity: 1.0, clearcoat: 0.5, clearcoatRoughness: 0.35 }), { wearColor: [0.62, 0.42, 0.34], wearRough: 0.3, wearMetal: 0, grimeDark: 0.3, wearScale: 0.9 }),
-    // laminated wood (AK handguard/stock option)
-    wood: injectWear(new M({ color: 0x5a3a1c, roughness: 0.5, metalness: 0.0, map: rep(tex.grunge, 3), roughnessMap: rep(tex.grunge, 3), normalMap: rep(tex.metalNormal, 3), normalScale: new THREE.Vector2(0.5, 0.5), envMapIntensity: 0.9, clearcoat: 0.6, clearcoatRoughness: 0.3 }), { wearColor: [0.75, 0.6, 0.4], wearRough: 0.35, wearMetal: 0, grimeDark: 0.35, wearScale: 0.8 }),
-    // scope lens (deeper blue-green coating than the red-dot glass)
-    lens: new M({ color: 0x0b2a3a, roughness: 0.02, metalness: 0.0, transparent: true, opacity: 0.55, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.5, depthWrite: false, side: THREE.DoubleSide, iridescence: 1.0, iridescenceIOR: 1.6, iridescenceThicknessRange: [250, 650], specularIntensity: 1.6, ior: 1.8, reflectivity: 1.0 }),
+    // coyote-tan tactical glove: nylon/leather weave with stitched seams; palm patches darker & pebbled (vertex color b); fingertip dirt via edge wear
+    glove: injectWear(new THREE.MeshStandardMaterial({ color: 0x7a5c3c, roughness: 0.86, metalness: 0.0, map: rep(tex.gloveMap, 2.2), roughnessMap: rep(tex.gloveMap, 2.2), normalMap: rep(tex.gloveNormal, 2.2), normalScale: new THREE.Vector2(0.9, 0.9), envMapIntensity: 0.5 }), { wearColor: [0.3, 0.25, 0.2], wearRough: 0.95, wearMetal: 0, grimeDark: 0.3, wearScale: 0.9, palmColor: [0.2, 0.185, 0.17] }),
+    // hard knuckle plate: slightly glossy dark grey polymer
+    knuckle: injectWear(new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.5, metalness: 0.05, normalMap: rep(tex.polymerNormal, 3), normalScale: new THREE.Vector2(0.4, 0.4), envMapIntensity: 0.7 }), { wearColor: [0.5, 0.5, 0.48], wearRough: 0.35, wearMetal: 0, wearScale: 0.8 }),
+    // multicam sleeve with creases (bump) and a rolled cuff
+    sleeve: injectWear(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.93, metalness: 0.0, map: rep(tex.camoMap, 1.6), bumpMap: rep(tex.camoBump, 1.6), bumpScale: 0.006, normalMap: rep(tex.gloveNormal, 5), normalScale: new THREE.Vector2(0.35, 0.35), envMapIntensity: 0.35 }), { wearColor: [0.55, 0.52, 0.42], wearRough: 0.95, wearMetal: 0, grimeDark: 0.35, wearScale: 0.3 }),
     // grenade body
     olive: injectWear(new M({ color: 0x3c4a2e, roughness: 0.6, metalness: 0.3, map: rep(tex.grunge, 2), roughnessMap: rep(tex.grunge, 2), normalMap: rep(tex.metalNormal, 2), normalScale: nsMetal }), { wearColor: [0.6, 0.6, 0.58], wearRough: 0.35, wearMetal: 0.9 }),
   };

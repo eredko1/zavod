@@ -18,19 +18,19 @@ export function buildLighting(world, M) {
   {
     const s = new THREE.Scene();
     const sky = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 8), new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: {}, vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }', fragmentShader: 'varying vec3 vP; void main(){ float h=normalize(vP).y; vec3 c=mix(vec3(0.22,0.17,0.12), vec3(0.55,0.5,0.42), smoothstep(-0.2,0.6,h)); gl_FragColor=vec4(c,1.0); }' }));
-    s.add(sky); scene.environment = pmrem.fromScene(s, 0.02).texture; scene.environmentIntensity = 0.3;
+    s.add(sky); scene.environment = pmrem.fromScene(s, 0.02).texture; scene.environmentIntensity = 0.22;
   }
-  new RGBELoader().load(HDRI_URL, (t) => { t.mapping = THREE.EquirectangularReflectionMapping; const env = pmrem.fromEquirectangular(t).texture; scene.environment = env; scene.environmentIntensity = 0.3; t.dispose(); pmrem.dispose(); }, undefined, () => { console.warn('[terminal] HDRI missing'); pmrem.dispose(); });
+  new RGBELoader().load(HDRI_URL, (t) => { t.mapping = THREE.EquirectangularReflectionMapping; const env = pmrem.fromEquirectangular(t).texture; scene.environment = env; scene.environmentIntensity = 0.22; t.dispose(); pmrem.dispose(); }, undefined, () => { console.warn('[terminal] HDRI missing'); pmrem.dispose(); });
 
   // ---- ambient: hemisphere (cool from the windows above, warm bounce from the pink marble) ----------------
-  const hemi = new THREE.HemisphereLight(0xb9c6d4, 0x6e5a48, 0.34); scene.add(hemi); ctx.lights.hemi = hemi;
+  const hemi = new THREE.HemisphereLight(0xb9c6d4, 0x6e5a48, 0.22); scene.add(hemi); ctx.lights.hemi = hemi;
 
   // ---- sun -------------------------------------------------------------------------------------------------
-  const sun = new THREE.DirectionalLight(0xfff0d2, 2.6);
+  const sun = new THREE.DirectionalLight(0xfff0d2, 4.4);
   sun.position.copy(SUN_DIR).multiplyScalar(150).add(new THREE.Vector3(0, 0, 8)); sun.target.position.set(0, 0, 8);
   sun.castShadow = true; const sm = sun.shadow; sm.mapSize.set(4096, 4096);
   sm.camera.left = -62; sm.camera.right = 62; sm.camera.top = 62; sm.camera.bottom = -62; sm.camera.near = 40; sm.camera.far = 300;
-  sm.bias = -0.00035; sm.normalBias = 0.03; sm.radius = 1.5;
+  sm.bias = -0.0005; sm.normalBias = 0.07; sm.radius = 1.5;
   scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
 
   // ---- window spots (shaft cores): 3 east windows (no shadow) + 2 clerestory (shadowed) -------------------
@@ -52,14 +52,14 @@ export function buildLighting(world, M) {
   pt(-12, 8.2, 40, 0xffd2a0, 140, 34); pt(12, 8.2, 40, 0xffd2a0, 140, 34);   // Vanderbilt Hall chandeliers
   pt(0, -1.6, 24.5, 0xffd0a0, 70, 24);                              // Whispering Gallery
   pt(6, -2.0, 40, 0xffd8b0, 110, 30); pt(-19, -2.5, 36, 0xffc890, 60, 20);   // dining / oyster bar
-  pt(-30, -8.7, 63, 0xd8e8ff, 80, 26); pt(-8, -8.7, 63, 0xd8e8ff, 80, 26); pt(14, -8.7, 63, 0xd8e8ff, 80, 26); pt(36, -8.7, 63, 0xd8e8ff, 80, 26);   // subway fluorescents (cool)
+  pt(-30, -10.2, 63, 0xd8e8ff, 42, 26); pt(-8, -10.2, 63, 0xd8e8ff, 42, 26); pt(14, -10.2, 63, 0xd8e8ff, 42, 26); pt(36, -10.2, 63, 0xd8e8ff, 42, 26);   // subway fluorescents (cool)
   pt(0, -2.8, 54, 0xe4ecff, 60, 20);                                // subway mezzanine
   pt(-22, -9.0, 71.9, 0xf2f6ff, 40, 12);                             // inside the stopped train
 
   // ---- light shafts: additive prisms from each window opening down the sun direction -----------------------
   const shaftMat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
-    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(1.0, 0.86, 0.62) }, uStrength: { value: 0.16 } },
+    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(1.0, 0.86, 0.62) }, uStrength: { value: 0.30 } },
     vertexShader: `
       attribute vec2 aBeam; // x: across (0..1), y: along (0 window → 1 floor)
       varying vec2 vB; varying vec3 vN; varying vec3 vV; varying vec3 vW;
@@ -78,7 +78,7 @@ export function buildLighting(world, M) {
         gl_FragColor = vec4(uColor * a, a);
       }`,
   });
-  const shaftGeos = []; const beamBoxes = [];
+  const shaftGeos = []; const beamBoxes = []; const beamQuads = [];
   const addShaft = (corners /* 4 window corners: bl, br, tr, tl in world */) => {
     const far = corners.map(c => c.clone().addScaledVector(SUN_DIR, -(c.y + 0.05) / SUN_DIR.y));
     const pos = [], beam = [], nor = [];
@@ -95,7 +95,7 @@ export function buildLighting(world, M) {
     quad(mid(bl, tl), mid(br, tr), mid(fbr, ftr), mid(fbl, ftl), [0, 0], [1, 0], [1, 1], [0, 1]);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('aBeam', new THREE.Float32BufferAttribute(beam, 2));
     shaftGeos.push(g);
-    const bb = new THREE.Box3(); for (const c of [...corners, ...far]) bb.expandByPoint(c); beamBoxes.push(bb);
+    const bb = new THREE.Box3(); for (const c of [...corners, ...far]) bb.expandByPoint(c); beamBoxes.push(bb); beamQuads.push([...corners, ...far]);
   };
   // east windows: three 9×18 m arches at x = X1 (inner face), z = -12.5, 0, 12.5, y 11..29 (use the rectangular body + arch approximated by top at 27)
   for (const cz of [-12.5, 0, 12.5]) { const x = P.X1; addShaft([new THREE.Vector3(x, 11.5, cz + 4.3), new THREE.Vector3(x, 11.5, cz - 4.3), new THREE.Vector3(x, 27.5, cz - 3.2), new THREE.Vector3(x, 27.5, cz + 3.2)]); }
@@ -105,14 +105,14 @@ export function buildLighting(world, M) {
     const merged = mergeShaftGeos(shaftGeos);
     const mesh = new THREE.Mesh(merged, shaftMat); mesh.name = 'lightShafts'; mesh.frustumCulled = false; mesh.renderOrder = 5; scene.add(mesh);
   }
-  // dust motes inside the beams
+  // dust motes inside the beams (bilinear sample of window quad → floor quad)
   {
     const N = 2600; const pos = new Float32Array(N * 3), seed = new Float32Array(N);
+    const lerp = (a, b, t) => a.clone().lerp(b, t);
     for (let i = 0; i < N; i++) {
-      const bb = beamBoxes[Math.floor(R() * beamBoxes.length)];
-      // sample along the beam: pick a window-space point then slide along SUN_DIR
-      const t = R(); const p = new THREE.Vector3(bb.min.x + R() * (bb.max.x - bb.min.x), 0, bb.min.z + R() * (bb.max.z - bb.min.z));
-      p.y = bb.min.y + R() * (bb.max.y - bb.min.y);
+      const q = beamQuads[Math.floor(R() * beamQuads.length)]; const [bl, br, tr, tl, fbl, fbr, ftr, ftl] = q;
+      const u = R(), v = R(), t = R();
+      const w = lerp(lerp(bl, br, u), lerp(tl, tr, u), v), f = lerp(lerp(fbl, fbr, u), lerp(ftl, ftr, u), v); const p = lerp(w, f, t);
       pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; seed[i] = R() * 100 + t;
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));

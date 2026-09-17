@@ -135,7 +135,15 @@ export function buildConcourse(world, M, Z) {
       Z.push({ x0: bx0, x1: bx1, z0: Z0, z1: Z1, h: BAL_Y });
       // balustrade on the balcony front, except where the stair landing/flights meet it (|z| < UP_Z1)
       const fx = side < 0 ? -BAL_X : BAL_X;
-      for (const [za, zb] of [[Z0 + 0.2, -P.UP_Z1], [P.UP_Z1, Z1 - 0.2]]) { balustrade(B, M.marble, M.marble, [fx, za], [fx, zb], { y: BAL_Y, instBal: world.termBal }); world.box([fx - 0.15, BAL_Y, Math.min(za, zb)], [fx + 0.15, BAL_Y + 1.1, Math.max(za, zb)]); }
+      // balcony tabs beyond the return flights: x∈[∓31,∓28.5], |z|∈[11.5,18.5] at +6 (collider slab, the flights land on them)
+      const tx0 = Math.min(fx, side * P.UP_X0), tx1 = Math.max(fx, side * P.UP_X0);
+      for (const [za, zb] of [[Z0, -P.UP_Z1], [P.UP_Z1, Z1]]) {
+        const lo = Math.min(za, zb), hi = Math.max(za, zb);
+        B.box(M.marble, [tx0, y0, lo], [tx1, y1, hi], { uvScale: uv(M.marble) }); world.walkable([tx0, y0, lo], [tx1, y1, hi]);
+        B.box(M.plaster, [tx0, y0 - 0.3, lo], [tx1, y0, hi], { uvScale: 0.5 });
+        const tfx = side * P.UP_X0; balustrade(B, M.marble, M.marble, [tfx, lo + 0.1], [tfx, hi - 0.1], { y: BAL_Y, instBal: world.termBal }); world.box([tfx - 0.15, BAL_Y, lo], [tfx + 0.15, BAL_Y + 1.1, hi]);
+        // short return balustrade closing the tab's inner corner at |z| = 11.5 is not needed: the flight arrives there
+      }
       balustrade(B, M.marble, M.marble, [fx, -P.LAND_Z], [fx, P.LAND_Z], { y: BAL_Y, instBal: world.termBal }); world.box([fx - 0.15, BAL_Y, -P.LAND_Z], [fx + 0.15, BAL_Y + 1.1, P.LAND_Z]);
       // arcade under the balcony front (|z| > UP_Z1): piers + arches + bronze grilles (closed passages)
       const arcX0 = Math.min(fx, fx - side * 0.9), arcX1 = Math.max(fx, fx - side * 0.9);
@@ -182,7 +190,7 @@ export function buildConcourse(world, M, Z) {
   for (const side of [-1, 1]) {
     const sx = (x) => side * x; // mirror helper (west uses negative x)
     // lower flight: from x=-20 to -26 (west) rising 0→3, width 8
-    const lower = stairSteps(world, B, M.marble, { x: sx(P.ST_X0), z: 0, dir: [side < 0 ? -1 : 1, 0], width: P.ST_HALF * 2, run: Math.abs(P.ST_X1 - P.ST_X0), rise: 3, n: 16, depthUnder: 0.6, uvScale: uv(M.marble) });
+    const lower = stairSteps(world, B, M.marble, { x: sx(P.ST_X0), z: 0, dir: [Math.sign(sx(P.ST_X1) - sx(P.ST_X0)), 0], width: P.ST_HALF * 2, run: Math.abs(P.ST_X1 - P.ST_X0), rise: 3, n: 16, depthUnder: 0.6, uvScale: uv(M.marble) });
     Z.push({ x0: Math.min(sx(P.ST_X0), sx(P.ST_X1)), x1: Math.max(sx(P.ST_X0), sx(P.ST_X1)), z0: -P.ST_HALF, z1: P.ST_HALF, h: (x) => { const a = Math.abs(x - sx(P.ST_X0)); const i = Math.min(15, Math.floor(a / lower.stepRun)); return (i + 1) * lower.stepRise; } });
     // landing y=3: x∈[-26,-31], z∈[-5.5,5.5]
     const lx0 = Math.min(sx(P.ST_X1), sx(-P.BAL_X)), lx1 = Math.max(sx(P.ST_X1), sx(-P.BAL_X));

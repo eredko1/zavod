@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { Bucket, mat4, stairSteps, instanced } from './kit.js';
 import { P } from './plan.js';
-import { addGrime } from '../mats.js';
 
 export function buildSubway(world, M, Z) {
   const B = new Bucket(world);
@@ -12,7 +11,7 @@ export function buildSubway(world, M, Z) {
   const z0 = PLAT.z0, z1 = PLAT.z1;
 
   // ---- floor / track bed ----------------------------------------------------------------------
-  const subFloor = M.concrete.clone(); subFloor.name = 'subFloor'; subFloor.color.set(0x5e5a55); subFloor.roughness = 0.85; addGrime(subFloor, world.R, { strength: 0.55, scale: 0.35, height: 0.5, tint: [0.3, 0.27, 0.22], wet: 0.3, key: 'sub' });
+  const subFloor = M.concrete.clone(); subFloor.name = 'subFloor'; subFloor.color.set(0x5a5754); subFloor.roughness = 1.0; subFloor.roughnessMap = M.marbleFloor.roughnessMap; subFloor.map = M.grimeMap; subFloor.needsUpdate = true;
   const subCeil = M.concrete.clone(); subCeil.name = 'subCeil'; subCeil.color.set(0x9a958c);
   B.box(subFloor, [PLAT.x0 - T, SUB - 0.6, z0 - 0.5], [PLAT.x1 + T, SUB, z1], { uvScale: 0.5 });
   Z.push({ x0: PLAT.x0 - T, x1: PLAT.x1 + T, z0: z0 - 0.5, z1, h: SUB });

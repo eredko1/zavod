@@ -88,7 +88,7 @@ export async function init(ctx) {
     }
     // day maps: the bright sky PMREM turns phosphate steel into chrome — pull the viewmodel's reflection strength down
     const dayK = ctx.world?.grade === 'day' ? 0.4 : 1;
-    for (const m of Object.values(mats)) { const want = useScene ? null : fallbackEnv; if (m.envMap !== want && 'envMap' in m) { m.envMap = want; m.needsUpdate = true; } if (m.envMapIntensity !== undefined) { if (m.userData.baseEnv === undefined) { m.userData.baseEnv = m.envMapIntensity; m.userData.baseRough = m.roughness; } m.envMapIntensity = m.userData.baseEnv * dayK; if (m.userData.baseMetal === undefined) m.userData.baseMetal = m.metalness; if (m.userData.baseMetal > 0.5) { m.roughness = Math.min(1, m.userData.baseRough + (dayK < 1 ? 0.26 : 0)); m.metalness = m.userData.baseMetal * (dayK < 1 ? 0.8 : 1); } } }
+    for (const m of Object.values(mats)) { const want = useScene ? null : fallbackEnv; if (m.envMap !== want && 'envMap' in m) { m.envMap = want; m.needsUpdate = true; } if (m.envMapIntensity !== undefined) { if (m.userData.baseEnv === undefined) { m.userData.baseEnv = m.envMapIntensity; m.userData.baseRough = m.roughness; } m.envMapIntensity = m.userData.baseEnv * dayK; if (m.userData.baseMetal === undefined) m.userData.baseMetal = m.metalness; if (m.userData.baseMetal > 0.5) { m.roughness = Math.min(1, m.userData.baseRough + (dayK < 1 ? 0.1 : 0)); m.metalness = m.userData.baseMetal; } } }
     fx.brassMesh.material.envMap = useScene ? null : fallbackEnv;
   };
   ensureEnv();

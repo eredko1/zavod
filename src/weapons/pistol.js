@@ -14,7 +14,7 @@ export const PISTOL_SPEC = {
   hipSpread: 2.2, adsSpread: 0.35, spreadPerShot: 1.1, spreadMax: 7, moveSpread: 1.8,
   recoilPitch: 0.75, recoilYaw: 0.28, kickBack: 0.04, kickUp: 0.16, kickRoll: 0.05,
   reloadTime: 1.7, reloadTimeTac: 1.45, swapTime: 0.32, adsTime: 0.16, adsDist: 0.30,
-  hip: { pos: [0.10, -0.125, -0.24], rot: [0.0, 0.06, 0.0] },
+  hip: { pos: [0.06, -0.065, -0.34], rot: [0.02, 0.04, 0.0] },
   sprint: { pos: [0.14, -0.15, -0.26], rot: [-0.3, 0.55, 0.3] },
   lower: { pos: [0.11, -0.34, -0.26], rot: [-0.9, 0.3, 0.2] },
 };

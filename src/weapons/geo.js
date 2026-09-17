@@ -56,14 +56,14 @@ export function lathe(profile, seg = 16) { return new THREE.LatheGeometry(profil
  * Computes an edge-wear weight per vertex into a 'color' attribute (r = wear, g = grime, b = unused).
  * For box-like parts, bevel vertices have off-axis normals → worn edges. For round parts, only the end rims wear.
  */
-export function bakeWear(geom, mode = 'box', amount = 1, grime = 0.5) {
+export function bakeWear(geom, mode = 'box', amount = 1, grime = 0.5, palm = 0) {
   const n = geom.attributes.normal, pos = geom.attributes.position;
   const count = pos.count; const col = new Float32Array(count * 3);
   geom.computeBoundingBox(); const bb = geom.boundingBox; const size = new THREE.Vector3(); bb.getSize(size);
   for (let i = 0; i < count; i++) {
     const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
     let wear = 0;
-    if (mode === 'box') { const mx = Math.max(nx, ny, nz); wear = THREE.MathUtils.smoothstep(1 - mx, 0.02, 0.35); }
+    if (mode === 'box') { const mx = Math.max(nx, ny, nz); wear = THREE.MathUtils.smoothstep(1 - mx, 0.1, 0.42); } // only genuinely angled bevel verts wear, so flat faces don't inherit a tint through interpolation
     else if (mode === 'rim') {
       // distance to the nearest bounding-box face along the longest axis
       const ax = size.x >= size.y && size.x >= size.z ? 'x' : size.y >= size.z ? 'y' : 'z';
@@ -75,7 +75,7 @@ export function bakeWear(geom, mode = 'box', amount = 1, grime = 0.5) {
     const h = Math.sin(pos.getX(i) * 913.1 + pos.getY(i) * 471.7 + pos.getZ(i) * 233.9) * 43758.5453; const r = h - Math.floor(h);
     col[i * 3] = Math.min(1, wear * amount * (0.55 + 0.45 * r));
     col[i * 3 + 1] = grime * (0.6 + 0.4 * r);
-    col[i * 3 + 2] = 0;
+    col[i * 3 + 2] = palm; // b: palm/pad mask (glove material darkens + pebbles it)
   }
   geom.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return geom;
@@ -94,7 +94,7 @@ export class Builder {
     if (geom.index) geom = geom.toNonIndexed();
     geom.applyMatrix4(_m);
     if (!geom.attributes.normal) geom.computeVertexNormals();
-    bakeWear(geom, o.wear ?? 'box', o.wearAmt ?? 1, o.grime ?? 0.5);
+    bakeWear(geom, o.wear ?? 'box', o.wearAmt ?? 1, o.grime ?? 0.5, o.palm ?? 0);
     for (const name of Object.keys(geom.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(name)) geom.deleteAttribute(name);
     if (!geom.attributes.uv) geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geom.attributes.position.count * 2), 2));
     (this.bins.get(key) || this.bins.set(key, []).get(key)).push(geom);

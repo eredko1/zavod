@@ -143,6 +143,13 @@ export function makeMats(ctx, R, env) {
   M.plaster = std('plaster', { color: 0xd9cfb9, roughness: 0.9, metalness: 0 });
   M.plasterDark = std('plasterDark', { color: 0x8f8574, roughness: 0.92, metalness: 0 });
   M.concrete = std('concrete', { color: 0x7a7772, roughness: 0.95, metalness: 0 });
+  { // grimy concrete floor map (tile = 4 m): mottled grey with dark traffic wear and litter specks
+    const S = 512, [c, g] = canvas(S, S); g.fillStyle = '#8c8985'; g.fillRect(0, 0, S, S);
+    const nf = noiseField(R, 128, 4); for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const n = nf[((y >> 2) % 128) * 128 + ((x >> 2) % 128)]; g.fillStyle = `rgba(${70 + n * 90},${68 + n * 88},${64 + n * 85},0.8)`; g.fillRect(x, y, 4, 4); }
+    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${20 + R() * 40},${18 + R() * 35},${15 + R() * 30},${0.2 + R() * 0.5})`; g.beginPath(); g.arc(R() * S, R() * S, 1 + R() * 6, 0, 7); g.fill(); }
+    for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(200,195,185,${0.3 + R() * 0.4})`; g.fillRect(R() * S, R() * S, 2 + R() * 6, 1 + R() * 3); }
+    M.grimeMap = tex(c);
+  }
   M.asphalt = std('asphalt', { color: 0x2a2a2c, roughness: 0.98, metalness: 0 });
   M.ballast = std('ballast', { color: 0x4a4644, roughness: 1, metalness: 0 });
   // ---- wood (benches, tables) -------------------------------------------------------

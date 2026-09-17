@@ -4,6 +4,7 @@ import { Bucket, mat4, lathe, instanced } from './kit.js';
 import { instanceModel } from '../props.js';
 import { P } from './plan.js';
 import { vaultY } from './concourse.js';
+import { table } from './south.js';
 
 export function buildProps(world, M) {
   const { ctx, scene, R } = world; const B = new Bucket(world);
@@ -77,6 +78,10 @@ export function buildProps(world, M) {
     for (const sgnZ of [kz - 1.51, kz + 1.51]) B.add(s, new THREE.PlaneGeometry(4.2, 0.45), mat4(kx, 2.35, sgnZ, 0, sgnZ < kz ? Math.PI : 0, 0));
     world.cover(kx - 2.9, kz, -1, 0); world.cover(kx + 2.9, kz, 1, 0); world.cover(kx, kz - 2.1, 0, -1); world.cover(kx, kz + 2.1, 0, 1);
   }
+  // ---- balcony restaurant tables (west: café tables; east: long shop table + stools) --------------------------------
+  for (const z of [-9, -4, 4, 9]) { table(B, M, -38.5, P.BAL_Y, z); world.cover(-37.3, z, 1, 0, P.BAL_Y); }
+  B.box(M.wood, [37.2, P.BAL_Y + 0.72, -5], [39.2, P.BAL_Y + 0.8, 5], { uvScale: 1 }); for (const z of [-4, -1.3, 1.3, 4]) B.box(M.ironDark, [37.9, P.BAL_Y, z - 0.25], [38.5, P.BAL_Y + 0.72, z + 0.25], { uvScale: 1 });
+  world.ctx.colliders.push(new THREE.Box3(new THREE.Vector3(37.2, P.BAL_Y, -5), new THREE.Vector3(39.2, P.BAL_Y + 0.8, 5))); world.cover(36.4, 0, -1, 0, P.BAL_Y);
   // ---- the big flag hanging from the east balcony wall (plain stripes, no emblem) ---------------------------------------
   {
     const c = document.createElement('canvas'); c.width = 256; c.height = 512; const g = c.getContext('2d');

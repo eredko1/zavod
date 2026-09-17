@@ -76,6 +76,20 @@ function rayClear(ctx, a, b) {
   return clear;
 }
 
+/** Mesh-verified LOS for actual bullets: ignores the vision budget/meshOk gate but caps forced rays per frame (excess → blocked). */
+function rayClearStrict(ctx, a, b) {
+  const targets = ctx.raycastTargets; if (!targets || !targets.length) return true;
+  S.strictRays = (S.strictRaysFrame === ctx.time.frame) ? S.strictRays + 1 : 1; S.strictRaysFrame = ctx.time.frame;
+  if (S.strictRays > 24) return false;
+  _v.subVectors(b, a); const dist = _v.length(); if (dist < 0.1) return true;
+  _ray.set(a, _v.multiplyScalar(1 / dist)); _ray.near = 0.05; _ray.far = dist - 0.05;
+  try {
+    const hits = _ray.intersectObjects(targets, false);
+    for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.soldier || o.userData.noLOS) continue; return false; }
+  } catch (e) { return false; }
+  return true;
+}
+
 // ---------- spawning ----------
 function acquireInstance(ctx) {
   let inst = S.pool.pop();
@@ -333,7 +347,9 @@ function fireRound(ctx, s, t) {
   if (tHit > 0 && tHit < 120) {
     const end = origin.clone().addScaledVector(shotDir, tHit - 0.05);
     hitPlayer = !segBlocked3D(origin, end, S.nav.solids);
-    if (hitPlayer && losStats.meshOk && S.raysThisFrame < S.rayBudget + 2) hitPlayer = rayClear(ctx, origin, end);
+    // a would-be hit on the player is ALWAYS verified against the real world meshes (floors, walls, props are not AABBs);
+    // if we can't afford the ray this frame it's a miss, never a free hit — no shooting through floors/cover
+    if (hitPlayer) hitPlayer = rayClearStrict(ctx, origin, end);
   }
   ctx.bus.emit('shot', { origin: origin.clone(), dir: shotDir, weapon: 'ak', who: 'enemy', soldier: s, hit: hitPlayer });
   if (hitPlayer && ctx.state === 'playing') {
