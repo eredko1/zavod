@@ -123,3 +123,7 @@ Web Audio, procedural synthesis + optional CC0 samples under assets/audio (< 20 
 
 ## Map 6 (queued): Coney Island (`coney`)
 Boardwalk + beach + amusement area (Wonder Wheel, Cyclone silhouette, Parachute Jump tower), Nathan's-style stands, Stillwell Ave station, MCU Park — same real-place research/accuracy standard. Day, summer light. Note: user already has a Coney Island Three.js scene in ~/Code/SurfersCode (coney.js) that can be mined for layout/landmarks.
+
+## Grand Central — pass 3 requirements (user feedback 2026-09-17)
+- The player can currently walk OUTSIDE into a black void (unsealed perimeter). Build the exterior instead of just sealing: 42nd Street facade (three arched windows, Mercury clock group as a block), Pershing Square viaduct + Park Avenue ramps, MetLife building directly north/above, Chrysler Building + Midtown skyline backdrop behind haze, sidewalks, taxis/parked cars, hydrants, street lamps, subway entrance kiosks; closed one block out with building walls/road ends. Vanderbilt Ave and Lexington Ave sides likewise.
+- Subway is wrong: it's labeled "GRAND CONCOURSE" — must be "GRAND CENTRAL – 42 ST" (generic mosaic styling); the station must be the real Lexington Ave IRT layout: TWO island platforms, FOUR tracks (local + express), trains parked fully in the station, doors aligned with the platform edge, columns between doors never in front of them; mezzanine with turnstiles above; S shuttle platform optional.
