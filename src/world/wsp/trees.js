@@ -73,7 +73,7 @@ export function buildTrees(world, T) {
   const tuftG = []; for (const rot of [0, Math.PI / 2]) { const q = new THREE.PlaneGeometry(1, 1); q.translate(0, 0.5, 0); q.rotateY(rot); tuftG.push(q); }
   const tufts = [];
   for (let i = 0; i < 1400; i++) { const x = PARK.x0 + 2 + R() * (PARK.x1 - PARK.x0 - 4), z = PARK.z0 + 2 + R() * (PARK.z1 - PARK.z0 - 4); if (V(x, z) !== 'lawn') continue; tufts.push({ x, z, ry: R() * 6.3, s: 0.35 + R() * 0.5 }); }
-  instance(world, mergeGeos(tuftG), new THREE.MeshStandardMaterial({ map: tuftTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9, color: 0xc7d0a8 }), tufts, { surface: 'ground', name: 'tufts', shadow: false });
+  instance(world, mergeGeos(tuftG), new THREE.MeshStandardMaterial({ map: tuftTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9, color: 0xc7d0a8 }), tufts, { surface: 'ground', name: 'tufts', shadow: false, ray: false });
   // hedges (boxwood blocks) inside the perimeter fence in runs, and shrubs around the park house
   const hedgeG = new THREE.BoxGeometry(3.6, 0.9, 0.9); hedgeG.translate(0, 0.45, 0);
   const hedges = [];

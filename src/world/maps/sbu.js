@@ -1,29 +1,71 @@
-// MAP: STONY BROOK — STUB. Owned by: SBU agent (this file plus ../sbu/*.js helpers and assets/models/sbu/).
+// MAP: STONY BROOK — Stony Brook University's Academic Mall and the campus around it, 1:1 from an OSM plan (see ../sbu/RESEARCH.md). Owned by: SBU agent (this file + ../sbu/*).
+// Levels: mall y=0 · Staller sunken plaza −3 with 8 grass terraces (0.375 m each) · SAC vestibule roof +4.6 (ladder) · Staller wing terrace 0 from the plaza (ladder).
 import * as THREE from 'three';
+import { makeMats } from '../sbu/mats.js';
+import { buildSky } from '../sbu/sky.js';
+import { buildGround, groundHeight } from '../sbu/ground.js';
+import { buildBuildings } from '../sbu/buildings.js';
+import { buildProps } from '../sbu/props.js';
+import { BOUNDS, MALL, SAC_PLAZA, PIT, BUS_LOOP, ENG_DRIVE, LIB, SAC, FREY, ZEBRA, PSY, STALLER, FOUNTAIN, EAST_LAWN } from '../sbu/layout.js';
 
 export const meta = {
   id: 'sbu', name: 'STONY BROOK', subtitle: 'DAY OPS · ACADEMIC MALL', time: 'day', weather: 'clear',
-  description: 'Stony Brook University, Long Island: the Academic Mall, brutalist concrete library and lecture halls, the SAC steps, Staller plaza and campus greens.',
+  description: 'Stony Brook University, Long Island, 1:1: the Academic Mall between the Melville Library and the SAC, the Zebra Path and Frey Hall, the Staller Steps and sunken plaza, the fountain, the bus loop on Campus Drive, and the halls that close the campus around them.',
   grade: 'day', ambience: 'sbu-day', thumb: 'assets/thumbs/sbu.jpg',
 };
 
 export function build(world) {
-  const { ctx, W, scene } = world;
-  ctx.renderer.toneMappingExposure = 1.0;
-  W.bounds.set(new THREE.Vector3(-70, -1, -70), new THREE.Vector3(70, 40, 70));
-  scene.background = new THREE.Color(0x9fb3c8);
-  scene.fog = new THREE.FogExp2(0x9fb3c8, 0.004);
-  const hemi = new THREE.HemisphereLight(0xbfd4ee, 0x5a5348, 0.9); scene.add(hemi); ctx.lights.hemi = hemi;
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.0); sun.position.set(40, 60, 20); sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096); sun.shadow.camera.left = -80; sun.shadow.camera.right = 80; sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80; sun.shadow.camera.far = 200; sun.shadow.bias = -0.0005;
-  scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x6d6a63, roughness: 0.95 }));
-  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.name = 'ground'; scene.add(floor); world.solid(floor, 'concrete', { collide: false });
-  for (let i = 0; i < 16; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 3), new THREE.MeshStandardMaterial({ color: 0x8a4a3a, roughness: 0.7 })); b.position.set((world.R() - 0.5) * 100, 1.5, (world.R() - 0.5) * 100); b.name = 'stub'; scene.add(b); world.solid(b, 'metal'); }
-  const v = (x, z) => new THREE.Vector3(x, 0, z);
-  W.playerSpawns = [v(0, 55), v(8, 55), v(-8, 55)];
-  W.enemySpawns = [v(-40, -40), v(0, -50), v(40, -40), v(-55, 0), v(55, 0), v(-40, 30), v(40, 30), v(20, -20), v(-20, -20), v(0, -20), v(50, -50), v(-50, -50)];
-  for (let i = 0; i < 40; i++) world.cover((world.R() - 0.5) * 100, (world.R() - 0.5) * 100, 0, 1);
-  W.poses = { spawn: [0, 0, 55, 0, 0], hero: [0, 0, 30, 0, 0], overview: [0, 30, 90, 0, -0.4] };
-  W.surfaceAt = () => 'concrete';
+  const { ctx, W } = world;
+  W.bounds.set(new THREE.Vector3(BOUNDS.x0, -4, BOUNDS.z0), new THREE.Vector3(BOUNDS.x1, 60, BOUNDS.z1));
+  W.groundHeight = groundHeight;
+
+  ctx.progress(0.13, 'stony brook: sky'); buildSky(world);
+  const M = makeMats(world); world.mats = M;
+  ctx.progress(0.15, 'stony brook: ground'); buildGround(world, M);
+  ctx.progress(0.18, 'stony brook: buildings'); buildBuildings(world, M);
+  ctx.progress(0.22, 'stony brook: props'); buildProps(world, M);
+
+  // ---- gameplay ------------------------------------------------------------------------------------------------------
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+  W.playerSpawns = [v(-100, 0, 24), v(-104, 0, 34), v(-96, 0, 12), v(-110, 0, 20)];                         // SAC plaza, west side
+  W.enemySpawns = [
+    v(27, 0, -12), v(-5, 0, -40), v(60, 0, -8), v(100, 0, -6), v(136, 0, -18),                                // library forecourt / mall east
+    v(90, 0, -100), v(120, groundHeight(120, -95), -95), v(139, PIT.floor, -100), v(144, 0, -80),              // Staller terraces / plaza / wing terrace
+    v(60, 0, 24), v(140, 0, 40), v(-35, 0, -80), v(-70, 0, -40), v(-125, 0, -50), v(30, 0, 92), v(160, 0, 4),   // Psychology, east lawn, Zebra Path, Frey, Harriman alley, south alley, Admin gate
+  ];
+  // extra cover along facades and the mall furniture (props/ground added the rest)
+  for (let x = -8; x < 70; x += 12) world.cover(x, LIB.z1 + 1.4, 0, 1);                                        // library face
+  for (let x = -76; x < -46; x += 10) world.cover(x, FREY.z1 + 1.2, 0, 1);                                     // Frey south face
+  for (let z = -100; z < -50; z += 12) { world.cover(FREY.x1 + 1.2, z, 1, 0); world.cover(LIB.x0 - 1.2, z, -1, 0); } // Zebra Path walls
+  for (let x = 58; x < 114; x += 12) world.cover(x, PSY.z0 - 1.2, 0, -1);                                      // Psychology north face
+  for (let z = 24; z < 64; z += 10) world.cover(SAC.x1 + 1.2, z, 1, 0);                                        // SAC east face
+  for (let z = -130; z < -70; z += 12) world.cover(STALLER.ex0 - 1.2, z, -1, 0, PIT.floor);                     // Staller entrance face (pit floor)
+  for (let z = -120; z < -70; z += 12) world.cover(LIB.x1 + 1.2, z, 1, 0);                                     // library east face (terrace top)
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) world.cover(FOUNTAIN.x + Math.cos(a) * (FOUNTAIN.ring + 1), FOUNTAIN.z + Math.sin(a) * (FOUNTAIN.ring + 1), Math.cos(a), Math.sin(a));
+
+  W.poses = {
+    spawn: [-104, 0, 24, -1.5, 0.0],                       // SAC plaza, looking east along the mall
+    hero: [-62, 0, 3, -1.32, 0.06],                        // the mall: library on the left, SAC drum on the right, fountain far ahead
+    overview: [-150, 95, 140, -0.8, -0.52],                // high from the SW over the plaza, mall and library
+    library: [27, 0, 4, 0.0, 0.12],                        // the entrance walk, "LIBRARY" over the doors
+    sac: [-112, 0, 38, -1.62, 0.08],                       // the glass front from the plaza
+    staller: [96, 0, -96, -1.55, -0.08],                   // on the terraces, Staller entrance canopy ahead, fly tower left
+    wang: [150, 0, -58, -0.62, 0.1],                       // NE over the pond to the Wang lantern tower
+    frey: [-28, 0, -34, 0.35, 0.1],                        // Zebra Path mouth, Frey's ribbed concrete on the left
+    zebra: [-35, 0, -104, 3.14, 0.02],                     // down the Zebra Path toward the mall
+    roads: [-118, 0, 66, 2.6, -0.02],                      // the bus loop on Campus Drive
+    fountain: [124, 0, 9, -1.15, 0.05],                    // fountain with the Administration building beyond
+    terrace: [-83.5, 4.6, 35, -1.4, -0.15],                // SAC vestibule roof (ladder)
+  };
+  W.surfaceAt = (p) => {
+    const { x, z } = p;
+    if (p.y > 1.5) return 'concrete';
+    if (x >= PIT.floorX0 && x <= PIT.x1 && z >= PIT.z0 && z <= PIT.z1) return 'concrete';
+    if (z >= MALL.z0 && z <= MALL.z1 && x >= MALL.x0 && x <= MALL.x1) return 'concrete';
+    if (x >= ZEBRA.x - 5 && x <= ZEBRA.x + 5 && z >= ZEBRA.z0 && z <= MALL.z0) return 'concrete';
+    if (x >= -125 && x <= -24 && z >= -16 && z <= 65) return 'concrete';
+    if (Math.hypot(x - BUS_LOOP.x, z - BUS_LOOP.z) < BUS_LOOP.r + BUS_LOOP.w) return 'concrete';
+    if (x >= ENG_DRIVE.x0 - 3 && x <= ENG_DRIVE.x1 + 3 && z >= ENG_DRIVE.z0) return 'concrete';
+    return 'ground';
+  };
 }

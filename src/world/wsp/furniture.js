@@ -12,7 +12,7 @@ const WOOD = () => mat('slat', { color: 0x4a3626, roughness: 0.85 });
 const CONC = () => mat('conc', { color: 0x8f8a82, roughness: 0.9 });
 
 /** Instance a merged geometry at placements [{x,y,z,ry,s}] → InstancedMesh (raycastable, optional per-instance AABB collider). */
-export function instance(world, geo, material, places, { surface = 'metal', collide = null, shadow = true, name = 'inst', colors = null } = {}) {
+export function instance(world, geo, material, places, { surface = 'metal', collide = null, shadow = true, name = 'inst', colors = null, ray = true } = {}) {
   const { ctx, scene } = world; if (!places.length) return null;
   const im = new THREE.InstancedMesh(geo, material, places.length); im.name = name;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), e = new THREE.Euler();
@@ -22,7 +22,7 @@ export function instance(world, geo, material, places, { surface = 'metal', coll
     if (collide) { const [hx, hy, hz] = collide; const c = Math.abs(Math.cos(pl.ry || 0)), sn = Math.abs(Math.sin(pl.ry || 0)); const ex = hx * c + hz * sn, ez = hx * sn + hz * c; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(pl.x - ex, (pl.y || 0), pl.z - ez), new THREE.Vector3(pl.x + ex, (pl.y || 0) + hy, pl.z + ez))); }
   });
   im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-  im.castShadow = shadow; im.receiveShadow = true; im.userData.surface = surface; im.frustumCulled = false; scene.add(im); ctx.raycastTargets.push(im);
+  im.castShadow = shadow; im.receiveShadow = true; im.userData.surface = surface; im.frustumCulled = false; scene.add(im); if (ray) ctx.raycastTargets.push(im);
   return im;
 }
 
@@ -79,7 +79,7 @@ export function buildFurniture(world, T) {
   const hoops = [];
   for (const p of PATHS) along(p.pts, 2.0, (x, z, ux, uz) => { for (const sd of [-1, 1]) { const off = p.w / 2 + 0.25; const fx = x - uz * sd * off, fz = z + ux * sd * off; if (V(fx - uz * sd * 0.5, fz + ux * sd * 0.5) !== 'lawn') continue; hoops.push({ x: fx, z: fz, ry: Math.atan2(-uz, ux) }); } });
   for (let i = 0; i < 96; i++) { const a = i / 96 * Math.PI * 2; const r = FOUNTAIN.plaza + 0.3; if (V(Math.cos(a) * (r + 0.6), Math.sin(a) * (r + 0.6)) === 'lawn') hoops.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, ry: Math.atan2(-Math.cos(a), -Math.sin(a)) }); }
-  instance(world, mergeGeos(hoop), BLACK(), hoops, { surface: 'metal', name: 'lawnFence', collide: [1.0, 0.42, 0.04], shadow: false });
+  instance(world, mergeGeos(hoop), BLACK(), hoops, { surface: 'metal', name: 'lawnFence', collide: [1.0, 0.42, 0.04], shadow: false, ray: false });
   // perimeter: 1.1 m picket fence on a granite curb, gaps at path entrances
   const pick = []; { const top = new THREE.BoxGeometry(2.0, 0.04, 0.04); top.translate(0, 1.08, 0); pick.push(top); const mid = top.clone(); mid.translate(0, -0.5, 0); pick.push(mid); for (let x = -0.9; x <= 0.9; x += 0.15) { const p = new THREE.BoxGeometry(0.025, 1.1, 0.025); p.translate(x, 0.55, 0); pick.push(p); } const curb = new THREE.BoxGeometry(2.0, 0.25, 0.3); curb.translate(0, 0.125, 0); }
   const picks = []; const curbs = [];
@@ -88,7 +88,7 @@ export function buildFurniture(world, T) {
   for (let z = PARK.z0 + 1; z < PARK.z1; z += 2) for (const x of [PARK.x0, PARK.x1]) { if (gap(x, z)) continue; picks.push({ x, z, ry: Math.PI / 2 }); }
   instance(world, mergeGeos(pick), BLACK(), picks, { surface: 'metal', name: 'perimeterFence', collide: [1.0, 1.1, 0.05], shadow: true });
   const curbG = new THREE.BoxGeometry(2.0, 0.22, 0.3); curbG.translate(0, 0.11, 0);
-  instance(world, curbG, mat('granite', { map: world.tex.granite, roughness: 0.7, color: 0xb8b4ac }), picks, { surface: 'concrete', name: 'fenceCurb', shadow: false });
+  instance(world, curbG, mat('granite', { map: world.tex.granite, roughness: 0.7, color: 0xb8b4ac }), picks, { surface: 'concrete', name: 'fenceCurb', shadow: false, ray: false });
 
   // ---- chess plaza: concrete tables with inlaid boards + 2 stools each (5 × 4 grid) --------------------------------
   const tableG = []; { const top = new THREE.BoxGeometry(0.9, 0.08, 0.9); top.translate(0, 0.74, 0); tableG.push(top); const ped = new THREE.CylinderGeometry(0.16, 0.2, 0.7, 10); ped.translate(0, 0.35, 0); tableG.push(ped); for (const sz of [-0.85, 0.85]) { const seat = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 10); seat.translate(0, 0.45, sz); tableG.push(seat); const leg = new THREE.CylinderGeometry(0.06, 0.08, 0.45, 8); leg.translate(0, 0.22, sz); tableG.push(leg); } }
@@ -96,7 +96,7 @@ export function buildFurniture(world, T) {
   const tables = [];
   for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) tables.push({ x: CHESS.x0 + 4 + i * 5.2, z: CHESS.z0 + 5 + j * 5.5, ry: (j & 1) * Math.PI / 2 });
   instance(world, mergeGeos(tableG), CONC(), tables, { surface: 'concrete', name: 'chessTables', collide: [0.45, 0.8, 1.05] });
-  instance(world, boards, mat('board', { map: chessTexture(), roughness: 0.6 }), tables, { surface: 'concrete', name: 'chessBoards', shadow: false });
+  instance(world, boards, mat('board', { map: chessTexture(), roughness: 0.6 }), tables, { surface: 'concrete', name: 'chessBoards', shadow: false, ray: false });
   for (const t of tables) { world.cover(t.x + 1.1, t.z, 1, 0); world.cover(t.x - 1.1, t.z, -1, 0); }
 
   // ---- statues: Garibaldi (bronze on a 2.6 m granite pedestal, sword-drawing pose) and the Holley bust (west) --------
@@ -232,12 +232,12 @@ function buildStreet(world, T) {
   instance(world, signPost, mat('signpost', { color: 0x6a6f74, roughness: 0.5, metalness: 0.6 }), signs, { surface: 'metal', name: 'signs', collide: [0.06, 3.0, 0.06] });
   instance(world, rack, BLACK(), racks, { surface: 'metal', name: 'bikeRacks', collide: [0.45, 0.6, 0.08] });
   const pitG = new THREE.BoxGeometry(1.6, 0.04, 1.6); pitG.translate(0, 0.02, 0);
-  instance(world, pitG, mat('soil', { color: 0x3b2f24, roughness: 1 }), pits, { surface: 'ground', name: 'treePits', shadow: false });
+  instance(world, pitG, mat('soil', { color: 0x3b2f24, roughness: 1 }), pits, { surface: 'ground', name: 'treePits', shadow: false, ray: false });
   // one-way arrow plates: white plane with a black arrow (canvas)
   const c = document.createElement('canvas'); c.width = 256; c.height = 96; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 96); g.fillStyle = '#111'; g.fillRect(40, 40, 140, 16); g.beginPath(); g.moveTo(170, 20); g.lineTo(230, 48); g.lineTo(170, 76); g.fill(); g.font = 'bold 22px Arial'; g.fillText('ONE WAY', 44, 30);
   const arrowTex = new THREE.CanvasTexture(c); arrowTex.colorSpace = THREE.SRGBColorSpace;
   const plate = new THREE.PlaneGeometry(0.9, 0.3); plate.translate(0, 2.6, 0.02);
-  instance(world, plate, new THREE.MeshStandardMaterial({ map: arrowTex, roughness: 0.5, side: THREE.DoubleSide }), signs, { surface: 'metal', name: 'signPlates', shadow: false });
+  instance(world, plate, new THREE.MeshStandardMaterial({ map: arrowTex, roughness: 0.5, side: THREE.DoubleSide }), signs, { surface: 'metal', name: 'signPlates', shadow: false, ray: false });
 
   // ---- road markings: lane edge lines + zebra crosswalks at the park corners / Fifth Ave (merged, y 0.012) ----------
   const marks = [];

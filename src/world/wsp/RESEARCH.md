@@ -1,31 +1,37 @@
-# WSP — Washington Square Park research → build plan (pre-research, 2026-09-16)
+# Washington Square Park — research & coordinate plan (WSP agent; merged with the coordinator's pre-research, 2026-09-17)
 
-Coordinate frame: metres, origin = fountain centre, **+x east, +z south, +y up**. The park is a near-rectangle ≈ 200 m (E–W) × 160 m (N–S); 9.75 acres / 3.95 ha.
-Bounding streets: Washington Sq North (z ≈ −80), South (z ≈ +80), East (x ≈ +100), West (x ≈ −100). Fifth Avenue meets the north edge on the arch axis (x ≈ 0).
+Frame: metres, origin = centre of the fountain (OSM way centroid 40.73083 N, 73.99746 W), **+x park-east, +z park-south, +y up**.
+The Manhattan grid is rotated ≈ 29° from true north; everything below is in the grid-aligned frame (OSM coordinates rotated;
+raw dump: `qa/refs/wsp/osm_plan_metres.txt`, constants in `src/world/wsp/layout.js`).
 
-## Measured facts (Wikipedia: Washington Square Park; Washington Square Arch)
-| Element | Fact | Game plan |
-|---|---|---|
-| Arch | Tuckahoe marble, total height 22.4–23 m, width 17 m, opening 9.1 m wide × 14 m high, piers 9.1 m apart; attic inscription band; frieze of 13 large + 42 small stars with "W"s; winged victories in the spandrels; 1918 statues on the north faces: *Washington as Commander-in-Chief* (east pier), *Washington as President* (west pier) | Arch centre at (0, 0, −72) spanning x −8.5…8.5, z −3…3 (piers 3.9 m wide); coffered vault; statue groups as blocky figures ~4.5 m; maintenance ladder inside the west pier (`world.ladder`) → walkable attic roof y ≈ 22 (sniper perch, parapet colliders) |
-| Fountain (Tisch) | 2009: moved ~7 m to sit on the arch axis; large circular basin with central jet and side jets; sunken plaza flattened/shrunk with concentric steps | Basin r ≈ 12 m at origin; plaza sunk 0.9 m (3 concentric steps ≤ 0.3 m, AABB steps); water plane + jet sprites; the plaza ring is the map's central "pit" |
-| Paths | Radiate from the fountain plaza to every corner/entrance; hexagonal asphalt pavers with granite curbs; granite slab benches (2007–14 renovation) | 8 radial paths 6 m wide + a ring path; hex-paver canvas texture; lawns between (grass + weeds cards) |
-| Garibaldi statue | 1888, east of the fountain | (+26, 0, +2) on a 3 m pedestal |
-| Holley bust | west side | (−28, 0, −6) |
-| Chess plaza | SW corner | tables + stools around (−60, 0, +45); low iron fence |
-| Mounds | SW quadrant (near chess/kids' area) | two grass hills r ≈ 14 m, h ≈ 2.4 m at (−45, 0, +25) and (−25, 0, +45) — `groundHeight` |
-| Playgrounds | NE and NW | fenced pads (+55, 0, −45), (−55, 0, −45) with simple play structures |
-| Dog runs | two (large SW-ish / small NE) | fenced gravel ovals |
-| Hangman's Elm | NW corner, giant English elm | trunk r 1.6 m, canopy r 14 m at (−80, 0, −60) |
-| NW lawn | reopened 2020, ~3,600 m² | big lawn (−60…−20, −60…−20) |
-| Bobst Library | NYU, red sandstone, Philip Johnson, **east** side (Wash Sq South/East corner) | 40 m tall block of red sandstone panels at x +100…+140, z +20…+80, grid windows |
-| Judson Memorial Church + campanile | south side | Romanesque brick/limestone; 3-storey church body at (−20…+10, +82…+110) with a 30 m square campanile |
-| The Row | Greek Revival row houses, north side, brick with white stoops and railings | continuous 4-storey brick facade z −82…−100 across x −90…+60, stoops with iron railings |
-| One Fifth Avenue | 27-storey Art Deco tower straight north on 5th Ave | silhouette block at (−10…+10, −130…−160), 90 m, visible through the arch |
-| Kimmel Center / Stern | NYU, south-west | glass-and-stone modern blocks on the south/west edge |
-| Street furniture | Bishop's-crook cast-iron lampposts, wooden-slat benches with concrete ends, low iron hoop fences, trash cans, NYU/NYPD signs | instanced; generic signage text |
-| Trees | London planes, elms, oaks | ~60 trees: trunk + 3 crossed alpha cards |
+## Measured footprint (OpenStreetMap via Overpass, ODbL) — built 1:1
+- Park polygon x ∈ [-163, 136], z ∈ [-73, 74] → 299 × 147 m (incl. its sidewalks; Wikipedia 9.75 acres). Playable bounds x ∈ [-176, 150], z ∈ [-142, 166] (≈ 326 × 308 m): the park + one block each side.
+- Streets (OSM centrelines): Washington Sq N z≈-77 · Sq S z≈78 · Sq W / MacDougal St x≈-165 · Sq E / University Pl x≈139 · Fifth Ave x≈-2 (north of the arch) ·
+  Washington Mews z≈-135 · MacDougal Alley z≈-130 · Thompson St x≈-14 · Sullivan St x≈-87 · LaGuardia Pl x≈58 · W 3rd St z≈158 · Waverly Pl / W 4th St continue the N/S park streets beyond the corners.
+- Fountain: OSM circle r ≈ 11.5 → sunken floor 23 m ⌀ at −0.9 m, three 0.3 m granite steps (1 m treads) to r 14.5, coping to r 16.4, hex-paved plaza to r ≈ 31 (OSM ring path), inner ring path r 18. Central basin r 2.6, rim 0.45 m, jets.
+- Washington Square Arch (OSM footprint x ∈ [-8, 11], z ∈ [-57.5, -50.5]): centre (1.5, -54); Wikipedia: 77 ft (23.5 m) high, 57 ft (17.4 m) wide, 30 ft (9.1 m) span, 47 ft (14.3 m) opening, piers 4.15 m, Tuckahoe marble.
+  Stair in the WEST pier → attic; statue groups on the NORTH face (Washington at War E pier, at Peace W pier); winged victories in the spandrels; star/W frieze; attic inscription.
+- Garibaldi (OSM node) (58, -6) east of the fountain; Holley bust west ≈ (-55, -3). Park house (comfort station) x ∈ [-72,-44] z ∈ [40,49]. Hangman's Elm (-149, -55).
+- Chess plaza SW x ∈ [-150,-120] z ∈ [30,62]; "Play Hills" mounds x ∈ [-120,-92] z ∈ [29,52] (3 hills 2–3.6 m); playgrounds NE x ∈ [32,80] z ∈ [-43,-20] and NW x ∈ [-62,-36] z ∈ [-66,-56]; dog runs x ∈ [-86,-34] z ∈ [50,67] and x ∈ [21,41] z ∈ [58,67]; three round plazas (NW elm circle, NE, SE).
+- Paths: all OSM footways transcribed (`PATHS` in layout.js) — radial N/S/E/W/SE/NE/SW/NW from the plaza, north walk, south walk, east loop, perimeter walks, corner entries, arch flanks.
+- Surroundings (OSM footprints + heights): The Row 1–13 Wash Sq N x ∈ [14,83] 18.7 m (red brick Greek Revival, stoops) · 19–26 Wash Sq N + 2 Fifth Ave (63 m, tan) west of Fifth ·
+  One Fifth Avenue x ∈ [11,43] z ∈ [-176,-139] 85 m Art-Deco setbacks (on the axis view, NE of the arch) · Washington Mews 2-storey stables · Silver Center x ∈ [145,179] 49 m (white/buff) ·
+  Pless / Goddard 26 m · Brown Bldg 44 m · Kimmel Center x ∈ [9,46] z ∈ [86,151] 50 m (glass) · GCASL · Judson Memorial Church x ∈ [-41,-21] 20.5 m + campanile ≈ 40 m ·
+  Bobst Library x ∈ [70,128] z ∈ [89,152] 43 m (red Longmeadow sandstone grid) with its raised forecourt · Kaufman (Stern) 50 m + Tisch Hall 45 m SE · Furman Hall 44 m · D'Agostino 46 m ·
+  NYU dorm towers 49–65 m along Wash Sq W · MacDougal / W 3rd / Sullivan walk-ups 14–22 m with storefronts.
+
+## Materials / furniture (photos: qa/refs/wsp, licences in SOURCES.txt)
+- Paving: dark grey-blue hexagonal asphalt pavers on every path and plaza; grey granite flags + steps in the sunken fountain; concrete sidewalks with 5-ft scoring; asphalt streets with lane lines + zebra crossings.
+- Lamps: black cast-iron ≈ 4.5 m posts with white acorn globes (off by day). Benches: World's-Fair style, black steel + dark slats, in long runs. Fences: 0.42 m black hoops around lawns (step-over), 1.1 m perimeter pickets on granite curbs with gates at every path, 1.3 m at playgrounds/dog runs.
+- Trees: London planes / elms (mottled bark, 15–20 m broad canopies) lining every path, dense along the north and south walks, tree pits on the sidewalks. Hedges inside the perimeter fence.
+- Street: parallel-parked cars, hydrants, one-way signs, bike racks, tree pits, Greek-Revival stoops with iron railings on The Row, awnings + storefronts on MacDougal / W 3rd / Sullivan, police barriers closing the street ends.
+- Light: late morning, sun from the SE ≈ 46°, partly-cloudy sky HDRI (kloofendal_48d) as background + PMREM environment, exposure 0.95, light haze.
+
+## Levels (all walkable / AI-registered)
+park floor 0 · fountain pit −0.9 (steps via groundHeight) · mounds to +3.6 · Row stoops +1.4 · Bobst plaza +0.9 · playground decks +1.6 · park-house roof 5.3 (ladder S side) ·
+Washington Mews roof 7.2 (fire-escape ladder from the Mews) · MacDougal Alley studios roof 10 (ladder from the alley) · arch attic 23.5 (ladder inside the west pier, door on its west face).
 
 ## Sources
-- https://en.wikipedia.org/wiki/Washington_Square_Park (area, streets, 2009 fountain realignment, features, surroundings, NW lawn)
-- https://en.wikipedia.org/wiki/Washington_Square_Arch (dimensions, materials, sculpture program, frieze/inscription)
-- TODO next run: OSM/satellite trace of the exact path network and mound positions; 8–12 photos into qa/refs/wsp/ (arch N & S faces, fountain plaza, chess plaza, Garibaldi, The Row, Bobst, Judson campanile, hex pavers, benches/lamps).
+- OpenStreetMap / Overpass (overpass.private.coffee): park, fountain, arch, footways, buildings with heights, streets — ODbL.
+- Wikipedia: Washington Square Arch (dimensions, materials, sculpture programme, inscription); Washington Square Park (area, 2009 fountain move/renovation, mounds, chess plaza).
+- Photos (Wikimedia Commons, CC / PD — see qa/refs/wsp/SOURCES.txt): arch north + south faces, fountain plaza, chess tables, Bobst/Kimmel, Judson, One Fifth Avenue, Garibaldi, Holley, park overview, Fifth Ave looking north.
