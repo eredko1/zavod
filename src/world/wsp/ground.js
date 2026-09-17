@@ -49,7 +49,7 @@ export function buildGround(world, T) {
   });
 
   // ---- material ---------------------------------------------------------------------------------------------------
-  const mat = new THREE.MeshStandardMaterial({ map: T.grass, normalMap: T.grassN, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.95, metalness: 0, color: 0xc9cdb8 });
+  const mat = new THREE.MeshStandardMaterial({ map: T.grass, normalMap: T.grassN, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.95, metalness: 0, color: 0xffffff });
   const U = { uMask: { value: mask }, uA: { value: new THREE.Vector4(CORE.x0, CORE.z0, CORE.x1 - CORE.x0, CORE.z1 - CORE.z0) }, uHex: { value: hex }, uAsph: { value: T.asphalt }, uAsphN: { value: T.asphaltN }, uSide: { value: side }, uGran: { value: granite } };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
@@ -72,9 +72,9 @@ export function buildGround(world, T) {
         gLawn = clamp(1.0 - gHex - gAsp - gSide - gRub - gGrv, 0.0, 1.0);
         vec2 wp = vWPos.xz;
         vec4 grassA = texture2D(map, wp / 4.0); vec4 grassB = texture2D(map, wp / 9.7 + 0.37);
-        vec4 lawn = mix(grassA, grassB, 0.45);
+        vec4 lawn = mix(grassA, grassB, 0.45); lawn.rgb *= vec3(0.52, 0.68, 0.36);
         float wear = nz(wp * 0.08) * 0.6 + nz(wp * 0.31) * 0.4;  // worn / dry patches
-        lawn.rgb = mix(lawn.rgb, lawn.rgb * vec3(1.25, 1.12, 0.78), smoothstep(0.55, 0.8, wear) * 0.7);
+        lawn.rgb = mix(lawn.rgb, lawn.rgb * vec3(1.15, 1.05, 0.75), smoothstep(0.6, 0.85, wear) * 0.45);
         vec4 hexc = texture2D(uHex, wp / 2.0);
         vec4 asph = texture2D(uAsph, wp / 7.0); asph.rgb *= 0.85;
         vec4 sidec = texture2D(uSide, wp / 3.0);
@@ -107,6 +107,15 @@ export function buildGround(world, T) {
   const ground = new THREE.Mesh(geo, mat); ground.name = 'ground'; ground.receiveShadow = true; ground.userData.surface = 'ground';
   scene.add(ground); ctx.raycastTargets.push(ground);
   world.ground = ground; world.groundMask = mask;
+  // CPU-side mask sampling for placement / surfaceAt
+  const mc = mask.image, mg = mc.getContext('2d'), mpx = mc.width / (CORE.x1 - CORE.x0);
+  const mdata = mg.getImageData(0, 0, mc.width, mc.height).data;
+  world.maskSample = (x, z) => {
+    const px = Math.floor((x - CORE.x0) * mpx), pz = Math.floor((z - CORE.z0) * mpx);
+    if (px < 0 || pz < 0 || px >= mc.width || pz >= mc.height) return 'side';
+    const i = (pz * mc.width + px) * 4; const r = mdata[i], g = mdata[i + 1], b = mdata[i + 2];
+    if (r > 120 && g > 120) return 'rubber'; if (r > 120 && b > 120) return 'gravel'; if (r > 120) return 'hex'; if (g > 120) return 'asphalt'; if (b > 120) return 'side'; return 'lawn';
+  };
 
   // ---- outer apron beyond the core (flat, cheap) ------------------------------------------------------------------
   const apron = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshStandardMaterial({ map: T.asphalt, roughness: 0.9, color: 0x9a9a98 }));
@@ -131,20 +140,15 @@ export function buildGround(world, T) {
   ctx.colliders.push(new THREE.Box3(new THREE.Vector3(-F.basinR - 0.45, F.floor - 0.1, -F.basinR - 0.45), new THREE.Vector3(F.basinR + 0.45, F.floor + F.basinH, F.basinR + 0.45)));
   const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x3a5f6e, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.86, envMapIntensity: 1.2, clearcoat: 1, clearcoatRoughness: 0.05 });
   const water = new THREE.Mesh(new THREE.CircleGeometry(F.basinR, 48), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = F.floor + F.basinH + 0.005; water.name = 'water'; water.userData.surface = 'water'; scene.add(water); ctx.raycastTargets.push(water);
-  // jets: a ring of spray sprites + centre plume (soft alpha discs; animated in updaters)
-  const sprTex = sprayTexture(); const sprMat = new THREE.SpriteMaterial({ map: sprTex, color: 0xf2f7fa, transparent: true, opacity: 0.55, depthWrite: false });
-  const sprites = []; const jets = 12;
-  for (let i = 0; i < jets + 6; i++) { const s = new THREE.Sprite(sprMat); s.userData.i = i; s.userData.ph = R() * 6.28; scene.add(s); sprites.push(s); }
+  // jets: a ring of spray quads (crossed, additive-ish alpha) merged into one mesh; scaled in updaters via uniform time
+  const sprTex = sprayTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: sprTex, color: 0xf4f8fa, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: true });
+  const jgeos = []; const jets = 12;
+  const jet = (x, z, h, w) => { for (const rot of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) { const q = new THREE.PlaneGeometry(w, h); q.translate(0, h / 2, 0); q.rotateY(rot); q.translate(x, F.floor + F.basinH, z); jgeos.push(q); } };
+  for (let i = 0; i < jets; i++) { const a = i / jets * Math.PI * 2; jet(Math.cos(a) * 1.9, Math.sin(a) * 1.9, 2.4, 0.5); }
+  jet(0, 0, 6.5, 1.3); jet(0.2, 0.1, 5.2, 1.0);
+  const jetsMesh = new THREE.Mesh(mergeGeos(jgeos), jetMat); jetsMesh.name = 'jets'; jetsMesh.renderOrder = 5; scene.add(jetsMesh);
   let t = 0;
-  world.updaters.push((dt) => {
-    t += dt;
-    for (const s of sprites) {
-      const i = s.userData.i;
-      if (i < jets) { const a = i / jets * Math.PI * 2; const h = 2.2 + Math.sin(t * 2.1 + s.userData.ph) * 0.35; s.position.set(Math.cos(a) * 1.9, F.floor + F.basinH + h * 0.5, Math.sin(a) * 1.9); s.scale.set(0.5, h, 1); }
-      else { const k = (i - jets); const h = 6 + Math.sin(t * 1.7 + s.userData.ph) * 0.9; s.position.set(Math.sin(t + k) * 0.15, F.floor + F.basinH + h * 0.5 + k * 0.3, Math.cos(t * 0.8 + k) * 0.15); s.scale.set(1.2 + k * 0.15, h, 1); }
-      s.material.rotation = 0;
-    }
-  });
+  world.updaters.push((dt) => { t += dt; jetsMesh.scale.y = 1 + Math.sin(t * 2.3) * 0.06; jetMat.opacity = 0.55 + Math.sin(t * 3.1) * 0.06; });
 
   return ground;
 }

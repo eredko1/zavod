@@ -24,13 +24,13 @@ const rnd = (R, a, b) => a + R() * (b - a);
 /** Hexagonal asphalt pavers (WSP paths): dark blue-grey hex tiles, pale mortar joints. Tile = 512 px covers ~2.0 m (hex ≈ 30 cm across flats). */
 export function hexPaverTexture(R) {
   const S = 512; const [c, g] = canvas(S, S);
-  g.fillStyle = '#8d8f90'; g.fillRect(0, 0, S, S);                 // mortar
+  g.fillStyle = '#5e6165'; g.fillRect(0, 0, S, S);                 // mortar (dark, low contrast)
   const cols = 8; const a = S / (cols * 1.5);                       // hex circumradius so the tile wraps: width per column = 1.5a
   const hgt = Math.sqrt(3) * a; const rows = Math.round(S / hgt);   // approximately wrap in y
   const aY = S / rows / Math.sqrt(3);
   for (let r = -1; r <= rows + 1; r++) for (let q = -1; q <= cols + 1; q++) {
     const cx = q * 1.5 * a, cy = r * Math.sqrt(3) * aY + (q & 1 ? Math.sqrt(3) * aY / 2 : 0);
-    const v = rnd(R, -14, 14); const base = [74 + v, 78 + v, 84 + v];
+    const v = rnd(R, -12, 12); const base = [78 + v, 81 + v, 86 + v];
     g.fillStyle = `rgb(${base[0] | 0},${base[1] | 0},${base[2] | 0})`;
     g.beginPath(); for (let i = 0; i < 6; i++) { const t = Math.PI / 3 * i; const px = cx + (a - 2.2) * Math.cos(t), py = cy + (aY - 2.2) * Math.sin(t); i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill();
     // wear highlights
@@ -71,7 +71,7 @@ export function leafTexture(R, { hue = 95 } = {}) {
   const S = 512; const [c, g] = canvas(S, S);
   g.clearRect(0, 0, S, S);
   const leaf = (x, y, r, rot, l) => {
-    g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = `hsl(${hue + rnd(R, -10, 10)},${45 + l * 20 | 0}%,${l | 0}%)`;
+    g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = `hsl(${hue + rnd(R, -8, 8)},${28 + l * 0.6 | 0}%,${l | 0}%)`;
     g.beginPath(); g.moveTo(0, -r);
     for (let i = 0; i < 5; i++) { const t = -Math.PI / 2 + (i + 0.5) * Math.PI * 2 / 5; g.quadraticCurveTo(Math.cos(t - 0.35) * r * 1.15, Math.sin(t - 0.35) * r * 1.15, Math.cos(t) * r * 0.55, Math.sin(t) * r * 0.55); g.quadraticCurveTo(Math.cos(t + 0.35) * r * 1.15, Math.sin(t + 0.35) * r * 1.15, Math.cos(t + Math.PI * 2 / 10) * r, Math.sin(t + Math.PI * 2 / 10) * r); }
     g.closePath(); g.fill(); g.restore();
@@ -80,9 +80,9 @@ export function leafTexture(R, { hue = 95 } = {}) {
   for (let i = 0; i < 900; i++) {
     const ang = R() * Math.PI * 2, d = Math.pow(R(), 0.6) * S * 0.46;
     const x = S / 2 + Math.cos(ang) * d, y = S / 2 + Math.sin(ang) * d * 0.95;
-    const depth = d / (S * 0.46); leaf(x, y, rnd(R, 14, 30), R() * 6.3, rnd(R, 22, 40) + (1 - depth) * -6);
+    const depth = d / (S * 0.46); leaf(x, y, rnd(R, 14, 30), R() * 6.3, rnd(R, 20, 36) + (1 - depth) * -5);
   }
-  for (let i = 0; i < 260; i++) { const ang = R() * 6.3, d = Math.pow(R(), 0.5) * S * 0.42; leaf(S / 2 + Math.cos(ang) * d, S / 2 + Math.sin(ang) * d, rnd(R, 12, 22), R() * 6.3, rnd(R, 40, 56)); }
+  for (let i = 0; i < 260; i++) { const ang = R() * 6.3, d = Math.pow(R(), 0.5) * S * 0.42; leaf(S / 2 + Math.cos(ang) * d, S / 2 + Math.sin(ang) * d, rnd(R, 12, 22), R() * 6.3, rnd(R, 30, 44)); }
   const t = finish(c, { wrap: false }); return t;
 }
 
@@ -100,8 +100,8 @@ export function barkTexture(R) {
 export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {}) {
   const S = 512; const [c, g] = canvas(S, S);
   const P = {
-    brick: { wall: '#8c4a3a', wall2: '#7a3f31', trim: '#d9d2c2', glass: '#2a3238', frame: '#efe9dc' },
-    row: { wall: '#9a4f3c', wall2: '#874334', trim: '#e9e3d5', glass: '#26303a', frame: '#f2eee4' },
+    brick: { wall: '#7e4a3c', wall2: '#6b3d31', trim: '#d9d2c2', glass: '#2a3238', frame: '#efe9dc' },
+    row: { wall: '#87503f', wall2: '#734335', trim: '#e9e3d5', glass: '#26303a', frame: '#f2eee4' },
     tan: { wall: '#b39a72', wall2: '#a68e68', trim: '#cbb996', glass: '#2c343a', frame: '#d8ccb0' },
     stone: { wall: '#cfc7b4', wall2: '#c4bca8', trim: '#e6e0d0', glass: '#2a3238', frame: '#e3ddcd' },
     sandstone: { wall: '#9a4f3b', wall2: '#8a4432', trim: '#7d3a2b', glass: '#1b2126', frame: '#5d2f24' },
@@ -112,8 +112,8 @@ export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {})
   g.fillStyle = P.wall; g.fillRect(0, 0, S, S);
   // brick courses / panel joints
   if (style === 'brick' || style === 'row' || style === 'tan') {
-    g.fillStyle = P.wall2; for (let y = 0; y < S; y += 6) for (let x = ((y / 6) & 1) * 8; x < S; x += 16) if (R() < 0.5) g.fillRect(x, y, 7, 2);
-    g.fillStyle = 'rgba(0,0,0,0.12)'; for (let y = 0; y < S; y += 6) g.fillRect(0, y, S, 1);
+    g.fillStyle = P.wall2; for (let y = 0; y < S; y += 4) for (let x = ((y / 4) & 1) * 5; x < S; x += 10) if (R() < 0.5) g.fillRect(x, y, 4, 2);
+    g.fillStyle = 'rgba(0,0,0,0.10)'; for (let y = 0; y < S; y += 4) g.fillRect(0, y, S, 1);
   } else if (style === 'sandstone') {
     // Bobst: strong vertical piers + horizontal bands (grid of red sandstone)
     g.fillStyle = P.wall2; for (let y = 0; y < S; y += 3) g.fillRect(0, y, S, 1);
@@ -231,4 +231,15 @@ export function makeMask(area, px, draw) {
   draw(m);
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 4; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.flipY = false;
   return t;
+}
+
+/** Tuckahoe-marble canvas: near-white warm grey with faint veins and weathering (512 px ≈ 2.4 m). */
+export function marbleTexture(R) {
+  const S = 512; const [c, g] = canvas(S, S);
+  g.fillStyle = '#e6e2d9'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 40; i++) { g.strokeStyle = `rgba(${150 + R() * 40 | 0},${150 + R() * 40 | 0},${145 + R() * 40 | 0},${0.12 + R() * 0.2})`; g.lineWidth = 0.6 + R() * 1.6; g.beginPath(); let x = R() * S, y = R() * S; g.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (R() - 0.5) * 90; y += (R() - 0.5) * 90; g.lineTo(x, y); } g.stroke(); }
+  for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(${R() < 0.5 ? '120,115,105' : '255,255,250'},${R() * 0.14})`; g.fillRect(R() * S, R() * S, 1 + R() * 2, 1 + R() * 2); }
+  // block joints (ashlar) every 1/3 tile
+  g.strokeStyle = 'rgba(90,85,78,0.35)'; g.lineWidth = 2; for (let y = 0; y < S; y += S / 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke(); } for (let x = 0; x < S; x += S / 2) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke(); }
+  return finish(c);
 }

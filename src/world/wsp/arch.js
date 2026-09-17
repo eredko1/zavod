@@ -1,13 +1,13 @@
 // Washington Square Arch: 17.4 × 7.0 × 23.5 m Tuckahoe marble, 9.1 m span, 14.3 m opening; hollow west pier with a ladder to the attic roof. WSP agent.
 import * as THREE from 'three';
 import { ARCH } from './layout.js';
-import { inscriptionTexture, friezeTexture, cofferTexture } from './textures.js';
+import { inscriptionTexture, friezeTexture, cofferTexture, marbleTexture } from './textures.js';
 import { mergeGeos } from './ground.js';
 
 export function buildArch(world, T) {
   const { ctx, scene } = world; const A = ARCH;
-  const marble = new THREE.MeshStandardMaterial({ map: T.marble, normalMap: T.marbleN, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.55, metalness: 0, color: 0xe9e3d6 });
-  T.marble.repeat.set(1, 1);
+  const marble = new THREE.MeshStandardMaterial({ map: marbleTexture(world.R), normalMap: T.marbleN, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.62, metalness: 0, color: 0xffffff });
+  world.marbleMat = marble;
   const g = new THREE.Group(); g.name = 'arch'; g.position.set(A.cx, 0, A.cz); scene.add(g);
   const hw = A.width / 2, hd = A.depth / 2, R = A.span / 2, springY = A.openH - R;
   const xW0 = -hw, xW1 = -hw + A.pier, xE0 = hw - A.pier, xE1 = hw;   // pier x ranges (local)
@@ -65,11 +65,14 @@ export function buildArch(world, T) {
   const frz = new THREE.MeshStandardMaterial({ map: friezeTexture(), roughness: 0.6, color: 0xf0ebe0 }); frz.map.repeat.set(4, 1);
   for (const zs of [-1, 1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(A.width, 1.2), frz); p.position.set(0, A.corniceY - 0.9, zs * (hd + 0.02)); p.rotation.y = zs > 0 ? 0 : Math.PI; g.add(p); }
   // spandrel medallions (wreaths) + winged-victory blocks
-  const medMat = new THREE.MeshStandardMaterial({ color: 0xd9d2c3, roughness: 0.7 });
   for (const zs of [-1, 1]) for (const xs of [-1, 1]) {
-    const m = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.22, 8, 24), medMat); m.position.set(xs * (hw - A.pier / 2), A.baseH + 6.5, zs * (hd + 0.15)); g.add(m);
-    const v = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.4, 0.35), medMat); v.position.set(xs * (R + 1.3), springY + 3.2, zs * (hd + 0.1)); v.rotation.z = xs * 0.35; g.add(v);
+    const m = new THREE.TorusGeometry(0.9, 0.22, 8, 24); m.translate(xs * (hw - A.pier / 2), A.baseH + 6.5, zs * (hd + 0.15)); ornament.push(m);
+    for (const fg of figure(2.6, 0.7, 0, 0, 0)) { fg.scale(1, 1, 0.35); fg.rotateZ(xs * 0.5); fg.translate(xs * (R + 1.6), springY + 1.6, zs * (hd + 0.12)); ornament.push(fg); }   // winged victory relief
+    const wing = new THREE.BoxGeometry(1.6, 0.5, 0.12); wing.rotateZ(xs * -0.6); wing.translate(xs * (R + 2.6), springY + 3.4, zs * (hd + 0.1)); ornament.push(wing);
+    // recessed pier panels (raised frames)
+    const fr = new THREE.BoxGeometry(A.pier - 1.2, 5.6, 0.12); fr.translate(xs * (hw - A.pier / 2), A.baseH + 3.6, zs * (hd + 0.05)); ornament.push(fr);
   }
+  ornMesh.geometry.dispose(); ornMesh.geometry = mergeGeos(ornament);
   // coffered vault: a cylinder segment just inside the intrados with the coffer texture
   const cof = new THREE.MeshStandardMaterial({ map: cofferTexture(), roughness: 0.7, color: 0xe6e0d3, side: THREE.BackSide }); cof.map.repeat.set(6, 3);
   const vaultGeo = new THREE.CylinderGeometry(R - 0.05, R - 0.05, A.depth - 0.1, 32, 1, true, 0, Math.PI); vaultGeo.rotateX(Math.PI / 2); vaultGeo.rotateZ(Math.PI / 2);
@@ -91,14 +94,15 @@ export function buildArch(world, T) {
   pb(0, -hd - 0.45 + pw / 2, A.width + 0.9, pw); pb(0, hd + 0.45 - pw / 2, A.width + 0.9, pw); pb(-hw - 0.45 + pw / 2, 0, pw, A.depth + 0.9); pb(hw + 0.45 - pw / 2, 0, pw, A.depth + 0.9);
   const parMesh = new THREE.Mesh(mergeGeos(parapets), parMat); g.add(parMesh); parMesh.castShadow = parMesh.receiveShadow = true; parMesh.userData.surface = 'concrete'; ctx.raycastTargets.push(parMesh);
 
-  // ---- statue groups (north face): Washington + two allegorical figures per pier, blocky, on the pedestals ---------
+  // ---- statue groups (north face): Washington + two allegorical figures per pier, blocky, merged into one mesh -----
   const statMat = new THREE.MeshStandardMaterial({ color: 0xd6cfc0, roughness: 0.75 });
+  const figGeos = [];
   for (const [x0, x1] of [[xW0, xW1], [xE0, xE1]]) {
     const cx = (x0 + x1) / 2, baseY = A.baseH + 1.8, z = -hd - 0.9;
-    const fig = (fx, h, w) => { const f = figure(statMat, h, w); f.position.set(cx + fx, baseY, z); g.add(f); f.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.surface = 'concrete'; ctx.raycastTargets.push(o); } }); };
-    fig(0, 4.6, 1.0); fig(-1.15, 3.6, 0.75); fig(1.15, 3.6, 0.75);
+    figGeos.push(...figure(4.6, 1.0, cx, baseY, z), ...figure(3.6, 0.75, cx - 1.15, baseY, z), ...figure(3.6, 0.75, cx + 1.15, baseY, z));
     ctx.colliders.push(wbox(cx - 1.7, 0, z - 0.9, cx + 1.7, A.baseH + 1.8, z + 0.9));
   }
+  const figMesh = new THREE.Mesh(mergeGeos(figGeos), statMat); g.add(figMesh); figMesh.castShadow = figMesh.receiveShadow = true; figMesh.userData.surface = 'concrete'; ctx.raycastTargets.push(figMesh);
 
   // cover around the arch piers + the plaza rim
   for (const x of [A.cx - hw - 1, A.cx + hw + 1]) { world.cover(x, A.cz - hd - 1.5, 0, -1); world.cover(x, A.cz + hd + 1.5, 0, 1); }
@@ -107,17 +111,16 @@ export function buildArch(world, T) {
   return g;
 }
 
-/** Blocky standing figure (robed): torso box, head, shoulders, base. */
-function figure(mat, h = 4.5, w = 1.0) {
-  const g = new THREE.Group();
-  const add = (geo, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; g.add(m); return m; };
-  add(new THREE.CylinderGeometry(w * 0.55, w * 0.7, h * 0.55, 10), h * 0.275);           // robe / legs
-  add(new THREE.BoxGeometry(w * 1.05, h * 0.3, w * 0.6), h * 0.55 + h * 0.15);            // torso
-  add(new THREE.BoxGeometry(w * 1.4, h * 0.08, w * 0.6), h * 0.85);                       // shoulders / cloak
-  add(new THREE.SphereGeometry(w * 0.26, 10, 8), h * 0.92);                                // head
-  const arm = add(new THREE.BoxGeometry(w * 0.22, h * 0.34, w * 0.22), h * 0.7); arm.position.x = w * 0.68; arm.rotation.z = -0.2;
-  const arm2 = add(new THREE.BoxGeometry(w * 0.22, h * 0.34, w * 0.22), h * 0.7); arm2.position.x = -w * 0.68; arm2.rotation.z = 0.2;
-  return g;
+/** Blocky standing figure (robed) as geometries translated to (x, y, z). */
+function figure(h = 4.5, w = 1.0, x = 0, y = 0, z = 0) {
+  const out = []; const add = (geo, dy, dx = 0, rz = 0) => { if (rz) geo.rotateZ(rz); geo.translate(x + dx, y + dy, z); out.push(geo); };
+  add(new THREE.CylinderGeometry(w * 0.55, w * 0.7, h * 0.55, 10), h * 0.275);
+  add(new THREE.BoxGeometry(w * 1.05, h * 0.3, w * 0.6), h * 0.7);
+  add(new THREE.BoxGeometry(w * 1.4, h * 0.08, w * 0.6), h * 0.85);
+  add(new THREE.SphereGeometry(w * 0.26, 10, 8), h * 0.92);
+  add(new THREE.BoxGeometry(w * 0.22, h * 0.34, w * 0.22), h * 0.7, w * 0.68, -0.2);
+  add(new THREE.BoxGeometry(w * 0.22, h * 0.34, w * 0.22), h * 0.7, -w * 0.68, 0.2);
+  return out;
 }
 
 export function scaleUV(geo, k) { const uv = geo.attributes.uv; if (!uv) return; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * k, uv.getY(i) * k); }

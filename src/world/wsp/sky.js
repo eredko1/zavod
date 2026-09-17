@@ -2,21 +2,21 @@
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
-export const HDRI_URL = './assets/hdri/urban_street_04_2k.hdr';
-// measured offline: brightest texel u=0.600, v=0.336 → elevation 29.5°, azimuth 36° from +x toward +z (SE in the park frame)
-const SUN_AZ = 36 * Math.PI / 180, SUN_EL = 44 * Math.PI / 180;   // key light raised to ~44° (late morning); disc mismatch hidden by the skyline
+export const HDRI_URL = './assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr';
+// puresky: sun disc at elevation 48°, azimuth 34° from +x toward +z (SE in the park frame) — the urban_street_04 HDRI (also in assets) put its street buildings above our skyline
+const SUN_AZ = 34 * Math.PI / 180, SUN_EL = 46 * Math.PI / 180;
 export const FOG_COLOR = new THREE.Color(0xcfd8e2);
 const ENV_SUN_CAP = 4.0;
 
 export function buildSky(world) {
   const { ctx, scene } = world; const { renderer } = ctx;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.95;
   const sunDir = new THREE.Vector3(Math.cos(SUN_EL) * Math.cos(SUN_AZ), Math.sin(SUN_EL), Math.cos(SUN_EL) * Math.sin(SUN_AZ));
   scene.background = FOG_COLOR.clone();
   scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0022);
 
-  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6b6a5e, 0.55); scene.add(hemi); ctx.lights.hemi = hemi;
-  const sun = new THREE.DirectionalLight(0xfff0d8, 9.5);
+  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6b6a5e, 0.45); scene.add(hemi); ctx.lights.hemi = hemi;
+  const sun = new THREE.DirectionalLight(0xfff0d8, 5.5);
   sun.position.copy(sunDir).multiplyScalar(220); sun.target.position.set(0, 0, 0);
   sun.castShadow = true; const sm = sun.shadow;
   sm.mapSize.set(4096, 4096);
@@ -35,7 +35,7 @@ export function buildSky(world) {
     const envTex = new THREE.DataTexture(clamped, w, h, THREE.RGBAFormat, THREE.FloatType); envTex.mapping = THREE.EquirectangularReflectionMapping; envTex.flipY = hdr.flipY; envTex.needsUpdate = true;
     const pmrem = new THREE.PMREMGenerator(renderer); pmrem.compileEquirectangularShader();
     const env = pmrem.fromEquirectangular(envTex).texture; pmrem.dispose(); envTex.dispose();
-    scene.environment = env; scene.environmentIntensity = 0.9;
+    scene.environment = env; scene.environmentIntensity = 0.8;
     scene.background = hdr; scene.backgroundIntensity = 1.0; scene.backgroundBlurriness = 0.0;
     ctx.bus?.emit?.('skyReady', { map: 'wsp' });
   }, undefined, (e) => console.warn('[wsp] HDRI failed', e));

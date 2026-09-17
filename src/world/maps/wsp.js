@@ -1,29 +1,101 @@
-// MAP: WASHINGTON SQUARE — STUB. Owned by: WSP agent (this file plus ../wsp/*.js helpers and assets/models/wsp/).
+// MAP: WASHINGTON SQUARE — Washington Square Park + the surrounding Greenwich Village blocks, 1:1 from an OSM plan. Owned by: WSP agent (this file + ../wsp/*).
+// Levels: park floor y=0 · fountain pit -0.9 (3 steps) · mounds to +3.6 · Bobst plaza +0.9 · Row stoops +1.4 · Mews roof 7.2 · Alley studios roof 10 · arch attic 23.5 (ladder in the west pier).
 import * as THREE from 'three';
+import { BOUNDS, ARCH, CHESS, MOUNDS, GARIBALDI, PARKHOUSE, BUILDINGS, FOUNTAIN } from '../wsp/layout.js';
+import { loadedTextures } from '../wsp/textures.js';
+import { buildSky } from '../wsp/sky.js';
+import { buildGround, groundHeight } from '../wsp/ground.js';
+import { buildArch } from '../wsp/arch.js';
+import { buildBuildings } from '../wsp/buildings.js';
+import { buildFurniture } from '../wsp/furniture.js';
+import { buildTrees } from '../wsp/trees.js';
 
 export const meta = {
   id: 'wsp', name: 'WASHINGTON SQUARE', subtitle: 'DAY OPS · GREENWICH VILLAGE', time: 'day', weather: 'clear',
-  description: 'Washington Square Park, Manhattan: the marble arch, the central fountain plaza, radiating paths, chess tables, Garibaldi and the NYU townhouse frontage.',
+  description: 'Washington Square Park, Manhattan, 1:1: the marble arch (climb the west pier to the attic), the sunken fountain plaza, Garibaldi, the chess plaza and mounds, The Row, Judson, Bobst and Kimmel, and the streets of the Village around it.',
   grade: 'day', ambience: 'wsp-day', thumb: 'assets/thumbs/wsp.jpg',
 };
 
 export function build(world) {
-  const { ctx, W, scene } = world;
-  ctx.renderer.toneMappingExposure = 1.0;
-  W.bounds.set(new THREE.Vector3(-70, -1, -70), new THREE.Vector3(70, 40, 70));
-  scene.background = new THREE.Color(0x9fb3c8);
-  scene.fog = new THREE.FogExp2(0x9fb3c8, 0.004);
-  const hemi = new THREE.HemisphereLight(0xbfd4ee, 0x5a5348, 0.9); scene.add(hemi); ctx.lights.hemi = hemi;
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.0); sun.position.set(40, 60, 20); sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096); sun.shadow.camera.left = -80; sun.shadow.camera.right = 80; sun.shadow.camera.top = 80; sun.shadow.camera.bottom = -80; sun.shadow.camera.far = 200; sun.shadow.bias = -0.0005;
-  scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x6d6a63, roughness: 0.95 }));
-  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.name = 'ground'; scene.add(floor); world.solid(floor, 'concrete', { collide: false });
-  for (let i = 0; i < 16; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 3), new THREE.MeshStandardMaterial({ color: 0x8a4a3a, roughness: 0.7 })); b.position.set((world.R() - 0.5) * 100, 1.5, (world.R() - 0.5) * 100); b.name = 'stub'; scene.add(b); world.solid(b, 'metal'); }
-  const v = (x, z) => new THREE.Vector3(x, 0, z);
-  W.playerSpawns = [v(0, 55), v(8, 55), v(-8, 55)];
-  W.enemySpawns = [v(-40, -40), v(0, -50), v(40, -40), v(-55, 0), v(55, 0), v(-40, 30), v(40, 30), v(20, -20), v(-20, -20), v(0, -20), v(50, -50), v(-50, -50)];
-  for (let i = 0; i < 40; i++) world.cover((world.R() - 0.5) * 100, (world.R() - 0.5) * 100, 0, 1);
-  W.poses = { spawn: [0, 0, 55, 0, 0], hero: [0, 0, 30, 0, 0], overview: [0, 30, 90, 0, -0.4] };
-  W.surfaceAt = () => 'concrete';
+  const { ctx, W } = world;
+  W.bounds.set(new THREE.Vector3(BOUNDS.x0, -2, BOUNDS.z0), new THREE.Vector3(BOUNDS.x1, 60, BOUNDS.z1));
+  W.groundHeight = groundHeight;
+
+  // ladders: register without the per-rung meshes (draw calls), draw them merged at the end
+  const ladders = []; const ladderReal = world.ladder;
+  world.ladder = (x, z, y0, y1, nx, nz) => { const L = ladderReal(x, z, y0, y1, nx, nz, { mesh: false }); ladders.push(L); return L; };
+  ctx.progress(0.13, 'wsp: sky'); buildSky(world);
+  const T = loadedTextures(); world.T = T;
+  ctx.progress(0.15, 'wsp: ground'); buildGround(world, T);
+  ctx.progress(0.18, 'wsp: arch'); buildArch(world, T);
+  ctx.progress(0.2, 'wsp: village blocks'); buildBuildings(world, T);
+  ctx.progress(0.22, 'wsp: furniture + streets'); buildFurniture(world, T);
+  ctx.progress(0.24, 'wsp: trees'); buildTrees(world, T);
+  buildLadderMeshes(world, ladders);
+
+  // ---- gameplay ------------------------------------------------------------------------------------------------------
+  const v = (x, y, z) => new THREE.Vector3(x, y, z);
+  const A = ARCH; const roofY = A.height;
+  W.playerSpawns = [v(-13, 0, 80), v(2, 0, 76), v(-28, 0, 76), v(20, 0, 75.5)];               // Washington Sq S sidewalk / Thompson St mouth
+  W.enemySpawns = [
+    v(A.cx + 5, roofY, A.cz), v(A.cx - 5, roofY, A.cz),                                       // arch attic
+    v(-112, groundHeight(-112, 38), 38), v(-100, groundHeight(-100, 46), 46),                  // mounds
+    v(-135, 0, 46), v(-142, 0, 56),                                                            // chess plaza
+    v(GARIBALDI.x + 4, 0, GARIBALDI.z + 3), v(30, 0, -20), v(-30, 0, -22),                     // around the plaza
+    v(0, FOUNTAIN.floor, 6),                                                                   // fountain pit
+    v(-9.5, 0, -66), v(12.5, 0, -66), v(1, 0, -95),                                            // arch forecourt + Fifth Ave
+    v(60, 0, -60), v(-60, 0, -60), v(110, 0, -30), v(-110, 0, -30),                            // north walk / lawns
+    v(100, 0, 40), v(-60, 0, 30), v(120, 0, 5),                                                // south / east
+    v(48, 0, -80), v(-100, 0, -80), v(145, 0, 30), v(-168, 0, 20),                             // streets
+    v(60, 7.2, -124), v(-125, 10, -142),                                                       // roofs (Mews / Alley studios)
+    v(100, 0.9, 86),                                                                           // Bobst plaza
+  ];
+  W.poses = {
+    spawn: [-13, 0, 80, 0.05, 0.0],
+    hero: [-12, 0, 33, -0.14, 0.03],            // from the S rim of the fountain plaza: basin + jets, arch behind, One Fifth through it
+    overview: [-150, 80, 150, -0.78, -0.48],
+    arch: [1.5, 0, -22, 0, 0.12],               // on the axis, looking north through the arch up Fifth Avenue
+    attic: [A.cx + 5, roofY, A.cz - 1, 0.25, -0.35],
+    fountain: [0, FOUNTAIN.floor, 8, 0, 0.05],
+    chess: [-118, 0, 42, 1.25, 0.0],
+    mounds: [-92, 0, 40, 1.3, 0.05],
+    row: [30, 0, -70, 0.15, 0.12],              // The Row from the north walk
+    bobst: [28, 0, 76.5, -1.75, 0.12],          // along Washington Sq S: Bobst ahead-right, Kimmel right
+    macdougal: [-168, 0, 90, 0.0, 0.05],
+    kimmel: [-4, 0, 66, -0.5, 0.14],
+    judson: [-14, 0, 62, 0.35, 0.16],
+    garibaldi: [48, 0, 4, -1.2, 0.05],
+    fifth: [0, 0, -100, 0, 0.08],
+  };
+  // cover along the fountain coping, paths, lawn fences (more from furniture builders)
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; const r = FOUNTAIN.coping + 0.6; world.cover(Math.cos(a) * r, Math.sin(a) * r, Math.cos(a), Math.sin(a)); }
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; const r = FOUNTAIN.r - 1; world.cover(Math.cos(a) * r, Math.sin(a) * r, -Math.cos(a), -Math.sin(a), FOUNTAIN.floor); }
+  for (const m of MOUNDS) for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { const x = m.x + Math.cos(a) * m.r * 0.6, z = m.z + Math.sin(a) * m.r * 0.6; world.cover(x, z, Math.cos(a), Math.sin(a), groundHeight(x, z)); }
+
+  W.surfaceAt = (p) => {
+    const x = p.x, z = p.z, y = p.y;
+    if (y > 22 && Math.abs(x - A.cx) < 10 && Math.abs(z - A.cz) < 5) return 'concrete';
+    const r = Math.hypot(x, z);
+    if (r < FOUNTAIN.basinR && y < FOUNTAIN.floor + FOUNTAIN.basinH + 0.1) return 'water';
+    if (r < FOUNTAIN.plaza) return 'concrete';
+    if (world.groundMask && world.maskSample) { const s = world.maskSample(x, z); if (s === 'lawn') return 'ground'; return 'concrete'; }
+    return 'ground';
+  };
+}
+
+/** One merged mesh for all ladders (rails + rungs) instead of ~80 meshes per ladder. */
+function buildLadderMeshes(world, ladders) {
+  const { ctx, scene } = world; const geos = [];
+  for (const L of ladders) {
+    const h = L.y1 - L.y0 + 0.9; const ang = Math.atan2(L.nx, L.nz);
+    const add = (g) => { g.rotateY(ang); g.translate(L.x + L.nx * 0.12, L.y0, L.z + L.nz * 0.12); geos.push(g); };
+    for (const sx of [-0.22, 0.22]) { const r = new THREE.CylinderGeometry(0.02, 0.02, h, 6); r.translate(sx, h / 2, 0); add(r); }
+    for (let y = 0.3; y < h - 0.2; y += 0.3) { const r = new THREE.CylinderGeometry(0.014, 0.014, 0.44, 6); r.rotateZ(Math.PI / 2); r.translate(0, y, 0); add(r); }
+    for (let y = 2.5; y < h - 1; y += 2.5) { const b = new THREE.BoxGeometry(0.5, 0.04, 0.16); b.translate(0, y, -0.1); add(b); }   // wall brackets
+  }
+  if (!geos.length) return;
+  const g = new THREE.BufferGeometry(); const pos = [], nor = [], uv = [];
+  for (const q of geos) { const n = q.index ? q.toNonIndexed() : q; pos.push(...n.attributes.position.array); nor.push(...n.attributes.normal.array); uv.push(...n.attributes.uv.array); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.5, metalness: 0.8 })); m.name = 'ladders'; m.castShadow = true; m.userData.surface = 'metal'; scene.add(m); ctx.raycastTargets.push(m);
 }
