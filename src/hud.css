@@ -325,3 +325,17 @@
 #hud .wrow .b i::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--v); background: var(--fg); }
 #hud .wrow.cur .b i::after { background: var(--acc); }
 #hud .wrow .ds { font: 400 calc(12px * var(--hs))/1.35 var(--fb); color: var(--dim); margin-top: calc(6px * var(--hs)); }
+
+/* ---------- phones (landscape, short viewport): scrollable compact panels ---------- */
+#hud .panel .body { touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+@media (max-height: 560px) {
+  #hud .panel.maps, #hud .panel.loadout { width: min(66vw, calc(100vw - var(--safe-x) - 300px * var(--hs) - 16px)); left: auto; right: var(--safe-x); }
+  #hud .mapcards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  #hud .mapcard .ds { display: none; }
+  #hud .mapcard .nm { font-size: 15px; padding: 8px 8px 2px; }
+  #hud .mapcard .sb { font-size: 9px; padding: 0 8px 8px; }
+  #hud .panel.loadout .body { grid-template-columns: 1fr; gap: 8px; }
+  #hud .wrow { padding: 7px 9px; margin-bottom: 6px; }
+  #hud .wrow .ds { display: none; }
+  #hud .wrow .nm { font-size: 15px; }
+}
