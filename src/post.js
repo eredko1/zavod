@@ -172,6 +172,16 @@ export function reset(ctx) {
   S.shakeAmt = 0; S.damage = 0; S.flash = 0; S.hasPrev = false; S.lowFpsT = 0;
 }
 
+const GRADES = {
+  night: { contrast: 1.08, saturation: 0.95, lift: [0.005, 0.009, 0.015], gain: [1.0, 0.99, 0.97], shadowTint: [0.86, 0.96, 1.10], highlightTint: [1.08, 1.0, 0.90], split: 0.55, vignette: 0.3, grain: 0.035, ca: 0.006, bloomThreshold: 1.6, bloomStrength: 0.45, ao: 0.85 },
+  day:   { contrast: 1.06, saturation: 1.04, lift: [0.0, 0.0, 0.0],       gain: [1.0, 1.0, 1.0],     shadowTint: [0.97, 0.99, 1.03], highlightTint: [1.03, 1.0, 0.96], split: 0.22, vignette: 0.16, grain: 0.02, ca: 0.004, bloomThreshold: 2.2, bloomStrength: 0.3, ao: 1.0 },
+};
+function applyGrade(S, name) {
+  const G = GRADES[name] || GRADES.night, g = S.gU;
+  g.uContrast.value = G.contrast; g.uSaturation.value = G.saturation; g.uLift.value.fromArray(G.lift); g.uGain.value.fromArray(G.gain);
+  g.uShadowTint.value.fromArray(G.shadowTint); g.uHighlightTint.value.fromArray(G.highlightTint); g.uSplitAmount.value = G.split; g.uCA.value = G.ca;
+  S.tuning.vignette = G.vignette; S.tuning.grain = G.grain; S.tuning.bloomThreshold = G.bloomThreshold; S.tuning.bloomStrength = G.bloomStrength; S.tuning.ao = G.ao;
+}
 export function onResize(ctx) { const S = ctx.post?._S; if (S) applySize(S, innerWidth, innerHeight); }
 
 function applySize(S, w, h) {
@@ -236,6 +246,9 @@ function render(S, dt, ctx) {
   const dofAmt = (settings.dof && q === 'ultra') ? smoothstep(0.15, 0.9, ads) : 0;
   S.dof.enabled = dofAmt > 0.02; S.dofU.uAmount.value = dofAmt;
 
+  // ---- grade preset per map (night: teal/sodium split-tone; day: neutral filmic) ----
+  const wantGrade = ctx.world?.grade || 'night';
+  if (S.gradeName !== wantGrade) { S.gradeName = wantGrade; applyGrade(S, wantGrade); }
   // ---- grade dynamics ----
   const g = S.gU;
   g.uGrain.value = settings.filmGrain === false ? 0 : S.tuning.grain;

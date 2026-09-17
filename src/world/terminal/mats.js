@@ -44,9 +44,9 @@ export function makeMats(ctx, R, env) {
   // ---- Tennessee pink marble floor (tile = 4 m) -------------------------------
   {
     const S = 1024, [c, g] = canvas(S, S);
-    g.fillStyle = '#c9a892'; g.fillRect(0, 0, S, S);
+    g.fillStyle = '#cfbfae'; g.fillRect(0, 0, S, S);
     const nf = noiseField(R, 256, 5);
-    for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const n = nf[((y >> 2) % 256) * 256 + ((x >> 2) % 256)]; g.fillStyle = `rgba(${150 + n * 60},${110 + n * 55},${95 + n * 45},0.75)`; g.fillRect(x, y, 4, 4); }
+    for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const n = nf[((y >> 2) % 256) * 256 + ((x >> 2) % 256)]; g.fillStyle = `rgba(${165 + n * 55},${140 + n * 50},${122 + n * 45},0.7)`; g.fillRect(x, y, 4, 4); }
     veins(g, R, S, { color: '#8a5f4d', count: 26, width: 2.2, alpha: 0.35 });
     veins(g, R, S, { color: '#e8d6c8', count: 30, width: 3, alpha: 0.35 });
     // slab joints every 1 m (256px) with slight offset per row
@@ -65,9 +65,9 @@ export function makeMats(ctx, R, env) {
   // ---- Caen stone ashlar (walls) tile = 4 m ----------------------------------------
   {
     const S = 1024, [c, g] = canvas(S, S);
-    g.fillStyle = '#c9b48e'; g.fillRect(0, 0, S, S);
+    g.fillStyle = '#b39a72'; g.fillRect(0, 0, S, S);
     const nf = noiseField(R, 256, 4);
-    for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const n = nf[((y >> 2) % 256) * 256 + ((x >> 2) % 256)]; g.fillStyle = `rgba(${185 + n * 45},${165 + n * 40},${125 + n * 40},0.7)`; g.fillRect(x, y, 4, 4); }
+    for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const n = nf[((y >> 2) % 256) * 256 + ((x >> 2) % 256)]; g.fillStyle = `rgba(${165 + n * 45},${140 + n * 40},${100 + n * 40},0.7)`; g.fillRect(x, y, 4, 4); }
     // blocks 1.2 x 0.6 m → 307 x 154 px
     const bw = 341, bh = 128;
     for (let j = 0; j < S / bh; j++) {
@@ -100,15 +100,16 @@ export function makeMats(ctx, R, env) {
   // ---- Celestial vault: teal plaster + gold stars/constellations (unique, covers the vault once) ----
   {
     const W = 2048, H = 1024, [c, g] = canvas(W, H);
-    g.fillStyle = '#2d6f6a'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#3b8f97'; g.fillRect(0, 0, W, H);
     const nf = noiseField(R, 256, 4);
-    for (let y = 0; y < H; y += 8) for (let x = 0; x < W; x += 8) { const n = nf[((y >> 3) % 256) * 256 + ((x >> 3) % 256)]; g.fillStyle = `rgba(${30 + n * 40},${95 + n * 40},${88 + n * 40},0.55)`; g.fillRect(x, y, 8, 8); }
+    for (let y = 0; y < H; y += 8) for (let x = 0; x < W; x += 8) { const n = nf[((y >> 3) % 256) * 256 + ((x >> 3) % 256)]; g.fillStyle = `rgba(${34 + n * 34},${108 + n * 36},${112 + n * 34},0.55)`; g.fillRect(x, y, 8, 8); }
     // grime gradient at edges (age)
-    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(20,40,40,0.35)'); gr.addColorStop(0.5, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(20,40,40,0.35)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(20,40,40,0.18)'); gr.addColorStop(0.5, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(20,40,40,0.18)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
     // dark uncleaned patch (Cancer, NW corner)
     g.fillStyle = 'rgba(40,45,38,0.9)'; g.fillRect(W * 0.16, H * 0.06, 90, 40);
     // emissive layer: stars + constellation lines + zodiac band
     const [ec, eg] = canvas(W, H); eg.fillStyle = '#000'; eg.fillRect(0, 0, W, H);
+    eg.globalAlpha = 0.5; eg.drawImage(c, 0, 0); eg.globalAlpha = 1; // plaster self-glow baked into the emissive (the real vault is uplit from the cornice)
     const stars = [];
     for (let i = 0; i < 2600; i++) { const x = R() * W, y = R() * H, r = 0.6 + R() * 1.6; stars.push([x, y, r]); eg.fillStyle = `rgba(255,${205 + R() * 40},${120 + R() * 60},${0.6 + R() * 0.4})`; eg.beginPath(); eg.arc(x, y, r, 0, Math.PI * 2); eg.fill(); }
     // ecliptic band (gold)
@@ -119,15 +120,14 @@ export function makeMats(ctx, R, env) {
     for (let k = 0; k < 14; k++) {
       const cx = W * (0.08 + R() * 0.84), cy = H * (0.15 + R() * 0.7); const n = 5 + Math.floor(R() * 6); const pts = [];
       for (let i = 0; i < n; i++) pts.push([cx + (R() - 0.5) * 260, cy + (R() - 0.5) * 180]);
-      eg.strokeStyle = 'rgba(235,190,90,0.7)'; eg.lineWidth = 1.6; eg.beginPath(); eg.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) eg.lineTo(p[0], p[1]); eg.stroke();
+      eg.strokeStyle = 'rgba(235,190,90,0.55)'; eg.lineWidth = 1.2; eg.beginPath(); eg.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) eg.lineTo(p[0], p[1]); eg.stroke();
       for (const p of pts) { eg.fillStyle = 'rgba(255,230,160,1)'; eg.beginPath(); eg.arc(p[0], p[1], 3.2, 0, Math.PI * 2); eg.fill(); }
-      // gold figure outline
-      eg.strokeStyle = 'rgba(220,170,70,0.35)'; eg.lineWidth = 2.5; eg.beginPath(); eg.ellipse(cx, cy, 120 + R() * 60, 70 + R() * 40, R() * Math.PI, 0, Math.PI * 2); eg.stroke();
-      eg.beginPath(); eg.ellipse(cx + 40, cy - 20, 50 + R() * 30, 30 + R() * 20, R() * Math.PI, 0, Math.PI * 2); eg.stroke();
-      g.strokeStyle = 'rgba(200,160,80,0.5)'; g.lineWidth = 3; g.beginPath(); g.ellipse(cx, cy, 120, 70, 0.4, 0, Math.PI * 2); g.stroke();
+      // faint gold figure strokes (a few open curves, like the painted zodiac figures) — no closed scribbles
+      g.strokeStyle = 'rgba(205,165,85,0.45)'; g.lineWidth = 2.2;
+      for (let s2 = 0; s2 < 2; s2++) { g.beginPath(); const a0 = R() * Math.PI * 2, rr = 60 + R() * 70; g.arc(cx + (R() - 0.5) * 120, cy + (R() - 0.5) * 80, rr, a0, a0 + 1.2 + R() * 1.6); g.stroke(); }
     }
     const map = tex(c, { repeat: false }), em = tex(ec, { repeat: false });
-    M.vault = std('vault', { map, emissiveMap: em, emissive: new THREE.Color(0xffd27a), emissiveIntensity: 0.9, roughness: 0.9, metalness: 0.0, side: THREE.BackSide });
+    M.vault = std('vault', { map, emissiveMap: em, emissive: new THREE.Color(0xfff2dc), emissiveIntensity: 0.85, roughness: 0.9, metalness: 0.0, side: THREE.BackSide, color: 0xffffff });
     M.vault.userData.castShadow = false;
   }
   // ---- metals -----------------------------------------------------------------------

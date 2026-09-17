@@ -9,7 +9,7 @@ export const HDRI_URL = './assets/hdri/st_fagans_interior_2k.hdr';
 
 export function buildLighting(world, M) {
   const { ctx, scene, R } = world; const { renderer } = ctx;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.82;
   scene.background = new THREE.Color(0x0b0d10);      // never visible (closed shell); dark neutral
   scene.fog = new THREE.FogExp2(0xcfc2a8, 0.0022);    // very light warm haze for depth
 
@@ -18,15 +18,15 @@ export function buildLighting(world, M) {
   {
     const s = new THREE.Scene();
     const sky = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 8), new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: {}, vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }', fragmentShader: 'varying vec3 vP; void main(){ float h=normalize(vP).y; vec3 c=mix(vec3(0.22,0.17,0.12), vec3(0.55,0.5,0.42), smoothstep(-0.2,0.6,h)); gl_FragColor=vec4(c,1.0); }' }));
-    s.add(sky); scene.environment = pmrem.fromScene(s, 0.02).texture; scene.environmentIntensity = 0.55;
+    s.add(sky); scene.environment = pmrem.fromScene(s, 0.02).texture; scene.environmentIntensity = 0.3;
   }
-  new RGBELoader().load(HDRI_URL, (t) => { t.mapping = THREE.EquirectangularReflectionMapping; const env = pmrem.fromEquirectangular(t).texture; scene.environment = env; scene.environmentIntensity = 0.5; t.dispose(); pmrem.dispose(); }, undefined, () => { console.warn('[terminal] HDRI missing'); pmrem.dispose(); });
+  new RGBELoader().load(HDRI_URL, (t) => { t.mapping = THREE.EquirectangularReflectionMapping; const env = pmrem.fromEquirectangular(t).texture; scene.environment = env; scene.environmentIntensity = 0.3; t.dispose(); pmrem.dispose(); }, undefined, () => { console.warn('[terminal] HDRI missing'); pmrem.dispose(); });
 
   // ---- ambient: hemisphere (cool from the windows above, warm bounce from the pink marble) ----------------
-  const hemi = new THREE.HemisphereLight(0xbcc9d8, 0x7a6350, 0.75); scene.add(hemi); ctx.lights.hemi = hemi;
+  const hemi = new THREE.HemisphereLight(0xb9c6d4, 0x6e5a48, 0.34); scene.add(hemi); ctx.lights.hemi = hemi;
 
   // ---- sun -------------------------------------------------------------------------------------------------
-  const sun = new THREE.DirectionalLight(0xfff0d2, 4.2);
+  const sun = new THREE.DirectionalLight(0xfff0d2, 2.6);
   sun.position.copy(SUN_DIR).multiplyScalar(150).add(new THREE.Vector3(0, 0, 8)); sun.target.position.set(0, 0, 8);
   sun.castShadow = true; const sm = sun.shadow; sm.mapSize.set(4096, 4096);
   sm.camera.left = -62; sm.camera.right = 62; sm.camera.top = 62; sm.camera.bottom = -62; sm.camera.near = 40; sm.camera.far = 300;
@@ -36,7 +36,7 @@ export function buildLighting(world, M) {
 
   // ---- window spots (shaft cores): 3 east windows (no shadow) + 2 clerestory (shadowed) -------------------
   ctx.lights.spots = ctx.lights.spots || [];
-  const spot = (from, to, { color = 0xffe2b0, intensity = 900, angle = 0.22, penumbra = 0.6, shadow = false } = {}) => {
+  const spot = (from, to, { color = 0xffe2b0, intensity = 650, angle = 0.22, penumbra = 0.6, shadow = false } = {}) => {
     const s = new THREE.SpotLight(color, intensity, 120, angle, penumbra, 1.4);
     s.position.copy(from); s.target.position.copy(to); s.castShadow = shadow;
     if (shadow) { s.shadow.mapSize.set(1024, 1024); s.shadow.bias = -0.0004; s.shadow.camera.near = 5; s.shadow.camera.far = 120; }

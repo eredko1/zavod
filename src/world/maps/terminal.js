@@ -52,6 +52,6 @@ export function build(world) {
     ramp: [-40, 0, 25, -Math.PI / 2, -0.05],
     dining: [-16, -6, 36, 1.2, 0.05],
     platform: [-20, -12, 63, -Math.PI / 2, 0.05],
-    ceiling: [0, 0, 0, 0, 1.2],
+    ceiling: [-10, 0, 8, -0.6, 1.1],
   };
 }
