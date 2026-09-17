@@ -198,6 +198,7 @@ export function makeMats(ctx, R, env) {
   M.bulb = new THREE.MeshBasicMaterial({ color: new THREE.Color(4.5, 3.2, 1.6), toneMapped: true }); M.bulb.name = 'bulb'; M.bulb.userData.castShadow = false;
   M.fluor = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.9, 3.2), toneMapped: true }); M.fluor.name = 'fluor'; M.fluor.userData.castShadow = false;
   M.lampGlass = std('lampGlass', { color: 0xfff1cc, emissive: 0xffc77a, emissiveIntensity: 3.5, roughness: 0.4, metalness: 0, transparent: true, opacity: 0.9 }); M.lampGlass.userData.castShadow = false;
+  M.shopGlow = std('shopGlow', { color: 0xf3dcb0, emissive: 0xffd9a0, emissiveIntensity: 0.9, roughness: 0.8, metalness: 0 }); M.shopGlow.userData.castShadow = false;
   M.clockFace = std('clockFace', { color: 0xfff6e6, emissive: 0xffe6b8, emissiveIntensity: 1.4, roughness: 0.3, metalness: 0 });
   M.darkGlass = std('darkGlass', { color: 0x0e1418, roughness: 0.08, metalness: 0.9, envMapIntensity: 1.3 });
   M.trainWindow = std('trainWindow', { color: 0x1a2530, roughness: 0.1, metalness: 0.6, emissive: 0x4a5560, emissiveIntensity: 0.6 });
@@ -236,6 +237,14 @@ export function makeMats(ctx, R, env) {
   M.sign = (text, { bg = '#111', fg = '#e6c26a', w = 1024, h = 128, font = 'bold 72px Georgia, serif' } = {}) => {
     const [c, g] = canvas(w, h); g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2);
     const m = std('sign', { map: tex(c, { repeat: false }), roughness: 0.5, metalness: 0.1 }); return m;
+  };
+  M.poster = (i = 0) => {
+    const W = 256, H = 256, [c, g] = canvas(W, H); const pal = [['#1d3f73', '#f2c14e'], ['#7a1f2b', '#f4ede0'], ['#0f5e4a', '#e8e2cf'], ['#333', '#ff7a3d'], ['#2b6ca3', '#ffffff'], ['#5b3a7a', '#f0d36b']][i % 6];
+    g.fillStyle = pal[0]; g.fillRect(0, 0, W, H); g.fillStyle = pal[1];
+    for (let k = 0; k < 5; k++) { g.globalAlpha = 0.25 + R() * 0.5; g.beginPath(); g.arc(R() * W, R() * H * 0.7, 20 + R() * 60, 0, 7); g.fill(); }
+    g.globalAlpha = 1; g.fillRect(16, H - 70, W - 32, 3); g.font = 'bold 26px Helvetica, Arial, sans-serif'; g.textAlign = 'left'; g.fillText(['SEE MORE OF THE CITY', 'RIDE SAFE · STAND CLEAR', 'SUMMER CONCERTS', 'MUSEUM NIGHTS', 'THE NEW LINE OPENS', 'FRESH EVERY MORNING'][i % 6].slice(0, 20), 16, H - 40);
+    g.font = '14px Helvetica, Arial'; g.fillText('a message from the city', 16, H - 18);
+    const m = std('poster', { map: tex(c, { repeat: false }), roughness: 0.6, metalness: 0 }); return m;
   };
   M.rollSign = (text) => {
     const [c, g] = canvas(256, 64); g.fillStyle = '#0a0a0a'; g.fillRect(0, 0, 256, 64); g.fillStyle = '#f0f0e8'; g.font = 'bold 40px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 128, 32);

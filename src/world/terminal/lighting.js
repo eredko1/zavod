@@ -32,7 +32,6 @@ export function buildLighting(world, M) {
   sm.camera.left = -62; sm.camera.right = 62; sm.camera.top = 62; sm.camera.bottom = -62; sm.camera.near = 40; sm.camera.far = 300;
   sm.bias = -0.00035; sm.normalBias = 0.03; sm.radius = 1.5;
   scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
-  const fill = new THREE.DirectionalLight(0x9fb4d0, 0.18); fill.position.set(-40, 50, -30); scene.add(fill); ctx.lights.fill = fill;
 
   // ---- window spots (shaft cores): 3 east windows (no shadow) + 2 clerestory (shadowed) -------------------
   ctx.lights.spots = ctx.lights.spots || [];
@@ -43,8 +42,9 @@ export function buildLighting(world, M) {
     scene.add(s); scene.add(s.target); ctx.lights.spots.push(s); return s;
   };
   const hit0 = (from) => from.clone().addScaledVector(SUN_DIR, -from.y / SUN_DIR.y); // where the ray reaches y=0
-  for (const cz of [-12.5, 0, 12.5]) { const w = new THREE.Vector3(P.X1 + 6, 20, cz).addScaledVector(SUN_DIR, 8); spot(w, hit0(new THREE.Vector3(P.X1, 20, cz)), { intensity: 1400, angle: 0.19 }); }
-  for (const cx of [-12, 12]) { const w = new THREE.Vector3(cx, 17.5, P.Z1 + 4).addScaledVector(SUN_DIR, 6); spot(w, hit0(new THREE.Vector3(cx, 17.5, P.Z1)), { intensity: 900, angle: 0.16, shadow: true }); }
+  // east windows: one wide spot for the three (the sun already paints the sharp patches); clerestory: two, no shadow (perf)
+  { const w = new THREE.Vector3(P.X1 + 6, 20, 0).addScaledVector(SUN_DIR, 8); spot(w, hit0(new THREE.Vector3(P.X1, 20, 0)), { intensity: 1400, angle: 0.34, penumbra: 0.7 }); }
+  for (const cx of [-12, 12]) { const w = new THREE.Vector3(cx, 17.5, P.Z1 + 4).addScaledVector(SUN_DIR, 6); spot(w, hit0(new THREE.Vector3(cx, 17.5, P.Z1)), { intensity: 900, angle: 0.16 }); }
 
   // ---- warm interior points (budget: 8) ----------------------------------------------------------------------
   const pt = (x, y, z, color, intensity, dist, decay = 2) => { const l = new THREE.PointLight(color, intensity, dist, decay); l.position.set(x, y, z); scene.add(l); return l; };
@@ -52,7 +52,9 @@ export function buildLighting(world, M) {
   pt(-12, 8.2, 40, 0xffd2a0, 140, 34); pt(12, 8.2, 40, 0xffd2a0, 140, 34);   // Vanderbilt Hall chandeliers
   pt(0, -1.6, 24.5, 0xffd0a0, 70, 24);                              // Whispering Gallery
   pt(6, -2.0, 40, 0xffd8b0, 110, 30); pt(-19, -2.5, 36, 0xffc890, 60, 20);   // dining / oyster bar
-  pt(-22, -8.7, 63, 0xd8e8ff, 90, 30); pt(22, -8.7, 63, 0xd8e8ff, 90, 30);   // subway fluorescents (cool)
+  pt(-30, -8.7, 63, 0xd8e8ff, 80, 26); pt(-8, -8.7, 63, 0xd8e8ff, 80, 26); pt(14, -8.7, 63, 0xd8e8ff, 80, 26); pt(36, -8.7, 63, 0xd8e8ff, 80, 26);   // subway fluorescents (cool)
+  pt(0, -2.8, 54, 0xe4ecff, 60, 20);                                // subway mezzanine
+  pt(-22, -9.0, 71.9, 0xf2f6ff, 40, 12);                             // inside the stopped train
 
   // ---- light shafts: additive prisms from each window opening down the sun direction -----------------------
   const shaftMat = new THREE.ShaderMaterial({

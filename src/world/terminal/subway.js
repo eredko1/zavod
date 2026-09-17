@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { Bucket, mat4, stairSteps, instanced } from './kit.js';
 import { P } from './plan.js';
+import { addGrime } from '../mats.js';
 
 export function buildSubway(world, M, Z) {
   const B = new Bucket(world);
@@ -11,7 +12,9 @@ export function buildSubway(world, M, Z) {
   const z0 = PLAT.z0, z1 = PLAT.z1;
 
   // ---- floor / track bed ----------------------------------------------------------------------
-  B.box(M.concrete, [PLAT.x0 - T, SUB - 0.6, z0 - 0.5], [PLAT.x1 + T, SUB, z1], { uvScale: 0.5 });
+  const subFloor = M.concrete.clone(); subFloor.name = 'subFloor'; subFloor.color.set(0x5e5a55); subFloor.roughness = 0.85; addGrime(subFloor, world.R, { strength: 0.55, scale: 0.35, height: 0.5, tint: [0.3, 0.27, 0.22], wet: 0.3, key: 'sub' });
+  const subCeil = M.concrete.clone(); subCeil.name = 'subCeil'; subCeil.color.set(0x9a958c);
+  B.box(subFloor, [PLAT.x0 - T, SUB - 0.6, z0 - 0.5], [PLAT.x1 + T, SUB, z1], { uvScale: 0.5 });
   Z.push({ x0: PLAT.x0 - T, x1: PLAT.x1 + T, z0: z0 - 0.5, z1, h: SUB });
   B.box(M.ballast, [PLAT.x0 - T, SUB - 1.8, z1], [PLAT.x1 + T, SUB - 1.2, TRACK.z1 + 0.5], { uvScale: 0.5 });
   Z.push({ x0: PLAT.x0 - T, x1: PLAT.x1 + T, z0: z1, z1: TRACK.z1 + 0.5, h: SUB - 1.2 });
@@ -29,6 +32,8 @@ export function buildSubway(world, M, Z) {
   const bandY = SUB + 2.1;
   // north wall with two stair openings (x=±12, 4 m wide)
   for (const [wx0, wx1] of [[PLAT.x0 - T, -14.2], [-9.8, 9.8], [14.2, PLAT.x1 + T]]) { B.box(M.tile, [wx0, SUB, z0 - 0.5], [wx1, CEIL, z0], { uvScale: 1 }); world.box([wx0, SUB, z0 - 0.5], [wx1, CEIL, z0]); B.box(M.tileBand, [wx0 + 0.001, bandY, z0 - 0.01], [wx1 - 0.001, bandY + 0.4, z0 + 0.01], { uvScale: 1 }); }
+  // framed generic posters between the tablets
+  for (let i = 0; i < 6; i++) { const px = -42 + i * 16.8 + 6; const po = M.poster(i); B.box(M.ironDark, [px - 1.0, SUB + 0.9, z0 - 0.02], [px + 1.0, SUB + 3.0, z0 + 0.04], { uvScale: 1 }); B.add(po, new THREE.PlaneGeometry(1.9, 2.0), mat4(px, SUB + 1.95, z0 + 0.045)); }
   // mosaic tablets on the north wall
   for (const mx of [-36, -24, 0, 24, 36]) { const mo = M.mosaic('GRAND CONCOURSE', '42 ST · LEXINGTON AV'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(mx, bandY + 0.2, z0 + 0.02)); }
   // far wall (south of the track)
@@ -47,8 +52,8 @@ export function buildSubway(world, M, Z) {
     B.box(M.ironDark, [ex0 - 0.02, SUB - 1.8, z1 - 0.3], [ex1 + 0.02, CEIL - 0.2, z1 + 0.05], { uvScale: 1 });
   }
   // ceiling (concrete, with a shallow beam grid), lower over the platform than the mezzanine
-  for (const [cx0, cx1] of [[PLAT.x0 - T - 1, -14.3], [-9.7, 9.7], [14.3, PLAT.x1 + T + 1]]) B.box(M.concrete, [cx0, CEIL, z0 - 0.5], [cx1, CEIL + 0.6, TRACK.z1 + 1.5], { uvScale: 0.5 });
-  for (const [cx0, cx1] of [[-14.3, -9.7], [9.7, 14.3]]) B.box(M.concrete, [cx0, CEIL, 64.5], [cx1, CEIL + 0.6, TRACK.z1 + 1.5], { uvScale: 0.5 });
+  for (const [cx0, cx1] of [[PLAT.x0 - T - 1, -14.3], [-9.7, 9.7], [14.3, PLAT.x1 + T + 1]]) B.box(subCeil, [cx0, CEIL, z0 - 0.5], [cx1, CEIL + 0.6, TRACK.z1 + 1.5], { uvScale: 0.5 });
+  for (const [cx0, cx1] of [[-14.3, -9.7], [9.7, 14.3]]) B.box(subCeil, [cx0, CEIL, 64.5], [cx1, CEIL + 0.6, TRACK.z1 + 1.5], { uvScale: 0.5 });
   for (let x = PLAT.x0; x <= PLAT.x1; x += 4.6) B.box(M.steelGreen, [x - 0.2, CEIL - 0.45, z0], [x + 0.2, CEIL, TRACK.z1 + 0.5], { uvScale: 1 });
   B.box(M.steelGreen, [PLAT.x0 - T, CEIL - 0.5, 64 - 0.25], [PLAT.x1 + T, CEIL, 64 + 0.25], { uvScale: 1 });
 
@@ -57,11 +62,16 @@ export function buildSubway(world, M, Z) {
     const web = new THREE.BoxGeometry(0.14, CEIL - SUB, 0.3); const fl = new THREE.BoxGeometry(0.42, CEIL - SUB, 0.06);
     const f1 = fl.clone().translate(0, 0, 0.15), f2 = fl.clone().translate(0, 0, -0.15);
     const base = new THREE.BoxGeometry(0.55, 0.25, 0.55); base.translate(0, -(CEIL - SUB) / 2 + 0.125, 0);
-    const col = mergeSimple([web, f1, f2, base]);
+    const rivets = []; for (let yy = -(CEIL - SUB) / 2 + 0.5; yy < (CEIL - SUB) / 2 - 0.2; yy += 0.28) for (const dx of [-0.16, 0.16]) for (const dz of [-0.19, 0.19]) { const r = new THREE.BoxGeometry(0.035, 0.035, 0.03); r.translate(dx, yy, dz); rivets.push(r); }
+    const col = mergeSimple([web, f1, f2, base, ...rivets]);
     const mats = []; const y = (SUB + CEIL) / 2;
     for (let x = PLAT.x0 + 2.3; x < PLAT.x1; x += 4.6) { mats.push(mat4(x, y, 64)); world.box([x - 0.25, SUB, 63.75], [x + 0.25, CEIL, 64.25]); world.cover(x + 0.7, 64, 1, 0, SUB); world.cover(x - 0.7, 64, -1, 0, SUB); }
     for (let x = PLAT.x0 + 2.3; x < PLAT.x1; x += 4.6) { mats.push(mat4(x, y, z1 + 0.3)); world.box([x - 0.25, SUB - 1.2, z1 + 0.05], [x + 0.25, CEIL, z1 + 0.55]); }
     instanced(world, col, M.steelGreen, mats, 'metal', { name: 'ibeams' });
+    // "42" tile signs on both faces of every column
+    const sg = M.sign('42', { w: 128, h: 128, bg: '#f0ece2', fg: '#111', font: 'bold 84px Helvetica, Arial, sans-serif' }); sg.map.repeat.set(1, 1);
+    const sgGeo = mergeSimple([new THREE.PlaneGeometry(0.34, 0.34).translate(0, -0.9, 0.2), new THREE.PlaneGeometry(0.34, 0.34).rotateY(Math.PI).translate(0, -0.9, -0.2)]);
+    instanced(world, sgGeo, sg, mats, 'metal', { name: 'colSigns', shadow: false });
     // rivet rows (tiny instanced spheres) skipped → painted rivet feel via roughness
   }
   // ---- stairs down from the mezzanine (x=±12, from z=57 (y -6) to z=66.6 (y -12)) --------------------------------
@@ -87,7 +97,7 @@ export function buildSubway(world, M, Z) {
   B.box(M.steelBlue, [-2, SUB, z0 + 0.1], [-0.8, SUB + 2.2, z0 + 0.7], { uvScale: 1, collide: true }); B.box(M.fluor, [-1.6, SUB + 1.9, z0 + 0.7], [-1.2, SUB + 2.0, z0 + 0.72], { uvScale: 1 });
   B.box(M.ironDark, [2, SUB, z0 + 0.1], [3.2, SUB + 1.9, z0 + 0.9], { uvScale: 1, collide: true }); B.box(M.darkGlass, [2.1, SUB + 0.6, z0 + 0.9], [3.1, SUB + 1.7, z0 + 0.92], { uvScale: 1 });
   // fluorescent tube fixtures along the platform ceiling (emissive) + positions for real lights
-  for (let x = PLAT.x0 + 3; x < PLAT.x1; x += 6) { B.box(M.fluor, [x - 1.2, CEIL - 0.25, 61 - 0.06], [x + 1.2, CEIL - 0.2, 61 + 0.06], { uvScale: 1 }); B.box(M.ironDark, [x - 1.3, CEIL - 0.2, 61 - 0.12], [x + 1.3, CEIL, 61 + 0.12], { uvScale: 1 }); B.box(M.fluor, [x - 1.2, CEIL - 0.25, 67 - 0.06], [x + 1.2, CEIL - 0.2, 67 + 0.06], { uvScale: 1 }); B.box(M.ironDark, [x - 1.3, CEIL - 0.2, 67 - 0.12], [x + 1.3, CEIL, 67 + 0.12], { uvScale: 1 }); }
+  for (let x = PLAT.x0 + 2.5; x < PLAT.x1; x += 5) for (const fz of [60.5, 67]) { B.box(M.fluor, [x - 1.9, CEIL - 0.22, fz - 0.14], [x + 1.9, CEIL - 0.16, fz + 0.14], { uvScale: 1 }); B.box(M.ironDark, [x - 2.0, CEIL - 0.16, fz - 0.2], [x + 2.0, CEIL, fz + 0.2], { uvScale: 1 }); }
   for (const lx of [-33, -11, 11, 33]) world.termLamps.push([lx, CEIL - 0.4, 63, 'fluorReal']);
   // wet floor patches (dark glossy decals) — thin boxes with low roughness
   const wet = new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.55 }); wet.name = 'wet'; wet.userData.castShadow = false;
@@ -129,7 +139,7 @@ export function buildSubway(world, M, Z) {
       // ends
       for (const ex of [x0, x1]) { B.box(M.stainless, [ex - 0.03, floorY, zA], [ex + 0.03, floorY + carH, zB], { uvScale: 1 }); world.box([ex - 0.05, floorY, zA], [ex + 0.05, floorY + carH, zB]); B.add(roll, new THREE.PlaneGeometry(1.1, 0.28), mat4(ex + (ex === x0 ? -0.04 : 0.04), floorY + 3.0, cz, 0, ex === x0 ? -Math.PI / 2 : Math.PI / 2)); }
       // roll sign on the platform side + car number
-      B.add(roll, new THREE.PlaneGeometry(1.1, 0.28), mat4(cx - 6.8, floorY + 2.75, zA - 0.03, 0, Math.PI, 0));
+      B.add(roll, new THREE.PlaneGeometry(1.3, 0.34), mat4(cx - 6.6, floorY + 2.68, zA - 0.03, 0, Math.PI, 0)); B.add(roll, new THREE.PlaneGeometry(1.3, 0.34), mat4(cx + 6.6, floorY + 2.68, zA - 0.03, 0, Math.PI, 0));
       // interior: longitudinal seats (both sides), poles, ceiling lights
       for (const [sa, sb] of [[x0 + 0.4, doors[0] - dw / 2 - 0.3], [doors[0] + dw / 2 + 0.3, doors[1] - dw / 2 - 0.3], [doors[1] + dw / 2 + 0.3, doors[2] - dw / 2 - 0.3], [doors[2] + dw / 2 + 0.3, x1 - 0.4]]) {
         if (sb - sa < 0.6) continue;

@@ -53,7 +53,17 @@ export function buildConcourse(world, M, Z) {
       const dir = zz > 0 ? -1 : 1;
       pil.push([x - 3.6, zz + dir * 0.35], [x + 3.6, zz + dir * 0.35]);
     }
-    for (const [x, z] of pil) { B.box(M.stone, [x - 0.6, 0, Math.min(z, z + (z > 0 ? -0.7 : 0.7))], [x + 0.6, CORNICE - 1.2, Math.max(z, z + (z > 0 ? -0.7 : 0.7))], { uvScale: uv(M.stone) }); }
+    for (const [x, z] of pil) {
+      const d = z > 0 ? -1 : 1;
+      B.box(M.stone, [x - 0.6, 0, Math.min(z, z + d * 0.95)], [x + 0.6, CORNICE - 1.2, Math.max(z, z + d * 0.95)], { uvScale: uv(M.stone) });
+      B.box(M.marble, [x - 0.8, CORNICE - 2.6, Math.min(z, z + d * 1.15)], [x + 0.8, CORNICE - 1.2, Math.max(z, z + d * 1.15)], { uvScale: uv(M.marble) });   // capital
+      B.box(M.marbleDark, [x - 0.75, 0, Math.min(z, z + d * 1.1)], [x + 0.75, 2.8, Math.max(z, z + d * 1.1)], { uvScale: uv(M.marbleDark) });               // base
+    }
+    // Botticino wainscot along the long walls (dark band with a cap molding)
+    B.box(M.marbleDark, [X0, 0, Z1 - 0.18], [X1, 2.6, Z1 + 0.05], { uvScale: uv(M.marbleDark) }); B.box(M.marble, [X0, 2.6, Z1 - 0.26], [X1, 2.8, Z1 + 0.05], { uvScale: uv(M.marble) });
+    B.box(M.marbleDark, [X0, 0, Z0 - 0.05], [X1, 2.6, Z0 + 0.18], { uvScale: uv(M.marbleDark) }); B.box(M.marble, [X0, 2.6, Z0 - 0.05], [X1, 2.8, Z0 + 0.26], { uvScale: uv(M.marble) });
+    // cornice underside molding + a second step (depth)
+    B.box(M.marble, [X0 - T, CORNICE - 1.6, Z1 - 0.6], [X1 + T, CORNICE - 1.2, Z1 + 0.2], { uvScale: uv(M.marble) }); B.box(M.marble, [X0 - T, CORNICE - 1.6, Z0 - 0.2], [X1 + T, CORNICE - 1.2, Z0 + 0.6], { uvScale: uv(M.marble) });
     // cornice (long walls + end walls), a projecting band under the vault spring
     B.box(M.marble, [X0 - T, CORNICE - 1.2, Z1 - 1.0], [X1 + T, CORNICE + 0.3, Z1 + 0.2], { uvScale: uv(M.marble) });
     B.box(M.marble, [X0 - T, CORNICE - 1.2, Z0 - 0.2], [X1 + T, CORNICE + 0.3, Z0 + 1.0], { uvScale: uv(M.marble) });
@@ -84,7 +94,8 @@ export function buildConcourse(world, M, Z) {
       for (const dz of [-3, -1, 1, 3]) B.box(M.bronze, [Math.min(gx, gx - side * 0.3), 11, cz + dz - 0.12], [Math.max(gx, gx - side * 0.3), 24.5, cz + dz + 0.12], { uvScale: 1 });
       // dim glass in the ground niches + balcony openings (interior spaces beyond)
       B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(cz, 0, 5, 6)), placeXY(gx - side * 0.2, 0, 0, yaw), { uvScale: uv(M.glassDim) });
-      B.add(M.plasterDark, new THREE.ShapeGeometry(archShapeAt(cz, BAL_Y, 4.6, 5.2)), placeXY(gx - side * 0.2, 0, 0, yaw), { uvScale: 0.5 });
+      B.add(M.shopGlow, new THREE.ShapeGeometry(archShapeAt(cz, BAL_Y, 4.6, 5.2)), placeXY(gx - side * 0.2, 0, 0, yaw), { uvScale: 0.5 });
+      B.box(M.brass, [Math.min(gx - side * 0.25, gx - side * 0.35), BAL_Y + 0.9, cz - 2.3], [Math.max(gx - side * 0.25, gx - side * 0.35), BAL_Y + 0.98, cz + 2.3], { uvScale: 1 });
     }
     world.box(side < 0 ? [X0 - T - 1, 0, Z0 - 2] : [X1, 0, Z0 - 2], side < 0 ? [X0, 44, Z1 + 2] : [X1 + T + 1, 44, Z1 + 2]);
     // end arch: deep coffered band following the vault edge
@@ -212,6 +223,8 @@ export function buildConcourse(world, M, Z) {
     B.add(sgn, new THREE.PlaneGeometry(9, 0.45), mat4(fxw - side * 0.05, BAL_Y - 0.3, 0, 0, yaww, 0));
   }
 
+  // ---- gold globe chandeliers (four at the ends, over the balconies) -----------------------------------------------
+  for (const [gx, gz] of [[-37, -10.5], [-37, 10.5], [37, -10.5], [37, 10.5]]) globeChandelier(B, M, gx, 9.2, gz, 1.0);
   // ---- information booth + four-faced clock -------------------------------------------------------------
   {
     const r = 3.1;
@@ -219,12 +232,15 @@ export function buildConcourse(world, M, Z) {
     B.add(M.darkGlass, new THREE.CylinderGeometry(r - 0.08, r - 0.08, 1.5, 18), mat4(0, 1.85, 0));
     for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; B.box(M.brass, [-0.06, 1.1, -0.06], [0.06, 2.65, 0.06], { uvScale: 1 }); const g = B.parts.get(M.brass); const last = g[g.length - 1]; last.applyMatrix4(mat4(Math.cos(a) * r, 0, Math.sin(a) * r, 0, -a)); }
     B.add(M.brass, new THREE.CylinderGeometry(r + 0.25, r + 0.1, 0.25, 18), mat4(0, 2.75, 0));
+    B.add(M.brass, new THREE.CylinderGeometry(r + 0.06, r + 0.06, 0.08, 18), mat4(0, 1.12, 0));
+    for (let i = 0; i < 18; i++) { const a = (i + 0.5) / 18 * Math.PI * 2; B.add(M.brassDark, new THREE.BoxGeometry(0.05, 0.9, 0.5), mat4(Math.cos(a) * (r + 0.02), 0.6, Math.sin(a) * (r + 0.02), 0, -a)); }
+    B.add(M.brass, new THREE.TorusGeometry(r * 0.6, 0.05, 8, 36), mat4(0, 3.5, 0, Math.PI / 2));
     B.add(M.brassDark, lathe([[r + 0.1, 0], [r - 0.3, 0.35], [r * 0.6, 0.62], [0.55, 0.85], [0.3, 0.9]], 36), mat4(0, 2.88, 0));
     // clock: pedestal, four opal faces, acorn finial
-    B.add(M.brass, new THREE.CylinderGeometry(0.22, 0.3, 0.6, 16), mat4(0, 4.05, 0));
-    B.add(M.brass, new THREE.BoxGeometry(0.78, 0.78, 0.78), mat4(0, 4.72, 0));
-    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; const fx = Math.sin(a) * 0.4, fz = Math.cos(a) * 0.4; B.add(M.clockFace, new THREE.CylinderGeometry(0.31, 0.31, 0.03, 32), mat4(fx, 4.72, fz, Math.PI / 2, a, 0)); B.add(M.brass, new THREE.TorusGeometry(0.33, 0.03, 8, 32), mat4(fx, 4.72, fz, 0, a, 0)); }
-    B.add(M.brass, lathe([[0, 0], [0.12, 0.05], [0.16, 0.2], [0.08, 0.36], [0, 0.45]], 16), mat4(0, 5.11, 0));
+    B.add(M.brass, new THREE.CylinderGeometry(0.26, 0.36, 0.7, 16), mat4(0, 4.1, 0));
+    B.add(M.brass, new THREE.BoxGeometry(0.95, 0.95, 0.95), mat4(0, 4.95, 0));
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; const fx = Math.sin(a) * 0.49, fz = Math.cos(a) * 0.49; B.add(M.clockFace, new THREE.CylinderGeometry(0.4, 0.4, 0.03, 32), mat4(fx, 4.95, fz, Math.PI / 2, a, 0)); B.add(M.brass, new THREE.TorusGeometry(0.42, 0.035, 8, 32), mat4(fx, 4.95, fz, 0, a, 0)); B.add(M.ironDark, new THREE.BoxGeometry(0.03, 0.3, 0.02), mat4(fx + Math.sin(a) * 0.02, 5.08, fz + Math.cos(a) * 0.02, 0, a, 0)); }
+    B.add(M.brass, lathe([[0, 0], [0.14, 0.05], [0.19, 0.22], [0.1, 0.42], [0, 0.52]], 16), mat4(0, 5.43, 0));
     world.box([-r - 0.15, 0, -r - 0.15], [r + 0.15, 2.9, r + 0.15]);
     Z.booth = { x: 0, z: 0, r };
     world.termLamps.push([0, 4.4, 0]);
@@ -253,6 +269,15 @@ export function buildConcourse(world, M, Z) {
 }
 
 // ---- helpers ------------------------------------------------------------------------------------------------
+export function globeChandelier(B, M, x, y, z, s = 1) {
+  B.add(M.brass, new THREE.CylinderGeometry(0.03, 0.03, 3.4, 6), mat4(x, y + 1.7 + 1.1 * s, z));
+  B.add(M.brass, new THREE.TorusGeometry(1.05 * s, 0.05 * s, 8, 32), mat4(x, y, z, Math.PI / 2));
+  B.add(M.brass, new THREE.TorusGeometry(0.75 * s, 0.045 * s, 8, 28), mat4(x, y + 0.65 * s, z, Math.PI / 2));
+  B.add(M.brass, new THREE.TorusGeometry(0.75 * s, 0.045 * s, 8, 28), mat4(x, y - 0.65 * s, z, Math.PI / 2));
+  for (let ring = 0; ring < 3; ring++) { const yy = y + (ring - 1) * 0.55 * s, rr = (ring === 1 ? 1.05 : 0.8) * s; const n = ring === 1 ? 16 : 10; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; B.add(M.lampGlass, new THREE.SphereGeometry(0.11 * s, 8, 6), mat4(x + Math.cos(a) * rr, yy, z + Math.sin(a) * rr)); } }
+  B.add(M.lampGlass, new THREE.SphereGeometry(0.3 * s, 12, 8), mat4(x, y, z));
+  B.add(M.brass, new THREE.SphereGeometry(0.16 * s, 10, 8), mat4(x, y - 1.15 * s, z));
+}
 export function archShapeAt(cx, y0, w, h) { const s = new THREE.Shape(); const r = w / 2, yc = y0 + h - r; s.moveTo(cx - r, y0); s.lineTo(cx + r, y0); s.lineTo(cx + r, yc); s.absarc(cx, yc, r, 0, Math.PI, false); s.lineTo(cx - r, y0); s.closePath(); return s; }
 
 /** Bronze grille: lattice of thin bars filling w×h (base at y=0 local, centered on x), optional arched top. */
