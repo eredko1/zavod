@@ -64,6 +64,12 @@ export async function init(ctx) {
   ctx.progress(0.12, `map: ${map.meta.name}`);
   map.build(world);
   if (!W.poses.spawn && W.playerSpawns[0]) { const s = W.playerSpawns[0]; W.poses.spawn = [s.x, s.y, s.z, 0, 0]; }
+  // random-spawn variety: every map offers ≥ 6 player spawn points — borrow ground-level enemy spawns farthest from the map's own player spawns
+  if (W.playerSpawns.length < 6 && W.enemySpawns.length > 6) {
+    const far = W.enemySpawns.filter(e => Math.abs(e.y || 0) < 0.15).map(e => ({ e, d: Math.min(...W.playerSpawns.map(p => p.distanceTo(e))) })).sort((a, b) => b.d - a.d);
+    const mid = far.slice(Math.floor(far.length / 3), Math.floor(far.length / 3) + (6 - W.playerSpawns.length)); // mid-distance ones: not on top of the enemy side
+    for (const { e } of mid) W.playerSpawns.push(e.clone());
+  }
   return W;
 }
 

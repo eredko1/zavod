@@ -77,21 +77,22 @@ function placeBikes() {
   const spots = Array.isArray(W?.vehicleSpots) ? W.vehicleSpots : null;
   if (spots && spots.length) { for (const s of spots.slice(0, 5)) makeBike(s.x, s.z, s.yaw ?? 0, s.y ?? 0); if (S.bikes.length >= 3) return; }
   const spawns = (W?.playerSpawns?.length ? W.playerSpawns : [new THREE.Vector3(0, 0, 0)]);
-  const want = 4, R = C.rng;
+  const want = 5, R = C.rng, MIN_APART = 25;
+  // candidates = every walkable anchor the map exposes (player spawns, enemy spawns, cover points) → bikes dispersed over the whole map
+  const anchors = [...spawns, ...(W?.enemySpawns || []), ...((W?.coverPoints || []).map(c => c.position))].filter(v => v && Math.abs(v.y || 0) < 0.15);
+  const farFromBikes = (x, z) => S.bikes.every(b => Math.hypot(b.group.position.x - x, b.group.position.z - z) >= MIN_APART);
+  const tryAt = (ax, az, ay) => { for (let k = 0; k < 12; k++) { const a = R() * Math.PI * 2, d = 2 + R() * 4; const x = ax + Math.cos(a) * d, z = az + Math.sin(a) * d; if (!spotFree(x, z, ay) || !farFromBikes(x, z)) continue; const cx = W?.bounds ? (W.bounds.min.x + W.bounds.max.x) / 2 : 0, cz = W?.bounds ? (W.bounds.min.z + W.bounds.max.z) / 2 : 0; makeBike(x, z, Math.atan2(-(cx - x), -(cz - z)) + (R() - 0.5) * 0.9, ay || 0); return true; } return false; };
+  // one near the player spawns first, then the rest spread out (greedy farthest-first over shuffled anchors)
+  const s0 = spawns[Math.floor(R() * spawns.length)]; tryAt(s0.x, s0.z, s0.y);
+  const pool = anchors.slice().sort(() => R() - 0.5);
   let tries = 0;
-  while (S.bikes.length < want && tries++ < 400) {
-    const s = spawns[Math.floor(R() * spawns.length) % spawns.length];
-    const a = R() * Math.PI * 2, d = 2.5 + R() * 7;
-    const x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;
-    if (!spotFree(x, z, s.y)) continue;
-    // face roughly toward the map centre (open ground), with jitter
-    const cx = W?.bounds ? (W.bounds.min.x + W.bounds.max.x) / 2 : 0, cz = W?.bounds ? (W.bounds.min.z + W.bounds.max.z) / 2 : 0;
-    const yaw = Math.atan2(-(cx - x), -(cz - z)) + (R() - 0.5) * 0.9;
-    makeBike(x, z, yaw, s.y);
+  while (S.bikes.length < want && tries++ < 300 && pool.length) {
+    // pick the candidate farthest from all placed bikes
+    let best = null, bd = -1; for (const a of pool) { let d = Infinity; for (const b of S.bikes) d = Math.min(d, Math.hypot(b.group.position.x - a.x, b.group.position.z - a.z)); if (d > bd) { bd = d; best = a; } }
+    if (!best) break; pool.splice(pool.indexOf(best), 1); if (bd < MIN_APART) continue; tryAt(best.x, best.z, best.y);
   }
   // guarantee ≥ 3: relax to any free ring cell around the first spawn
-  const s0 = spawns[0];
-  for (let d = 3; S.bikes.length < 3 && d < 30; d += 1.5) for (let i = 0; i < 16 && S.bikes.length < 3; i++) { const a = i / 16 * Math.PI * 2; const x = s0.x + Math.cos(a) * d, z = s0.z + Math.sin(a) * d; if (spotFree(x, z, s0.y)) makeBike(x, z, a + Math.PI / 2, s0.y); }
+  for (let d = 3; S.bikes.length < 3 && d < 30; d += 1.5) for (let i = 0; i < 16 && S.bikes.length < 3; i++) { const a = i / 16 * Math.PI * 2; const x = s0.x + Math.cos(a) * d, z = s0.z + Math.sin(a) * d; if (spotFree(x, z, s0.y)) makeBike(x, z, a, s0.y || 0); }
 }
 
 // ---------- mount / dismount ----------
