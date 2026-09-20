@@ -70,9 +70,12 @@ export class NavGrid {
       let lo = 1; for (let j = 2; j < K; j++) if (cand[o + j] < cand[o + lo]) lo = j; // slot 0 is the base
       if (top > cand[o + lo]) { cand[o + lo] = top; candW[o + lo] = isW; }
     };
+    const slabs = this.slabs = new Set(); // big thin non-walkable boxes = terrain slabs (ground colliders under sunken areas): never floors, never walls
+    for (const box of cols) { const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (!walk.has(box) && sx * sz > 400 && box.max.y - box.min.y <= 1.5) slabs.add(box); }
     for (const box of cols) {
       const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (Math.min(sx, sz) < 0.35) continue; // railings / poles never carry a floor
       const isW = walk.has(box) ? 1 : 0;
+      if (!isW && (sx * sz > 400 || slabs.has(box))) continue; // big non-walkable masses (buildings, ground slabs) carry no floor unless registered walkable
       const x0 = Math.max(0, Math.ceil((box.min.x - minX) / cell - 0.5)), x1 = Math.min(w - 1, Math.floor((box.max.x - minX) / cell - 0.5));
       const z0 = Math.max(0, Math.ceil((box.min.z - minZ) / cell - 0.5)), z1 = Math.min(h - 1, Math.floor((box.max.z - minZ) / cell - 0.5));
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) addCand(z * w + x, box.max.y, isW);
@@ -80,8 +83,10 @@ export class NavGrid {
     // ---- 2. blocking: a collider inside the standing volume [f+0.5, f+1.8] (inflated footprint) kills that candidate ----
     const blocked = new Uint8Array(n * K);
     for (const box of cols) {
-      const x0 = Math.max(0, Math.floor((box.min.x - AGENT_R - minX) / cell)), x1 = Math.min(w - 1, Math.floor((box.max.x + AGENT_R - minX) / cell));
-      const z0 = Math.max(0, Math.floor((box.min.z - AGENT_R - minZ) / cell)), z1 = Math.min(h - 1, Math.floor((box.max.z + AGENT_R - minZ) / cell));
+      if (slabs.has(box)) continue;
+      // cells whose CENTRE lies inside the box inflated by the agent radius (not every cell the box touches — that over-inflated by up to half a cell and walled off 1 m gaps)
+      const x0 = Math.max(0, Math.ceil((box.min.x - AGENT_R - minX) / cell - 0.5)), x1 = Math.min(w - 1, Math.floor((box.max.x + AGENT_R - minX) / cell - 0.5));
+      const z0 = Math.max(0, Math.ceil((box.min.z - AGENT_R - minZ) / cell - 0.5)), z1 = Math.min(h - 1, Math.floor((box.max.z + AGENT_R - minZ) / cell - 0.5));
       const lo = box.min.y, hi = box.max.y;
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
         const i = z * w + x, o = i * K, c = candN[i];
@@ -177,7 +182,9 @@ export class NavGrid {
   /** highest solid top under (x,z) at or below y+0.3 (for ragdolls, decals, dropped props) */
   highestTopBelow(x, z, y) { let best = this.groundY(x, z); for (const b of this.solids) { if (b.max.y > y + 0.3 || b.max.y <= best) continue; if (x < b.min.x || x > b.max.x || z < b.min.z || z > b.max.z) continue; best = b.max.y; } return best; }
   /** support height for a free body at (x,z,y): the nav floor below it if any, else the highest collider top / ground */
-  floorBelow(x, z, y) { const cx = this.cx(x), cz = this.cz(z); if (this.inGrid(cx, cz)) { const i = cz * this.w + cx, c = this.nl[i]; let best = -Infinity; for (let j = 0; j < c; j++) { const f = this.floor[i * L + j]; if (f <= y + 0.3 && f > best) best = f; } if (best > -Infinity) return best; } return this.highestTopBelow(x, z, y); }
+  floorBelow(x, z, y) { const f = this.cellFloorBelow(x, z, y); return f > -Infinity ? f : this.highestTopBelow(x, z, y); }
+  /** grid-only: highest nav floor in this cell at or below y+0.3, else -Infinity */
+  cellFloorBelow(x, z, y) { const cx = this.cx(x), cz = this.cz(z); let best = -Infinity; if (this.inGrid(cx, cz)) { const i = cz * this.w + cx, c = this.nl[i]; for (let j = 0; j < c; j++) { const f = this.floor[i * L + j]; if (f <= y + 0.3 && f > best) best = f; } } return best; }
   regionAt(x, z, y) { const cx = this.cx(x), cz = this.cz(z); if (!this.inGrid(cx, cz)) return -1; const i = cz * this.w + cx; if (!this.nl[i]) return -1; return this.region[i * L + this.layerFor(i, y ?? this.floor[i * L])]; }
   sameRegion(a, b) { const ra = this.regionAt(a.x, a.z, a.y), rb = this.regionAt(b.x, b.z, b.y); return ra !== -1 && ra === rb; }
 
@@ -295,15 +302,13 @@ export class NavGrid {
   // string pulling per level-continuous segment (drops stay as explicit waypoints)
   smooth(pts) {
     if (pts.length <= 2) return pts.slice(1);
-    const out = []; let i = 0;
-    while (i < pts.length - 1) {
-      let j = pts.length - 1;
-      // never skip across a drop: limit j to the last point before the next drop edge
-      let lim = i + 1; while (lim < pts.length - 1 && Math.abs(pts[lim + 1].y - pts[lim].y) <= STEP) lim++;
-      if (j > lim) j = lim;
+    const out = []; let i = 0; const n = pts.length;
+    while (i < n - 1) {
+      if (Math.abs(pts[i + 1].y - pts[i].y) > STEP) { out.push(pts[i + 1]); i++; continue; } // drop edge: keep both ends
+      let lim = i + 1; while (lim < n - 1 && Math.abs(pts[lim + 1].y - pts[lim].y) <= STEP) lim++;
+      let j = lim;
       while (j > i + 1 && !this.lineFree(pts[i].x, pts[i].z, pts[j].x, pts[j].z, pts[i].y)) j--;
       out.push(pts[j]); i = j;
-      if (i < pts.length - 1 && Math.abs(pts[i + 1].y - pts[i].y) > STEP) { out.push(pts[i + 1]); i++; } // the drop target
     }
     return out;
   }
@@ -312,7 +317,7 @@ export class NavGrid {
   resolveCircle(pos, radius, y0 = STEP_BLOCK, y1 = 1.5) {
     let hit = false;
     for (const box of this.solids) {
-      if (box.max.y < pos.y + y0 || box.min.y > pos.y + y1) continue;
+      if (box.max.y < pos.y + y0 || box.min.y > pos.y + y1 || this.slabs.has(box)) continue;
       if (pos.x < box.min.x - radius || pos.x > box.max.x + radius || pos.z < box.min.z - radius || pos.z > box.max.z + radius) continue;
       const cx = Math.max(box.min.x, Math.min(pos.x, box.max.x)), cz = Math.max(box.min.z, Math.min(pos.z, box.max.z));
       let dx = pos.x - cx, dz = pos.z - cz; const d2 = dx * dx + dz * dz;

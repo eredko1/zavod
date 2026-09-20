@@ -29,7 +29,7 @@ export function buildPassage(world, M, Z) {
   B.box(M.marbleDark, [sx0 - 0.4, 0, sz0 - 0.55], [sx1 + 0.4, 0.14, sz0 - 0.3], { uvScale: 1 }); world.box([sx0 - 0.4, 0, sz0 - 0.55], [sx1 + 0.4, 0.14, sz0 - 0.3]);
   // lit "SUBWAY ↓" sign over the stair head + emissive white strip lighting the treads
   const subSign = M.sign('SUBWAY  ↓   1 · 2 · 3 · 4', { bg: '#0d3b1f', fg: '#ffffff', font: 'bold 64px Helvetica, Arial, sans-serif' });
-  B.add(subSign, new THREE.PlaneGeometry(3.2, 0.42), mat4(cx, 3.1, sz0 - 0.45, 0, 0, 0)); B.add(subSign, new THREE.PlaneGeometry(3.2, 0.42), mat4(cx, 3.1, sz0 - 0.45, 0, Math.PI, 0));
+  B.add(M.atlas, M.signGeo(subSign, 3.2, 0.42), mat4(cx, 3.1, sz0 - 0.45, 0, 0, 0)); B.add(M.atlas, M.signGeo(subSign, 3.2, 0.42), mat4(cx, 3.1, sz0 - 0.45, 0, Math.PI, 0));
   B.box(M.brassDark, [cx - 1.7, 2.85, sz0 - 0.5], [cx + 1.7, 3.35, sz0 - 0.4], { uvScale: 1 });
   world.termLamps.push([cx, 3.6, sz0 - 0.45, 'point']);
 
@@ -61,12 +61,12 @@ export function buildPassage(world, M, Z) {
   for (let z = Bg.z0 + 3; z < Bg.z1; z += 6) world.termLamps.push([(Bg.x0 + Bg.x1) / 2, yc - 0.15, z, 'fluorZ']);
   for (let x = C.x0 + 3; x < C.x1; x += 6) world.termLamps.push([x, yc - 0.15, (C.z0 + C.z1) / 2, 'fluor']);
   world.termLamps.push([(Bg.x0 + Bg.x1) / 2, yc - 0.6, 38, 'fluorReal']);
-  const sg = (t, x, z, yaw) => B.add(M.sign(t, { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial, sans-serif' }), new THREE.PlaneGeometry(3.6, 0.45), mat4(x, LOW + 2.45, z, 0, yaw, 0));
+  const sg = (t, x, z, yaw) => B.add(M.atlas, M.signGeo(t, { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial, sans-serif' }, 3.6, 0.45), mat4(x, LOW + 2.45, z, 0, yaw, 0));
   sg('⟵  TO TRAINS  ·  1 · 2 · 3 · 4', cx, A.z1 - 0.02, Math.PI); sg('⟶  MAIN CONCOURSE  ·  EXIT', A.x1 - 6, A.z0 + 0.02, 0);
   sg('TO TRAINS  ⟶', Bg.x0 + 0.02, C.z0 + 1.8, Math.PI / 2); sg('⟵  EXIT  ·  MAIN CONCOURSE', Bg.x1 - 0.02, A.z1 + 2, -Math.PI / 2);
   sg('TRAINS  ⟶', C.x1 - 3, C.z0 + 0.02, 0);
   // posters in leg B, bins, cover
-  for (let z = 26; z < 50; z += 8) { B.box(M.ironDark, [Bg.x0 - 0.05, LOW + 0.9, z - 1.0], [Bg.x0 + 0.02, LOW + 3.0, z + 1.0], { uvScale: 1 }); B.add(M.poster(Math.floor(z / 8)), new THREE.PlaneGeometry(2.0, 1.9), mat4(Bg.x0 + 0.03, LOW + 1.95, z, 0, Math.PI / 2, 0)); }
+  for (let z = 26; z < 50; z += 8) { B.box(M.ironDark, [Bg.x0 - 0.05, LOW + 0.9, z - 1.0], [Bg.x0 + 0.02, LOW + 3.0, z + 1.0], { uvScale: 1 }); B.add(M.atlas, M.posterGeo(Math.floor(z / 8), 2.0, 1.9), mat4(Bg.x0 + 0.03, LOW + 1.95, z, 0, Math.PI / 2, 0)); }
   world.termTrash.push([A.x0 + 1, LOW, A.z1 - 0.8], [Bg.x1 - 0.8, LOW, 40], [C.x1 - 1.5, LOW, C.z1 - 0.8]);
   world.cover(Bg.x1 - 1.0, 30, 1, 0, LOW); world.cover(A.x0 + 1.2, A.z0 + 2, -1, 0, LOW); world.cover(C.x0 + 1, C.z0 + 2, -1, 0, LOW);
 

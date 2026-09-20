@@ -16,6 +16,9 @@ function basisQuat(up, side, out) {
 export class Ragdoll {
   constructor(soldier, nav, hit) {
     const b = soldier.bones; this.soldier = soldier; this.nav = nav; this.bones = b;
+    // local floor (nav layer under the body, not y=0) and only the solids within reach of the body
+    const sp = soldier.position; this.groundY = nav.floorBelow ? nav.floorBelow(sp.x, sp.z, sp.y + 0.2) : nav.groundY(sp.x, sp.z);
+    this.solids = []; for (const box of nav.solids) { if (nav.slabs?.has(box)) continue; if (box.max.x < sp.x - 4 || box.min.x > sp.x + 4 || box.max.z < sp.z - 4 || box.min.z > sp.z + 4 || box.max.y < this.groundY - 4 || box.min.y > sp.y + 3) continue; this.solids.push(box); }
     soldier.group.updateMatrixWorld(true);
     const wp = (bone, dy = 0) => bone.getWorldPosition(new THREE.Vector3()).add(_v.set(0, dy, 0));
     const P = this.P = {};
@@ -111,9 +114,9 @@ export class Ragdoll {
   collide() {
     const P = this.P, nav = this.nav;
     for (const n of this.names) {
-      const p = P[n], r = this.radius[n]; const gy = nav.groundY(p.x, p.z) + r;
+      const p = P[n], r = this.radius[n]; let cf = nav.cellFloorBelow(p.x, p.z, p.y); if (cf === -Infinity) cf = this.groundY; const gy = Math.max(cf, nav.groundY(p.x, p.z)) + r;
       if (p.y < gy) { p.y = gy; const q = this.prev[n]; q.x = p.x + (q.x - p.x) * 0.35; q.z = p.z + (q.z - p.z) * 0.35; }
-      for (const box of nav.solids) {
+      for (const box of this.solids) {
         if (p.x < box.min.x - r || p.x > box.max.x + r || p.z < box.min.z - r || p.z > box.max.z + r || p.y < box.min.y - r || p.y > box.max.y + r) continue;
         const px = Math.min(p.x - (box.min.x - r), (box.max.x + r) - p.x), pz = Math.min(p.z - (box.min.z - r), (box.max.z + r) - p.z), py = (box.max.y + r) - p.y;
         if (py <= px && py <= pz) { p.y = box.max.y + r; const q = this.prev[n]; q.x = p.x + (q.x - p.x) * 0.35; q.z = p.z + (q.z - p.z) * 0.35; }

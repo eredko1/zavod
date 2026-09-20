@@ -6,6 +6,8 @@ import { buildLighting } from '../terminal/lighting.js';
 import { buildConcourse } from '../terminal/concourse.js';
 import { buildSouth } from '../terminal/south.js';
 import { buildSubway } from '../terminal/subway.js';
+import { buildPassage } from '../terminal/passage.js';
+import { buildExterior } from '../terminal/exterior.js';
 
 export const meta = {
   id: 'terminal', name: 'CENTRAL STATION', subtitle: 'DAY OPS · MAIN CONCOURSE', time: 'day', weather: 'clear',
@@ -23,6 +25,8 @@ export function build(world) {
   ctx.progress(0.15, 'main concourse'); buildConcourse(world, M, Z);
   ctx.progress(0.19, 'vanderbilt hall · ramps · dining'); try { buildSouth(world, M, Z); } catch (e) { console.error('[terminal] south', e); }
   ctx.progress(0.22, 'subway'); try { buildSubway(world, M, Z); } catch (e) { console.error('[terminal] subway', e); }
+  ctx.progress(0.225, 'passage'); try { buildPassage(world, M, Z); } catch (e) { console.error('[terminal] passage', e); }
+  ctx.progress(0.23, 'street'); try { buildExterior(world, M, Z); } catch (e) { console.error('[terminal] exterior', e); }
   ctx.progress(0.235, 'props'); import('../terminal/props.js').then((m) => { m.buildProps(world, M); clearOpenings(); }).catch((e) => console.warn('[terminal] props skipped', e?.message || e));
 
   // keep the arcade arches and track gates passable: drop any low prop collider that sits inside an opening
@@ -38,12 +42,18 @@ export function build(world) {
     for (let i = 0; i < Z.length; i++) { const q = Z[i]; if (typeof q.h === 'number' && q.h >= 5.9) continue; if (x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1) h = typeof q.h === 'function' ? q.h(x, z) : q.h; }
     return h;
   };
-  W.surfaceAt = (p) => (p.y < -1 && p.z > 55 ? 'concrete' : 'concrete');
+  W.surfaceAt = (p) => {
+    if (p.y < -8 && ((p.z > P.TRK.A[0] - 0.2 && p.z < P.TRK.A[1]) || (p.z > P.TRK.D[0] && p.z < P.TRK.D[1] + 0.2))) return 'metal';   // trains
+    if (p.y < -5 && p.z > 53.5 && p.z < 54.5 && Math.abs(p.x) < 7) return 'metal';                                                  // turnstiles
+    return 'concrete';
+  };
 
   const v = (x, y, z) => new THREE.Vector3(x, y, z);
-  W.playerSpawns = [v(-36, 0, 0), v(-34, 0, 8), v(-34, 0, -8)];
-  // concourse-floor spawns only until the AI nav is height-aware (balcony/lower-level spawns come with that block)
-  W.enemySpawns = [v(36, 0, 0), v(34, 0, 10), v(34, 0, -10), v(20, 0, 14), v(20, 0, -14), v(0, 0, -15), v(-8, 0, 15), v(14, 0, 4), v(14, 0, -4), v(26, 0, 0), v(6, 0, -12), v(6, 0, 12), v(-14, 0, -15), v(30, 0, 16)];
+  const isl1 = (P.ISL[1][0] + P.ISL[1][1]) / 2, isl2 = (P.ISL[2][0] + P.ISL[2][1]) / 2;
+  W.playerSpawns = [v(-36, 0, 0), v(-34, 0, 8), v(-34, 0, -8), v(-38, 0, 12), v(-30, -12, isl1), v(-40, 0, 53)];
+  W.enemySpawns = [v(36, 0, 0), v(34, 0, 10), v(34, 0, -10), v(20, 0, 14), v(20, 0, -14), v(0, 0, -15), v(-8, 0, 15), v(14, 0, 4), v(14, 0, -4), v(26, 0, 0), v(6, 0, -12), v(6, 0, 12), v(-14, 0, -15), v(30, 0, 16),
+    v(30, -12, isl1), v(-6, -12, isl1), v(34, -12, isl2), v(-30, -12, isl2), v(6, -12, isl2), v(0, -6, 70), v(16, -6, 60), v(0, -6, 24.5), v(10, -6, 40), v(30, 0, 62), v(-20, 0, 66)];
+  W.objectives = [{ name: 'SUBWAY', position: v(0, -12, isl1) }];
   if (W.coverPoints.length < 40) {
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; world.cover(Math.cos(a) * 4.2, Math.sin(a) * 4.2, Math.cos(a), Math.sin(a)); }   // info booth ring
     for (const x of [-30, -18, -6, 6, 18, 30]) { world.cover(x, 16.5, 0, -1); world.cover(x, -16.5, 0, 1); }                                          // wall piers
@@ -60,11 +70,19 @@ export function build(world) {
     vanderbilt: [-4, 0, 47.5, 0.25, 0.34],
     windows: [8, 0, -4, -Math.PI / 2 - 0.3, 0.4],
     shafts: [18, 6, -13, Math.PI * 0.72, -0.28],
-    train: [-24, -12.05, 71.8, -Math.PI / 2, 0.0],
     gallery: [0, -6, 21.5, Math.PI - 0.25, 0.1],
     ramp: [-40, -1.45, 25, -Math.PI / 2, -0.05],
     dining: [-16, -6, 36, 1.2, 0.05],
-    platform: [-34, -12, 61.5, -Math.PI / 2 + 0.28, 0.06],
+    mezzanine_sub: [0, -6, 52, Math.PI - 0.2, 0.06],
+    platform: [-36, -12, isl1 - 2.6, -Math.PI / 2 + 0.2, 0.05],
+    platform2: [36, -12, isl2 + 2.6, Math.PI / 2 - 0.25, 0.05],
+    train: [-24, -12.05, (P.TRK.A[0] + P.TRK.A[1]) / 2 - 0.3, -Math.PI / 2, 0.0],
+    substair: [-38.5, 0, 4, Math.PI - 0.15, 0.3],
+    passage: [-52, -6, 24, Math.PI, 0.05],
+    street: [-24, 0, 62, Math.PI + 0.6, 0.06],
+    facade: [6, 0, 74, -0.25, 0.42],
+    viaduct: [-44, 0, 66, -Math.PI / 2 + 0.55, 0.18],
+    skyline: [0, 0, 56, Math.PI - 0.3, 0.32],
     ceiling: [-10, 0, 8, -0.6, 1.1],
   };
 }

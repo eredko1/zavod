@@ -240,12 +240,47 @@ export function makeMats(ctx, R, env) {
     g.font = 'bold 40px Georgia, serif'; g.fillText(sub, W / 2, H / 2 + 62);
     const m = std('mosaic', { map: tex(c, { repeat: false }), roughness: 0.35, metalness: 0 }); return m;
   };
-  // ---- generic sign (gold on black / black on cream) ------------------------------
-  M.sign = (text, { bg = '#111', fg = '#e6c26a', w = 1024, h = 128, font = 'bold 72px Georgia, serif' } = {}) => {
+  // ---- sign / poster / mosaic ATLAS: one 2048² canvas + one material for every text plane (draw-call budget) ----------------
+  {
+    const A = 2048; const [ac, ag] = canvas(A, A); ag.fillStyle = '#000'; ag.fillRect(0, 0, A, A);
+    const atlasTex = tex(ac, { repeat: false, aniso: 8 }); const shelves = []; const cache = new Map();
+    const alloc = (w, h) => { let sh = shelves.find(q => q.h === h && q.x + w <= A); if (!sh) { const y = shelves.reduce((a, q) => a + q.h, 0); if (y + h > A) { console.warn('[terminal] sign atlas full'); return { x: 0, y: 0, w: 4, h: 4 }; } sh = { y, h, x: 0 }; shelves.push(sh); } const r = { x: sh.x, y: sh.y, w, h }; sh.x += w; return r; };
+    M.atlas = std('atlas', { map: atlasTex, roughness: 0.55, metalness: 0.05, emissive: new THREE.Color(0xffffff), emissiveMap: atlasTex, emissiveIntensity: 0.45 }); M.atlas.userData.castShadow = false;
+    const uvGeo = (w, h, r) => { const g = new THREE.PlaneGeometry(w, h); const u0 = (r.x + 1.5) / A, u1 = (r.x + r.w - 1.5) / A, v0 = 1 - (r.y + r.h - 1.5) / A, v1 = 1 - (r.y + 1.5) / A; g.setAttribute('uv', new THREE.Float32BufferAttribute([u0, v1, u1, v1, u0, v0, u1, v0], 2)); return g; };
+    const fontOf = (font, px) => font.replace(/(\d+)px/, `${px}px`);
+    /** A sign quad (w×h m) whose text lives in the shared atlas: B.add(M.atlas, M.signGeo(text, opts, w, h), matrix). */
+    M.signGeo = (text, opts = {}, w = 4, h = 0.5) => {
+      if (typeof text === 'object' && text && text.__sign) { h = opts; w = text.w; opts = text.opts; text = text.text; }
+      const { bg = '#111', fg = '#e6c26a', font = 'bold 72px Georgia, serif' } = opts;
+      const key = `s|${text}|${bg}|${fg}|${font}|${(w / h).toFixed(1)}`;
+      let r = cache.get(key);
+      if (!r) { const ch = 80, cw = Math.max(64, Math.min(1024, Math.round(ch * (w / h) / 8) * 8)); r = alloc(cw, ch); ag.fillStyle = bg; ag.fillRect(r.x, r.y, r.w, r.h); ag.fillStyle = fg; ag.font = fontOf(font, Math.round(ch * 0.58)); ag.textAlign = 'center'; ag.textBaseline = 'middle'; let tw = ag.measureText(text).width; if (tw > cw - 12) ag.font = fontOf(font, Math.floor(ch * 0.58 * (cw - 12) / tw)); ag.fillText(text, r.x + r.w / 2, r.y + r.h / 2 + 2); atlasTex.needsUpdate = true; cache.set(key, r); }
+      return uvGeo(w, h, r);
+    };
+    M.sign = (text, opts = {}) => ({ __sign: true, text, opts, w: opts.w ? opts.w / (opts.h || 128) : 8 });
+    M.signRef = M.sign;
+    /** legacy: a standalone sign material (used only for instanced signs) */
+    M.signMat = (text, { bg = '#111', fg = '#e6c26a', w = 1024, h = 128, font = 'bold 72px Georgia, serif' } = {}) => {
+      const [c, g] = canvas(w, h); g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2);
+      const m = std('sign', { map: tex(c, { repeat: false }), roughness: 0.5, metalness: 0.1 }); return m;
+    };
+    M.posterGeo = (i = 0, w = 1.9, h = 2.0) => {
+      const key = `p|${i % 6}`; let r = cache.get(key);
+      if (!r) { const pal = [['#1d3f73', '#f2c14e'], ['#7a1f2b', '#f4ede0'], ['#0f5e4a', '#e8e2cf'], ['#333', '#ff7a3d'], ['#2b6ca3', '#ffffff'], ['#5b3a7a', '#f0d36b']][i % 6]; r = alloc(192, 192); const g = ag; g.save(); g.beginPath(); g.rect(r.x, r.y, r.w, r.h); g.clip(); g.fillStyle = pal[0]; g.fillRect(r.x, r.y, r.w, r.h); g.fillStyle = pal[1]; for (let k = 0; k < 5; k++) { g.globalAlpha = 0.25 + R() * 0.5; g.beginPath(); g.arc(r.x + R() * r.w, r.y + R() * r.h * 0.7, 16 + R() * 44, 0, 7); g.fill(); } g.globalAlpha = 1; g.fillRect(r.x + 12, r.y + r.h - 52, r.w - 24, 2); g.font = 'bold 18px Helvetica, Arial, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.fillText(['SEE MORE OF THE CITY', 'RIDE SAFE · STAND CLEAR', 'SUMMER CONCERTS', 'MUSEUM NIGHTS', 'THE NEW LINE OPENS', 'FRESH EVERY MORNING'][i % 6], r.x + 12, r.y + r.h - 30); g.font = '11px Helvetica, Arial'; g.fillText('a message from the city', r.x + 12, r.y + r.h - 14); g.restore(); atlasTex.needsUpdate = true; cache.set(key, r); }
+      return uvGeo(w, h, r);
+    };
+    M.mosaicGeo = (text = 'CENTRAL STATION', sub = 'MAIN ST', w = 4.2, h = 1.05) => {
+      const key = `m|${text}|${sub}`; let r = cache.get(key);
+      if (!r) { r = alloc(512, 128); const g = ag; const { x, y } = r; const W = 512, H = 128; g.save(); g.beginPath(); g.rect(x, y, W, H); g.clip(); g.fillStyle = '#e9e4d6'; g.fillRect(x, y, W, H); for (let px = 0; px < W; px += 8) for (let py = 0; py < H; py += 8) { const v = 215 + R() * 35; g.fillStyle = `rgb(${v},${v - 4},${v - 14})`; g.fillRect(x + px + 1, y + py + 1, 6, 6); } g.fillStyle = '#1c5a3c'; g.fillRect(x, y, W, 13); g.fillRect(x, y + H - 13, W, 13); g.fillRect(x, y, 13, H); g.fillRect(x + W - 13, y, 13, H); g.fillStyle = '#b78a34'; g.fillRect(x + 13, y + 13, W - 26, 3); g.fillRect(x + 13, y + H - 16, W - 26, 3); g.fillStyle = '#12301f'; g.font = 'bold 46px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, x + W / 2, y + H / 2 - 9); g.font = 'bold 20px Georgia, serif'; g.fillText(sub, x + W / 2, y + H / 2 + 31); g.restore(); atlasTex.needsUpdate = true; cache.set(key, r); }
+      return uvGeo(w, h, r);
+    };
+  }
+  // ---- (legacy generators kept for reference; not used for draw-call reasons) ------------------------------
+  M._signOld = (text, { bg = '#111', fg = '#e6c26a', w = 1024, h = 128, font = 'bold 72px Georgia, serif' } = {}) => {
     const [c, g] = canvas(w, h); g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2);
     const m = std('sign', { map: tex(c, { repeat: false }), roughness: 0.5, metalness: 0.1 }); return m;
   };
-  M.poster = (i = 0) => {
+  M._posterOld = (i = 0) => {
     const W = 256, H = 256, [c, g] = canvas(W, H); const pal = [['#1d3f73', '#f2c14e'], ['#7a1f2b', '#f4ede0'], ['#0f5e4a', '#e8e2cf'], ['#333', '#ff7a3d'], ['#2b6ca3', '#ffffff'], ['#5b3a7a', '#f0d36b']][i % 6];
     g.fillStyle = pal[0]; g.fillRect(0, 0, W, H); g.fillStyle = pal[1];
     for (let k = 0; k < 5; k++) { g.globalAlpha = 0.25 + R() * 0.5; g.beginPath(); g.arc(R() * W, R() * H * 0.7, 20 + R() * 60, 0, 7); g.fill(); }

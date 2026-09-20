@@ -121,10 +121,27 @@ function playerVisibleFrom(ctx, p) {
   return rayClear(ctx, eye, _v3.set(p.x, p.y + 1.2, p.z));
 }
 
+/** world spawns snapped onto the nav floor nearest their own y (any level); unreachable ones (no floor within 3 m) are dropped */
+function snappedSpawns(ctx) {
+  const src = ctx.world?.enemySpawns || [];
+  if (S.spawnSrc === src && S.spawnNav === S.nav.builds) return S.spawns;
+  S.spawnSrc = src; S.spawnNav = S.nav.builds; S.spawns = []; S.badSpawns = [];
+  for (const v of src) {
+    if (!v || !isFinite(v.x) || !isFinite(v.z)) continue;
+    const p = S.nav.nearestFree(v.x, v.z, 3, v.y || 0);
+    if (!p) { S.badSpawns.push(v); continue; }
+    S.spawns.push(p);
+  }
+  if (S.badSpawns.length) console.warn('[ai] ' + S.badSpawns.length + ' enemy spawns have no nav floor within 3 m: ' + S.badSpawns.map(v => `(${v.x},${v.y},${v.z})`).join(' '));
+  return S.spawns;
+}
+
 function pickSpawns(ctx, count) {
-  let spawns = (ctx.world?.enemySpawns || []).filter(v => v && isFinite(v.x) && (v.y || 0) < 0.15); // TODO multi-level nav: elevated spawns skipped until nav knows floors
-  if (spawns.length < count) { for (let i = 0; i < count * 3 && spawns.length < count + 4; i++) { const p = S.nav.randomFreeNear(0, 0, 55, ctx.rng); if (p && p.distanceTo(ctx.player.position) > 25) spawns.push(p); } }
   const pp = ctx.player?.position || new THREE.Vector3();
+  let spawns = snappedSpawns(ctx).slice();
+  // reachable from the player's level (weak connectivity; drops count both ways) — the AI can't climb anything but stairs
+  const pr = S.nav.regionAt(pp.x, pp.z, pp.y); if (pr !== -1) { const ok = spawns.filter(p => S.nav.regionAt(p.x, p.z, p.y) === pr); if (ok.length >= Math.min(4, spawns.length)) spawns = ok; }
+  if (spawns.length < count) { for (let i = 0; i < count * 3 && spawns.length < count + 4; i++) { const p = S.nav.randomFreeNear(pp.x, pp.z, 55, ctx.rng, pp.y); if (p && p.distanceTo(pp) > 25) spawns.push(p); } }
   // prefer spawns hidden from the player at 35–65 m; fall back to the farthest ones
   const scored = spawns.map(p => { const d = p.distanceTo(pp); const vis = d < 90 && playerVisibleFrom(ctx, p); return { p, d, vis, score: (vis ? 100 : 0) + Math.max(0, 35 - d) * 3 + Math.max(0, d - 65) }; });
   scored.sort((a, b) => a.score - b.score || b.d - a.d);
@@ -140,7 +157,7 @@ function spawnSquad(ctx, size, spawnPos, waveN) {
   const yaw = Math.atan2(ctx.player.position.x - spawnPos.x, ctx.player.position.z - spawnPos.z);
   for (let i = 0; i < size; i++) {
     const a = (i / size) * Math.PI * 2 + ctx.rng(); const r = i === 0 ? 0 : 1.4 + ctx.rng();
-    const p = S.nav.randomFreeNear(spawnPos.x + Math.cos(a) * r, spawnPos.z + Math.sin(a) * r, 1.5, ctx.rng) || spawnPos.clone();
+    const p = S.nav.randomFreeNear(spawnPos.x + Math.cos(a) * r, spawnPos.z + Math.sin(a) * r, 1.5, ctx.rng, spawnPos.y) || spawnPos.clone();
     const rusher = waveN >= 2 && i === size - 1 && size >= 3;
     const s = spawnSoldier(ctx, p, yaw + (ctx.rng() - 0.5) * 0.4, { archetype: rusher ? 'rusher' : 'rifleman', health: rusher ? 80 : 100 });
     s.squad = sq; sq.members.push(s); s.state = 'advance'; s.peeks = 0;
@@ -161,17 +178,26 @@ function startWave(ctx, n) {
 // ---------- cover ----------
 function coverPoints(ctx) {
   const w = ctx.world?.coverPoints;
-  if (w && w.length >= 8) { if (S.coverSrc !== w) { S.coverSrc = w; S.cover = w.filter(c => (c.position?.y || 0) < 0.15).map(c => ({ position: c.position, normal: c.normal || new THREE.Vector3(0, 0, 1), height: c.height ?? 1.3, claimedBy: null })); } }
-  else if (!S.cover || S.coverSrc !== 'gen' || S.coverN !== ctx.colliders.length) { S.coverSrc = 'gen'; S.coverN = ctx.colliders.length; S.cover = generateCover(ctx, S.nav).map(c => ({ ...c, claimedBy: null })); }
+  if (w && w.length >= 8) {
+    if (S.coverSrc !== w || S.coverNav !== S.nav.builds) { // snap each point onto the nav floor nearest its own y (balconies, decks, platforms); drop points with no floor
+      S.coverSrc = w; S.coverNav = S.nav.builds; S.cover = [];
+      for (const c of w) { if (!c?.position) continue; const p = S.nav.nearestFree(c.position.x, c.position.z, 1.5, c.position.y || 0); if (!p) continue; S.cover.push({ position: new THREE.Vector3(c.position.x, p.y, c.position.z), normal: c.normal || new THREE.Vector3(0, 0, 1), height: c.height ?? 1.3, claimedBy: null }); }
+    }
+  }
+  else if (!S.cover || S.coverSrc !== 'gen' || S.coverNav !== S.nav.builds) { S.coverSrc = 'gen'; S.coverNav = S.nav.builds; S.cover = generateCover(ctx, S.nav).map(c => ({ ...c, claimedBy: null })); }
   return S.cover;
 }
 
 function pickCover(ctx, s, opt) {
-  const pts = coverPoints(ctx); const pp = ctx.player.position; const eye = ctx.player.eye ? ctx.player.eye() : _v3.set(pp.x, pp.y + 1.6, pp.z);
+  const pts = coverPoints(ctx); const pp = opt.around || ctx.player.position; const eye = ctx.player.eye ? ctx.player.eye() : _v3.set(pp.x, pp.y + 1.6, pp.z);
   const pf = _v2.set(-Math.sin(ctx.player.yaw || 0), 0, -Math.cos(ctx.player.yaw || 0));
   let best = null, bestScore = 1e9; const cands = [];
+  const region = S.nav.regionAt(s.position.x, s.position.z, s.position.y);
+  // level play: sometimes (per decision) want cover on a different level than the target — high ground when the player is below, and vice versa
+  const wantLevel = opt.level ?? (ctx.rng() < 0.3 ? (ctx.rng() < 0.6 ? 'above' : 'below') : 'any');
   for (const c of pts) {
     if (c.claimedBy && c.claimedBy !== s && !c.claimedBy.dead) continue;
+    if (region !== -1 && S.nav.regionAt(c.position.x, c.position.z, c.position.y) !== region) continue; // unreachable level
     const dp = c.position.distanceTo(pp), ds = c.position.distanceTo(s.position);
     if (ds < 1.0 && !opt.allowCurrent) continue;
     if (opt.maxTravel && ds > opt.maxTravel) continue;
@@ -181,6 +207,9 @@ function pickCover(ctx, s, opt) {
     const toP = _v.subVectors(pp, c.position); toP.y = 0; toP.normalize();
     if (c.normal.dot(toP) > -0.2) continue; // solid must be between the point and the player
     let score = Math.abs(dp - (opt.preferDist ?? 16)) * 1.0 + ds * 0.45;
+    const dy = c.position.y - pp.y;
+    if (wantLevel === 'above' && dy > 1.5) score -= 6; else if (wantLevel === 'below' && dy < -1.5) score -= 6;
+    if (Math.abs(dy) > 1.5) score += 1.5; // otherwise a mild preference for the player's own level
     if (opt.flank) { const ang = Math.acos(clamp(_v.negate().dot(pf), -1, 1)); score += Math.abs(ang - Math.PI / 2) * 10; }
     for (const o of S.soldiers) if (o !== s && !o.dead && o.position.distanceToSquared(c.position) < 4) score += 6;
     cands.push([score, c]);
@@ -206,7 +235,7 @@ function choosePeek(ctx, s, c) {
   const toP = _v.subVectors(ctx.player.position, c.position); const side = Math.sign(toP.dot(t)) || 1;
   for (const k of [side, -side]) {
     const p = c.position.clone().addScaledVector(t, 0.75 * k);
-    if (!S.nav.isFree(p.x, p.z)) continue;
+    if (!S.nav.isFree(p.x, p.z, c.position.y)) continue; p.y = S.nav.floorAt(p.x, p.z, c.position.y);
     if (rayClear(ctx, _v2.set(p.x, p.y + 1.55, p.z), eye)) return { pos: p, lean: k };
   }
   return { pos: c.position.clone(), lean: 0 };
@@ -259,10 +288,12 @@ function think(ctx, s, t) {
       s.crouchTarget = 0; s.leanTarget = 0;
       if (!s.cover || s.arrived || (s.cover && s.cover.claimedBy !== s)) {
         if (s.arrived && s.cover && s.position.distanceTo(s.cover.position) < 1.2) { s.state = 'cover'; s.stateT = 0; s.peeks = 0; s.setGoal(null); s.crouchTarget = s.cover.height > 0.9 ? 1 : 0.4; break; }
-        const c = pickCover(ctx, s, s.state === 'flank' ? { flank: true, preferDist: 12, minDist: 6, maxTravel: 45 } : { closerThan: Math.max(8, dist - 2), preferDist: known ? 13 : 9, minDist: 5, maxTravel: 40 });
+        // objective bias: while the player is not known, squads converge on the objective nearest the player instead of the player himself
+        const obj = !known ? objectiveFor(ctx, s) : null; const around = obj || pl.position; const dAround = obj ? s.position.distanceTo(obj) : dist;
+        const c = pickCover(ctx, s, s.state === 'flank' ? { flank: true, preferDist: 12, minDist: 6, maxTravel: 45 } : { around, closerThan: Math.max(8, dAround - 2), preferDist: known ? 13 : 9, minDist: 5, maxTravel: 40 });
         if (c) { claim(s, c); s.setGoal(c.position, 'run'); }
-        else { // no cover: approach the player directly, stop at 8 m
-          if (dist > 8) s.setGoal(pl.position, 'run'); else { s.setGoal(null); s.state = 'cover'; s.stateT = 0; s.peeks = 0; }
+        else { // no cover: approach directly, stop at 8 m
+          if (dAround > 8) s.setGoal(around, 'run'); else { s.setGoal(null); s.state = 'cover'; s.stateT = 0; s.peeks = 0; }
         }
       }
       if (vis && dist < 20 && s.stateT > 0.5) s.wantFire = true; // fire on the move when close
@@ -306,6 +337,15 @@ function think(ctx, s, t) {
     }
     default: s.state = 'advance'; s.stateT = 0;
   }
+}
+
+/** the objective this soldier's squad should press: api.setObjective() if set, else the world objective nearest the player, else null */
+function objectiveFor(ctx, s) {
+  if (S.objective) return S.objective;
+  const list = ctx.world?.objectives; if (!list || !list.length) return null;
+  const pp = ctx.player.position; let best = null, bd = 1e9;
+  for (const o of list) { const p = o?.position || o; if (!p || !isFinite(p.x)) continue; const d = p.distanceTo(pp); if (d < bd) { bd = d; best = p; } }
+  return best;
 }
 
 function qaThink(ctx, s, t, vis) {
@@ -385,7 +425,7 @@ function killSoldier(ctx, s, hit) {
   S.dropped.push({ mesh: r, vel, av, t: 0, landed: false, soldier: s });
   s.inst.flash.visible = false;
   // blood
-  placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6);
+  placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6, s.position.y + 0.2);
   // score (QA-spawned dummies don't count)
   const t = ctx.time.elapsed; const headshot = !!hit?.headshot;
   if (s.qaLock) { ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score, qa: true }); if (s.squad) s.squad.alert(t, ctx.player.position); return; }
@@ -396,9 +436,9 @@ function killSoldier(ctx, s, hit) {
   if (s.squad) { s.squad.alert(t, ctx.player.position); }
 }
 
-function placeBlood(ctx, x, z, scale) {
+function placeBlood(ctx, x, z, scale, y = 0) {
   const b = S.blood[S.bloodN++ % S.blood.length];
-  b.position.set(x + (ctx.rng() - 0.5) * 0.3, S.nav.groundY(x, z) + 0.012, z + (ctx.rng() - 0.5) * 0.3);
+  b.position.set(x + (ctx.rng() - 0.5) * 0.3, S.nav.floorBelow(x, z, y) + 0.012, z + (ctx.rng() - 0.5) * 0.3);
   b.rotation.z = ctx.rng() * Math.PI * 2; b.scale.setScalar(scale); b.visible = true; b.userData.t = 0; b.material.opacity = 1;
 }
 
@@ -416,7 +456,7 @@ export async function init(ctx) {
   S = {
     asset, nav, soldiers: [], squads: [], pool: [], dropped: [], blood, bloodN: 0, variantN: 0, squadN: 0,
     wave: 0, score: 0, kills: 0, streak: 0, streakT: -100, phase: 'idle', phaseT: 0, pending: [], waveClock: 0,
-    raysThisFrame: 0, rayBudget: 6, rebuildT: 0, enabled: ctx.qs?.get('ai') !== '0', startDelay: 2.5, cover: null, coverSrc: null,
+    raysThisFrame: 0, rayBudget: 6, rebuildT: 0, enabled: ctx.qs?.get('ai') !== '0', startDelay: 2.5, cover: null, coverSrc: null, coverNav: -1, objective: null, spawns: [], badSpawns: [], spawnSrc: null, spawnNav: -1,
   };
   // pre-warm a few instances
   for (let i = 0; i < 4; i++) { const inst = createInstance(asset, S.variantN++ % 3); inst.rifleLocal = { p: inst.rifle.position.clone(), q: inst.rifle.quaternion.clone(), s: inst.rifle.scale.clone() }; S.pool.push(inst); }
@@ -457,7 +497,7 @@ export async function init(ctx) {
     },
     qaKillAll: () => { for (const s of S.soldiers.slice()) if (!s.dead) killSoldier(ctx, s, { dir: new THREE.Vector3(ctx.rng() - 0.5, 0.2, ctx.rng() - 0.5).normalize(), strength: 3 }); },
     qaSpawnAt: (x, z, opts = {}) => {
-      const p = S.nav.nearestFree(x, z, 6) || new THREE.Vector3(x, 0, z);
+      const p = S.nav.nearestFree(x, z, 6, opts.y) || new THREE.Vector3(x, opts.y || 0, z);
       const yaw = opts.yaw ?? Math.atan2(ctx.player.position.x - p.x, ctx.player.position.z - p.z);
       const s = spawnSoldier(ctx, p, yaw, { archetype: opts.archetype || 'rifleman', health: opts.health });
       s.qaLock = opts.state || 'aim'; s.state = s.qaLock === 'cover' ? 'cover' : 'shoot';
@@ -469,6 +509,28 @@ export async function init(ctx) {
     qaStartWave: (n) => startWave(ctx, n || 1),
     qaSetEnabled: (v) => { S.enabled = !!v; },
     nav, cover: () => coverPoints(ctx), losStats,
+    /** squads converge on this point while the player is unknown (null → ctx.world.objectives nearest the player, if any) */
+    setObjective: (pos) => { S.objective = pos ? new THREE.Vector3(pos.x, pos.y ?? S.nav.floorAt(pos.x, pos.z), pos.z) : null; },
+    get objective() { return S.objective; },
+    /** A* with heights: [{x,y,z}...] from (x0,z0) to (x1,z1); y0/y1 pick the level (default: lowest floor there) */
+    qaNavPath: (x0, z0, x1, z1, y0, y1) => { const a = new THREE.Vector3(x0, y0 ?? S.nav.floorAt(x0, z0), z0), b = new THREE.Vector3(x1, y1 ?? S.nav.floorAt(x1, z1), z1); const p = S.nav.findPath(a, b); return p ? Object.assign(p.map(v => [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)]), { complete: p.complete }) : null; },
+    /** per-soldier floor/embedding checks + spawn reachability; logs offenders */
+    qaValidate: () => {
+      const floating = [], embedded = [], stuck = [];
+      for (const s of S.soldiers) {
+        if (s.dead) continue; const p = s.position; const f = S.nav.floorAt(p.x, p.z, p.y);
+        const rec = { id: s.id, pos: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)], floor: +f.toFixed(2), state: s.state };
+        if (!s.airborne && Math.abs(p.y - f) >= 0.2) floating.push(rec);
+        let inside = false; for (const b of S.nav.solids) { if (S.nav.slabs.has(b)) continue; if (p.x > b.min.x + 0.05 && p.x < b.max.x - 0.05 && p.z > b.min.z + 0.05 && p.z < b.max.z - 0.05 && p.y + 0.6 > b.min.y && p.y + 1.4 < b.max.y) { inside = true; break; } }
+        if (inside) embedded.push(rec);
+        if (s.moveGoal && !s.arrived && s.stuckN >= 2) stuck.push(rec);
+      }
+      const pp = ctx.player.position; const pr = S.nav.regionAt(pp.x, pp.z, pp.y);
+      const sp = snappedSpawns(ctx); const unreachableSpawns = (S.badSpawns || []).map(v => [v.x, v.y, v.z]).concat(sp.filter(p => pr !== -1 && S.nav.regionAt(p.x, p.z, p.y) !== pr).map(p => [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)]));
+      const out = { floating, embedded, stuck, unreachableSpawns, alive: S.soldiers.filter(s => !s.dead).length, playerRegion: pr, nav: S.nav.debugStats() };
+      if (floating.length || embedded.length || stuck.length) console.warn('[ai] qaValidate offenders', JSON.stringify({ floating, embedded, stuck }));
+      return out;
+    },
   };
   ctx.ai = api; S.api = api;
   return api;
@@ -486,7 +548,7 @@ export function reset(ctx) {
   for (const d of S.dropped) ctx.scene.remove(d.mesh); S.dropped.length = 0;
   for (const b of S.blood) b.visible = false;
   if (S.cover) for (const c of S.cover) c.claimedBy = null;
-  S.wave = 0; S.score = 0; S.kills = 0; S.streak = 0; S.streakT = -100; S.phase = 'idle'; S.phaseT = 0;
+  S.wave = 0; S.score = 0; S.kills = 0; S.streak = 0; S.streakT = -100; S.phase = 'idle'; S.phaseT = 0; S.objective = null;
   if (S.enabled) { S.phase = 'countdown'; S.phaseT = S.startDelay; }
 }
 
@@ -495,7 +557,7 @@ export function update(dt, ctx) {
   const t = ctx.time.elapsed; const api = S.api; const playing = ctx.state === 'playing';
   const active = playing && !api.frozen && dt > 0;
   S.raysThisFrame = 0; S.nav.budget = 4;
-  S.rebuildT += dt; if (S.rebuildT > 2) { S.rebuildT = 0; S.nav.maybeRebuild(); }
+  S.rebuildT += dt; if (S.rebuildT > 1) { S.rebuildT = 0; if (S.nav.maybeRebuild()) { for (const s of S.soldiers) { if (!s.dead) { s.path = null; s.pathT = -10; } } } }
 
   // ---- waves ----
   if (active && S.enabled) {
@@ -554,7 +616,7 @@ export function update(dt, ctx) {
     if (!d.landed) {
       d.vel.y -= 18 * dt; m.position.addScaledVector(d.vel, dt);
       m.rotation.x += d.av.x * dt; m.rotation.y += d.av.y * dt; m.rotation.z += d.av.z * dt;
-      const gy = S.nav.groundY(m.position.x, m.position.z) + 0.035;
+      const gy = S.nav.floorBelow(m.position.x, m.position.z, m.position.y) + 0.035;
       if (m.position.y <= gy) {
         m.position.y = gy; d.landed = true;
         const yaw = Math.atan2(d.vel.x, d.vel.z) + (ctx.rng() - 0.5);
@@ -562,7 +624,7 @@ export function update(dt, ctx) {
         d.fromQ = m.quaternion.clone(); d.landT = 0;
       }
     } else if (d.landT < 0.25) { d.landT += dt; m.quaternion.slerpQuaternions(d.fromQ, d.restQ, Math.min(1, d.landT / 0.25)); }
-    if (d.t > 60) { const k = (d.t - 60) / 1.5; m.position.y = S.nav.groundY(m.position.x, m.position.z) + 0.035 - k * 0.4; if (k >= 1) { ctx.scene.remove(m); S.dropped.splice(i, 1); } }
+    if (d.t > 60) { const k = (d.t - 60) / 1.5; if (d.restY === undefined) d.restY = m.position.y; m.position.y = d.restY - k * 0.4; if (k >= 1) { ctx.scene.remove(m); S.dropped.splice(i, 1); } }
   }
   // ---- blood fade ----
   for (const b of S.blood) { if (!b.visible) continue; b.userData.t += dt; if (b.userData.t > 40) { b.material.opacity = Math.max(0, 1 - (b.userData.t - 40) / 4); if (b.material.opacity <= 0) b.visible = false; } }

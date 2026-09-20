@@ -35,6 +35,7 @@ export class Soldier {
     this.rng = ctx.rng;
     // motion
     this.moveGoal = null; this.path = null; this.pathIdx = 0; this.pathT = -10; this.gait = 'run'; this.arrived = true;
+    this.floorY = 0; this.vy = 0; this.airborne = false; this.stuckAcc = 0; this.stuckN = 0; this.pathFails = 0; this.realSpeed = 0;
     this.crouch = 0; this.crouchTarget = 0; this.lean = 0; this.leanTarget = 0; this.stagger = 0;
     this.faceDir = new THREE.Vector3(0, 0, 1);
     // aim
@@ -85,7 +86,7 @@ export class Soldier {
   }
 
   placeAt(pos, yaw) {
-    this.position.copy(pos); this.yaw = yaw; this.faceDir.set(Math.sin(yaw), 0, Math.cos(yaw));
+    this.position.copy(pos); this.yaw = yaw; this.faceDir.set(Math.sin(yaw), 0, Math.cos(yaw)); this.floorY = pos.y; this.vy = 0; this.airborne = false;
     this.group.position.copy(pos); this.group.rotation.y = yaw; this.group.updateMatrixWorld(true);
   }
 
@@ -104,19 +105,22 @@ export class Soldier {
   moveStep(dt, nav, others, player) {
     const t = this.ctx.time.elapsed;
     const desired = _v.set(0, 0, 0);
+    const px0 = this.position.x, pz0 = this.position.z;
     if (this.moveGoal && !this.arrived) {
       if (!this.path && t - this.pathT > 0.35 && nav.budget > 0) {
         nav.budget--; this.pathT = t;
         const p = nav.findPath(this.position, this.moveGoal);
-        if (p && p.length) { this.path = p; this.pathIdx = 0; }
+        if (p && p.length) { this.path = p; this.pathIdx = 0; this.pathFails = 0; }
         else if (p && !p.length) { this.arrived = true; }
-        else { // no path: try straight line
-          this.path = [this.moveGoal.clone()]; this.pathIdx = 0;
+        else { // no path: straight line once, then give the goal up so the brain picks another
+          if (++this.pathFails >= 2) { this.pathFails = 0; this.arrived = true; this.path = null; }
+          else { this.path = [this.moveGoal.clone()]; this.pathIdx = 0; }
         }
       }
       if (this.path) {
         let wp = this.path[this.pathIdx];
-        while (wp && this.position.distanceToSquared(wp) < (this.pathIdx === this.path.length - 1 ? 0.16 : 0.36)) { this.pathIdx++; wp = this.path[this.pathIdx]; }
+        const near2 = (wp) => { const dx = wp.x - this.position.x, dz = wp.z - this.position.z; return dx * dx + dz * dz; }; // XZ only: the floor tracks the path
+        while (wp && near2(wp) < (this.pathIdx === this.path.length - 1 ? 0.16 : 0.36) && Math.abs(wp.y - this.position.y) < 1.2) { this.pathIdx++; wp = this.path[this.pathIdx]; }
         if (!wp) { this.arrived = true; this.path = null; }
         else {
           desired.subVectors(wp, this.position); desired.y = 0; const d = desired.length();
@@ -141,18 +145,39 @@ export class Soldier {
       const dx = this.position.x - player.position.x, dz = this.position.z - player.position.z; const d2 = dx * dx + dz * dz;
       if (d2 < 4 && d2 > 1e-6) { const d = Math.sqrt(d2); const k = (2 - d) / 2 * 3; desired.x += dx / d * k; desired.z += dz / d * k; }
     }
-    // steer velocity
+    // steer velocity (XZ)
     const acc = 14;
-    this.vel.x = damp(this.vel.x, desired.x, acc, dt); this.vel.z = damp(this.vel.z, desired.z, acc, dt); this.vel.y = 0;
-    this.position.addScaledVector(this.vel, dt);
-    nav.resolveCircle(this.position, 0.38);
-    this.position.y = nav.groundY(this.position.x, this.position.z);
-    this.speed = Math.hypot(this.vel.x, this.vel.z);
-    // stuck detection: if we barely move toward a far goal, replan
-    if (this.moveGoal && !this.arrived) {
-      this.stuckAcc = (this.stuckAcc || 0) + (this.speed < 0.3 ? dt : -dt * 0.5); if (this.stuckAcc < 0) this.stuckAcc = 0;
-      if (this.stuckAcc > 1.2) { this.stuckAcc = 0; this.path = null; this.pathT = -10; }
+    this.vel.x = damp(this.vel.x, desired.x, acc, dt); this.vel.z = damp(this.vel.z, desired.z, acc, dt);
+    this.position.x += this.vel.x * dt; this.position.z += this.vel.z * dt;
+    nav.resolveCircle(this.position, 0.3);
+    // ---- vertical: feet follow the nav floor of the layer we are on; stairs are smoothed, drops use gravity ----
+    const f = nav.floorAt(this.position.x, this.position.z, this.position.y + (this.airborne ? 0 : 0.3));
+    if (Number.isFinite(f)) {
+      this.floorY = f; const dy = f - this.position.y;
+      if (dy >= 0) { // step up (stairs/ramps): quick smooth snap, no popping
+        this.vy = 0; this.airborne = false;
+        this.position.y = dy > 1.2 ? f : damp(this.position.y, f, 18, dt); if (f - this.position.y < 0.01) this.position.y = f;
+      } else if (dy > -0.45 && !this.airborne) { // small descent (stairs down): smooth
+        this.position.y = damp(this.position.y, f, 18, dt); if (this.position.y - f < 0.01) this.position.y = f;
+      } else { // hop down: gravity
+        this.airborne = true; this.vy -= 20 * dt; this.position.y += this.vy * dt;
+        if (this.position.y <= f) { this.position.y = f; this.vy = 0; this.airborne = false; }
+      }
     }
+    this.vel.y = 0;
+    // real displacement speed (steering velocity alone lies when a wall pushes us back = "running in place")
+    const mdx = this.position.x - px0, mdz = this.position.z - pz0; const real = dt > 1e-5 ? Math.hypot(mdx, mdz) / dt : 0;
+    this.realSpeed = real; const want = Math.hypot(this.vel.x, this.vel.z);
+    this.speed = Math.min(want, real * 1.15 + 0.05);
+    // stuck detection: wanting to move but not moving → replan; repeatedly → nudge to the nearest free cell, then drop the goal
+    if (this.moveGoal && !this.arrived) {
+      this.stuckAcc += (want > 0.8 && real < 0.35 * want) ? dt : -dt * 0.5; if (this.stuckAcc < 0) this.stuckAcc = 0;
+      if (this.stuckAcc > 1.2) {
+        this.stuckAcc = 0; this.stuckN++; this.path = null; this.pathT = -10; this.stuckT = t;
+        if (this.stuckN >= 2) { const p = nav.nearestFree(this.position.x, this.position.z, 2.5, this.position.y); if (p && Math.hypot(p.x - this.position.x, p.z - this.position.z) > 0.15) { this.position.x = p.x; this.position.z = p.z; this.position.y = p.y; this.floorY = p.y; } }
+        if (this.stuckN >= 4) { this.stuckN = 0; this.arrived = true; this.moveGoal = null; }
+      }
+    } else { this.stuckAcc = 0; if (real > 1) this.stuckN = 0; }
   }
 
   // body yaw: face target when engaged and not moving away from it, else face movement dir

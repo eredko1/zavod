@@ -73,7 +73,7 @@ export function buildSouth(world, M, Z) {
     for (let a = 12; a < 50; a += 4) { const cx = ax(a); const yc = a > P.OPEN_X0 ? 4.2 : rampY(cx) + 4.2 + 0.5; B.box(M.plasterDark, [cx - 0.3, yc - 0.6, RAMP_Z0], [cx + 0.3, yc + 0.02, RZ1], { uvScale: 0.5 }); }
     // opening in the concourse south wall → corridor: door surround and sign
     const sgn = M.sign(side < 0 ? '⟵  DINING CONCOURSE · OYSTER BAR · SUBWAY' : 'DINING CONCOURSE · OYSTER BAR · SUBWAY  ⟶', { bg: '#1d1710', fg: '#e8c56a', font: 'bold 52px Georgia, serif' });
-    B.add(sgn, new THREE.PlaneGeometry(4.2, 0.5), mat4(ax((P.OPEN_X0 + P.OPEN_X1) / 2), 4.6, P.Z1 - 0.02, 0, Math.PI, 0));
+    B.add(M.atlas, M.signGeo(sgn, 4.2, 0.5), mat4(ax((P.OPEN_X0 + P.OPEN_X1) / 2), 4.6, P.Z1 - 0.02, 0, Math.PI, 0));
     // cover along the corridor: marble benches
     for (const a of [34, 42]) { const bx = ax(a); B.box(M.marbleDark, [bx - 1.2, 0, RZ0 + 0.2], [bx + 1.2, 0.5, RZ0 + 0.9], { uvScale: 1, collide: true }); world.cover(bx, RZ0 + 1.6, 0, 1); }
     // ramp cover: baggage carts along the ramp wall
@@ -91,7 +91,7 @@ export function buildSouth(world, M, Z) {
     B.box(M.marble, [-BRIDGE_HX - 0.5, LOW, RZ0 - 0.5], [BRIDGE_HX + 0.5, LOW + 5.5, RZ0], { uvScale: uv(M.marble) }); world.box([-BRIDGE_HX - 0.5, LOW, RZ0 - 0.5], [BRIDGE_HX + 0.5, 0, RZ0]);
     B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(0, LOW, 4, 3.6)), placeXY(0, 0, RZ0 + 0.05), { uvScale: uv(M.glassDim) });
     B.add(M.bronze, grilleGeo(4, 3.6, { arch: true }), placeXY(0, LOW, RZ0 + 0.3));
-    const sgnO = M.sign('OYSTER BAR  &  RESTAURANT', { bg: '#0e0a06', fg: '#f2d27a', font: 'bold 60px Georgia, serif' }); B.add(sgnO, new THREE.PlaneGeometry(5.5, 0.6), mat4(0, LOW + 4.0, RZ0 + 0.06));
+    const sgnO = M.sign('OYSTER BAR  &  RESTAURANT', { bg: '#0e0a06', fg: '#f2d27a', font: 'bold 60px Georgia, serif' }); B.add(M.atlas, M.signGeo(sgnO, 5.5, 0.6), mat4(0, LOW + 4.0, RZ0 + 0.06));
     world.termLamps.push([0, LOW + 4.6, (RZ0 + RZ1) / 2, 'point']);
     // side walls of the gallery toward the ramps below their arch (the ramps arrive here at -6): open — nothing
     // south wall: arch opening to the Dining Concourse (x∈[-5,5]); piers either side
@@ -127,7 +127,7 @@ export function buildSouth(world, M, Z) {
     for (const side of [-1, 1]) { const wx0 = side < 0 ? x0 - T : x1, wx1 = side < 0 ? x0 : x1 + T; B.box(M.stone, [wx0, 0, z0 - T], [wx1, h + 0.6, z1 + T], { uvScale: uv(M.stone) }); world.box([wx0, 0, z0 - T], [wx1, h, z1 + T]); }
     // windows: dim daylight glass + bronze grilles (N & S), door glass
     for (const cx of [-24, -12, 0, 12, 24]) { const zz = z0 - T * 0.5; B.add(M.glassDim, new THREE.PlaneGeometry(5.2, 7.5), mat4(cx, 8.25, zz), { uvScale: uv(M.glassDim) }); B.add(M.bronze, grilleGeo(5.2, 7.5), mat4(cx, 4.5, z0 + 0.1, 0, 0, 0)); }
-    for (const cx of [-13, 0, 13]) { B.add(M.glass, new THREE.ShapeGeometry(archShapeAt(cx, 5.2, 7.6, 9.0)), placeXY(0, 0, z1 + T * 0.5), { uvScale: uv(M.glass) }); B.add(M.bronze, grilleGeo(7.6, 9.0, { arch: true }), mat4(cx, 5.2, z1 + 0.12)); B.box(M.bronze, [cx - 2.0, 3.8, z1 - 0.1], [cx + 2.0, 4.3, z1 + T + 0.1], { uvScale: 1 }); }
+    for (const cx of [-13, 0, 13]) { B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(cx, 5.2, 7.6, 9.0)), placeXY(0, 0, z1 + T * 0.5), { uvScale: uv(M.glassDim) }); B.add(M.bronze, grilleGeo(7.6, 9.0, { arch: true }), mat4(cx, 5.2, z1 + 0.12)); B.box(M.bronze, [cx - 2.0, 3.8, z1 - 0.1], [cx + 2.0, 4.3, z1 + T + 0.1], { uvScale: 1 }); }
     // wainscot + cornice + coffered ceiling
     B.box(M.marble, [x0, 0, z0], [x1, 2.2, z0 + 0.12], { uvScale: uv(M.marble) }); B.box(M.marble, [x0, 0, z1 - 0.12], [x1, 2.2, z1], { uvScale: uv(M.marble) });
     B.box(M.marble, [x0, h - 1.2, z0], [x1, h, z0 + 0.6], { uvScale: uv(M.marble) }); B.box(M.marble, [x0, h - 1.2, z1 - 0.6], [x1, h, z1], { uvScale: uv(M.marble) });
@@ -140,10 +140,10 @@ export function buildSouth(world, M, Z) {
     for (const cx of [-20, -8, 8, 20]) for (const zz of [35, 40, 45]) { bench(B, M, cx, zz, 4.5); world.cover(cx, zz + 1.0, 0, 1); world.cover(cx, zz - 1.0, 0, -1); }
     // sign over the north arch (inside VH) + over the bridge (toward the concourse)
     const sgn = M.sign('MAIN CONCOURSE  ·  TRACKS  ·  BALCONIES', { bg: '#1d1710', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
-    B.add(sgn, new THREE.PlaneGeometry(6.5, 0.6), mat4(0, 7.5, z0 - 0.02, 0, 0, 0));
+    B.add(M.atlas, M.signGeo(sgn, 6.5, 0.6), mat4(0, 7.5, z0 - 0.02, 0, 0, 0));
     const sgn2 = M.sign('WAITING HALL  ·  MAIN STREET', { bg: '#1d1710', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
-    B.add(sgn2, new THREE.PlaneGeometry(6.5, 0.6), mat4(0, 7.5, z0 - T + 0.02, 0, Math.PI, 0));
-    B.add(sgn2, new THREE.PlaneGeometry(6.5, 0.6), mat4(0, 9.6, P.Z1 - 0.02, 0, Math.PI, 0));
+    B.add(M.atlas, M.signGeo(sgn2, 6.5, 0.6), mat4(0, 7.5, z0 - T + 0.02, 0, Math.PI, 0));
+    B.add(M.atlas, M.signGeo(sgn2, 6.5, 0.6), mat4(0, 9.6, P.Z1 - 0.02, 0, Math.PI, 0));
   }
 
   // ================= Dining Concourse (y=-6, under Vanderbilt Hall) =================
@@ -165,7 +165,7 @@ export function buildSouth(world, M, Z) {
     for (const px of [-20, -12, 12, 20]) for (const pz of [z0 + 6.6, z0 + 13.3]) { if (px < OYS.x1 && pz < OYS.z1) continue; B.box(M.marble, [px - 0.6, LOW, pz - 0.6], [px + 0.6, yc, pz + 0.6], { uvScale: uv(M.marble), collide: true }); world.cover(px + 1.1, pz, 1, 0, LOW); world.cover(px - 1.1, pz, -1, 0, LOW); }
     // food counters along the south wall (shuttered fronts + generic neon-ish signs)
     const names = ['COFFEE', 'BAGELS', 'PIZZA', 'SUSHI', 'TACOS', 'JUICE'];
-    let k = 0; for (const x of [-27, -17, 17, 27]) { B.box(M.marbleDark, [x - 4, LOW, z1 - 3], [x + 4, LOW + 1.1, z1], { uvScale: 1, collide: true }); B.box(M.shutter, [x - 4, LOW + 1.1, z1 - 0.5], [x + 4, LOW + 3.4, z1], { uvScale: 1 }); const s = M.sign(names[k++ % names.length], { bg: '#160f0a', fg: k % 2 ? '#7fe0e6' : '#f2c25a', font: 'bold 80px Helvetica, Arial, sans-serif' }); B.add(s, new THREE.PlaneGeometry(4.5, 0.6), mat4(x, LOW + 3.9, z1 - 0.52, 0, Math.PI, 0)); world.cover(x, z1 - 3.7, 0, -1, LOW); world.termLamps.push([x, LOW + 4.0, z1 - 1.5, 'fluor']); }
+    let k = 0; for (const x of [-27, -17, 17, 27]) { B.box(M.marbleDark, [x - 4, LOW, z1 - 3], [x + 4, LOW + 1.1, z1], { uvScale: 1, collide: true }); B.box(M.shutter, [x - 4, LOW + 1.1, z1 - 0.5], [x + 4, LOW + 3.4, z1], { uvScale: 1 }); const s = M.sign(names[k++ % names.length], { bg: '#160f0a', fg: k % 2 ? '#7fe0e6' : '#f2c25a', font: 'bold 80px Helvetica, Arial, sans-serif' }); B.add(M.atlas, M.signGeo(s, 4.5, 0.6), mat4(x, LOW + 3.9, z1 - 0.52, 0, Math.PI, 0)); world.cover(x, z1 - 3.7, 0, -1, LOW); world.termLamps.push([x, LOW + 4.0, z1 - 1.5, 'fluor']); }
     // Pullman-style booths in the centre (wood + red seats)
     for (const bx of [-2, 6, 14, 22]) for (const bz of [z0 + 4, z0 + 9.5, z0 + 15]) { booth(B, M, bx, LOW, bz); world.cover(bx + 1.6, bz, 1, 0, LOW); world.cover(bx - 1.6, bz, -1, 0, LOW); }
     // terrazzo medallion + info kiosk (dining concourse clock)
@@ -175,7 +175,7 @@ export function buildSouth(world, M, Z) {
     // trash cans (instanced later via props) — positions
     world.termTrash.push([-8, LOW, z0 + 2], [12, LOW, z1 - 4.2], [26, LOW, z0 + 12]);
     // signage to the subway
-    const s = M.sign('SUBWAY  ·  4 · 5 · 6  ·  MAIN ST', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 60px Helvetica, Arial, sans-serif' }); B.add(s, new THREE.PlaneGeometry(4.5, 0.5), mat4(0, LOW + 3.1, z1 - 0.02, 0, Math.PI, 0));
+    const s = M.sign('SUBWAY  ·  4 · 5 · 6  ·  MAIN ST', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 60px Helvetica, Arial, sans-serif' }); B.add(M.atlas, M.signGeo(s, 4.5, 0.5), mat4(0, LOW + 3.1, z1 - 0.02, 0, Math.PI, 0));
   }
   // Oyster Bar: x∈[-31,-8], z∈[30,41], Guastavino vaulted, counter + tables; door from the dining side (x=-8) at z∈[32,35]
   {
@@ -192,7 +192,7 @@ export function buildSouth(world, M, Z) {
     B.box(M.wood, [x0 + 2, LOW, z0 + 1.2], [x1 - 3, LOW + 1.1, z0 + 2.2], { uvScale: 1, collide: true });
     for (let x = x0 + 3; x < x1 - 3; x += 1.2) { B.add(M.brass, new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8), mat4(x, LOW + 0.35, z0 + 3)); B.add(M.redSeat, new THREE.CylinderGeometry(0.2, 0.2, 0.08, 12), mat4(x, LOW + 0.74, z0 + 3)); }
     for (const [tx, tz] of [[-26, 37], [-21, 37], [-16, 37], [-26, 39.5], [-21, 39.5], [-16, 39.5], [-12, 38]]) { table(B, M, tx, LOW, tz); world.cover(tx + 1, tz, 1, 0, LOW); }
-    const s = M.sign('OYSTER BAR', { bg: '#0a0806', fg: '#ff6a5a', font: 'bold 84px Georgia, serif' }); B.add(s, new THREE.PlaneGeometry(3.6, 0.5), mat4(x1 - 0.42, LOW + 3.6, 33.5, 0, Math.PI / 2, 0));
+    const s = M.sign('OYSTER BAR', { bg: '#0a0806', fg: '#ff6a5a', font: 'bold 84px Georgia, serif' }); B.add(M.atlas, M.signGeo(s, 3.6, 0.5), mat4(x1 - 0.42, LOW + 3.6, 33.5, 0, Math.PI / 2, 0));
     for (const lx of [-26, -20, -14]) for (const lz of [32.5, 38]) world.termLamps.push([lx, LOW + 3.4, lz, 'pendant']);
   }
 

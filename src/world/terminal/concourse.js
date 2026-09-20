@@ -168,7 +168,7 @@ export function buildConcourse(world, M, Z) {
       B.box(M.plaster, [bx0, y0 - 0.3, Z0], [bx1, y0, Z1], { uvScale: 0.5 });
       // sign band on the arcade lintel
       const sgn = M.sign(side < 0 ? 'WEST AVENUE  ·  SHUTTLE  ·  MAIN ST' : 'MARKET AVENUE  ·  EAST PASSAGE', { bg: '#3a2c18', fg: '#e8c56a', font: 'bold 60px Georgia, serif' });
-      const sg = new THREE.PlaneGeometry(14, 0.9); B.add(sgn, sg, mat4(fx - side * 0.01, y0 - 0.55, side < 0 ? 0 : 0, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2));
+      B.add(M.atlas, M.signGeo(sgn, 14, 0.9), mat4(fx - side * 0.01, y0 - 0.55, side < 0 ? 0 : 0, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2));
     }
     // north balcony
     B.box(M.marble, [-BAL_X, y0, Z0], [BAL_X, y1, P.BAL_NZ], { uvScale: uv(M.marble) });
@@ -185,7 +185,7 @@ export function buildConcourse(world, M, Z) {
       // open track gates: pier colliders between the arches + lintel band above (arch 3.6 wide, 4.6 high)
       { let px = -BAL_X - 0.1; for (const cx of gates) { world.box([px, 0, P.BAL_NZ - 1.0], [cx - 1.8, y0, P.BAL_NZ]); px = cx + 1.8; } world.box([px, 0, P.BAL_NZ - 1.0], [BAL_X + 0.1, y0, P.BAL_NZ]); world.box([-BAL_X - 0.1, 4.3, P.BAL_NZ - 1.0], [BAL_X + 0.1, y0, P.BAL_NZ]); }
       // gate numbers (generic)
-      let tn = 42; for (const cx of gates) { const s = M.sign(`TRACK ${tn}`, { w: 512, h: 128, bg: '#1a1a1a', fg: '#f2e6c8', font: 'bold 64px Georgia, serif' }); B.add(s, new THREE.PlaneGeometry(1.8, 0.45), mat4(cx, 4.85, P.BAL_NZ + 0.01)); tn -= 3; }
+      let tn = 42; for (const cx of gates) { const s = M.sign(`TRACK ${tn}`, { w: 512, h: 128, bg: '#1a1a1a', fg: '#f2e6c8', font: 'bold 64px Georgia, serif' }); B.add(M.atlas, M.signGeo(s, 1.8, 0.45), mat4(cx, 4.85, P.BAL_NZ + 0.01)); tn -= 3; }
       B.box(M.bulb, [-BAL_X + 1, 3.6, Z0 + 0.6], [BAL_X - 1, 3.7, Z0 + 0.7], { uvScale: 1 });
       // platform-ish glow surfaces behind the gates (train shed hint)
       B.box(M.plasterDark, [-BAL_X, 0, Z0], [BAL_X, y0, Z0 + 0.4], { uvScale: 0.5 });
@@ -234,7 +234,7 @@ export function buildConcourse(world, M, Z) {
     B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(0, 3, 3, 2.3)), placeXY(fxw, 0, 0, yaww), { uvScale: uv(M.glassDim) });
     B.add(M.bronze, grilleGeo(3, 2.3, { arch: true }), placeXY(fxw - side * 0.05, 3, 0, yaww));
     const sgn = M.sign(side < 0 ? 'WEST AVENUE  ·  DINING CONCOURSE  ·  SUBWAY' : 'MARKET AVENUE  ·  EAST BALCONY  ·  SUBWAY', { bg: '#2a1e10', fg: '#e8c56a', font: 'bold 52px Georgia, serif' });
-    B.add(sgn, new THREE.PlaneGeometry(9, 0.45), mat4(fxw - side * 0.05, BAL_Y - 0.3, 0, 0, yaww, 0));
+    B.add(M.atlas, M.signGeo(sgn, 9, 0.45), mat4(fxw - side * 0.05, BAL_Y - 0.3, 0, 0, yaww, 0));
   }
 
   // ---- gold globe chandeliers (four at the ends, over the balconies) -----------------------------------------------
@@ -260,7 +260,7 @@ export function buildConcourse(world, M, Z) {
     world.termLamps.push([0, 4.4, 0]);
     // the "information" sign band
     const sgn = M.sign('INFORMATION', { bg: '#151515', fg: '#f0e2c0', w: 1024, h: 96, font: 'bold 64px Georgia, serif' });
-    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; B.add(sgn, new THREE.PlaneGeometry(2.4, 0.3), mat4(Math.sin(a) * (r + 0.27), 2.75, Math.cos(a) * (r + 0.27), 0, a, 0)); }
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; B.add(M.atlas, M.signGeo(sgn, 2.4, 0.3), mat4(Math.sin(a) * (r + 0.27), 2.75, Math.cos(a) * (r + 0.27), 0, a, 0)); }
   }
 
   // ---- ticket offices along the south wall + departure boards ------------------------------------------------
@@ -269,7 +269,7 @@ export function buildConcourse(world, M, Z) {
     B.box(M.marble, [x0, 0, P.TICK_Z0], [x1, P.TICK_H, Z1], { uvScale: uv(M.marble), collide: true });
     B.box(M.brassDark, [x0, P.TICK_H - 0.5, P.TICK_Z0 - 0.06], [x1, P.TICK_H, P.TICK_Z0 - 0.02], { uvScale: 1 });
     const sgn = M.sign('TICKETS   ·   REGIONAL RAIL   ·   TICKETS', { bg: '#1b1611', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
-    B.add(sgn, new THREE.PlaneGeometry(x1 - x0 - 0.4, 0.45), mat4((x0 + x1) / 2, P.TICK_H - 0.25, P.TICK_Z0 - 0.07, 0, Math.PI, 0));
+    B.add(M.atlas, M.signGeo(sgn, x1 - x0 - 0.4, 0.45), mat4((x0 + x1) / 2, P.TICK_H - 0.25, P.TICK_Z0 - 0.07, 0, Math.PI, 0));
     for (let x = x0 + 1.2; x < x1 - 0.8; x += 2.4) { B.add(M.bronze, grilleGeo(1.4, 1.5), mat4(x, 1.85, P.TICK_Z0 - 0.04, 0, Math.PI, 0)); B.box(M.darkGlass, [x - 0.7, 1.1, P.TICK_Z0 - 0.02], [x + 0.7, 2.6, P.TICK_Z0], { uvScale: 1 }); B.box(M.marbleDark, [x - 0.8, 0.95, P.TICK_Z0 - 0.35], [x + 0.8, 1.1, P.TICK_Z0], { uvScale: 1 }); }
     // departure board above (canvas emissive) framed in brass
     const bd = M.board(side < 0 ? 'DEPARTURES' : 'ARRIVALS');

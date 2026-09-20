@@ -75,7 +75,7 @@ export function buildProps(world, M) {
     B.box(M.shutter, [kx - 2.2, 0.9, kz - 1.4], [kx + 2.2, 2.6, kz + 1.4], { uvScale: 1, collide: true });
     B.box(M.brassDark, [kx - 2.3, 2.6, kz - 1.5], [kx + 2.3, 2.85, kz + 1.5], { uvScale: 1 });
     const s = M.sign('NEWSSTAND  ·  MAGAZINES  ·  CANDY', { bg: '#1a1410', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
-    for (const sgnZ of [kz - 1.51, kz + 1.51]) B.add(s, new THREE.PlaneGeometry(4.2, 0.45), mat4(kx, 2.35, sgnZ, 0, sgnZ < kz ? Math.PI : 0, 0));
+    for (const sgnZ of [kz - 1.51, kz + 1.51]) B.add(M.atlas, M.signGeo(s, 4.2, 0.45), mat4(kx, 2.35, sgnZ, 0, sgnZ < kz ? Math.PI : 0, 0));
     world.cover(kx - 2.9, kz, -1, 0); world.cover(kx + 2.9, kz, 1, 0); world.cover(kx, kz - 2.1, 0, -1); world.cover(kx, kz + 2.1, 0, 1);
   }
   // ---- balcony restaurant tables (west: café tables; east: long shop table + stools) --------------------------------

@@ -45,7 +45,7 @@ export function buildSubway(world, M, Z) {
       for (const [za, zb] of segsZ) { B.box(M.tile, [wx0, LOW, za], [wx1, yc, zb], { uvScale: 1 }); world.box([wx0, LOW, za], [wx1, yc, zb]); }
       if (side < 0) { B.box(M.tile, [wx0, LOW + 2.6, 51.1], [wx1, yc, 54.8], { uvScale: 1 }); world.box([wx0, LOW + 2.6, 51.1], [wx1, yc, 54.8]); }
       B.box(M.tileBand, [side < 0 ? wx1 : wx0 - 0.01, LOW + 2.2, z0], [side < 0 ? wx1 + 0.01 : wx0, LOW + 2.6, z1], { uvScale: 1 });
-      for (const mz of [60, 76]) { const mo = M.mosaic('CENTRAL STATION', 'MAIN ST'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(side < 0 ? wx1 + 0.02 : wx0 - 0.02, LOW + 2.4, mz, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2, 0)); }
+      for (const mz of [60, 76]) { B.add(M.atlas, M.mosaicGeo('CENTRAL STATION', 'MAIN ST', 4.2, 1.05), mat4(side < 0 ? wx1 + 0.02 : wx0 - 0.02, LOW + 2.4, mz, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2, 0)); }
     }
     B.box(M.tile, [x0 - T, LOW, z1], [x1 + T, yc, z1 + T], { uvScale: 1 }); world.box([x0 - T, LOW, z1], [x1 + T, yc, z1 + T]);
     B.box(M.tileBand, [x0, LOW + 2.2, z1 - 0.01], [x1, LOW + 2.6, z1], { uvScale: 1 });
@@ -59,9 +59,9 @@ export function buildSubway(world, M, Z) {
     for (let i = 0; i < 5; i++) { const tx = -4.8 + i * 2.4; world.termTurnstiles.push([tx, LOW, 54]); }
     B.box(M.stainless, [-6, LOW, 53.6], [-5.5, LOW + 1.0, 54.4], { uvScale: 1, collide: true }); B.box(M.stainless, [5.5, LOW, 53.6], [6, LOW + 1.0, 54.4], { uvScale: 1, collide: true });
     B.box(M.ironDark, [8, LOW, 51.5], [11, LOW + 2.6, 53.3], { uvScale: 1, collide: true }); B.box(M.darkGlass, [8.05, LOW + 1.1, 51.4], [10.95, LOW + 2.2, 51.5], { uvScale: 1 });
-    B.add(M.sign('TOKEN BOOTH', { w: 512, h: 96, bg: '#0d0d0d', fg: '#ffffff', font: 'bold 48px Helvetica, Arial' }), new THREE.PlaneGeometry(2.4, 0.42), mat4(9.5, LOW + 2.4, 51.38, 0, Math.PI, 0));
+    B.add(M.atlas, M.signGeo('TOKEN BOOTH', { w: 512, h: 96, bg: '#0d0d0d', fg: '#ffffff', font: 'bold 48px Helvetica, Arial' }, 2.4, 0.42), mat4(9.5, LOW + 2.4, 51.38, 0, Math.PI, 0));
     // wayfinding: overhead black signs, lit
-    const sg = (t, x, z, yaw = 0, w = 4) => B.add(M.sign(t, { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial, sans-serif' }), new THREE.PlaneGeometry(w, w / 8), mat4(x, LOW + 2.75, z, 0, yaw, 0));
+    const sg = (t, x, z, yaw = 0, w = 4) => B.add(M.atlas, M.signGeo(t, { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial, sans-serif' }, w, w / 8), mat4(x, LOW + 2.75, z, 0, yaw, 0));
     sg('⟵  UPTOWN  ·  LOCAL & EXPRESS  ·  DOWNTOWN  ⟶', 0, 55.2, Math.PI, 6); sg('⟵  UPTOWN  ·  LOCAL & EXPRESS  ·  DOWNTOWN  ⟶', 0, 55.2, 0, 6);
     for (const w of stairWells) { const t = w.isl === 1 ? 'UPTOWN & NORTH  ·  1 · 2' : 'DOWNTOWN & HARBOR  ·  3 · 4'; sg(t, w.side * 19, w.z0 - 0.6, w.side < 0 ? Math.PI / 2 : -Math.PI / 2, 3.2); }
     sg('EXIT  ·  WEST AVENUE  ·  MAIN CONCOURSE  ⟵', -20, 52.2, 0, 4.5);
@@ -69,7 +69,7 @@ export function buildSubway(world, M, Z) {
     for (const lx of [-16, -4, 8, 20]) for (let lz = 52; lz < z1; lz += 8) world.termLamps.push([lx, yc - 0.15, lz, 'fluor']);
     world.termTrash.push([-14, LOW, 52], [14, LOW, 56], [-20, LOW, 70], [20, LOW, 78], [0, LOW, 86]);
     // system map boards
-    for (const [mx, mz, yaw] of [[-23.9, 66, Math.PI / 2], [23.9, 74, -Math.PI / 2]]) { B.box(M.ironDark, [mx - 0.05, LOW + 0.9, mz - 1.1], [mx + 0.05, LOW + 2.4, mz + 1.1], { uvScale: 1 }); B.add(M.poster(4), new THREE.PlaneGeometry(2, 1.4), mat4(mx + (yaw > 0 ? 0.06 : -0.06), LOW + 1.65, mz, 0, yaw, 0)); }
+    for (const [mx, mz, yaw] of [[-23.9, 66, Math.PI / 2], [23.9, 74, -Math.PI / 2]]) { B.box(M.ironDark, [mx - 0.05, LOW + 0.9, mz - 1.1], [mx + 0.05, LOW + 2.4, mz + 1.1], { uvScale: 1 }); B.add(M.atlas, M.posterGeo(4, 2, 1.4), mat4(mx + (yaw > 0 ? 0.06 : -0.06), LOW + 1.65, mz, 0, yaw, 0)); }
   }
 
   // ================= station level (y = −12): floors, track beds, walls, ceiling =================
@@ -97,8 +97,8 @@ export function buildSubway(world, M, Z) {
   const wallRun = (zw0, zw1, faceZ, yawFace) => {
     B.box(M.tile, [X0 - T, SUB - 1.8, zw0], [X1 + T, CEIL, zw1], { uvScale: 1 }); world.box([X0 - T, SUB - 2, zw0], [X1 + T, CEIL + 1, zw1]);
     B.box(M.tileBand, [X0, bandY, faceZ - (yawFace ? 0.01 : 0)], [X1, bandY + 0.4, faceZ + (yawFace ? 0 : 0.01)], { uvScale: 1 });
-    for (const mx of [-38, -19, 0, 19, 38]) B.add(M.mosaic('CENTRAL STATION', 'MAIN ST · MARKET AV'), new THREE.PlaneGeometry(4.2, 1.05), mat4(mx, bandY + 0.2, faceZ + (yawFace ? -0.02 : 0.02), 0, yawFace ? Math.PI : 0, 0));
-    for (let i = 0; i < 8; i++) { const px = -42 + i * 12; if (Math.abs(px) % 19 < 2.5) continue; B.box(M.ironDark, [px - 1.0, SUB + 0.9, faceZ + (yawFace ? -0.04 : -0.02)], [px + 1.0, SUB + 3.0, faceZ + (yawFace ? 0.02 : 0.04)], { uvScale: 1 }); B.add(M.poster(i), new THREE.PlaneGeometry(1.9, 2.0), mat4(px, SUB + 1.95, faceZ + (yawFace ? -0.045 : 0.045), 0, yawFace ? Math.PI : 0, 0)); }
+    for (const mx of [-38, -19, 0, 19, 38]) B.add(M.atlas, M.mosaicGeo('CENTRAL STATION', 'MAIN ST · MARKET AV', 4.2, 1.05), mat4(mx, bandY + 0.2, faceZ + (yawFace ? -0.02 : 0.02), 0, yawFace ? Math.PI : 0, 0));
+    for (let i = 0; i < 8; i++) { const px = -42 + i * 12; if (Math.abs(px) % 19 < 2.5) continue; B.box(M.ironDark, [px - 1.0, SUB + 0.9, faceZ + (yawFace ? -0.04 : -0.02)], [px + 1.0, SUB + 3.0, faceZ + (yawFace ? 0.02 : 0.04)], { uvScale: 1 }); B.add(M.atlas, M.posterGeo(i, 1.9, 2.0), mat4(px, SUB + 1.95, faceZ + (yawFace ? -0.045 : 0.045), 0, yawFace ? Math.PI : 0, 0)); }
     for (let x = X0 + 4; x < X1; x += 9.2) B.box(M.tile, [x - 0.4, SUB - 1.8, Math.min(faceZ, faceZ + (yawFace ? -0.3 : 0.3))], [x + 0.4, CEIL, Math.max(faceZ, faceZ + (yawFace ? -0.3 : 0.3))], { uvScale: 1 });
     B.box(M.asphalt, [X0 - T, SUB - 1.8, faceZ + (yawFace ? -0.05 : 0)], [X1 + T, SUB - 0.6, faceZ + (yawFace ? 0 : 0.05)], { uvScale: 1 });
   };
@@ -134,7 +134,7 @@ export function buildSubway(world, M, Z) {
       world.box([cx - 0.25, SUB, rz - 0.25], [cx + 0.25, SUB + 3.5, rz + 0.25]); world.cover(cx + 0.75, rz, 1, 0, SUB); world.cover(cx - 0.75, rz, -1, 0, SUB);
     }
     instanced(world, colFull, M.steelGreen, matsFull, 'metal', { name: 'ibeams' }); instanced(world, colMez, M.steelGreen, matsMez, 'metal', { name: 'ibeamsMez' });
-    const sg = M.sign('CS', { w: 128, h: 128, bg: '#f0ece2', fg: '#111', font: 'bold 84px Helvetica, Arial, sans-serif' });
+    const sg = M.signMat('CS', { w: 128, h: 128, bg: '#f0ece2', fg: '#111', font: 'bold 84px Helvetica, Arial, sans-serif' });
     const sgGeo = mergeSimple([new THREE.PlaneGeometry(0.34, 0.34).translate(0, 0, 0.2), new THREE.PlaneGeometry(0.34, 0.34).rotateY(Math.PI).translate(0, 0, -0.2)]);
     const signMats = [...matsFull, ...matsMez].map(m => { const p = new THREE.Vector3().setFromMatrixPosition(m); return mat4(p.x, SUB + 1.6, p.z); });
     instanced(world, sgGeo, sg, signMats, 'metal', { name: 'colSigns', shadow: false });
@@ -153,7 +153,7 @@ export function buildSubway(world, M, Z) {
     world.termLamps.push([(w.x0 + w.x1) / 2, LOW + 3.0, zc, 'fluorReal']);
     // wayfinding at the foot of the stair (on the platform side)
     const sgn = M.sign('⟵  MEZZANINE  ·  EXIT  ·  MAIN CONCOURSE', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 52px Helvetica, Arial' });
-    B.add(sgn, new THREE.PlaneGeometry(3.4, 0.42), mat4(xBot - w.side * 0.3, SUB + 2.6, zc, 0, w.side < 0 ? Math.PI / 2 : -Math.PI / 2, 0));
+    B.add(M.atlas, M.signGeo(sgn, 3.4, 0.42), mat4(xBot - w.side * 0.3, SUB + 2.6, zc, 0, w.side < 0 ? Math.PI / 2 : -Math.PI / 2, 0));
     // step nosings (yellow) — as a merged run of thin boxes
     for (let i = 0; i < 32; i += 2) { const x = xBot + w.side * (i * st.stepRun); B.box(yellow, [x - 0.03, SUB + (i + 1) * st.stepRise - 0.01, w.z0 + 0.2], [x + 0.03, SUB + (i + 1) * st.stepRise + 0.01, w.z1 - 0.2], { uvScale: 1 }); }
     world.cover(xBot - w.side * 1.2, zc + 2.8, 0, 1, SUB);
@@ -165,13 +165,13 @@ export function buildSubway(world, M, Z) {
     for (const bx of [-40, -32, 32, 40, -8, 8]) { B.box(M.wood, [bx - 1.5, SUB + 0.42, zc - 0.28], [bx + 1.5, SUB + 0.5, zc + 0.28], { uvScale: 1 }); B.box(M.wood, [bx - 1.5, SUB + 0.5, zc - 0.04], [bx + 1.5, SUB + 1.0, zc + 0.04], { uvScale: 1 }); for (const dx of [-1.3, 0, 1.3]) B.box(M.ironDark, [bx + dx - 0.05, SUB, zc - 0.28], [bx + dx + 0.05, SUB + 0.45, zc + 0.28], { uvScale: 1 }); world.box([bx - 1.5, SUB, zc - 0.3], [bx + 1.5, SUB + 1.0, zc + 0.3]); world.cover(bx, zc + 1.0, 0, 1, SUB); world.cover(bx, zc - 1.0, 0, -1, SUB); }
     world.termTrash.push([-36, SUB, zc], [36, SUB, zc], [-4, SUB, zc], [4, SUB, zc]);
     B.box(M.steelBlue, [-28, SUB, zc - 0.4], [-26.8, SUB + 2.2, zc + 0.4], { uvScale: 1, collide: true }); B.box(M.fluor, [-27.6, SUB + 1.9, zc + 0.4], [-27.2, SUB + 2.0, zc + 0.42], { uvScale: 1 });
-    B.box(M.ironDark, [26.8, SUB, zc - 0.5], [28, SUB + 1.9, zc + 0.5], { uvScale: 1, collide: true }); B.add(M.poster(2), new THREE.PlaneGeometry(1.0, 1.4), mat4(27.4, SUB + 1.1, zc + 0.51));
+    B.box(M.ironDark, [26.8, SUB, zc - 0.5], [28, SUB + 1.9, zc + 0.5], { uvScale: 1, collide: true }); B.add(M.atlas, M.posterGeo(2, 1.0, 1.4), mat4(27.4, SUB + 1.1, zc + 0.51));
     for (let x = X0 + 2.5; x < X1; x += 5) { const yTop = Math.abs(x) < MEZ.x1 ? LOW - 0.6 : CEIL; for (const fz of [za + 2.2, zb - 2.2]) { B.box(M.fluor, [x - 1.9, yTop - 0.22, fz - 0.14], [x + 1.9, yTop - 0.16, fz + 0.14], { uvScale: 1 }); B.box(M.ironDark, [x - 2.0, yTop - 0.16, fz - 0.2], [x + 2.0, yTop, fz + 0.2], { uvScale: 1 }); } }
     // wet floor patches
     const wet = new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.55 }); wet.name = 'wet'; wet.userData.castShadow = false;
     for (const [wx, r] of [[-26, 2.2], [8, 1.6], [30, 2.6]]) B.add(wet, new THREE.CircleGeometry(r, 20), mat4(wx + (isl - 1) * 7, SUB + 0.006, zc + (isl - 1) * 0.5, -Math.PI / 2));
     // platform-edge "stand clear" signs hanging from the ceiling
-    for (const sx of [-20, 20]) B.add(M.sign(isl === 1 ? 'UPTOWN & NORTH   ·   1 LOCAL  ·  2 EXPRESS' : 'DOWNTOWN & HARBOR   ·   3 EXPRESS  ·  4 LOCAL', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 52px Helvetica, Arial' }), new THREE.PlaneGeometry(4.5, 0.55), mat4(sx, SUB + 3.0, zc, 0, 0, 0));
+    for (const sx of [-20, 20]) B.add(M.atlas, M.signGeo(isl === 1 ? 'UPTOWN & NORTH   ·   1 LOCAL  ·  2 EXPRESS' : 'DOWNTOWN & HARBOR   ·   3 EXPRESS  ·  4 LOCAL', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 52px Helvetica, Arial' }, 4.5, 0.55), mat4(sx, SUB + 3.0, zc, 0, 0, 0));
   }
 
   // ================= two trains parked on the outer tracks (A: doors face south onto island 1, D: doors face north onto island 2) ===========
