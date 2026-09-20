@@ -28,7 +28,7 @@ export function buildSubway(world, M, Z) {
     // stair wells (x from ±23 → ±13.4 descending toward the centre; one per island per side)
     for (const side of [-1, 1]) for (const isl of [1, 2]) { const [za, zb] = ISL[isl]; const zc = (za + zb) / 2; stairWells.push({ x0: Math.min(side * 21, side * 11.4), x1: Math.max(side * 21, side * 11.4), z0: zc - 2, z1: zc + 2, side, isl }); }
     // floor: strips between wells (split by z bands so the wells are real holes)
-    const bands = [[z0 - T, ISL[1][0] + 1.5], [ISL[1][0] + 1.5, ISL[1][1] - 1.5], [ISL[1][1] - 1.5, ISL[2][0] + 1.5], [ISL[2][0] + 1.5, ISL[2][1] - 1.5], [ISL[2][1] - 1.5, z1 + T]];
+    const bands = [[z0 + T, ISL[1][0] + 1.5], [ISL[1][0] + 1.5, ISL[1][1] - 1.5], [ISL[1][1] - 1.5, ISL[2][0] + 1.5], [ISL[2][0] + 1.5, ISL[2][1] - 1.5], [ISL[2][1] - 1.5, z1 + T]];
     for (const [ba, bb] of bands) {
       const wells = stairWells.filter(w => w.z0 < bb && w.z1 > ba);
       if (!wells.length) { B.box(subFloor, [x0 - T, LOW - 0.6, ba], [x1 + T, LOW, bb], { uvScale: 0.5 }); continue; }
@@ -41,16 +41,16 @@ export function buildSubway(world, M, Z) {
     for (const side of [-1, 1]) {
       const wx0 = side < 0 ? x0 - T : x1, wx1 = side < 0 ? x0 : x1 + T;
       // west wall has the passage opening z∈[50.5,54] (direct stair from the concourse)
-      const segsZ = side < 0 ? [[z0, 50.4], [54.1, z1 + T]] : [[z0, z1 + T]];
+      const segsZ = side < 0 ? [[z0 + T, 51.1], [54.8, z1 + T]] : [[z0 + T, z1 + T]];
       for (const [za, zb] of segsZ) { B.box(M.tile, [wx0, LOW, za], [wx1, yc, zb], { uvScale: 1 }); world.box([wx0, LOW, za], [wx1, yc, zb]); }
-      if (side < 0) { B.box(M.tile, [wx0, LOW + 2.6, 50.4], [wx1, yc, 54.1], { uvScale: 1 }); world.box([wx0, LOW + 2.6, 50.4], [wx1, yc, 54.1]); }
+      if (side < 0) { B.box(M.tile, [wx0, LOW + 2.6, 51.1], [wx1, yc, 54.8], { uvScale: 1 }); world.box([wx0, LOW + 2.6, 51.1], [wx1, yc, 54.8]); }
       B.box(M.tileBand, [side < 0 ? wx1 : wx0 - 0.01, LOW + 2.2, z0], [side < 0 ? wx1 + 0.01 : wx0, LOW + 2.6, z1], { uvScale: 1 });
       for (const mz of [60, 76]) { const mo = M.mosaic('CENTRAL STATION', 'MAIN ST'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(side < 0 ? wx1 + 0.02 : wx0 - 0.02, LOW + 2.4, mz, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2, 0)); }
     }
     B.box(M.tile, [x0 - T, LOW, z1], [x1 + T, yc, z1 + T], { uvScale: 1 }); world.box([x0 - T, LOW, z1], [x1 + T, yc, z1 + T]);
     B.box(M.tileBand, [x0, LOW + 2.2, z1 - 0.01], [x1, LOW + 2.6, z1], { uvScale: 1 });
     // ceiling with beam grid
-    B.box(subCeil, [x0 - T, yc, z0 - 0.5], [x1 + T, yc + 0.5, z1 + T], { uvScale: 0.5 });
+    B.box(subCeil, [x0 - T, yc, z0 + T], [x1 + T, yc + 0.5, z1 + T], { uvScale: 0.5 });
     for (let z = z0 + 4; z < z1; z += 8) B.box(M.steelGreen, [x0, yc - 0.4, z - 0.2], [x1, yc, z + 0.2], { uvScale: 1 });
     // square tiled piers on the beam lines (leave the wells + the fare line clear)
     for (const px of [-12, 0, 12]) for (let z = z0 + 8; z < z1; z += 8) { if (Math.abs(z - 54) < 2) continue; B.box(M.tile, [px - 0.5, LOW, z - 0.5], [px + 0.5, yc, z + 0.5], { uvScale: 1, collide: true }); world.cover(px + 1.0, z, 1, 0, LOW); world.cover(px - 1.0, z, -1, 0, LOW); }

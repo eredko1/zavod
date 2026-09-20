@@ -36,8 +36,8 @@ export function buildPassage(world, M, Z) {
   // ---- passage legs (y −6): A: stair foot → west under the arcade floor; B: south under the corridor/landing; C: east into the mezzanine --------
   const legs = [
     { x0: PASS.legW[0], x1: sx1, z0: sz1, z1: sz1 + 4 },                                    // A: z∈[17.6,21.6], x from −54 to −36.5 (under the arcade + corridor edge)
-    { x0: PASS.legW[0], x1: PASS.legW[1], z0: sz1 + 4, z1: MEZ.z0 + 4 },                     // B: x∈[−54,−50], z from 21.6 to 54
-    { x0: PASS.legW[1], x1: MEZ.x0 - 1 + 0.01, z0: MEZ.z0 + 0.5, z1: MEZ.z0 + 4 },           // C: z∈[50.5,54], x from −50 to −25
+    { x0: PASS.legW[0], x1: PASS.legW[1], z0: sz1 + 4, z1: MEZ.z0 + 4.7 },                   // B: x∈[−54,−50], z from 21.6 to 54.7
+    { x0: PASS.legW[1], x1: MEZ.x0 - 1 + 0.01, z0: MEZ.z0 + 1.2, z1: MEZ.z0 + 4.7 },           // C: z∈[51.2,54.7], x from −50 to −25
   ];
   for (const L of legs) {
     B.box(M.concrete, [L.x0 - T, LOW - 0.6, L.z0 - T], [L.x1 + T, LOW, L.z1 + T], { uvScale: 0.5 });

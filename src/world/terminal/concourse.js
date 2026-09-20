@@ -16,7 +16,13 @@ export function buildConcourse(world, M, Z) {
   const { X0, X1, Z0, Z1, CORNICE, APEX, WALL_T: T, BAL_Y, BAL_X } = P;
 
   // ---- floor (Tennessee pink marble) --------------------------------------------------
-  B.box(M.marbleFloor, [X0 - 2, -0.6, Z0 - 2], [X1 + 2, 0, Z1 + 2], { uvScale: uv(M.marbleFloor) });
+  { // floor split around the west subway stair well (x∈[−40.5,−36.5], z∈[8,17.6])
+    const [wx0, wx1] = P.PASS.stairX, [wz0, wz1] = P.PASS.stairZ;
+    B.box(M.marbleFloor, [X0 - 2, -0.6, Z0 - 2], [X1 + 2, 0, wz0], { uvScale: uv(M.marbleFloor) });
+    B.box(M.marbleFloor, [X0 - 2, -0.6, wz1], [X1 + 2, 0, Z1 + 2], { uvScale: uv(M.marbleFloor) });
+    B.box(M.marbleFloor, [X0 - 2, -0.6, wz0], [wx0 - 0.3, 0, wz1], { uvScale: uv(M.marbleFloor) });
+    B.box(M.marbleFloor, [wx1 + 0.3, -0.6, wz0], [X1 + 2, 0, wz1], { uvScale: uv(M.marbleFloor) });
+  }
 
   // ---- long walls (N/S) to the cornice, with pilasters -------------------------------------
   // south wall: central arch (bridge), two corner openings (ramps), clerestory arches, tall grilled windows

@@ -52,13 +52,14 @@ export function buildSouth(world, M, Z) {
     // parapet between corridor (0) and ramp: marble wall, 1.0 m above the corridor, |x| 26 → 50
     { const px0 = Math.min(ax(P.OPEN_X0 - 0.5), ax(P.RAMP_TOP_X)), px1 = Math.max(ax(P.OPEN_X0 - 0.5), ax(P.RAMP_TOP_X)); B.box(M.marble, [px0, -0.7, RAMP_Z0 - 0.3], [px1, 1.0, RAMP_Z0], { uvScale: uv(M.marble) }); world.box([px0, -0.7, RAMP_Z0 - 0.3], [px1, 1.0, RAMP_Z0]); }
     // ramp-side wall below the corridor (the corridor slab face) down to the ramp: solid mass
-    B.box(M.marble, [cx0, -6.6, RZ0 - 0.2], [cx1, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) });
+    if (side < 0) { B.box(M.marble, [-35.9, -6.6, RZ0 - 0.2], [cx1, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) }); B.box(M.marble, [cx0, -6.6, RAMP_Z0 - 0.45], [-35.9, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) }); }
+    else B.box(M.marble, [cx0, -6.6, RZ0 - 0.2], [cx1, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) });
     // north wall of the ramp strip for |x| < 26.5 (solid behind the ticket offices, marble-clad) — from the pit floor up to the ceiling
     B.box(M.marble, [Math.min(ax(BRIDGE_HX + 0.5), ax(P.OPEN_X0 - 0.5)), -6.6, RZ0 - 0.5], [Math.max(ax(BRIDGE_HX + 0.5), ax(P.OPEN_X0 - 0.5)), 4.2, RAMP_Z0], { uvScale: uv(M.marble) });
     world.box([Math.min(ax(BRIDGE_HX + 0.5), ax(P.OPEN_X0 - 0.5)), -6.6, RZ0 - 0.5], [Math.max(ax(BRIDGE_HX + 0.5), ax(P.OPEN_X0 - 0.5)), 4.2, RAMP_Z0]);
     // south wall of the ramp strip (z=29..30) with blind arches; the Vanderbilt Hall wall stands above it
-    B.box(M.marble, [Math.min(ax(BRIDGE_HX + 0.5), ax(54)), -6.6, RZ1], [Math.max(ax(BRIDGE_HX + 0.5), ax(54)), 4.2, RZ1 + T], { uvScale: uv(M.marble) });
-    world.box([Math.min(ax(BRIDGE_HX + 0.5), ax(54)), -6.6, RZ1], [Math.max(ax(BRIDGE_HX + 0.5), ax(54)), 4.2, RZ1 + T]);
+    if (side < 0) { B.box(M.marble, [-49.4, -6.6, RZ1], [-BRIDGE_HX - 0.5, 4.2, RZ1 + T], { uvScale: uv(M.marble) }); world.box([-49.4, -6.6, RZ1], [-BRIDGE_HX - 0.5, 4.2, RZ1 + T]); B.box(M.marble, [-54, -3.2, RZ1], [-49.4, 4.2, RZ1 + T], { uvScale: uv(M.marble) }); world.box([-54, -3.2, RZ1], [-49.4, 4.2, RZ1 + T]); }
+    else { B.box(M.marble, [BRIDGE_HX + 0.5, -6.6, RZ1], [54, 4.2, RZ1 + T], { uvScale: uv(M.marble) }); world.box([BRIDGE_HX + 0.5, -6.6, RZ1], [54, 4.2, RZ1 + T]); }
     for (let a = 12; a < 50; a += 8) { const cx = ax(a); B.add(M.guastavino, new THREE.ShapeGeometry(archShapeAt(0, 0, 4, 3.2)), placeXY(cx, rampY(cx) + 0.4, RZ1 - 0.05, Math.PI), { uvScale: 1 }); B.box(M.brass, [cx - 0.15, rampY(cx) + 3.7, RZ1 - 0.35], [cx + 0.15, rampY(cx) + 3.85, RZ1], { uvScale: 1 }); world.termLamps.push([cx, rampY(cx) + 3.6, RZ1 - 0.5, 'wall']); }
     // end wall at |x| = 54 (closed bronze doors to Vanderbilt Ave / Lexington Ave) — corridor + landing
     B.box(M.stone, [Math.min(ax(54), ax(55)), -0.6, RZ0 - 0.5], [Math.max(ax(54), ax(55)), 4.2, RZ1 + T], { uvScale: uv(M.stone) }); world.box([Math.min(ax(54), ax(55)), -0.6, RZ0 - 0.5], [Math.max(ax(54), ax(55)), 4.2, RZ1 + T]);
@@ -116,17 +117,17 @@ export function buildSouth(world, M, Z) {
     world.walkable([x0 - T, -0.8, z0 - T], [x1 + T, 0, z1 + T]);
     // walls: N (with the central arch to the bridge + 5 window bays), S (42nd St doors), E/W
     const holesN = [archHole(0, 0, 2 * BRIDGE_HX - 3, 7)]; const holesS = [];
-    for (const cx of [-24, -12, 0, 12, 24]) { holesN.push(rectHole(cx - 2.6, 4.5, cx + 2.6, 12)); holesS.push(rectHole(cx - 2.6, 4.5, cx + 2.6, 12)); }
-    for (const cx of [-12, 0, 12]) holesS.push(rectHole(cx - 1.8, 0, cx + 1.8, 3.6)); // 42nd St doors
+    for (const cx of [-24, -12, 0, 12, 24]) holesN.push(rectHole(cx - 2.6, 4.5, cx + 2.6, 12));
+    for (const cx of [-13, 0, 13]) { holesS.push(archHole(cx, 5.2, 7.6, 9.0)); holesS.push(rectHole(cx - 1.8, 0, cx + 1.8, 3.8)); } // street facade: arched windows over open doorways
     const shape = () => { const s = new THREE.Shape(); s.moveTo(x0 - T, 0); s.lineTo(x1 + T, 0); s.lineTo(x1 + T, h + 0.6); s.lineTo(x0 - T, h + 0.6); s.closePath(); return s; };
     B.add(M.stone, wallGeo(shape(), holesN, T), placeXY(0, 0, z0 - T), { uvScale: uv(M.stone) });
     B.add(M.stone, wallGeo(shape(), holesS, T), placeXY(0, 0, z1), { uvScale: uv(M.stone) });
     world.box([x0 - T, 0, z0 - T], [-BRIDGE_HX + 1.5, h, z0]); world.box([BRIDGE_HX - 1.5, 0, z0 - T], [x1 + T, h, z0]); world.box([x0 - T, 7, z0 - T], [x1 + T, h, z0]);
-    world.box([x0 - T, 0, z1], [x1 + T, h, z1 + T]);
+    for (const [a, b] of [[x0 - T, -14.8], [-11.2, -1.8], [1.8, 11.2], [14.8, x1 + T]]) world.box([a, 0, z1], [b, h, z1 + T]); world.box([x0 - T, 3.8, z1], [x1 + T, h, z1 + T]);
     for (const side of [-1, 1]) { const wx0 = side < 0 ? x0 - T : x1, wx1 = side < 0 ? x0 : x1 + T; B.box(M.stone, [wx0, 0, z0 - T], [wx1, h + 0.6, z1 + T], { uvScale: uv(M.stone) }); world.box([wx0, 0, z0 - T], [wx1, h, z1 + T]); }
     // windows: dim daylight glass + bronze grilles (N & S), door glass
-    for (const cx of [-24, -12, 0, 12, 24]) for (const zz of [z0 - T * 0.5, z1 + T * 0.5]) { B.add(M.glassDim, new THREE.PlaneGeometry(5.2, 7.5), mat4(cx, 8.25, zz), { uvScale: uv(M.glassDim) }); B.add(M.bronze, grilleGeo(5.2, 7.5), mat4(cx, 4.5, zz > 40 ? z1 - 0.1 : z0 + 0.1, 0, 0, 0)); }
-    for (const cx of [-12, 0, 12]) { B.add(M.glassDim, new THREE.PlaneGeometry(3.4, 3.4), mat4(cx, 1.8, z1 + 0.5), { uvScale: uv(M.glassDim) }); B.add(M.bronze, grilleGeo(3.4, 3.4), mat4(cx, 0, z1 + 0.2)); }
+    for (const cx of [-24, -12, 0, 12, 24]) { const zz = z0 - T * 0.5; B.add(M.glassDim, new THREE.PlaneGeometry(5.2, 7.5), mat4(cx, 8.25, zz), { uvScale: uv(M.glassDim) }); B.add(M.bronze, grilleGeo(5.2, 7.5), mat4(cx, 4.5, z0 + 0.1, 0, 0, 0)); }
+    for (const cx of [-13, 0, 13]) { B.add(M.glass, new THREE.ShapeGeometry(archShapeAt(cx, 5.2, 7.6, 9.0)), placeXY(0, 0, z1 + T * 0.5), { uvScale: uv(M.glass) }); B.add(M.bronze, grilleGeo(7.6, 9.0, { arch: true }), mat4(cx, 5.2, z1 + 0.12)); B.box(M.bronze, [cx - 2.0, 3.8, z1 - 0.1], [cx + 2.0, 4.3, z1 + T + 0.1], { uvScale: 1 }); }
     // wainscot + cornice + coffered ceiling
     B.box(M.marble, [x0, 0, z0], [x1, 2.2, z0 + 0.12], { uvScale: uv(M.marble) }); B.box(M.marble, [x0, 0, z1 - 0.12], [x1, 2.2, z1], { uvScale: uv(M.marble) });
     B.box(M.marble, [x0, h - 1.2, z0], [x1, h, z0 + 0.6], { uvScale: uv(M.marble) }); B.box(M.marble, [x0, h - 1.2, z1 - 0.6], [x1, h, z1], { uvScale: uv(M.marble) });
