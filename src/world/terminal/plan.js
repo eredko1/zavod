@@ -21,9 +21,16 @@ export const P = {
   VH: { x0: -31, x1: 31, z0: 30, z1: 50, h: 15 },
   DIN: { x0: -31, x1: 31, z0: 30, z1: 50 },      // dining concourse under VH (y=-6)
   OYS: { x0: -31, x1: -8, z0: 30, z1: 41 },       // oyster bar room (y=-6)
-  MEZ: { x0: -16, x1: 16, z0: 50, z1: 58 },       // subway mezzanine (y=-6)
-  PLAT: { x0: -46, x1: 46, z0: 58, z1: 68 },      // subway platform (y=-12)
-  TRACK: { z0: 68, z1: 73 },
-  SOUTH_WALL_Z: 73.5,
-  BOUNDS: { x0: -56, x1: 56, z0: -26, z1: 78, y0: -14, y1: 46 },
+  MEZ: { x0: -24, x1: 24, z0: 50, z1: 88 },       // subway mezzanine (y=-6) spanning the whole station width
+  SUB_X0: -46, SUB_X1: 46,                        // station length (x)
+  // four-track express station (y=-12), north→south: track A (train) · island 1 · track B · track C · island 2 · track D (train)
+  TRK: { A: [58, 62.5], B: [69.5, 74], C: [74, 78.5], D: [85.5, 90] },
+  ISL: { 1: [62.5, 69.5], 2: [78.5, 85.5] },
+  SUB_CEIL: -8.2,
+  SOUTH_WALL_Z: 90.5,
+  // exterior (Main Street) — street level 0 south of the waiting hall
+  ST: { z0: 51, curbN: 55.5, curbS: 70.5, z1: 76, x0: -62, x1: 62, facadeZ: 76, viaductY: 7.2 },
+  // direct west subway passage (y=-6): stair in the west arcade → passage west → south → east into the mezzanine
+  PASS: { stairX: [-40.5, -36.5], stairZ: [8, 17.6], legW: [-54, -50], legZ: [14, 19.5] },
+  BOUNDS: { x0: -62, x1: 62, z0: -26, z1: 95, y0: -14, y1: 46 },
 };

@@ -195,29 +195,6 @@ export function buildSouth(world, M, Z) {
     for (const lx of [-26, -20, -14]) for (const lz of [32.5, 38]) world.termLamps.push([lx, LOW + 3.4, lz, 'pendant']);
   }
 
-  // ================= subway mezzanine (y=-6) x∈[-16,16], z∈[50,58] =================
-  {
-    const { x0, x1, z0, z1 } = MEZ; const yc = LOW + 3.4;
-    B.box(M.concrete, [x0 - T, LOW - 0.6, z0], [x1 + T, LOW, z1 - 1], { uvScale: 0.5 });
-    for (const [fx0, fx1] of [[x0 - T, -14.3], [-9.7, 9.7], [14.3, x1 + T]]) B.box(M.concrete, [fx0, LOW - 0.6, z1 - 1], [fx1, LOW, z1 + T], { uvScale: 0.5 });
-    Z.push({ x0: x0 - T, x1: x1 + T, z0, z1: z1 + T, h: LOW });
-    // tiled walls E/W + S (with two stair openings at x=±12 → handled by subway.js), ceiling
-    for (const side of [-1, 1]) { const wx0 = side < 0 ? x0 - T : x1, wx1 = side < 0 ? x0 : x1 + T; B.box(M.tile, [wx0, LOW, z0], [wx1, yc, z1 + T], { uvScale: 1 }); world.box([wx0, LOW, z0], [wx1, yc, z1 + T]); B.box(M.tileBand, [side < 0 ? wx1 : wx0 - 0.01, LOW + 2.2, z0], [side < 0 ? wx1 + 0.01 : wx0, LOW + 2.6, z1], { uvScale: 1 }); }
-    B.box(M.tile, [x0 - T, LOW, z1], [-14.2, yc, z1 + T], { uvScale: 1 }); B.box(M.tile, [-9.8, LOW, z1], [9.8, yc, z1 + T], { uvScale: 1 }); B.box(M.tile, [14.2, LOW, z1], [x1 + T, yc, z1 + T], { uvScale: 1 });
-    world.box([x0 - T, LOW, z1], [-14.2, yc, z1 + T]); world.box([-9.8, LOW, z1], [9.8, yc, z1 + T]); world.box([14.2, LOW, z1], [x1 + T, yc, z1 + T]);
-    B.box(M.concrete, [x0 - T, yc, z0 - 0.5], [x1 + T, yc + 0.5, z1 + T], { uvScale: 0.5 });
-    // turnstile line at z=54 with fare walls; token booth
-    for (const side of [-1, 1]) { const fx0 = Math.min(side * 6, side * x1), fx1 = Math.max(side * 6, side * x1); B.box(M.stainless, [fx0, LOW, 53.6], [fx1, LOW + 1.1, 54.4], { uvScale: 1, collide: true }); B.box(M.ironDark, [fx0, LOW + 1.1, 53.9], [fx1, LOW + 2.3, 54.1], { uvScale: 1 }); }
-    for (let i = 0; i < 5; i++) { const tx = -4.8 + i * 2.4; world.termTurnstiles.push([tx, LOW, 54]); }
-    B.box(M.stainless, [-6, LOW, 53.6], [-5.5, LOW + 1.0, 54.4], { uvScale: 1, collide: true }); B.box(M.stainless, [5.5, LOW, 53.6], [6, LOW + 1.0, 54.4], { uvScale: 1, collide: true });
-    B.box(M.ironDark, [8, LOW, 51.5], [11, LOW + 2.6, 53.3], { uvScale: 1, collide: true }); B.box(M.darkGlass, [8.05, LOW + 1.1, 51.4], [10.95, LOW + 2.2, 51.5], { uvScale: 1 });
-    const s = M.sign('TOKEN BOOTH', { w: 512, h: 96, bg: '#0d0d0d', fg: '#ffffff', font: 'bold 48px Helvetica, Arial' }); B.add(s, new THREE.PlaneGeometry(2.4, 0.42), mat4(9.5, LOW + 2.4, 51.38, 0, Math.PI, 0));
-    world.cover(9.5, 50.8, 0, -1, LOW); world.cover(-9, 55.2, 0, 1, LOW); world.cover(9, 55.2, 0, 1, LOW);
-    for (const lx of [-10, 0, 10]) for (const lz of [51.5, 56]) world.termLamps.push([lx, yc - 0.15, lz, 'fluor']);
-    const s2 = M.sign('DOWNTOWN & HARBOR  ·  4 5 6', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial' }); B.add(s2, new THREE.PlaneGeometry(4, 0.5), mat4(0, LOW + 2.9, z1 - 0.02, 0, Math.PI, 0));
-    world.termTrash.push([-14, LOW, 52], [14, LOW, 56]);
-  }
-
   B.flush((m) => (m === M.brass || m === M.brassDark || m === M.bronze || m === M.ironDark || m === M.stainless || m === M.shutter ? 'metal' : m === M.wood ? 'wood' : 'concrete'), { name: 'south' });
 }
 function side_(i) { return i % 2 ? 1 : -1; }
