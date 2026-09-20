@@ -171,6 +171,7 @@ export function update(dt, ctx) {
   const adsIn = typeof wAds === 'number' ? wAds > 0.5 : (wAds != null ? !!wAds : !!input.ads);
 
   // ---- mantle in progress: scripted motion ----
+  if (p.mounted) { p.onGround = true; p.sprinting = false; p.crouching = false; p.velocity.set(0, 0, 0); p.speed = p.mounted.speed || 0; p.moveState = 'vehicle'; p.canFire = true; p.bob.x = p.bob.y = p.bob.roll = 0; return; } // vehicles.js owns position + camera while mounted
   if (S.mantle) { updateMantle(p, ctx, dt); finishFrame(p, ctx, dt, ix, iy, il); return; }
 
   // ---- ladders (world.ladder registrations): grab when moving into one, climb with forward/back, jump to let go ----

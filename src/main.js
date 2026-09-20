@@ -10,6 +10,7 @@ import * as post from './post.js';
 import * as hud from './hud.js';
 import * as audio from './audio.js';
 import * as touch from './touch.js';
+import * as vehicles from './vehicles.js';
 
 const ctx = createCtx();
 // Phones: every image loader (textures, GLTF props, HDR stays) is redirected to the <=512px mirror in assets-m/ (see qa/build-mobile-assets.sh)
@@ -89,8 +90,8 @@ addEventListener('keydown', e => {
 const bootbar = document.getElementById('bootbar'), boottxt = document.getElementById('boottxt');
 ctx.progress = (frac, txt) => { bootbar.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`; if (txt) boottxt.textContent = txt; };
 
-const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch]];
-const UPDATE_ORDER = ['touch', 'player', 'weapons', 'ai', 'world', 'audio', 'hud']; // post.render() runs last
+const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch], ['vehicles', vehicles]];
+const UPDATE_ORDER = ['touch', 'vehicles', 'player', 'weapons', 'ai', 'world', 'audio', 'hud']; // vehicles before player: a mounted player is driven by the vehicle // post.render() runs last
 const mods = Object.fromEntries(MODULES);
 
 async function boot() {
