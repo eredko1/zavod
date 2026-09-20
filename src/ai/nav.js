@@ -35,6 +35,7 @@ class Heap {
 }
 
 const DX = [1, -1, 0, 0, 1, 1, -1, -1], DZ = [0, 0, 1, -1, 1, -1, 1, -1];
+const EMPTY = [];
 
 export class NavGrid {
   constructor(ctx, cell = 0.5) {
@@ -64,6 +65,12 @@ export class NavGrid {
     const cols = []; const seen = new Set();
     for (const src of [ctx.colliders || [], ctx.world?.walkables || []]) for (const box of src) { if (!box || !box.min || seen.has(box)) continue; if (!(box.max.x > box.min.x && box.max.z > box.min.z && box.max.y >= box.min.y)) continue; if (!isFinite(box.min.x + box.max.x + box.min.y + box.max.y + box.min.z + box.max.z)) continue; seen.add(box); cols.push(box); }
     this.solids = cols;
+    const slabs = this.slabs = new Set(); // big thin non-walkable boxes = terrain slabs (ground colliders under sunken areas): never floors, never walls
+    for (const box of cols) { const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (!walk.has(box) && sx * sz > 400 && box.max.y - box.min.y <= 1.5) slabs.add(box); }
+    // 4 m spatial hash of the non-slab solids (resolveCircle, hop checks, ragdolls)
+    const HC = this.hashCell = 4; const hash = this.hash = new Map(); const hk = (ix, iz) => ix * 65536 + iz;
+    // (0.6 m insertion margin → one-bucket lookups are exact for query radii ≤ 0.6)
+    for (const box of cols) { if (this.slabs?.has(box)) continue; const x0 = Math.floor((box.min.x - 0.6) / HC), x1 = Math.floor((box.max.x + 0.6) / HC), z0 = Math.floor((box.min.z - 0.6) / HC), z1 = Math.floor((box.max.z + 0.6) / HC); if ((x1 - x0 + 1) * (z1 - z0 + 1) > 2500) continue; for (let ix = x0; ix <= x1; ix++) for (let iz = z0; iz <= z1; iz++) { const k = hk(ix, iz); let l = hash.get(k); if (!l) { l = []; hash.set(k, l); } l.push(box); } }
     const addCand = (i, top, isW) => { // isW: 2 = registered walkable, 1 = may seed (wide top), 0 = thin (stair step / rail: only flood-accepted from a neighbour)
       const o = i * K; let c = candN[i];
       for (let j = 0; j < c; j++) if (Math.abs(cand[o + j] - top) < 0.03) { if (isW > candW[o + j]) candW[o + j] = isW; return; }
@@ -71,8 +78,6 @@ export class NavGrid {
       let lo = 1; for (let j = 2; j < K; j++) if (cand[o + j] < cand[o + lo]) lo = j; // slot 0 is the base
       if (top > cand[o + lo]) { cand[o + lo] = top; candW[o + lo] = isW; }
     };
-    const slabs = this.slabs = new Set(); // big thin non-walkable boxes = terrain slabs (ground colliders under sunken areas): never floors, never walls
-    for (const box of cols) { const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (!walk.has(box) && sx * sz > 400 && box.max.y - box.min.y <= 1.5) slabs.add(box); }
     for (const box of cols) {
       const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; const thin = Math.min(sx, sz) < 0.35; if (Math.min(sx, sz) < 0.12) continue; // fence panels / poles never carry a floor
       const isW = walk.has(box) ? 2 : thin ? 0 : 1;
@@ -141,7 +146,8 @@ export class NavGrid {
           if (k < 4 && c === 0) { // drop across a blocked ring (container edge): 2 cells out, cardinal
             const mx = x + DX[k] * 2, mz = z + DZ[k] * 2; if (mx < 0 || mz < 0 || mx >= w || mz >= h) continue;
             const mi = mz * w + mx, mc = nl[mi];
-            for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (region[s2] !== -1) continue; const d = Math.abs(floor[s2] - f); if (d <= DROP_MAX) { region[s2] = rid; rq[tail++] = s2; } }
+            const mxw = this.wx(x + DX[k]), mzw = this.wz(z + DZ[k]);
+            for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (region[s2] !== -1) continue; const d = Math.abs(floor[s2] - f); if (d <= DROP_MAX && this.ledgeClear(mxw, mzw, Math.max(f, floor[s2]))) { region[s2] = rid; rq[tail++] = s2; } }
           }
         }
       }
@@ -152,6 +158,11 @@ export class NavGrid {
     this.buildMs = performance.now() - t0; this.builds++;
     this.levels = this.countLevels();
   }
+
+  /** solids within 0.6 m of the 4 m bucket containing (x,z) */
+  boxesNear(x, z) { const l = this.hash.get(Math.floor(x / this.hashCell) * 65536 + Math.floor(z / this.hashCell)); return l || EMPTY; }
+  /** true when nothing but the ledge occupies the standing band above floor f at world (x,z) — used for 2-cell hops across an inflated ring */
+  ledgeClear(x, z, f) { const l = this.boxesNear(x, z); for (let i = 0; i < l.length; i++) { const b = l[i]; if (x < b.min.x - AGENT_R || x > b.max.x + AGENT_R || z < b.min.z - AGENT_R || z > b.max.z + AGENT_R) continue; if (b.min.y < f + CLEAR && b.max.y > f + STEP_BLOCK) return false; } return true; }
 
   countLevels() { const set = new Set(); const f = this.floor, nl = this.nl; for (let i = 0; i < this.n; i++) for (let j = 0; j < nl[i]; j++) set.add(Math.round(f[i * L + j] * 2) / 2); return set.size; }
 
@@ -284,8 +295,8 @@ export class NavGrid {
         }
         if (!diag && c === 0 && !walked) { // drop over a blocked ring (e.g. a container edge): 2 cells out
           const mx = x + DX[k] * 2, mz = z + DZ[k] * 2; if (mx < 0 || mz < 0 || mx >= w || mz >= h) continue;
-          const mi = mz * w + mx, mc = nl[mi];
-          for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (closed[s2] === stamp) continue; const d = floor[s2] - f; let cost; if (d < -STEP && -d <= DROP_MAX) cost = 2 + 3 + -d * 0.5; else if (d > STEP && d <= CLIMB_MAX) cost = 2 + 6 + d * 2; else continue; const ng = gs + cost; if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(mi) * 1.001); } }
+          const mi = mz * w + mx, mc = nl[mi]; const mxw = this.wx(nx), mzw = this.wz(nz);
+          for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (closed[s2] === stamp) continue; const d = floor[s2] - f; if (!this.ledgeClear(mxw, mzw, Math.max(f, floor[s2]))) continue; let cost; if (d < -STEP && -d <= DROP_MAX) cost = 2 + 3 + -d * 0.5; else if (d > STEP && d <= CLIMB_MAX) cost = 2 + 6 + d * 2; else continue; const ng = gs + cost; if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(mi) * 1.001); } }
         }
       }
     }
@@ -316,10 +327,11 @@ export class NavGrid {
   }
 
   // Push a circle (XZ) at body height pos.y out of solids that span the standing volume. Mutates pos. Returns true when it hit something.
-  resolveCircle(pos, radius, y0 = STEP_BLOCK, y1 = 1.5) {
+  resolveCircle(pos, radius, y0 = STEP + 0.02, y1 = 1.5) {
     let hit = false;
-    for (const box of this.solids) {
-      if (box.max.y < pos.y + y0 || box.min.y > pos.y + y1 || this.slabs.has(box)) continue;
+    const l = this.boxesNear(pos.x, pos.z);
+    for (let bi = 0; bi < l.length; bi++) { const box = l[bi];
+      if (box.max.y < pos.y + y0 || box.min.y > pos.y + y1) continue;
       if (pos.x < box.min.x - radius || pos.x > box.max.x + radius || pos.z < box.min.z - radius || pos.z > box.max.z + radius) continue;
       const cx = Math.max(box.min.x, Math.min(pos.x, box.max.x)), cz = Math.max(box.min.z, Math.min(pos.z, box.max.z));
       let dx = pos.x - cx, dz = pos.z - cz; const d2 = dx * dx + dz * dz;
