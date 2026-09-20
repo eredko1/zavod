@@ -118,8 +118,8 @@ function respawn(silent = false) {
   const spawns = ctx.world?.playerSpawns?.length ? ctx.world.playerSpawns : [p.position.clone()];
   const enemies = (ctx.ai?.soldiers ?? []).filter(s => s && s.position && s.state !== 'dead' && (s.health ?? 1) > 0);
   // random among the safer half of spawns (far from live enemies) so respawns vary but never drop you into a squad
-  const scored = spawns.map(s => { let d = Infinity; for (const e of enemies) d = Math.min(d, s.distanceTo(e.position)); return { s, d: enemies.length ? d : 1 }; }).sort((a, b) => b.d - a.d);
-  let pool = scored.slice(0, Math.max(1, Math.ceil(scored.length / 2))).filter(x => x.d > 12 || x === scored[0]);
+  const scored = spawns.map(s => { let d = Infinity; for (const e of enemies) d = Math.min(d, s.distanceTo(e.position)); return { s, d: enemies.length ? d : Infinity }; }).sort((a, b) => b.d - a.d);
+  let pool = enemies.length ? scored.slice(0, Math.max(1, Math.ceil(scored.length / 2))).filter(x => x.d > 12 || x === scored[0]) : scored.slice();
   if (pool.length > 1 && S.lastSpawn) pool = pool.filter(x => x.s !== S.lastSpawn); // never the same spot twice in a row
   let best = (pool[Math.floor(Math.random() * pool.length)] || scored[0]).s; S.lastSpawn = best;
   const wasDead = p.dead;
