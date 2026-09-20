@@ -125,6 +125,12 @@ export async function init(ctx) {
     get loadout() { return { ...S.loadout }; },
     get stats() { return arsenalEntry(S.weapons[S.cur].spec).stats; },
     setLoadout: (lo) => setLoadout(lo),
+    /** Pick up a dropped weapon: same id as the current primary → +reserve ammo; otherwise it replaces the primary (with a full mag + the given reserve). */
+    pickup: (id = 'ak74', reserve = 60) => {
+      const cur = S.weapons[0]; if (!REGISTRY[id] || REGISTRY[id].spec.slot !== 0) return false;
+      if (cur && cur.id === id) { cur.reserve += reserve; cur.cur.reserve = cur.reserve; if (cur.ammo <= 0 && !S.reload) api.reload?.(); ctx.bus.emit('pickup', { id, ammo: true }); return true; }
+      setLoadout({ primary: id, secondary: S.loadout.secondary }); const w = S.weapons[0]; if (w) { w.reserve = reserve; w.cur.reserve = reserve; } ctx.bus.emit('pickup', { id, ammo: false }); return true;
+    },
     fire: () => { const w = S.weapons[S.cur]; if (w.ammo > 0 && !w.needsAction) fireShot(w); else if (w.ammo <= 0) dryFire(w); },
     qaFire: (n = 1) => { const w = S.weapons[S.cur]; for (let i = 0; i < n; i++) { if (w.ammo <= 0) { w.ammo = w.spec.mag; } w.needsAction = false; w.actionT = 9; fireShot(w, { hold: 0.6 }); } },
     reload: () => startReload(),
@@ -352,7 +358,7 @@ export function update(dt, ctx) {
     if (input.mouse.wheel) startSwap(1 - S.cur);
     if (input.consume('KeyR')) startReload();
     if (input.consume('KeyG')) startThrow();
-    if (input.consume('KeyF')) startInspect();
+    if ((!ctx.ai?.nearPickup && !ctx.vehicles?.nearBike && input.consume('KeyF'))) startInspect();
     const trig = !!input.fire; if (trig && !S.triggerHeld) S.triggerPressed = true; if (!trig) S.dryLatch = false; S.triggerHeld = trig;
     if (S.triggerPressed && S.reload?.style === 'shell' && S.reload.phase === 'shell' && w.ammo > 0) S.reload.interrupt = true; // fire interrupts a shell-by-shell reload
     const busy = S.swap || S.throwing;

@@ -381,6 +381,7 @@ function killSoldier(ctx, s, hit) {
   const av = new THREE.Vector3(ctx.rng() - 0.5, ctx.rng() - 0.5, ctx.rng() - 0.5).multiplyScalar(9);
   const vel = new THREE.Vector3(s.vel.x * 0.5 + (ctx.rng() - 0.5) * 1.5, 1.2 + ctx.rng(), s.vel.z * 0.5 + (ctx.rng() - 0.5) * 1.5);
   if (hit?.dir) vel.addScaledVector(hit.dir, 1.5);
+  r.userData.pickup = { id: 'ak74', reserve: 45 + Math.floor(ctx.rng() * 46) }; // the merc's AK — walk over it and press F
   S.dropped.push({ mesh: r, vel, av, t: 0, landed: false, soldier: s });
   s.inst.flash.visible = false;
   // blood
@@ -538,6 +539,16 @@ export function update(dt, ctx) {
   for (let i = S.squads.length - 1; i >= 0; i--) if (S.squads[i].members.every(m => m.dead)) S.squads.splice(i, 1);
 
   // ---- dropped rifles ----
+  // ---- weapon pickups from dropped rifles ----
+  if (playing && ctx.player) {
+    const pp = ctx.player.position; let near = null, nd = 1.7 * 1.7;
+    for (const d of S.dropped) { if (!d.landed || !d.mesh.userData.pickup) continue; const m = d.mesh.position; const dx = m.x - pp.x, dz = m.z - pp.z, dy = m.y - pp.y; const q = dx * dx + dz * dz + dy * dy * 0.25; if (q < nd) { nd = q; near = d; } }
+    if (near !== S.nearPickup) { S.nearPickup = near; if (near) ctx.hud?.toast?.(`F — TAKE ${near.mesh.userData.pickup.id === 'ak74' ? 'AK-74M' : near.mesh.userData.pickup.id.toUpperCase()}${(ctx.weapons?.current?.slot === 0 && ctx.weapons?.current?.id === near.mesh.userData.pickup.id) ? ' AMMO' : ''}`, 2500); }
+    api.nearPickup = near ? near.mesh.userData.pickup : null;
+    if (near && ctx.input.pressed.has('KeyF')) { ctx.input.pressed.delete('KeyF'); const pk = near.mesh.userData.pickup; if (ctx.weapons?.pickup?.(pk.id, pk.reserve)) { ctx.scene.remove(near.mesh); S.dropped.splice(S.dropped.indexOf(near), 1); S.nearPickup = null; } }
+    // out of ammo entirely: auto-pick when standing on it (helps touch players without an F button)
+    if (near && ctx.weapons?.current && ctx.weapons.current.slot === 0 && ctx.weapons.current.ammo <= 0 && ctx.weapons.current.reserve <= 0 && nd < 0.8 * 0.8) { const pk = near.mesh.userData.pickup; if (ctx.weapons.pickup(pk.id, pk.reserve)) { ctx.scene.remove(near.mesh); S.dropped.splice(S.dropped.indexOf(near), 1); S.nearPickup = null; } }
+  }
   for (let i = S.dropped.length - 1; i >= 0; i--) {
     const d = S.dropped[i]; d.t += dt; const m = d.mesh;
     if (!d.landed) {
@@ -551,7 +562,7 @@ export function update(dt, ctx) {
         d.fromQ = m.quaternion.clone(); d.landT = 0;
       }
     } else if (d.landT < 0.25) { d.landT += dt; m.quaternion.slerpQuaternions(d.fromQ, d.restQ, Math.min(1, d.landT / 0.25)); }
-    if (d.t > 12) { const k = (d.t - 12) / 1.5; m.position.y = S.nav.groundY(m.position.x, m.position.z) + 0.035 - k * 0.4; if (k >= 1) { ctx.scene.remove(m); S.dropped.splice(i, 1); } }
+    if (d.t > 60) { const k = (d.t - 60) / 1.5; m.position.y = S.nav.groundY(m.position.x, m.position.z) + 0.035 - k * 0.4; if (k >= 1) { ctx.scene.remove(m); S.dropped.splice(i, 1); } }
   }
   // ---- blood fade ----
   for (const b of S.blood) { if (!b.visible) continue; b.userData.t += dt; if (b.userData.t > 40) { b.material.opacity = Math.max(0, 1 - (b.userData.t - 40) / 4); if (b.material.opacity <= 0) b.visible = false; } }
