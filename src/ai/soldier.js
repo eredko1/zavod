@@ -105,7 +105,7 @@ export class Soldier {
   moveStep(dt, nav, others, player) {
     const t = this.ctx.time.elapsed;
     const desired = _v.set(0, 0, 0);
-    const px0 = this.position.x, pz0 = this.position.z;
+    const px0 = this.position.x, pz0 = this.position.z; let vault = false;
     if (this.moveGoal && !this.arrived) {
       if (!this.path && t - this.pathT > 0.35 && nav.budget > 0) {
         nav.budget--; this.pathT = t;
@@ -128,6 +128,8 @@ export class Soldier {
           let sp = this.gait === 'walk' ? SPEED.walk : SPEED.run;
           if (this.crouch > 0.5) sp = Math.min(sp, SPEED.crouch + 0.6);
           if (this.stagger > 0) sp *= 0.25;
+          // climb waypoint (wagon deck, loading dock ≤ 1.25 m): vault — lift the body first so the ledge collider stops pushing us back, then step in
+          if (wp.y - this.position.y > 0.4 && d < 1.1) { vault = true; this.position.y = damp(this.position.y, wp.y, 9, dt); if (wp.y - this.position.y < 0.03) this.position.y = wp.y; this.vy = 0; this.airborne = false; sp = Math.min(sp, 1.6); }
           // slow down on final approach
           const remain = this.pathIdx === this.path.length - 1 ? d : 99;
           if (remain < 1.2) sp = Math.min(sp, Math.max(0.8, remain * 2.5));
@@ -152,7 +154,8 @@ export class Soldier {
     nav.resolveCircle(this.position, 0.3);
     // ---- vertical: feet follow the nav floor of the layer we are on; stairs are smoothed, drops use gravity ----
     const f = nav.floorAt(this.position.x, this.position.z, this.position.y + (this.airborne ? 0 : 0.3));
-    if (Number.isFinite(f)) {
+    if (vault) { if (Number.isFinite(f) && f > this.position.y) this.position.y = f; }
+    else if (Number.isFinite(f)) {
       this.floorY = f; const dy = f - this.position.y;
       if (dy >= 0) { // step up (stairs/ramps): quick smooth snap, no popping
         this.vy = 0; this.airborne = false;

@@ -4,10 +4,11 @@
 import * as THREE from 'three';
 
 const AGENT_R = 0.28;       // inflation radius for blocking (soldier half-width)
-const STEP = 0.55;          // max floor change between neighbour cells (stairs are ≤ 0.45 steps)
+const STEP = 0.75;          // max floor change between neighbour cells (a 0.5 m cell can straddle two 0.3 m stair steps)
 const STEP_BLOCK = 0.5;     // colliders whose top is ≤ this above the floor are steps, not walls
 const CLEAR = 1.8;          // headroom needed above a floor
 const DROP_MAX = 3.5;       // one-way hop-down limit
+const CLIMB_MAX = 1.25;     // mantle-up limit (wagon decks, loading docks) — costly, cardinal only
 const LOW_FLOOR = 2.2;      // collider tops this close above the base floor are floors without needing a stair chain
 const K = 4;                // candidate slots per cell (base + 3 highest tops)
 const L = 3;                // final layers per cell
@@ -63,9 +64,9 @@ export class NavGrid {
     const cols = []; const seen = new Set();
     for (const src of [ctx.colliders || [], ctx.world?.walkables || []]) for (const box of src) { if (!box || !box.min || seen.has(box)) continue; if (!(box.max.x > box.min.x && box.max.z > box.min.z && box.max.y >= box.min.y)) continue; if (!isFinite(box.min.x + box.max.x + box.min.y + box.max.y + box.min.z + box.max.z)) continue; seen.add(box); cols.push(box); }
     this.solids = cols;
-    const addCand = (i, top, isW) => {
+    const addCand = (i, top, isW) => { // isW: 2 = registered walkable, 1 = may seed (wide top), 0 = thin (stair step / rail: only flood-accepted from a neighbour)
       const o = i * K; let c = candN[i];
-      for (let j = 0; j < c; j++) if (Math.abs(cand[o + j] - top) < 0.03) { if (isW) candW[o + j] = 1; return; }
+      for (let j = 0; j < c; j++) if (Math.abs(cand[o + j] - top) < 0.03) { if (isW > candW[o + j]) candW[o + j] = isW; return; }
       if (c < K) { cand[o + c] = top; candW[o + c] = isW; candN[i] = c + 1; return; }
       let lo = 1; for (let j = 2; j < K; j++) if (cand[o + j] < cand[o + lo]) lo = j; // slot 0 is the base
       if (top > cand[o + lo]) { cand[o + lo] = top; candW[o + lo] = isW; }
@@ -73,9 +74,9 @@ export class NavGrid {
     const slabs = this.slabs = new Set(); // big thin non-walkable boxes = terrain slabs (ground colliders under sunken areas): never floors, never walls
     for (const box of cols) { const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (!walk.has(box) && sx * sz > 400 && box.max.y - box.min.y <= 1.5) slabs.add(box); }
     for (const box of cols) {
-      const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (Math.min(sx, sz) < 0.35) continue; // railings / poles never carry a floor
-      const isW = walk.has(box) ? 1 : 0;
-      if (!isW && (sx * sz > 400 || slabs.has(box))) continue; // big non-walkable masses (buildings, ground slabs) carry no floor unless registered walkable
+      const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; const thin = Math.min(sx, sz) < 0.35; if (Math.min(sx, sz) < 0.12) continue; // fence panels / poles never carry a floor
+      const isW = walk.has(box) ? 2 : thin ? 0 : 1;
+      if (isW !== 2 && (sx * sz > 400 || slabs.has(box))) continue; // big non-walkable masses (buildings, ground slabs) carry no floor unless registered walkable
       const x0 = Math.max(0, Math.ceil((box.min.x - minX) / cell - 0.5)), x1 = Math.min(w - 1, Math.floor((box.max.x - minX) / cell - 0.5));
       const z0 = Math.max(0, Math.ceil((box.min.z - minZ) / cell - 0.5)), z1 = Math.min(h - 1, Math.floor((box.max.z - minZ) / cell - 0.5));
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) addCand(z * w + x, box.max.y, isW);
@@ -99,7 +100,7 @@ export class NavGrid {
     // ---- 3. acceptance: base + walkables + low tops are seeds; other tops (stair steps) are accepted by flooding from an
     //         accepted neighbour with |Δfloor| ≤ STEP while the height-above-base stays continuous (kills phantom slabs over pits) ----
     const acc = new Uint8Array(n * K); const queue = new Int32Array(n * K); let qh = 0, qt = 0;
-    for (let i = 0; i < n; i++) { const o = i * K, c = candN[i]; for (let j = 0; j < c; j++) { if (blocked[o + j]) continue; if (j === 0 || candW[o + j] || cand[o + j] - base[i] <= LOW_FLOOR) { acc[o + j] = 1; queue[qt++] = o + j; } } }
+    for (let i = 0; i < n; i++) { const o = i * K, c = candN[i]; for (let j = 0; j < c; j++) { if (blocked[o + j]) continue; if (j === 0 || candW[o + j] === 2 || (candW[o + j] === 1 && cand[o + j] - base[i] <= LOW_FLOOR)) { acc[o + j] = 1; queue[qt++] = o + j; } } }
     while (qh < qt) {
       const s = queue[qh++]; const i = (s / K) | 0; const f = cand[s]; const hab = f - base[i];
       const x = i % w, z = (i - x) / w;
@@ -276,6 +277,7 @@ export class NavGrid {
           const d = floor[s2] - f; let cost;
           if (Math.abs(d) <= STEP) { cost = diag ? Math.SQRT2 : 1; walked = true; }
           else if (!diag && d < 0 && -d <= DROP_MAX) cost = 1 + 2 + -d * 0.5; // hop down: penalised so it's a shortcut, not a habit
+          else if (!diag && d > 0 && d <= CLIMB_MAX) cost = 1 + 5 + d * 2;     // mantle up: expensive, used only when there is no stair
           else continue;
           const ng = gs + cost;
           if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(ni) * 1.001); }
@@ -283,7 +285,7 @@ export class NavGrid {
         if (!diag && c === 0 && !walked) { // drop over a blocked ring (e.g. a container edge): 2 cells out
           const mx = x + DX[k] * 2, mz = z + DZ[k] * 2; if (mx < 0 || mz < 0 || mx >= w || mz >= h) continue;
           const mi = mz * w + mx, mc = nl[mi];
-          for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (closed[s2] === stamp) continue; const d = floor[s2] - f; if (d >= -STEP || -d > DROP_MAX) continue; const ng = gs + 2 + 3 + -d * 0.5; if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(mi) * 1.001); } }
+          for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (closed[s2] === stamp) continue; const d = floor[s2] - f; let cost; if (d < -STEP && -d <= DROP_MAX) cost = 2 + 3 + -d * 0.5; else if (d > STEP && d <= CLIMB_MAX) cost = 2 + 6 + d * 2; else continue; const ng = gs + cost; if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(mi) * 1.001); } }
         }
       }
     }
@@ -307,7 +309,7 @@ export class NavGrid {
       if (Math.abs(pts[i + 1].y - pts[i].y) > STEP) { out.push(pts[i + 1]); i++; continue; } // drop edge: keep both ends
       let lim = i + 1; while (lim < n - 1 && Math.abs(pts[lim + 1].y - pts[lim].y) <= STEP) lim++;
       let j = lim;
-      while (j > i + 1 && !this.lineFree(pts[i].x, pts[i].z, pts[j].x, pts[j].z, pts[i].y)) j--;
+      while (j > i + 1 && !(this.lineFree(pts[i].x, pts[i].z, pts[j].x, pts[j].z, pts[i].y) && Math.abs(this.lineEndF - pts[j].y) <= STEP)) j--; // the walked floor must arrive on the node's own layer
       out.push(pts[j]); i = j;
     }
     return out;

@@ -31,10 +31,10 @@ export function buildSubway(world, M, Z) {
     const bands = [[z0 + T, ISL[1][0] + 1.5], [ISL[1][0] + 1.5, ISL[1][1] - 1.5], [ISL[1][1] - 1.5, ISL[2][0] + 1.5], [ISL[2][0] + 1.5, ISL[2][1] - 1.5], [ISL[2][1] - 1.5, z1 + T]];
     for (const [ba, bb] of bands) {
       const wells = stairWells.filter(w => w.z0 < bb && w.z1 > ba);
-      if (!wells.length) { B.box(subFloor, [x0 - T, LOW - 0.6, ba], [x1 + T, LOW, bb], { uvScale: 0.5 }); continue; }
-      // x-segments around the two wells in this band (west well, centre, east well)
+      if (!wells.length) { B.box(subFloor, [x0 - T, LOW - 0.6, ba], [x1 + T, LOW, bb], { uvScale: 0.5, collide: true }); continue; }
+      // x-segments around the two wells in this band (west well, centre, east well) — collider slabs: the mezzanine floats over the platforms
       const segs = [[x0 - T, -21], [-11.4, 11.4], [21, x1 + T]];
-      for (const [sa, sb] of segs) B.box(subFloor, [sa, LOW - 0.6, ba], [sb, LOW, bb], { uvScale: 0.5 });
+      for (const [sa, sb] of segs) B.box(subFloor, [sa, LOW - 0.6, ba], [sb, LOW, bb], { uvScale: 0.5, collide: true });
     }
     Z.push({ x0: x0 - T, x1: x1 + T, z0: z0, z1: z1 + T, h: LOW });
     // walls (tile + band), E/W full length, S; N wall is the dining-concourse party wall (x∈[−6,6] passage at z=50)
@@ -69,7 +69,7 @@ export function buildSubway(world, M, Z) {
     for (const lx of [-16, -4, 8, 20]) for (let lz = 52; lz < z1; lz += 8) world.termLamps.push([lx, yc - 0.15, lz, 'fluor']);
     world.termTrash.push([-14, LOW, 52], [14, LOW, 56], [-20, LOW, 70], [20, LOW, 78], [0, LOW, 86]);
     // system map boards
-    for (const [mx, mz, yaw] of [[-23.9, 66, Math.PI / 2], [23.9, 74, -Math.PI / 2]]) { B.box(M.ironDark, [mx - 0.05, LOW + 0.9, mz - 1.1], [mx + 0.05, LOW + 2.4, mz + 1.1], { uvScale: 1 }); B.add(M.atlas, M.posterGeo(4, 2, 1.4), mat4(mx + (yaw > 0 ? 0.06 : -0.06), LOW + 1.65, mz, 0, yaw, 0)); }
+    for (const [mx, mz, yaw] of [[-23.9, 70, Math.PI / 2], [23.9, 74, -Math.PI / 2]]) { B.box(M.ironDark, [mx - 0.05, LOW + 0.9, mz - 1.1], [mx + 0.05, LOW + 2.4, mz + 1.1], { uvScale: 1 }); B.add(M.atlas, M.posterGeo(4, 2, 1.4), mat4(mx + (yaw > 0 ? 0.06 : -0.06), LOW + 1.65, mz, 0, yaw, 0)); }
   }
 
   // ================= station level (y = −12): floors, track beds, walls, ceiling =================
@@ -90,7 +90,7 @@ export function buildSubway(world, M, Z) {
     Z.push({ x0: X0 - T, x1: X1 + T, z0: ta, z1: tb, h: SUB - 1.2 });
     const zc = (ta + tb) / 2;
     for (const rz of [zc - 0.72, zc + 0.72]) B.box(M.ironDark, [X0 - T, SUB - 1.2, rz - 0.04], [X1 + T, SUB - 1.02, rz + 0.04], { uvScale: 1 });
-    for (let x = X0; x < X1; x += 0.7) B.box(M.wood, [x - 0.12, SUB - 1.2, zc - 1.3], [x + 0.12, SUB - 1.08, zc + 1.3], { uvScale: 1 });
+    for (let x = X0; x < X1; x += 0.7) B.box(M.asphalt, [x - 0.12, SUB - 1.2, zc - 1.3], [x + 0.12, SUB - 1.08, zc + 1.3], { uvScale: 1 });
     B.box(M.wood, [X0 - T, SUB - 0.95, k === 'A' || k === 'C' ? ta + 0.3 : tb - 0.6], [X1 + T, SUB - 0.9, k === 'A' || k === 'C' ? ta + 0.6 : tb - 0.3], { uvScale: 1 }); // third-rail cover board
   }
   // north wall (behind track A) and south wall (behind track D): tile, band, mosaics, posters

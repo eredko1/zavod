@@ -67,7 +67,7 @@ export function buildPassage(world, M, Z) {
   sg('TRAINS  ⟶', C.x1 - 3, C.z0 + 0.02, 0);
   // posters in leg B, bins, cover
   for (let z = 26; z < 50; z += 8) { B.box(M.ironDark, [Bg.x0 - 0.05, LOW + 0.9, z - 1.0], [Bg.x0 + 0.02, LOW + 3.0, z + 1.0], { uvScale: 1 }); B.add(M.atlas, M.posterGeo(Math.floor(z / 8), 2.0, 1.9), mat4(Bg.x0 + 0.03, LOW + 1.95, z, 0, Math.PI / 2, 0)); }
-  world.termTrash.push([A.x0 + 1, LOW, A.z1 - 0.8], [Bg.x1 - 0.8, LOW, 40], [C.x1 - 1.5, LOW, C.z1 - 0.8]);
+  world.termTrash.push([A.x0 + 0.6, LOW, A.z1 - 0.6], [Bg.x1 - 0.5, LOW, 40]);
   world.cover(Bg.x1 - 1.0, 30, 1, 0, LOW); world.cover(A.x0 + 1.2, A.z0 + 2, -1, 0, LOW); world.cover(C.x0 + 1, C.z0 + 2, -1, 0, LOW);
 
   // ---- level-0 floors above the passage become collider slabs (the concourse floor is groundHeight 0 elsewhere) ---------------------------

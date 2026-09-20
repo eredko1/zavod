@@ -80,7 +80,7 @@ export function build(world) {
     substair: [-38.5, 0, 4, Math.PI - 0.15, 0.3],
     passage: [-52, -6, 24, Math.PI, 0.05],
     street: [-24, 0, 62, Math.PI + 0.6, 0.06],
-    facade: [6, 0, 74, -0.25, 0.42],
+    facade: [26, 0, 74, 0.45, 0.4],
     viaduct: [-44, 0, 66, -Math.PI / 2 + 0.55, 0.18],
     skyline: [0, 0, 56, Math.PI - 0.3, 0.32],
     ceiling: [-10, 0, 8, -0.6, 1.1],
