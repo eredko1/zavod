@@ -70,7 +70,7 @@ export function buildProps(world, M) {
     for (const [x, z, ry, y] of spots) { world.ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.75, y, z - 0.75), new THREE.Vector3(x + 0.75, y + 1.5, z + 0.75))); world.cover(x + 1.2, z, 1, 0, y); }
   }
   // ---- newsstand kiosks (shuttered) on the concourse + a flower stand ------------------------------------------------
-  for (const [kx, kz] of [[-16, -10], [16, 10]]) {
+  for (const [kx, kz] of [[-16, -5], [16, 10]]) { // north kiosk pulled off the track-gate lane
     B.box(M.marbleDark, [kx - 2.2, 0, kz - 1.4], [kx + 2.2, 0.9, kz + 1.4], { uvScale: 1, collide: true });
     B.box(M.shutter, [kx - 2.2, 0.9, kz - 1.4], [kx + 2.2, 2.6, kz + 1.4], { uvScale: 1, collide: true });
     B.box(M.brassDark, [kx - 2.3, 2.6, kz - 1.5], [kx + 2.3, 2.85, kz + 1.5], { uvScale: 1 });

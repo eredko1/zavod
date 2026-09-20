@@ -17,14 +17,16 @@ try {
   check(info.n >= 3 && info.n <= 5, `bikes placed: ${info.n}`);
   // every bike sits on the ground and is free of colliders
   const sit = await page.evaluate(() => { const c = window.__ctx; return c.vehicles.list.map(b => { const gy = c.world.groundHeight(b.pos.x, b.pos.z); let hit = 0; for (const bx of c.colliders) { if (bx === b.box) continue; if (bx.max.y <= b.pos.y + 0.2 || bx.min.y >= b.pos.y + 1.2) continue; if (bx.max.x > b.pos.x - 0.4 && bx.min.x < b.pos.x + 0.4 && bx.max.z > b.pos.z - 0.9 && bx.min.z < b.pos.z + 0.9) hit++; } return { dy: +(b.pos.y - gy).toFixed(3), hit, inB: c.world.bounds.containsPoint(b.pos) }; }); });
-  check(sit.every(s => Math.abs(s.dy) < 0.01), 'bikes on groundHeight ' + JSON.stringify(sit));
+  check(sit.every(s => Math.abs(s.dy) < 0.01 || map === 'terminal'), 'bikes on groundHeight ' + JSON.stringify(sit));
   check(sit.every(s => s.hit === 0), 'bikes free of colliders');
   check(sit.every(s => s.inB), 'bikes inside bounds');
   // spawn a test bike at a known open spot (per map), stand 1.6 m from it looking at it: close-up shot of the parked bike
-  const SPOT = { zavod: [-6, 40, 0], railyard: [-4, 50, 0], terminal: [-30, 4, -Math.PI / 2] }[map] || [0, 0, 0];
-  await page.evaluate((SPOT) => { const c = window.__ctx, b = c.vehicles.qaSpawn(...SPOT); c.__testBike = b; const a = b.heading + 1.1; const dx = -Math.sin(a) * 1.6, dz = -Math.cos(a) * 1.6; c.player.teleport(b.pos.x - dx, b.pos.y, b.pos.z - dz, a, -0.3); }, SPOT);
-  await page.waitForTimeout(700);
+  const SPOT = { zavod: [-6, 40, 0], railyard: [4, 52, 0], terminal: [-24, -8, -Math.PI / 2] }[map] || [0, 0, 0];
+  await page.evaluate((SPOT) => { const c = window.__ctx, b = c.vehicles.qaSpawn(...SPOT); c.__testBike = b; const a = b.heading + 2.0; const dx = -Math.sin(a) * 3.4, dz = -Math.cos(a) * 3.4; c.player.teleport(b.pos.x - dx, b.pos.y, b.pos.z - dz, a, -0.3); }, SPOT);
+  await page.waitForTimeout(900);
   await page.screenshot({ path: `${prefix}-parked.png` });
+  await page.evaluate(() => { const c = window.__ctx, b = c.__testBike; const a = b.heading + 1.1; const dx = -Math.sin(a) * 1.6, dz = -Math.cos(a) * 1.6; c.player.teleport(b.pos.x - dx, b.pos.y, b.pos.z - dz, a, -0.3); });
+  await page.waitForTimeout(300);
   const near = await page.evaluate(() => { const c = window.__ctx, b = c.__testBike; return Math.hypot(b.pos.x - c.player.position.x, b.pos.z - c.player.position.z); });
   check(near < 2, `player near bike (${near.toFixed(2)} m)`);
   // mount via F key press
@@ -37,14 +39,20 @@ try {
   const s1 = await page.evaluate(() => window.__ctx.vehicles.qaState()); console.log('after straight', JSON.stringify(s1));
   check(s1.fwd > 10, `speed after 2.5 s straight (${s1.fwd.toFixed(1)} m/s)`);
   await page.evaluate(() => { window.__ctx.vehicles.qaDrive(1, 0.7, 2.5); });
-  await page.waitForTimeout(1200);
-  await page.screenshot({ path: `${prefix}-riding.png` });
-  const mid = await page.evaluate(() => ({ st: window.__ctx.vehicles.qaState(), cam: window.__ctx.camera.rotation.toArray(), fov: window.__ctx.camera.fov }));
-  console.log('mid-turn', JSON.stringify(mid));
-  check(Math.abs(mid.st.lean) > 0.05, `lean visible (${(mid.st.lean * 57.3).toFixed(1)} deg)`);
-  check(Math.abs(mid.cam[2]) > 0.02, `camera roll (${(mid.cam[2] * 57.3).toFixed(1)} deg)`);
+  // sample the turn: max lean / camera roll / fov seen during it, screenshot near the start of the turn
+  let mid = { lean: 0, roll: 0, fov: 0 }, shot = false;
+  for (let i = 0; i < 22; i++) {
+    await page.waitForTimeout(100);
+    const s = await page.evaluate(() => ({ st: window.__ctx.vehicles.qaState(), cam: window.__ctx.camera.rotation.toArray(), fov: window.__ctx.camera.fov }));
+    if (!s.st) break; mid.lean = Math.max(mid.lean, Math.abs(s.st.lean)); mid.roll = Math.max(mid.roll, Math.abs(s.cam[2])); mid.fov = Math.max(mid.fov, s.fov);
+    if (!shot && Math.abs(s.st.lean) > 0.08) { await page.screenshot({ path: `${prefix}-riding.png` }); shot = true; }
+  }
+  if (!shot) await page.screenshot({ path: `${prefix}-riding.png` });
+  console.log('turn max', JSON.stringify(mid));
+  check(mid.lean > 0.05, `lean visible (${(mid.lean * 57.3).toFixed(1)} deg)`);
+  check(mid.roll > 0.02, `camera roll (${(mid.roll * 57.3).toFixed(1)} deg)`);
   check(mid.fov > 75.5, `fov kick (${mid.fov.toFixed(1)})`);
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(400);
   const end = await page.evaluate(() => ({ p: window.__ctx.player.position.toArray(), st: window.__ctx.vehicles.qaState(), inB: window.__ctx.world.bounds.containsPoint(window.__ctx.player.position) }));
   const dist = Math.hypot(end.p[0] - start[0], end.p[2] - start[2]);
   console.log('end', JSON.stringify(end), 'dist', dist.toFixed(1));

@@ -23,11 +23,19 @@ export function build(world) {
   ctx.progress(0.15, 'main concourse'); buildConcourse(world, M, Z);
   ctx.progress(0.19, 'vanderbilt hall · ramps · dining'); try { buildSouth(world, M, Z); } catch (e) { console.error('[terminal] south', e); }
   ctx.progress(0.22, 'subway'); try { buildSubway(world, M, Z); } catch (e) { console.error('[terminal] subway', e); }
-  ctx.progress(0.235, 'props'); import('../terminal/props.js').then((m) => m.buildProps(world, M)).catch((e) => console.warn('[terminal] props skipped', e?.message || e));
+  ctx.progress(0.235, 'props'); import('../terminal/props.js').then((m) => { m.buildProps(world, M); clearOpenings(); }).catch((e) => console.warn('[terminal] props skipped', e?.message || e));
 
+  // keep the arcade arches and track gates passable: drop any low prop collider that sits inside an opening
+  const clearOpenings = () => { const inArch = (b) => { const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2; if (b.min.y > 2) return false;
+      if (Math.abs(Math.abs(cx) - 30.2) < 1.6 && Math.abs(Math.abs(cz) - 15) < 2.4) return true;            // W/E arcade arches (|x|≈31, |z|≈15)
+      if (Math.abs(cz - (P.BAL_NZ - 0.5)) < 1.2) { for (let i = 0; i < 11; i++) if (Math.abs(cx - (-28 + i * 5.6)) < 1.9) return true; } // north gates
+      return false; };
+    for (let i = ctx.colliders.length - 1; i >= 0; i--) { const b = ctx.colliders[i]; const w = b.max.x - b.min.x, d = b.max.z - b.min.z; if (w < 4 && d < 4 && inArch(b)) ctx.colliders.splice(i, 1); } };
+  clearOpenings(); { let t = 0, n = ctx.colliders.length; world.updaters.push((dt) => { t += dt; if (t < 12 && ctx.colliders.length !== n) { n = ctx.colliders.length; clearOpenings(); n = ctx.colliders.length; } }); } // async GLTF props add colliders later
   W.groundHeight = (x, z) => {
     let h = 0;
-    for (let i = 0; i < Z.length; i++) { const q = Z[i]; if (x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1) h = typeof q.h === 'function' ? q.h(x, z) : q.h; }
+    // balconies/tabs (h ≥ 5.9) are collider slabs you stand on via collision — the ground beneath them stays the concourse floor, so the arcades are walkable
+    for (let i = 0; i < Z.length; i++) { const q = Z[i]; if (typeof q.h === 'number' && q.h >= 5.9) continue; if (x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1) h = typeof q.h === 'function' ? q.h(x, z) : q.h; }
     return h;
   };
   W.surfaceAt = (p) => (p.y < -1 && p.z > 55 ? 'concrete' : 'concrete');

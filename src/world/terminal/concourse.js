@@ -153,8 +153,8 @@ export function buildConcourse(world, M, Z) {
         shape.moveTo(lo, 0); shape.lineTo(hi, 0); shape.lineTo(hi, y0 + 0.01); shape.lineTo(lo, y0 + 0.01); shape.closePath();
         const g = wallGeo(shape, [archHole(zc, 0, 4.6, 5.0)], 0.9);
         B.add(M.stone, g, placeXY(side < 0 ? arcX1 : arcX0, 0, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2), { uvScale: uv(M.stone) });
-        B.add(M.bronze, grilleGeo(4.6, 5.0, { arch: true }), placeXY(fx, 0, zc, side < 0 ? Math.PI / 2 : -Math.PI / 2));
-        world.box([arcX0 - 0.1, 0, lo], [arcX1 + 0.1, y0, hi]);
+        // open passage: colliders for the piers either side of the arch and the lintel above it (arch 4.6 wide, 5.0 high)
+        world.box([arcX0 - 0.1, 0, lo], [arcX1 + 0.1, y0, zc - 2.3]); world.box([arcX0 - 0.1, 0, zc + 2.3], [arcX1 + 0.1, y0, hi]); world.box([arcX0 - 0.1, 4.6, zc - 2.3], [arcX1 + 0.1, y0, zc + 2.3]);
         // lit passage behind: back wall glow + a warm bulb strip
         B.box(M.bulb, [side < 0 ? X0 + 1 : X1 - 5, 3.4, zc - 1.5], [side < 0 ? X0 + 5 : X1 - 1, 3.5, zc + 1.5], { uvScale: 1 });
       }
@@ -176,8 +176,8 @@ export function buildConcourse(world, M, Z) {
       const holes = []; const gates = [];
       for (let i = 0; i < 11; i++) { const cx = -28 + i * 5.6; holes.push(archHole(cx, 0, 3.6, 4.6)); gates.push(cx); }
       const g = wallGeo(shape, holes, 0.9); B.add(M.stone, g, placeXY(0, 0, P.BAL_NZ - 0.9), { uvScale: uv(M.stone) });
-      for (const cx of gates) { B.add(M.bronze, grilleGeo(3.6, 4.6, { arch: true }), placeXY(cx, 0, P.BAL_NZ - 0.45)); }
-      world.box([-BAL_X - 0.1, 0, P.BAL_NZ - 1.0], [BAL_X + 0.1, y0, P.BAL_NZ]);
+      // open track gates: pier colliders between the arches + lintel band above (arch 3.6 wide, 4.6 high)
+      { let px = -BAL_X - 0.1; for (const cx of gates) { world.box([px, 0, P.BAL_NZ - 1.0], [cx - 1.8, y0, P.BAL_NZ]); px = cx + 1.8; } world.box([px, 0, P.BAL_NZ - 1.0], [BAL_X + 0.1, y0, P.BAL_NZ]); world.box([-BAL_X - 0.1, 4.3, P.BAL_NZ - 1.0], [BAL_X + 0.1, y0, P.BAL_NZ]); }
       // gate numbers (generic)
       let tn = 42; for (const cx of gates) { const s = M.sign(`TRACK ${tn}`, { w: 512, h: 128, bg: '#1a1a1a', fg: '#f2e6c8', font: 'bold 64px Georgia, serif' }); B.add(s, new THREE.PlaneGeometry(1.8, 0.45), mat4(cx, 4.85, P.BAL_NZ + 0.01)); tn -= 3; }
       B.box(M.bulb, [-BAL_X + 1, 3.6, Z0 + 0.6], [BAL_X - 1, 3.7, Z0 + 0.7], { uvScale: 1 });

@@ -27,14 +27,22 @@ const S = {
 };
 
 function groundY(x, z) { const g = C.world?.groundHeight; return g ? g(x, z) : 0; }
+const STEP_UP = 0.5; // bikes ride over anything this low (kerbs, rails, stair steps)
+/** Floor under (x,z) for something currently at height yRef: highest of world.groundHeight / collider tops that is ≤ yRef+STEP_UP; keeps yRef when nothing qualifies (multi-level maps whose groundHeight reports the level above). */
+function floorAt(x, z, yRef, skip = null) {
+  let best = -Infinity; const gy = groundY(x, z); if (gy <= yRef + STEP_UP) best = gy;
+  const boxes = S.grid.query(x - 0.3, z - 0.3, x + 0.3, z + 0.3);
+  for (let i = 0; i < boxes.length; i++) { const b = boxes[i]; if (b === skip) continue; if (b.min.x > x + 0.3 || b.max.x < x - 0.3 || b.min.z > z + 0.3 || b.max.z < z - 0.3) continue; const t = b.max.y; if (t <= yRef + STEP_UP && t > best && b.min.y < t) best = t; }
+  return best === -Infinity ? yRef : best;
+}
 function inBounds(x, z, pad = 1) { const b = C.world?.bounds; return !b || (x > b.min.x + pad && x < b.max.x - pad && z > b.min.z + pad && z < b.max.z - pad); }
 
 // ---------- bike object ----------
-function makeBike(x, z, yaw) {
+function makeBike(x, z, yaw, yRef = 0) {
   const parts = buildBike(C);
   const bike = {
-    ...parts, home: { x, z, yaw },
-    pos: new THREE.Vector3(x, groundY(x, z), z), heading: yaw, vel: new THREE.Vector3(), speed: 0, fwdSpeed: 0,
+    ...parts, home: { x, z, yaw, y: floorAt(x, z, yRef) },
+    pos: new THREE.Vector3(x, floorAt(x, z, yRef), z), vy: 0, heading: yaw, vel: new THREE.Vector3(), speed: 0, fwdSpeed: 0,
     steer: 0, lean: 0, susp: 0, suspV: 0, spin: 0, skid: 0, throttle: 0, parked: true, box: new THREE.Box3(),
     hitT: 0,
   };
@@ -55,9 +63,10 @@ function rebuildGrids() { S.grid.build(C.colliders); try { C.player?.rebuildColl
 function fwdOf(h, out) { return out.set(-Math.sin(h), 0, -Math.cos(h)); }
 
 // ---------- placement ----------
-function spotFree(x, z, ignoreBox = null) {
+function spotFree(x, z, yRef = 0, ignoreBox = null) {
   if (!inBounds(x, z, 2.5)) return false;
-  const y = groundY(x, z);
+  const y = floorAt(x, z, yRef);
+  if (Math.abs(y - yRef) > 0.02) return false; // same level as the spawn it belongs to (not on rails / kerbs / steps)
   if (rectBlocked(S.grid, x - 1.6, z - 1.6, x + 1.6, z + 1.6, y + 0.15, y + 1.6, ignoreBox)) return false;
   for (const b of S.bikes) if (Math.hypot(b.pos.x - x, b.pos.z - z) < 3.2) return false;
   for (const s of C.world?.playerSpawns || []) if (Math.hypot(s.x - x, s.z - z) < 1.8) return false;
@@ -66,7 +75,7 @@ function spotFree(x, z, ignoreBox = null) {
 function placeBikes() {
   const W = C.world; S.grid.build(C.colliders);
   const spots = Array.isArray(W?.vehicleSpots) ? W.vehicleSpots : null;
-  if (spots && spots.length) { for (const s of spots.slice(0, 5)) makeBike(s.x, s.z, s.yaw ?? 0); if (S.bikes.length >= 3) return; }
+  if (spots && spots.length) { for (const s of spots.slice(0, 5)) makeBike(s.x, s.z, s.yaw ?? 0, s.y ?? 0); if (S.bikes.length >= 3) return; }
   const spawns = (W?.playerSpawns?.length ? W.playerSpawns : [new THREE.Vector3(0, 0, 0)]);
   const want = 4, R = C.rng;
   let tries = 0;
@@ -74,15 +83,15 @@ function placeBikes() {
     const s = spawns[Math.floor(R() * spawns.length) % spawns.length];
     const a = R() * Math.PI * 2, d = 2.5 + R() * 7;
     const x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;
-    if (!spotFree(x, z)) continue;
+    if (!spotFree(x, z, s.y)) continue;
     // face roughly toward the map centre (open ground), with jitter
     const cx = W?.bounds ? (W.bounds.min.x + W.bounds.max.x) / 2 : 0, cz = W?.bounds ? (W.bounds.min.z + W.bounds.max.z) / 2 : 0;
     const yaw = Math.atan2(-(cx - x), -(cz - z)) + (R() - 0.5) * 0.9;
-    makeBike(x, z, yaw);
+    makeBike(x, z, yaw, s.y);
   }
   // guarantee ≥ 3: relax to any free ring cell around the first spawn
   const s0 = spawns[0];
-  for (let d = 3; S.bikes.length < 3 && d < 30; d += 1.5) for (let i = 0; i < 16 && S.bikes.length < 3; i++) { const a = i / 16 * Math.PI * 2; const x = s0.x + Math.cos(a) * d, z = s0.z + Math.sin(a) * d; if (spotFree(x, z)) makeBike(x, z, a + Math.PI / 2); }
+  for (let d = 3; S.bikes.length < 3 && d < 30; d += 1.5) for (let i = 0; i < 16 && S.bikes.length < 3; i++) { const a = i / 16 * Math.PI * 2; const x = s0.x + Math.cos(a) * d, z = s0.z + Math.sin(a) * d; if (spotFree(x, z, s0.y)) makeBike(x, z, a + Math.PI / 2, s0.y); }
 }
 
 // ---------- mount / dismount ----------
@@ -111,7 +120,7 @@ function dismount() {
   for (const [sx, sz] of cands) {
     const x = bike.pos.x + _r.x * sx + _f.x * -sz, z = bike.pos.z + _r.z * sx + _f.z * -sz;
     if (!inBounds(x, z, 0.6)) continue;
-    const gy = groundY(x, z);
+    const gy = floorAt(x, z, bike.pos.y, bike.box);
     if (rectBlocked(S.grid, x - 0.36, z - 0.36, x + 0.36, z + 0.36, gy + 0.05, gy + 1.75, bike.box)) continue;
     p.teleport(x, gy, z, bike.heading + S.lookYaw, S.lookPitch); placed = true; break;
   }
@@ -160,7 +169,7 @@ function stepBike(bike, dt, inThr, inBrake, inHard, inSteer) {
   // integrate + collide (two circles: front & rear axle) with slide, speed loss, small bounce
   const nx0 = p.x + v.x * dt, nz0 = p.z + v.z * dt;
   let px = nx0, pz = nz0, hitN = null;
-  const y0 = p.y + 0.22, y1 = p.y + 1.25;
+  const y0 = p.y + STEP_UP, y1 = p.y + 1.25;
   for (let i = 0; i < 2; i++) {
     const az = i === 0 ? FRONT_Z : REAR_Z; const ax = px - _f.x * az, azz = pz - _f.z * az; // axle world pos (fwd = -Z → -az along fwd)
     if (resolveCircle(S.grid, ax, azz, BODY_R, y0, y1, bike.box, _res)) { px += _res.x - ax; pz += _res.z - azz; if (!hitN || _res.depth > hitN.depth) hitN = { nx: _res.nx, nz: _res.nz, depth: _res.depth }; }
@@ -186,10 +195,10 @@ function stepBike(bike, dt, inThr, inBrake, inHard, inSteer) {
     if (pz > b.max.z - 1.2) { pz = b.max.z - 1.2; if (v.z > 0) { v.z = -v.z * BOUNCE; v.x *= 0.6; } }
   }
   p.x = px; p.z = pz;
-  // ground follow (smooth on slopes)
-  const gy = groundY(px, pz); const dy = gy - p.y;
-  p.y = Math.abs(dy) > 1.5 ? gy : damp(p.y, gy, 18, dt);
-  bike.suspV += -dy * 4;
+  // ground follow: step up smoothly, fall under gravity
+  const gy = floorAt(px, pz, p.y, bike.box); const dy = gy - p.y;
+  if (dy >= -0.02) { p.y = damp(p.y, gy, 18, dt); bike.vy = 0; bike.suspV += -dy * 4; }
+  else { bike.vy -= 20 * dt; p.y += bike.vy * dt; if (p.y <= gy) { p.y = gy; bike.suspV += bike.vy * 0.6; bike.vy = 0; } }
   // derived
   fs = v.x * _f.x + v.z * _f.z; bike.fwdSpeed = fs; bike.speed = v.length();
   // lean: from lateral acceleration, capped ±12°, plus counter-lean from slide
@@ -242,7 +251,7 @@ export async function init(ctx) {
   const api = {
     list: S.bikes, get mounted() { return S.mounted; }, nearBike: null,
     mount: (bike) => mount(bike || nearestBike()), dismount,
-    qaSpawn(x, z, yaw = 0) { S.grid.sync(ctx.colliders); const b = makeBike(x, z, yaw); S.grid.build(ctx.colliders); ctx.player?.rebuildColliders?.(); return b; },
+    qaSpawn(x, z, yaw = 0, y = ctx.player?.position.y ?? 0) { S.grid.sync(ctx.colliders); const b = makeBike(x, z, yaw, y); S.grid.build(ctx.colliders); ctx.player?.rebuildColliders?.(); return b; },
     qaMount() { const b = nearestBike(); if (!b) return false; return mount(b); },
     /** Drive with fixed inputs for `seconds`; resolves when done. throttle: -1..1 (negative = brake/reverse), steer: -1..1 (+ = right), opts {hard} */
     qaDrive(throttle = 1, steer = 0, seconds = 3, opts = {}) { if (!S.mounted) api.qaMount(); if (!S.mounted) return Promise.resolve(false); if (S.qa) S.qa.res(false); return new Promise((res) => { S.qa = { thr: throttle, steer, t: seconds, hard: !!opts.hard, res }; }); },
@@ -304,7 +313,7 @@ export function update(dt, ctx) {
 export function reset(ctx) {
   if (S.mounted) dismount();
   for (const b of S.bikes) {
-    b.pos.set(b.home.x, groundY(b.home.x, b.home.z), b.home.z); b.heading = b.home.yaw; b.vel.set(0, 0, 0); b.speed = b.fwdSpeed = 0; b.steer = b.lean = b.susp = b.suspV = b.skid = 0;
+    b.pos.set(b.home.x, b.home.y, b.home.z); b.vy = 0; b.heading = b.home.yaw; b.vel.set(0, 0, 0); b.speed = b.fwdSpeed = 0; b.steer = b.lean = b.susp = b.suspV = b.skid = 0;
     b.group.position.copy(b.pos); b.group.rotation.set(0, b.heading, 0); b.body.position.y = 0; b.body.rotation.set(0, 0, 0); b.fork.rotation.y = 0; b.parked = true; parkBox(b);
   }
   S.qa = null; S.lookYaw = S.lookPitch = 0;

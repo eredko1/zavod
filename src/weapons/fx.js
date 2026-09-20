@@ -180,8 +180,8 @@ export class FX {
     this.splash = new ParticleSystem(scene, 300, { map: dot, gravity: 14, drag: 0.8, renderOrder: 6 });
 
     // billboards
-    this.puffs = new BillboardPool(scene, 24, this.tex.smoke, { renderOrder: 6 });
-    this.fire = new BillboardPool(scene, 16, this.tex.smoke, { blending: THREE.AdditiveBlending, toneMapped: false, renderOrder: 8 });
+    this.puffs = new BillboardPool(scene, 40, this.tex.smoke, { renderOrder: 6 });
+    this.fire = new BillboardPool(scene, 32, this.tex.smoke, { blending: THREE.AdditiveBlending, toneMapped: false, renderOrder: 8 });
     this.flashes = new BillboardPool(scene, 8, this.tex.flash, { blending: THREE.AdditiveBlending, toneMapped: false, renderOrder: 9 });
     for (const it of this.flashes.items) { it.mesh.material.map = this.tex.flash.clone(); it.mesh.material.map.repeat.set(1 / 3, 1); it.mesh.material.map.needsUpdate = true; }
     this.rings = new BillboardPool(scene, 4, this.tex.ring, { blending: THREE.AdditiveBlending, toneMapped: false, renderOrder: 8 });
@@ -316,10 +316,13 @@ export class FX {
   explosion(pos) {
     const r = this.rng; const p = _v.copy(pos);
     // flash
-    const fl = this.flashes.spawn(p, { life: 0.1, s0: 6, s1: 9, c0: 0xffffff, c1: 0xffa040, a0: 1, a1: 0 }); fl.mesh.material.map.offset.x = 0;
+    const fl = this.flashes.spawn(p, { life: 0.16, s0: 8, s1: 13, c0: new THREE.Color(0xffffff).multiplyScalar(3), c1: new THREE.Color(0xffa040).multiplyScalar(2), a0: 1, a1: 0 }); fl.mesh.material.map.offset.x = 0;
+    // HDR fireball core (bloom catches it) — the frag must read as a real detonation, not a puff
+    const HOT = new THREE.Color(0xfff0c0).multiplyScalar(7), HOT2 = new THREE.Color(0xff7a20).multiplyScalar(3);
+    for (let i = 0; i < 4; i++) { _v2.set((r() - 0.5) * 0.8, 0.6 + r() * 0.8, (r() - 0.5) * 0.8).add(p); this.fire.spawn(_v2, { life: 0.28 + r() * 0.2, s0: 2.5 + r(), s1: 6 + r() * 3, c0: HOT, c1: HOT2, a0: 1, a1: 0, spin: (r() - 0.5) * 3 }); }
     // fireballs (additive) + smoke (normal)
-    for (let i = 0; i < 7; i++) { _v2.set((r() - 0.5) * 1.6, r() * 1.2 + 0.4, (r() - 0.5) * 1.6).add(p); this.fire.spawn(_v2, { life: 0.35 + r() * 0.3, s0: 1.2 + r(), s1: 4 + r() * 2.5, c0: 0xffe8b0, c1: 0xb02a08, a0: 1, a1: 0, vel: _v3.set((r() - 0.5) * 2, 3 + r() * 3, (r() - 0.5) * 2), roll: r() * 6.28, spin: (r() - 0.5) * 3 }); }
-    for (let i = 0; i < 10; i++) { _v2.set((r() - 0.5) * 2.2, r() * 1.6 + 0.3, (r() - 0.5) * 2.2).add(p); this.puffs.spawn(_v2, { life: 2.2 + r() * 1.6, s0: 1.5 + r() * 1.5, s1: 6 + r() * 4, c0: 0x2a2622, c1: 0x3a3838, a0: 0.9, a1: 0, vel: _v3.set((r() - 0.5) * 1.5, 1.2 + r() * 1.5, (r() - 0.5) * 1.5), roll: r() * 6.28, spin: (r() - 0.5) * 1.2, fadeIn: 0.15 }); }
+    for (let i = 0; i < 10; i++) { _v2.set((r() - 0.5) * 2.2, r() * 1.8 + 0.4, (r() - 0.5) * 2.2).add(p); this.fire.spawn(_v2, { life: 0.5 + r() * 0.45, s0: 1.8 + r() * 1.2, s1: 6 + r() * 3.5, c0: new THREE.Color(0xffd090).multiplyScalar(3.5), c1: new THREE.Color(0xb02a08).multiplyScalar(1.5), a0: 1, a1: 0, vel: _v3.set((r() - 0.5) * 2, 3 + r() * 3, (r() - 0.5) * 2), roll: r() * 6.28, spin: (r() - 0.5) * 3 }); }
+    for (let i = 0; i < 16; i++) { _v2.set((r() - 0.5) * 3.0, r() * 2.6 + 0.3, (r() - 0.5) * 3.0).add(p); this.puffs.spawn(_v2, { life: 3.5 + r() * 2.5, s0: 2 + r() * 2, s1: 9 + r() * 6, c0: 0x2a2622, c1: 0x4a4644, a0: 0.9, a1: 0, vel: _v3.set((r() - 0.5) * 1.5, 1.2 + r() * 1.5, (r() - 0.5) * 1.5), roll: r() * 6.28, spin: (r() - 0.5) * 1.2, fadeIn: 0.15 }); }
     // ring shockwave (flat on ground)
     const ring = this.rings.spawn(_v2.copy(p).setY(p.y + 0.15), { life: 0.45, s0: 1, s1: 18, c0: 0xffd0a0, c1: 0xff9040, a0: 0.9, a1: 0 });
     ring.flat = true;
@@ -329,7 +332,7 @@ export class FX {
     for (let i = 0; i < 60; i++) { const sp = 5 + r() * 12; _v3.set((r() - 0.5), r() * 1.0 + 0.2, (r() - 0.5)).normalize().multiplyScalar(sp); this.chips.emit(p, _v3, 1.0 + r() * 1.2, 0.03 + r() * 0.05, [0.35, 0.33, 0.3, 1], [0.25, 0.23, 0.2, 1]); }
     for (let i = 0; i < 70; i++) { const sp = 3 + r() * 6; _v3.set((r() - 0.5), r() * 0.5, (r() - 0.5)).normalize().multiplyScalar(sp); this.dust.emit(p, _v3, 1.2 + r() * 1.2, 0.5 + r() * 0.4, [0.45, 0.42, 0.38, 0.6], [0.4, 0.38, 0.35, 0]); }
     this.scorch(_v2.copy(p).setY(this.ctx.world?.groundHeight?.(p.x, p.z) ?? 0));
-    this.boomLight.position.copy(p).y += 0.8; this.boomLight.intensity = 1400; this.boomT = 0;
+    this.boomLight.position.copy(p).y += 1.2; this.boomLight.intensity = 9000; this.boomT = 0;
   }
 
   update(dt, camera) {
@@ -338,7 +341,7 @@ export class FX {
     // lights decay
     this.muzzleLightT += dt; if (this.muzzleLight.intensity > 0) { const k = 1 - this.muzzleLightT / this.muzzleLightMax; this.muzzleLight.intensity = k > 0 ? this.muzzleLight.intensity * (k > 0.6 ? 1 : 0.6) : 0; if (k <= 0) this.muzzleLight.intensity = 0; }
     this.enemyLightT += dt; if (this.enemyLight.intensity > 0 && this.enemyLightT > 0.045) this.enemyLight.intensity = 0;
-    this.boomT += dt; if (this.boomLight.intensity > 0) this.boomLight.intensity = Math.max(0, 1400 * (1 - this.boomT / 0.35));
+    this.boomT += dt; if (this.boomLight.intensity > 0) this.boomLight.intensity = Math.max(0, 9000 * Math.pow(1 - Math.min(1, this.boomT / 0.7), 2));
     // particles
     this.sparks.update(dt); this.embers.update(dt); this.dust.update(dt); this.chips.update(dt); this.blood.update(dt); this.splash.update(dt);
     this.puffs.update(dt, camera); this.fire.update(dt, camera); this.flashes.update(dt, camera);

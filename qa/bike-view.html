@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>bike view</title>
+<style>html,body{margin:0;background:#3a3f45;overflow:hidden}</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/build/three.module.js", "three/addons/": "../vendor/three/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { buildBike } from '../src/vehicles/bike.js';
+const q = new URLSearchParams(location.search); const az = +(q.get('az') || 0.9), el = +(q.get('el') || 0.25), dist = +(q.get('d') || 3.2);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.setPixelRatio(1); r.shadowMap.enabled = true; r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x3a3f45);
+const c = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 100);
+c.position.set(Math.sin(az) * Math.cos(el) * dist, 0.6 + Math.sin(el) * dist, Math.cos(az) * Math.cos(el) * dist); c.lookAt(0, 0.55, 0);
+s.add(new THREE.HemisphereLight(0xcfe3ff, 0x4a4030, 1.2));
+const d = new THREE.DirectionalLight(0xfff0dd, 3); d.position.set(3, 6, 4); d.castShadow = true; s.add(d);
+const g = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({ color: 0x555a60, roughness: 0.9 })); g.rotation.x = -Math.PI / 2; g.receiveShadow = true; s.add(g);
+const b = buildBike({}); s.add(b.group); b.headlight.visible = q.get('hl') === '1'; if (b.headlight.visible) b.headlight.intensity = 200;
+if (q.get('steer')) { b.fork.rotation.y = +q.get('steer'); }
+let tris = 0; b.group.traverse(o => { if (o.isMesh) { const i = o.geometry.index; tris += (i ? i.count : o.geometry.attributes.position.count) / 3; } });
+window.__tris = tris; window.__game = { ready: true, stats: () => ({ tris }) };
+r.render(s, c); console.log('tris', tris);
+</script>
