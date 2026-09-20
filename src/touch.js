@@ -20,6 +20,8 @@ const CSS = `
 #touch .swap{right:calc(env(safe-area-inset-right,0px) + 112px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:52px;height:52px;font-size:11px}
 #touch .nade{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 100px);width:54px;height:54px;font-size:11px}
 #touch .pause{right:calc(env(safe-area-inset-right,0px) + 16px);top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:30px;border-radius:6px;font-size:12px}
+#touch .act{left:calc(env(safe-area-inset-left,0px) + 120px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);min-width:96px;height:44px;padding:0 14px;border-radius:22px;font-size:13px;background:rgba(233,162,59,.35);border-color:#e9a23b;display:none}
+#touch .act.show{display:flex}
 #touch .fireL{left:calc(env(safe-area-inset-left,0px) + 30px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);width:70px;height:70px;background:rgba(160,40,30,.3);border-color:rgba(255,120,100,.45)}
 `;
 
@@ -39,7 +41,8 @@ export async function init(ctx) {
     <div class="btn crouch tog">CROUCH</div>
     <div class="btn reload">RELOAD</div>
     <div class="btn swap">SWAP</div>
-    <div class="btn nade">NADE</div>`;
+    <div class="btn nade">NADE</div>
+    <div class="btn act">TAKE</div>`;
   document.body.appendChild(root);
   const q = (c) => root.querySelector(c);
   const input = ctx.input; const T = input.touch;
@@ -74,6 +77,7 @@ export async function init(ctx) {
   tap(q('.reload'), () => press('KeyR'));
   tap(q('.swap'), () => { const slot = ctx.weapons?.current?.slot ?? 0; press(slot === 0 ? 'Digit2' : 'Digit1'); input.mouse.wheel += 1; });
   tap(q('.nade'), () => press('KeyG'));
+  S.act = q('.act'); tap(S.act, () => { input.pressed.add('KeyF'); }); // contextual: pick up weapon / mount / dismount (same F both systems read)
   tap(q('.pause'), () => ctx.setState('paused'));
 
   const show = (v) => { root.classList.toggle('hidden', !v); root.classList.toggle('on', v); if (!v) { clearStick(); S.looks.clear(); T.fire = false; } };
@@ -88,5 +92,11 @@ export async function init(ctx) {
   };
 }
 
-export function update(dt, ctx) { /* stateless: touch handlers write straight into ctx.input */ }
+export function update(dt, ctx) {
+  if (!S || !S.act) return;
+  // contextual action button: weapon pickup or motorcycle mount/dismount
+  const pk = ctx.ai?.nearPickup, bike = ctx.vehicles?.nearBike, mounted = ctx.vehicles?.mounted || ctx.player?.mounted;
+  const label = mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;
+  if (label !== S.actLabel) { S.actLabel = label; S.act.textContent = label || ''; S.act.classList.toggle('show', !!label && ctx.state === 'playing'); }
+}
 export function reset(ctx) { if (S) { ctx.input.touch.fire = false; ctx.input.touch.ads = false; } }

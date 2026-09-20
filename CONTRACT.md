@@ -136,3 +136,4 @@ Boardwalk + beach + amusement area (Wonder Wheel, Cyclone silhouette, Parachute 
 - Shooting: while mounted the player may fire (weapons keeps working — camera-attached viewmodel; recoil unchanged). Optionally force the secondary slot on mount and restore on dismount (`ctx.weapons.swap(1)`).
 - Enemies: bikes are raycast targets with `userData.surface='metal'`; player on a bike is still hittable (capsule follows position).
 - Reset: bikes back to spots, dismount.
+- Touch: touch.js shows a contextual button (TAKE / RIDE / GET OFF) that injects `input.pressed 'KeyF'`; it reads `ctx.ai.nearPickup`, `ctx.vehicles.nearBike` (Bike|null — VEHICLES agent must expose this) and `ctx.vehicles.mounted`.
