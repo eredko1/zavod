@@ -190,8 +190,8 @@ export function inscriptionTexture() {
   g.fillStyle = '#e4dfd3'; g.fillRect(0, 0, W, H);
   for (let i = 0; i < 6000; i++) { g.fillStyle = `rgba(120,110,95,${Math.random() * 0.12})`; g.fillRect(Math.random() * W, Math.random() * H, 2, 2); }
   g.fillStyle = '#7d766a'; g.font = '600 46px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('LET US RAISE A STANDARD TO WHICH THE WISE AND THE HONEST CAN REPAIR', W / 2, H * 0.36);
-  g.font = '600 40px Georgia, serif'; g.fillText('THE EVENT IS IN THE HAND OF GOD · WASHINGTON', W / 2, H * 0.68);
+  g.fillText('TO THE CITIZENS WHO BUILT THIS CITY AND TO THOSE WHO KEEP IT FREE', W / 2, H * 0.36);
+  g.font = '600 40px Georgia, serif'; g.fillText('ERECTED BY THE PEOPLE OF THE CITY · MDCCCXCII', W / 2, H * 0.68);
   return finish(c, { wrap: false, aniso: 16 });
 }
 
@@ -202,7 +202,7 @@ export function friezeTexture() {
   g.fillStyle = '#b9b2a4'; g.fillRect(0, 0, W, 10); g.fillRect(0, H - 10, W, 10);
   const star = (x, y, r) => { g.beginPath(); for (let i = 0; i < 10; i++) { const rr = i & 1 ? r * 0.45 : r; const t = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(x + Math.cos(t) * rr, y + Math.sin(t) * rr); } g.closePath(); g.fill(); };
   g.fillStyle = '#9d9587';
-  for (let i = 0; i < 4; i++) { star(64 + i * 128, H / 2, 30); g.font = 'bold 34px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('W', 128 + i * 128, H / 2); }
+  for (let i = 0; i < 4; i++) { star(64 + i * 128, H / 2, 30); g.font = 'bold 34px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('C', 128 + i * 128, H / 2); }
   for (let i = 0; i < 8; i++) star(32 + i * 64, 24, 7), star(32 + i * 64, H - 24, 7);
   const t = finish(c, { aniso: 16 }); t.wrapT = THREE.ClampToEdgeWrapping; return t;
 }

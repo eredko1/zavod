@@ -1,6 +1,6 @@
 // SBU plan constants — metres, origin = Academic Mall centre in front of the Melville Library, +x campus-east, +z campus-south (see RESEARCH.md). SBU agent.
 export const BOUNDS = { x0: -165, x1: 180, z0: -150, z1: 140 };
-export const GROUND = { x0: -420, x1: 420, z0: -420, z1: 420 };
+export const GROUND = { x0: -1500, x1: 1500, z0: -1500, z1: 1500 };
 
 // Academic Mall paving band (hex pavers) and the library forecourt lawn
 export const MALL = { x0: -125, x1: 196, z0: -14, z1: 12 };
@@ -19,7 +19,7 @@ export const HARRIMAN = { x0: -219, x1: -121, z0: -110, z1: -54 };
 export const ESS = { x0: -239, x1: -140, z0: -41, z1: 52 };
 export const PSY = { x0: 55, x1: 116, z0: 19, z1: 72, wingZ1: 37, wingX0: 77 };
 export const STALLER = { nx0: 78, nx1: 174, nz0: -198, nz1: -141, ex0: 146, ex1: 174, ez0: -141, ez1: -61, towerX0: 146, towerX1: 174, towerZ0: -198, towerZ1: -168 };
-export const PIT = { x0: 78, x1: 146, z0: -141, z1: -61, floorX0: 132, floor: -3, steps: 8, tread: 5, rise: 0.375 };
+export const PIT = { x0: 78, x1: 146, z0: -141, z1: -61, floorX0: 132, floor: -4.5, steps: 10, tread: 4.5, rise: 0.45 };
 export const FOUNTAIN = { x: 136, z: -6, r: 4.5, ring: 9 };
 export const POND = { x0: 156, x1: 176, z0: -60, z1: -36, depth: -0.6 };
 export const ADMIN = { x0: 198, x1: 272, z0: -65, z1: 4 };

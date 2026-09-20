@@ -29,8 +29,14 @@ export function facade(B, o) {
   for (let f = 0; f < floors; f++) {
     const wy = y, wh = storey - band;
     B.box(glass, [x0 + inset, wy, z0 + inset], [x1 - inset, wy + wh, z1 - inset], { collide: false });
-    for (let x = x0 + pitch / 2 - pierW / 2; x < x1 - pierW; x += pitch) { B.box(pier, [x, wy, z0], [x + pierW, wy + wh, z0 + inset], { collide: false }); B.box(pier, [x, wy, z1 - inset], [x + pierW, wy + wh, z1], { collide: false }); }
-    for (let z = z0 + pitch / 2 - pierW / 2; z < z1 - pierW; z += pitch) { B.box(pier, [x0, wy, z], [x0 + inset, wy + wh, z + pierW], { collide: false }); B.box(pier, [x1 - inset, wy, z], [x1, wy + wh, z + pierW], { collide: false }); }
+    if (pierW > 0) for (let x = x0 + pitch / 2 - pierW / 2; x < x1 - pierW; x += pitch) { B.box(pier, [x, wy, z0], [x + pierW, wy + wh, z0 + inset], { collide: false }); B.box(pier, [x, wy, z1 - inset], [x + pierW, wy + wh, z1], { collide: false }); }
+    if (pierW > 0) for (let z = z0 + pitch / 2 - pierW / 2; z < z1 - pierW; z += pitch) { B.box(pier, [x0, wy, z], [x0 + inset, wy + wh, z + pierW], { collide: false }); B.box(pier, [x1 - inset, wy, z], [x1, wy + wh, z + pierW], { collide: false }); }
+    const mp = o.mullionPitch ?? pitch / 3, mm = 0.07;
+    if (mp > 0) {
+      for (let x = x0 + mp; x < x1 - 0.2; x += mp) { B.box('darkMullion', [x - mm / 2, wy, z0 + inset - 0.12], [x + mm / 2, wy + wh, z0 + inset], { collide: false }); B.box('darkMullion', [x - mm / 2, wy, z1 - inset], [x + mm / 2, wy + wh, z1 - inset + 0.12], { collide: false }); }
+      for (let z = z0 + mp; z < z1 - 0.2; z += mp) { B.box('darkMullion', [x0 + inset - 0.12, wy, z - mm / 2], [x0 + inset, wy + wh, z + mm / 2], { collide: false }); B.box('darkMullion', [x1 - inset, wy, z - mm / 2], [x1 - inset + 0.12, wy + wh, z + mm / 2], { collide: false }); }
+      B.box('darkMullion', [x0 + inset - 0.12, wy + wh * 0.5 - mm, z0 + inset - 0.12], [x1 - inset + 0.12, wy + wh * 0.5 + mm, z1 - inset + 0.12], { collide: false });
+    }
     B.box(wall, [x0, wy + wh, z0], [x1, wy + storey, z1], { collide: false });
     y += storey;
   }
@@ -85,13 +91,13 @@ export function buildBuildings(world, M) {
 
   // ---- Frank Melville Jr. Memorial Library: 6 storeys of pale precast bands, slit top floor, sawtooth roof, brick stair towers ---
   const L = LIB;
-  const lib = facade(B, { x0: L.x0, x1: L.x1, z0: L.z0, z1: L.z1, floors: 4, storey: 4.2, band: 1.5, inset: 0.85, pitch: 4.2, pierW: 0.55, wall: 'precast', glass: 'glass', ground: { h: 4.6, inset: 1.3, glass: 'glass', pitch: 8.4 }, top: { h: 4.2, key: 'slit' }, parapet: 1.0 });
-  facade(B, { x0: L.wingX0, x1: L.x0 + 0.5, z0: L.wingZ0, z1: L.wingZ1, floors: 4, storey: 4.2, band: 1.5, inset: 0.85, pitch: 4.2, pierW: 0.55, wall: 'precast', ground: { h: 4.6, inset: 1.3, pitch: 8.4 }, top: { h: 4.2, key: 'slit' }, parapet: 1.0 });
+  const lib = facade(B, { x0: L.x0, x1: L.x1, z0: L.z0, z1: L.z1, floors: 4, storey: 4.2, band: 1.5, inset: 0.85, pitch: 4.2, pierW: 0.55, wall: 'precast', glass: 'glass', ground: { h: 4.6, inset: 1.3, glass: 'glassDark', pitch: 8.4 }, top: { h: 4.2, key: 'slit' }, parapet: 1.0 });
+  facade(B, { x0: L.wingX0, x1: L.x0 + 0.5, z0: L.wingZ0, z1: L.wingZ1, floors: 4, storey: 4.2, band: 1.5, inset: 0.85, pitch: 4.2, pierW: 0.55, wall: 'precast', ground: { h: 4.6, inset: 1.3, glass: 'glassDark', pitch: 8.4 }, top: { h: 4.2, key: 'slit' }, parapet: 1.0 });
   sawtooth(B, L.x0 + 4, L.x1 - 4, L.z0 + 6, L.z1 - 12, lib.top - 0.3, 7, 2.6);
   // brick stair/service towers (dark brick) rising above the parapet
-  block(B, 'brickDark', L.x0 - 2, L.z1 - 9, L.x0 + 6, L.z1 + 1, lib.top + 3.2, { roof: 'roof' });
-  block(B, 'brickDark', L.x1 - 8, L.z0 - 1, L.x1 + 1, L.z0 + 8, lib.top + 3.2, { roof: 'roof' });
-  block(B, 'brickDark', L.x0 - 2, L.z0 - 1, L.x0 + 6, L.z0 + 8, lib.top + 2.2, { roof: 'roof' });
+  block(B, 'brickDark', L.x0 - 1.5, L.z1 - 8, L.x0 + 4.5, L.z1 + 0.8, lib.top + 2.4, { roof: 'roof' });
+  block(B, 'brickDark', L.x1 - 6, L.z0 - 0.8, L.x1 + 0.8, L.z0 + 7, lib.top + 2.4, { roof: 'roof' });
+  block(B, 'brickDark', L.x0 - 1.5, L.z0 - 0.8, L.x0 + 4.5, L.z0 + 7, lib.top + 1.6, { roof: 'roof' });
   // entrance: projecting glass vestibule on the mall face, concrete canopy, "LIBRARY" lettering, planters
   B.box('glass', [L.entX0, 0, L.z1 - 0.5], [L.entX1, 4.2, L.z1 + 2.2], { collide: true });
   B.box('darkMullion', [L.entX0 - 0.15, 0, L.z1 + 2.2], [L.entX0 + 0.15, 4.4, L.z1 + 2.5], { collide: false });
@@ -99,8 +105,8 @@ export function buildBuildings(world, M) {
   for (let x = L.entX0 + 3; x < L.entX1; x += 3) B.box('darkMullion', [x - 0.06, 0, L.z1 + 2.2], [x + 0.06, 4.2, L.z1 + 2.45], { collide: false });
   B.box('precast', [L.entX0 - 1, 4.2, L.z1 - 0.5], [L.entX1 + 1, 4.9, L.z1 + 3.4], { collide: false });
   B.box('precast', [L.entX0 - 1, 4.9, L.z1 - 0.2], [L.entX1 + 1, 6.4, L.z1 + 0.15], { collide: false });
-  lettering(world, 'LIBRARY', (L.entX0 + L.entX1) / 2, 5.65, L.z1 + 0.17, 9, 1.1);
-  lettering(world, 'Frank Melville Jr. Memorial', (L.entX0 + L.entX1) / 2, 6.9, L.z1 + 0.02, 10, 0.55);
+  lettering(world, 'LIBRARY', (L.entX0 + L.entX1) / 2, 5.45, L.z1 + 0.17, 8, 0.9);
+  lettering(world, 'Central Memorial', (L.entX0 + L.entX1) / 2, 6.1, L.z1 + 0.17, 8, 0.4);
   // library east face at the Staller terraces: base wall down to the pit floor
   B.box('precastDark', [L.x1 - 0.2, PIT.floor - 0.5, PIT.z0], [L.x1 + 0.2, 0.05, PIT.z1], { collide: false });
 
@@ -113,7 +119,7 @@ export function buildBuildings(world, M) {
   curtain(B, { face: 's', a0: S.x0, a1: S.hallX1, c: S.hallZ1 - 0.4, y0: 0, y1: 10.6, cellW: 2.6, cellH: 2.65 });
   B.box('white', [S.x0 - 0.3, 10.6, S.z0 - 0.3], [S.hallX1 + 0.3, 12.4, S.hallZ1 + 0.3], { collide: false });
   B.box('roof', [S.x0, 12.4, S.z0], [S.hallX1, 12.45, S.hallZ1], { collide: false });
-  for (let z = S.z0 + 2; z < S.hallZ1; z += 5.1) B.cyl('white', S.x0 - 0.36, z, 11.2, 11.9, 0.36, 12);      // circle ornaments on the trim
+  for (let z = S.z0 + 2; z < S.hallZ1; z += 5.1) B.cyl('white', S.x0 - 0.36, z, 11.85, 12.25, 0.22, 12);      // circle ornaments on the trim
   // white entrance vestibule (walkable roof via ladder) with doors
   B.box('white', [S.x0 - 4.2, 0, S.z0 + 9], [S.x0 - 0.2, 4.6, S.z0 + 20], { walkable: false, collide: false });
   world.walkable([S.x0 - 4.2, 0, S.z0 + 9], [S.x0 - 0.2, 4.6, S.z0 + 20]);
@@ -122,11 +128,11 @@ export function buildBuildings(world, M) {
   B.box('whiteMullion', [S.x0 - 4.36, 2.6, S.z0 + 9.5], [S.x0 - 4.2, 2.75, S.z0 + 19.5], { collide: false });
   B.box('white', [S.x0 - 4.5, 4.6, S.z0 + 8.7], [S.x0 + 0.2, 5.1, S.z0 + 20.3], { collide: false });                    // parapet lip (stops falls)
   world.box([S.x0 - 4.5, 4.6, S.z0 + 8.7], [S.x0 - 4.2, 5.4, S.z0 + 20.3]); world.box([S.x0 - 4.5, 4.6, S.z0 + 8.7], [S.x0 + 0.2, 5.4, S.z0 + 9]); world.box([S.x0 - 4.5, 4.6, S.z0 + 20], [S.x0 + 0.2, 5.4, S.z0 + 20.3]);
-  world.ladder(S.x0 - 4.2, S.z0 + 21.6, 0, 4.6, -1, 0);
-  lettering(world, 'STUDENT  ACTIVITIES  CENTER', S.x0 - 0.38, 11.5, (S.z0 + S.hallZ1) / 2, 26, 1.2, -Math.PI / 2, '#55606a');
+  world.ladder(S.x0 - 2.2, S.z0 + 9, 0, 4.6, 0, -1);
+  lettering(world, 'STUDENT  ACTIVITIES  CENTER', S.x0 - 0.62, 11.25, (S.z0 + S.hallZ1) / 2, 26, 1.0, -Math.PI / 2, '#55606a');
   // brick wings behind the hall: 3 storeys with ribbon windows + barrel-vault roofs
   facade(B, { x0: S.hallX1, x1: S.x1, z0: S.z0, z1: 66, floors: 3, storey: 4.6, band: 2.4, inset: 0.45, pitch: 3.0, pierW: 0.9, wall: 'brickRed', glass: 'glass', parapet: 0.7 });
-  for (const [z0, z1] of [[S.z0 + 2, S.z0 + 20], [S.z0 + 24, S.z0 + 42]]) B.hcyl('roofMetal', 'x', S.hallX1 + 1, S.x1 - 1, (z0 + z1) / 2, 14.5, (z1 - z0) / 2, 24);
+  for (const [z0, z1] of [[S.z0 + 3, S.z0 + 19], [S.z0 + 25, S.z0 + 41]]) B.hcyl('roofMetal', 'x', S.hallX1 + 1, S.x1 - 1, (z0 + z1) / 2, 14.6, 4.2, 24);
   // auditorium / ballroom block (brick, windowless, white cornice) south-west
   block(B, 'brickRed', S.x0, S.hallZ1, S.hallX1 + 8, S.z1, 12.5);
   B.box('white', [S.x0 - 0.3, 11.2, S.hallZ1 - 0.3], [S.hallX1 + 8.3, 12.6, S.z1 + 0.3], { collide: false });
@@ -141,6 +147,10 @@ export function buildBuildings(world, M) {
   for (let i = 0; i < bay.length - 2; i += 1) { const p = bay[i]; const a = Math.atan2(p[1] - S.bayCz, p[0] - S.bayCx); const g = boxGeo([-0.08, 0, -0.16], [0.08, 8.4, 0.16]); g.rotateY(-a + Math.PI / 2); g.translate(p[0] + Math.cos(a) * 0.1, 0, p[1] + Math.sin(a) * 0.1); B.add('whiteMullion', g, { uv: false }); }
   for (let k = 0; k < 6; k++) { const y = 1.4 + k * 1.4; B.prism('whiteMullion', bay.map(p => { const a = Math.atan2(p[1] - S.bayCz, p[0] - S.bayCx); return [p[0] + Math.cos(a) * 0.12, p[1] + Math.sin(a) * 0.12]; }), y - 0.05, y + 0.05, { collide: false }); }
   { const n = 7; for (let i = 0; i < n; i++) { const a0 = Math.PI + 0.42 + (Math.PI - 0.84) * i / n, a1 = Math.PI + 0.42 + (Math.PI - 0.84) * (i + 1) / n; const xs = [S.bayCx + Math.cos(a0) * S.bayR, S.bayCx + Math.cos(a1) * S.bayR], zs = [S.bayCz + Math.sin(a0) * S.bayR, S.bayCz + Math.sin(a1) * S.bayR]; world.box([Math.min(...xs), 0, Math.min(...zs)], [Math.max(...xs), 10.2, S.z0 + 3.2]); } }
+  // raised terrace with steps in front of the bay (mall side)
+  B.box('concretePav', [S.bayCx - 21, 0, S.z0 - 6], [S.bayCx + 21, 0.9, S.z0 + 3.2], { walkable: true });
+  B.stairs('concretePav', { x: S.bayCx, z: S.z0 - 6, y0: 0, rise: 0.9, run: 2.4, width: 42, axis: 'z', dir: -1, n: 3 });
+  for (const x of [S.bayCx - 21.6, S.bayCx + 21]) { B.box('concreteGrey', [x, 0, S.z0 - 8.4], [x + 0.6, 1.35, S.z0 + 3.2]); world.cover(x + 0.3, S.z0 - 9.2, 0, -1); }
   // red glass drum (rotunda) at the west end of the mall front
   B.cyl('glassRed', S.drumX, S.drumZ, 0, 8.2, S.drumR, 32, { collide: true });
   B.cyl('white', S.drumX, S.drumZ, 8.2, 9.2, S.drumR + 0.3, 32);
@@ -174,16 +184,16 @@ export function buildBuildings(world, M) {
 
   // ---- Staller Center for the Arts: brown brick, ribbon windows, fly tower, west entrance canopy on the sunken plaza ---------------
   const T = STALLER;
-  facade(B, { x0: T.nx0, x1: T.nx1, z0: T.nz0, z1: T.nz1, y0: PIT.floor, floors: 3, storey: 4.6, band: 2.4, inset: 0.45, pitch: 3.2, pierW: 1.0, wall: 'brickBrown', pier: 'brickBrown', parapet: 0.8 });
-  facade(B, { x0: T.ex0, x1: T.ex1, z0: T.nz1 - 0.5, z1: T.ez1, y0: PIT.floor, floors: 3, storey: 4.6, band: 2.4, inset: 0.45, pitch: 3.2, pierW: 1.0, wall: 'brickBrown', pier: 'brickBrown', parapet: 0.8 });
-  block(B, 'brickBrown', T.towerX0 - 6, T.towerZ0, T.towerX1, T.towerZ1, 24, { y0: PIT.floor });
-  block(B, 'brickBrown', T.nx0 + 10, T.nz0 + 6, T.nx0 + 40, T.nz1 - 20, 19, { y0: PIT.floor });                 // recital hall mass
+  facade(B, { x0: T.nx0, x1: T.nx1, z0: T.nz0, z1: T.nz1, y0: PIT.floor, floors: 3, storey: 4.6, band: 3.1, inset: 0.35, pitch: 12, pierW: 0, mullionPitch: 1.6, wall: 'brickStaller', pier: 'brickStaller', parapet: 0.8 });
+  facade(B, { x0: T.ex0, x1: T.ex1, z0: T.nz1 - 0.5, z1: T.ez1, y0: PIT.floor, floors: 3, storey: 4.6, band: 3.1, inset: 0.35, pitch: 12, pierW: 0, mullionPitch: 1.6, wall: 'brickStaller', pier: 'brickStaller', parapet: 0.8 });
+  block(B, 'brickStaller', T.towerX0 - 6, T.towerZ0, T.towerX1, T.towerZ1, 24, { y0: PIT.floor });
+  block(B, 'brickStaller', T.nx0 + 10, T.nz0 + 6, T.nx0 + 40, T.nz1 - 20, 19, { y0: PIT.floor });                 // recital hall mass
   // entrance: glazed lobby + concrete canopy on the pit floor, lettering
   B.box('glass', [T.ex0 - 0.6, PIT.floor, T.ez0 + 6], [T.ex0 + 0.2, PIT.floor + 4.2, T.ez0 + 30], { collide: false });
   for (let z = T.ez0 + 6; z <= T.ez0 + 30; z += 1.6) B.box('darkMullion', [T.ex0 - 0.66, PIT.floor, z - 0.05], [T.ex0 - 0.5, PIT.floor + 4.2, z + 0.05], { collide: false });
   B.box('concreteGrey', [T.ex0 - 5.5, PIT.floor + 4.2, T.ez0 + 5], [T.ex0 + 0.4, PIT.floor + 5.0, T.ez0 + 31], { collide: false });
   for (const z of [T.ez0 + 7, T.ez0 + 29]) B.box('concreteGrey', [T.ex0 - 5.2, PIT.floor, z - 0.35], [T.ex0 - 4.5, PIT.floor + 4.2, z + 0.35], { collide: true });
-  lettering(world, 'STALLER CENTER FOR THE ARTS', T.ex0 - 5.52, PIT.floor + 4.6, T.ez0 + 18, 12, 0.55, -Math.PI / 2, '#e8e2d8');
+  lettering(world, 'STALLER CENTER FOR THE ARTS', T.ex0 - 5.52, PIT.floor + 4.55, T.ez0 + 18, 11, 0.5, -Math.PI / 2, '#e8e2d8');
   // raised terrace with railing along the wing's west face (mall level), reached by a ladder from the plaza + a stair from the mall
   B.box('concreteGrey', [T.ex0 - 5, PIT.floor - 0.5, T.ez0 + 32], [T.ex0, 0, T.ez1], { walkable: true });
   for (let z = T.ez0 + 32; z <= T.ez1; z += 2) B.box('steelDark', [T.ex0 - 5, 0, z - 0.03], [T.ex0 - 4.94, 1.05, z + 0.03], { collide: false });
@@ -200,7 +210,8 @@ export function buildBuildings(world, M) {
   // ---- south perimeter: Educational Communications Center (brick), Engineering (precast), Javits / New CS / Light Engineering backdrop ----
   facade(B, { x0: ECC.x0, x1: ECC.x1, z0: ECC.z0, z1: ECC.z1, floors: 2, storey: 4.5, band: 1.8, inset: 0.4, pitch: 3.0, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8 });
   facade(B, { x0: ENG.x0, x1: ENG.x1, z0: ENG.z0, z1: ENG.z1, floors: 3, storey: 4.2, band: 1.5, inset: 0.6, pitch: 3.6, pierW: 0.5, wall: 'precast', parapet: 0.9 });
-  facade(B, { x0: JAVITS.x0, x1: JAVITS.x1, z0: JAVITS.z0, z1: JAVITS.z1, floors: 2, storey: 4.2, band: 1.6, inset: 0.5, pitch: 3.6, pierW: 0.5, wall: 'concrete', parapet: 0.9 });
+  block(B, 'concrete', JAVITS.x0 + 8, JAVITS.z0 + 8, JAVITS.x1 - 8, JAVITS.z1 - 8, 6.5);
+  for (const [cx, cz] of [[JAVITS.x0 + 14, JAVITS.z0 + 14], [JAVITS.x1 - 14, JAVITS.z0 + 14], [JAVITS.x0 + 14, JAVITS.z1 - 14], [JAVITS.x1 - 14, JAVITS.z1 - 14]]) { B.cyl('concrete', cx, cz, 0, 10.5, 13, 28, { collide: true }); B.cyl('roof', cx, cz, 10.5, 10.55, 12.6, 28); B.cyl('glass', cx, cz, 3.2, 5.0, 13.05, 28); }
   facade(B, { x0: NEWCS.x0, x1: NEWCS.x1, z0: NEWCS.z0, z1: NEWCS.z1, floors: 4, storey: 4.0, band: 1.2, inset: 0.4, pitch: 3.0, pierW: 0.3, wall: 'stuccoLight', glass: 'glassLight', parapet: 0.8 });
   facade(B, { x0: LIGHTENG.x0, x1: LIGHTENG.x1, z0: LIGHTENG.z0, z1: LIGHTENG.z1, floors: 2, storey: 4.5, band: 1.8, inset: 0.4, pitch: 3.0, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8 });
 
@@ -240,7 +251,7 @@ export function buildBuildings(world, M) {
     { x: -62, z: 6, ry: 0, text: 'ACADEMIC MALL', sub: 'LIBRARY  ·  STALLER CENTER  →' },
     { x: 60, z: 14, ry: Math.PI, text: 'STUDENT ACTIVITIES CENTER', sub: '←  BUS LOOP  ·  CAMPUS DRIVE' },
     { x: 120, z: -12, ry: 0, text: 'ADMINISTRATION  →', sub: 'WANG CENTER  ·  STALLER STEPS' },
-    { x: -35, z: -30, ry: 0, text: 'ZEBRA PATH', sub: 'CHEMISTRY  ·  STONY BROOK UNION  ↑' },
+    { x: -35, z: -30, ry: 0, text: 'ZEBRA PATH', sub: 'CHEMISTRY  ·  STUDENT UNION  ↑' },
     { x: -118, z: 66, ry: Math.PI / 2, text: 'CAMPUS DRIVE', sub: 'BUS LOOP' },
   ];
   for (const s of signs) {

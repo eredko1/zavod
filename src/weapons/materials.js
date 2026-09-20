@@ -179,7 +179,7 @@ export function makeMaterials(tex) {
     blackout: new THREE.MeshBasicMaterial({ color: 0x030303 }),
     dot: new THREE.MeshBasicMaterial({ color: 0xff1a10, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }),
     // coyote-tan tactical glove: nylon/leather weave with stitched seams; palm patches darker & pebbled (vertex color b); fingertip dirt via edge wear
-    glove: injectWear(new THREE.MeshStandardMaterial({ color: 0x6b5236, roughness: 0.9, metalness: 0.0, map: rep(tex.gloveMap, 3.0), roughnessMap: rep(tex.gloveMap, 3.0), normalMap: rep(tex.gloveNormal, 3.0), normalScale: new THREE.Vector2(1.1, 1.1), envMapIntensity: 0.0 }), { wearColor: [0.62, 0.55, 0.42], wearRough: 0.92, wearMetal: 0, grimeDark: 0.6, wearScale: 0.8, palmColor: [0.17, 0.155, 0.14] }),
+    glove: injectWear(new THREE.MeshStandardMaterial({ color: 0x6b5236, roughness: 0.9, metalness: 0.0, map: rep(tex.gloveMap, 3.0), roughnessMap: rep(tex.gloveMap, 3.0), normalMap: rep(tex.gloveNormal, 3.0), normalScale: new THREE.Vector2(1.1, 1.1), envMapIntensity: 0.0 }), { wearColor: [0.5, 0.44, 0.34], wearRough: 0.92, wearMetal: 0, grimeDark: 0.6, wearScale: 0.7, palmColor: [0.17, 0.155, 0.14] }),
     // hard knuckle plate: slightly glossy dark grey polymer
     knuckle: injectWear(new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.5, metalness: 0.05, normalMap: rep(tex.polymerNormal, 3), normalScale: new THREE.Vector2(0.4, 0.4), envMapIntensity: 0.7 }), { wearColor: [0.5, 0.5, 0.48], wearRough: 0.35, wearMetal: 0, wearScale: 0.8 }),
     // multicam sleeve with creases (bump) and a rolled cuff

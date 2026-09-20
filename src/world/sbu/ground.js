@@ -61,14 +61,15 @@ export function buildGround(world, M) {
   pav('hex', 11, 20, 18, 100);              // SAC east alley to the south
   pav('hex', -40, 20, 11, 24);              // in front of the drum base
   // brick bands across the mall every 6 m + longitudinal edges
-  for (let x = MALL.x0 + 6; x < MALL.x1; x += 6) pav('brickPav', x - 0.3, MALL.z0, x + 0.3, MALL.z1, { y: PAV_Y + 0.004, t: 0.02 });
-  pav('brickPav', MALL.x0, MALL.z0 + 5.5, MALL.x1, MALL.z0 + 6.1, { y: PAV_Y + 0.004, t: 0.02 });
-  pav('brickPav', MALL.x0, MALL.z1 - 6.1, MALL.x1, MALL.z1 - 5.5, { y: PAV_Y + 0.004, t: 0.02 });
+  for (let x = MALL.x0 + 8; x < MALL.x1; x += 8) pav('brickPav', x - 0.22, MALL.z0, x + 0.22, MALL.z1, { y: PAV_Y + 0.004, t: 0.02 });
+  pav('brickPav', MALL.x0, MALL.z0 + 5.6, MALL.x1, MALL.z0 + 6.0, { y: PAV_Y + 0.004, t: 0.02 });
+  pav('brickPav', MALL.x0, MALL.z1 - 6.0, MALL.x1, MALL.z1 - 5.6, { y: PAV_Y + 0.004, t: 0.02 });
   // tree-pit strips (ivy) along the mall's south edge and the library lawn edge
   for (let x = -100; x < 190; x += 12) {
     if (x > 120 && x < 152) continue; // fountain circle
-    pav('ivy', x - 2, MALL.z1 - 5.4, x + 2, MALL.z1 - 1.4, { y: PAV_Y + 0.05, t: 0.06 });
-    world.cover(x - 2.6, MALL.z1 - 3.4, -1, 0); world.cover(x + 2.6, MALL.z1 - 3.4, 1, 0);
+    S.box('concreteGrey', [x - 2.2, 0, MALL.z1 - 5.6], [x + 2.2, 0.42, MALL.z1 - 1.2]);
+    pav('ivy', x - 2.0, MALL.z1 - 5.4, x + 2.0, MALL.z1 - 1.4, { y: 0.5, t: 0.1 });
+    world.cover(x - 2.8, MALL.z1 - 3.4, -1, 0); world.cover(x + 2.8, MALL.z1 - 3.4, 1, 0);
   }
 
   // ---- library forecourt: lawn strip with the entrance walk, hoop-fence + hex apron along the face ------------------
@@ -93,6 +94,7 @@ export function buildGround(world, M) {
   // ---- SAC plaza: hex field + radial concrete bands + ring ---------------------------------------------------------------
   B.poly('hex', SAC_PLAZA, PAV_Y + 0.002);
   const pc = PLAZA_C;
+  B.poly('asphalt', circlePts(pc.x, pc.z, pc.r, 64), PAV_Y + 0.005);
   for (let k = 0; k < 12; k++) {
     const a = k * Math.PI / 6 + 0.15; const dx = Math.cos(a), dz = Math.sin(a); const nx = -dz * 0.45, nz = dx * 0.45;
     const r0 = 6, r1 = pc.r;
@@ -141,14 +143,14 @@ export function buildGround(world, M) {
   B.box('concretePav', [T.floorX0, T.floor - 0.5, T.z0], [T.x1, T.floor, T.z1], { collide: true });
   for (let i = 0; i < T.steps; i++) {
     const x1 = T.floorX0 - i * T.tread, x0 = x1 - T.tread; const top = T.floor + T.rise * (i + 1);
-    S.box('grass', [x0 + 0.5, T.floor - 0.5, T.z0], [x1, top, T.z1], { walkable: true });
-    S.box('concreteGrey', [x0, T.floor - 0.5, T.z0], [x0 + 0.5, top + 0.02, T.z1], { collide: false }); // riser lip
+    S.box('grass', [x0, T.floor - 0.5, T.z0], [x1 - 0.5, top, T.z1], { walkable: true });
+    S.box('concreteGrey', [x1 - 0.5, T.floor - 0.5, T.z0], [x1, top + 0.03, T.z1], { collide: false }); // riser lip (concrete edge people sit on)
     world.cover(x0 + 1.2, T.z0 + 12, 1, 0, top); world.cover(x0 + 1.2, T.z1 - 12, 1, 0, top);
   }
   S.box('grass', [T.x0, -0.5, T.z0], [T.floorX0 - T.steps * T.tread, 0, T.z1], { collide: true });          // upper lawn
   S.box('concreteGrey', [T.x0 - 0.2, T.floor - 0.5, T.z0 - 0.4], [T.x1, T.floor + 0.1, T.z0], { collide: true }); // north wall footing (Staller block sits on it)
   S.box('concreteGrey', [T.floorX0 - 4, T.floor - 0.5, T.z1], [T.x1, 0, T.z1 + 0.6], { collide: true });      // south retaining wall (east part)
-  S.stairs('concretePav', { x: (T.floorX0 + T.x1) / 2, z: T.z1 - 8, y0: T.floor, rise: -T.floor, run: 8, width: T.x1 - T.floorX0 - 1, axis: 'z', dir: 1, n: 8 });
+  S.stairs('concretePav', { x: (T.floorX0 + T.x1) / 2, z: T.z1 - 9, y0: T.floor, rise: -T.floor, run: 9, width: T.x1 - T.floorX0 - 1, axis: 'z', dir: 1, n: 10 });
   // low wall along the south rim of the terraces (mall side) with a gap for the stair
   S.box('concreteGrey', [T.x0, 0, T.z1], [T.floorX0 - 4, 0.45, T.z1 + 0.5]);
   for (let x = T.x0 + 6; x < T.floorX0 - 6; x += 12) world.cover(x, T.z1 + 1.3, 0, 1);
@@ -191,7 +193,13 @@ export function buildGround(world, M) {
   // John S. Toll Drive (backdrop, north of Chemistry / Staller) + Circle-Road-style west backdrop road
   pav('asphalt', -260, -212, 400, -202, { y: 0.02, t: 0.1 });
   for (let x = -258; x < 400; x += 8) pav('paintY', x, -207.1, x + 4, -206.9, { y: 0.035, t: 0.015 });
-  pav('asphalt', -262, -212, -252, 260, { y: 0.02, t: 0.1 });
+  pav('asphalt', -262, -212, -252, 260, { y: 0.02, t: 0.1 });                                   // Circle Road (west arc, straightened)
+  for (let z = -210; z < 260; z += 8) pav('paintY', -257.1, z, -256.9, z + 4, { y: 0.035, t: 0.015 });
+  pav('asphalt', -262, 250, 400, 260, { y: 0.02, t: 0.1 });                                     // Circle Road south leg
+  // Nicolls Road (Route 97): divided 4-lane highway at the far west edge of campus, grass median
+  pav('asphalt', -712, -900, -698, 900, { y: 0.02, t: 0.1 }); pav('asphalt', -690, -900, -676, 900, { y: 0.02, t: 0.1 });
+  for (let z = -900; z < 900; z += 12) { pav('paint', -705.1, z, -704.9, z + 4, { y: 0.035, t: 0.015 }); pav('paint', -683.1, z, -682.9, z + 4, { y: 0.035, t: 0.015 }); }
+  pav('paintY', -698.2, -900, -697.9, 900, { y: 0.035, t: 0.015 }); pav('paintY', -690.1, -900, -689.8, 900, { y: 0.035, t: 0.015 });
 
   B.flush({ shadow: false }); S.flush();
   W.groundHeight = groundHeight;

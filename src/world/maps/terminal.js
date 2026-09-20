@@ -8,8 +8,8 @@ import { buildSouth } from '../terminal/south.js';
 import { buildSubway } from '../terminal/subway.js';
 
 export const meta = {
-  id: 'terminal', name: 'GRAND CENTRAL', subtitle: 'DAY OPS · MAIN CONCOURSE', time: 'day', weather: 'clear',
-  description: 'Grand Central Terminal, Manhattan: the Main Concourse under the celestial ceiling, the opal clock, marble staircases and balconies, Vanderbilt Hall, the Dining Concourse ramps and the subway platforms below.',
+  id: 'terminal', name: 'CENTRAL STATION', subtitle: 'DAY OPS · MAIN CONCOURSE', time: 'day', weather: 'clear',
+  description: 'A grand Beaux-Arts rail terminal: the main concourse under a celestial ceiling, the four-faced clock, marble staircases and balconies, the waiting hall, dining concourse ramps and the subway below.',
   grade: 'day', ambience: 'terminal-day', thumb: 'assets/thumbs/terminal.jpg',
 };
 

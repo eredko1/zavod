@@ -342,3 +342,12 @@
 
 /* sniper scope view: the scope overlay owns the reticle */
 #hud.scoped .xh, #hud.scoped .compass, #hud.scoped .obj { opacity: 0 !important; }
+
+/* ---------- mission framing ---------- */
+#hud .mainmenu .brief { max-width: calc(440px * var(--hs)); margin-top: calc(14px * var(--hs)); font: 400 calc(13px * var(--hs))/1.45 var(--fb); color: var(--dim); border-left: 2px solid var(--acc); padding-left: calc(12px * var(--hs)); }
+#hud .mainmenu .brief b { color: var(--acc); letter-spacing: .2em; font-weight: 600; }
+#hud .deploybrief { position: absolute; left: 50%; top: 22%; transform: translate(-50%, -10px); width: min(560px, 80vw); text-align: center; opacity: 0; transition: opacity .5s var(--ease), transform .5s var(--ease); pointer-events: none; }
+#hud .deploybrief.on { opacity: 1; transform: translate(-50%, 0); }
+#hud .deploybrief .k { font: 700 calc(15px * var(--hs))/1 var(--fc); letter-spacing: .32em; color: var(--acc); text-transform: uppercase; margin-bottom: 8px; }
+#hud .deploybrief .v { font: 400 calc(14px * var(--hs))/1.45 var(--fb); color: var(--fg); text-shadow: 0 1px 8px rgba(0,0,0,.8); }
+@media (max-height: 560px) { #hud .mainmenu .brief { display: none; } }

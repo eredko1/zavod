@@ -88,7 +88,7 @@ export function zebraTexture(R) {
 /** Leaf clump alpha texture (deciduous / pine). */
 export function leafTexture(R, { pine = false } = {}) {
   const S = 256; const [c, g] = canvas(S, S); g.clearRect(0, 0, S, S);
-  const n = pine ? 900 : 520;
+  const n = pine ? 2600 : 520;
   for (let i = 0; i < n; i++) {
     const x = R() * S, y = R() * S; const a = R() * Math.PI * 2; const l = pine ? 6 + R() * 8 : 7 + R() * 9;
     const gsh = pine ? 70 + R() * 40 : 95 + R() * 60; const rr = pine ? 30 + R() * 25 : 60 + R() * 45; const b = pine ? 30 + R() * 25 : 25 + R() * 30;
@@ -144,9 +144,9 @@ export function makeMats(world) {
   const reg = (key, mat, surface, uvScale) => { M[key] = mat; M.surface[key] = surface; M.uvScale[key] = uvScale; return mat; };
 
   // ---- ground -------------------------------------------------------------------------------
-  reg('grass', pbr('grass', 'wsp_grass', '1k', { color: 0xa9b57a, normalScale: 0.8, arm: false, roughness: 0.95, envMapIntensity: 0.35 }), 'ground', 1 / 2.5);
-  reg('hex', new THREE.MeshStandardMaterial({ map: hexPaverTexture(R), color: 0xd2d2ce, roughness: 0.9, metalness: 0, envMapIntensity: 0.5, name: 'hex' }), 'concrete', 1 / 2);
-  reg('brickPav', pbr('brickPav', 'wsp_brick', '1k', { color: 0xb8705a, normalScale: 0.7, arm: false, roughness: 0.9, envMapIntensity: 0.4 }), 'concrete', 1 / 1.2);
+  reg('grass', pbr('grass', 'wsp_grass', '1k', { color: 0x86a05c, normalScale: 0.8, arm: false, roughness: 0.95, envMapIntensity: 0.3 }), 'ground', 1 / 2.5);
+  reg('hex', new THREE.MeshStandardMaterial({ map: hexPaverTexture(R), color: 0xc6c8c6, roughness: 0.9, metalness: 0, envMapIntensity: 0.5, name: 'hex' }), 'concrete', 1 / 2);
+  reg('brickPav', pbr('brickPav', 'wsp_brick', '1k', { color: 0x9a6a58, normalScale: 0.7, arm: false, roughness: 0.9, envMapIntensity: 0.4 }), 'concrete', 1 / 1.2);
   reg('concretePav', pbr('concretePav', 'concrete_floor_02', '1k', { color: 0xd3cfc6, normalScale: 0.5, grime: { strength: 0.3, height: 0.2, wet: 0, tint: [0.5, 0.48, 0.44] } }), 'concrete', 1 / 3);
   reg('asphalt', pbr('asphalt', 'asphalt_02', '2k', { color: 0x8f8f8d, normalScale: 0.6, envMapIntensity: 0.5 }), 'concrete', 1 / 5);
   reg('cobble', pbr('cobble', 'rail_church_bricks_03', '1k', { color: 0xc9bca6, normalScale: 0.9, envMapIntensity: 0.4 }), 'concrete', 1 / 1.4);
@@ -162,18 +162,20 @@ export function makeMats(world) {
   const rib = ribbedConcreteTexture(R);
   reg('ribbed', new THREE.MeshStandardMaterial({ map: rib.map, normalMap: rib.normalMap, normalScale: new THREE.Vector2(0.8, 0.8), color: 0xd3cbbd, roughness: 0.92, envMapIntensity: 0.5, name: 'ribbed' }), 'concrete', 1 / 2);
   addGrime(M.ribbed, R, { key: 'ribbed', strength: 0.5, height: 2.5, wet: 0, tint: [0.45, 0.42, 0.37] });
-  reg('precast', new THREE.MeshStandardMaterial({ map: precastTexture(R), color: 0xd9d1c2, roughness: 0.88, envMapIntensity: 0.55, name: 'precast' }), 'concrete', 1 / 4);
+  reg('precast', new THREE.MeshStandardMaterial({ map: precastTexture(R), color: 0xc2b6a3, roughness: 0.88, envMapIntensity: 0.55, name: 'precast' }), 'concrete', 1 / 4);
   addGrime(M.precast, R, { key: 'precast', strength: 0.4, height: 2.2, wet: 0, tint: [0.45, 0.42, 0.37] });
   reg('precastDark', new THREE.MeshStandardMaterial({ map: M.precast.map, color: 0xa79d8e, roughness: 0.9, envMapIntensity: 0.45, name: 'precastDark' }), 'concrete', 1 / 4);
-  reg('slit', new THREE.MeshStandardMaterial({ map: slitWindowTexture(R), roughness: 0.85, envMapIntensity: 0.5, name: 'slit' }), 'concrete', 1 / 4.2);
+  reg('slit', new THREE.MeshStandardMaterial({ map: slitWindowTexture(R), color: 0xc8bcaa, roughness: 0.85, envMapIntensity: 0.5, name: 'slit' }), 'concrete', 1 / 4.2);
   reg('concrete', pbr('concrete', 'concrete_wall_006', '1k', { color: 0xd6d0c6, normalScale: 0.6, grime: { strength: 0.5, height: 2.0, wet: 0, tint: [0.42, 0.4, 0.35] } }), 'concrete', 1 / 2.5);
-  reg('concreteGrey', pbr('concreteGrey', 'concrete_wall_006', '1k', { color: 0xa9a7a2, normalScale: 0.6 }), 'concrete', 1 / 2.5);
+  reg('concreteGrey', pbr('concreteGrey', 'concrete_wall_006', '1k', { color: 0xbdbab3, normalScale: 0.6 }), 'concrete', 1 / 2.5);
   reg('brickRed', pbr('brickRed', 'factory_brick', '1k', { color: 0xc9887a, normalScale: 0.9, grime: { strength: 0.45, height: 1.8, wet: 0, tint: [0.4, 0.33, 0.28] } }), 'concrete', 1 / 1.6);
-  reg('brickBrown', pbr('brickBrown', 'rail_church_bricks_03', '1k', { color: 0x8a6a56, normalScale: 0.9, grime: { strength: 0.45, height: 2, wet: 0, tint: [0.35, 0.3, 0.26] } }), 'concrete', 1 / 1.6);
-  reg('brickDark', pbr('brickDark', 'factory_brick', '1k', { color: 0x7a5a50, normalScale: 0.9 }), 'concrete', 1 / 1.6);
+  reg('brickBrown', pbr('brickBrown', 'rail_church_bricks_03', '1k', { color: 0x6e5245, normalScale: 0.9, grime: { strength: 0.45, height: 2, wet: 0, tint: [0.35, 0.3, 0.26] } }), 'concrete', 1 / 1.6);
+  reg('brickDark', pbr('brickDark', 'factory_brick', '1k', { color: 0x5a3d35, normalScale: 0.9 }), 'concrete', 1 / 1.6);
+  reg('brickStaller', pbr('brickStaller', 'factory_brick', '1k', { color: 0x7a5744, normalScale: 0.9, grime: { strength: 0.4, height: 2, wet: 0, tint: [0.35, 0.3, 0.26] } }), 'concrete', 1 / 1.6);
   reg('stucco', pbr('stucco', 'painted_concrete', '1k', { color: 0x9a9894, normalScale: 0.4, grime: { strength: 0.35, height: 2.5, wet: 0 } }), 'concrete', 1 / 3);
   reg('stuccoLight', pbr('stuccoLight', 'painted_concrete', '1k', { color: 0xc4c1bb, normalScale: 0.4 }), 'concrete', 1 / 3);
-  reg('glass', plain('glass', 0x33414c, { roughness: 0.1, metalness: 0.92, envMapIntensity: 1.3 }), 'metal', 0.5);
+  reg('glass', plain('glass', 0x7d95a8, { roughness: 0.12, metalness: 0.8, envMapIntensity: 1.3 }), 'metal', 0.5);
+  reg('glassDark', plain('glassDark', 0x4a5c68, { roughness: 0.15, metalness: 0.85, envMapIntensity: 1.1 }), 'metal', 0.5);
   reg('glassLight', plain('glassLight', 0x8fb2c2, { roughness: 0.06, metalness: 0.9, envMapIntensity: 1.5 }), 'metal', 0.5);
   reg('glassRed', plain('glassRed', 0x8c1a22, { roughness: 0.12, metalness: 0.85, envMapIntensity: 1.2 }), 'metal', 0.5);
   reg('white', plain('white', 0xe9e8e2, { roughness: 0.55, metalness: 0.1, envMapIntensity: 0.7 }), 'metal', 0.5);

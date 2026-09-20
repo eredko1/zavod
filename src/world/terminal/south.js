@@ -140,7 +140,7 @@ export function buildSouth(world, M, Z) {
     // sign over the north arch (inside VH) + over the bridge (toward the concourse)
     const sgn = M.sign('MAIN CONCOURSE  ·  TRACKS  ·  BALCONIES', { bg: '#1d1710', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
     B.add(sgn, new THREE.PlaneGeometry(6.5, 0.6), mat4(0, 7.5, z0 - 0.02, 0, 0, 0));
-    const sgn2 = M.sign('VANDERBILT HALL  ·  42nd STREET', { bg: '#1d1710', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
+    const sgn2 = M.sign('WAITING HALL  ·  MAIN STREET', { bg: '#1d1710', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
     B.add(sgn2, new THREE.PlaneGeometry(6.5, 0.6), mat4(0, 7.5, z0 - T + 0.02, 0, Math.PI, 0));
     B.add(sgn2, new THREE.PlaneGeometry(6.5, 0.6), mat4(0, 9.6, P.Z1 - 0.02, 0, Math.PI, 0));
   }
@@ -174,7 +174,7 @@ export function buildSouth(world, M, Z) {
     // trash cans (instanced later via props) — positions
     world.termTrash.push([-8, LOW, z0 + 2], [12, LOW, z1 - 4.2], [26, LOW, z0 + 12]);
     // signage to the subway
-    const s = M.sign('SUBWAY  ·  4 · 5 · 6  ·  42 ST', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 60px Helvetica, Arial, sans-serif' }); B.add(s, new THREE.PlaneGeometry(4.5, 0.5), mat4(0, LOW + 3.1, z1 - 0.02, 0, Math.PI, 0));
+    const s = M.sign('SUBWAY  ·  4 · 5 · 6  ·  MAIN ST', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 60px Helvetica, Arial, sans-serif' }); B.add(s, new THREE.PlaneGeometry(4.5, 0.5), mat4(0, LOW + 3.1, z1 - 0.02, 0, Math.PI, 0));
   }
   // Oyster Bar: x∈[-31,-8], z∈[30,41], Guastavino vaulted, counter + tables; door from the dining side (x=-8) at z∈[32,35]
   {
@@ -214,7 +214,7 @@ export function buildSouth(world, M, Z) {
     const s = M.sign('TOKEN BOOTH', { w: 512, h: 96, bg: '#0d0d0d', fg: '#ffffff', font: 'bold 48px Helvetica, Arial' }); B.add(s, new THREE.PlaneGeometry(2.4, 0.42), mat4(9.5, LOW + 2.4, 51.38, 0, Math.PI, 0));
     world.cover(9.5, 50.8, 0, -1, LOW); world.cover(-9, 55.2, 0, 1, LOW); world.cover(9, 55.2, 0, 1, LOW);
     for (const lx of [-10, 0, 10]) for (const lz of [51.5, 56]) world.termLamps.push([lx, yc - 0.15, lz, 'fluor']);
-    const s2 = M.sign('DOWNTOWN & BROOKLYN  ·  4 5 6', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial' }); B.add(s2, new THREE.PlaneGeometry(4, 0.5), mat4(0, LOW + 2.9, z1 - 0.02, 0, Math.PI, 0));
+    const s2 = M.sign('DOWNTOWN & HARBOR  ·  4 5 6', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial' }); B.add(s2, new THREE.PlaneGeometry(4, 0.5), mat4(0, LOW + 2.9, z1 - 0.02, 0, Math.PI, 0));
     world.termTrash.push([-14, LOW, 52], [14, LOW, 56]);
   }
 

@@ -161,7 +161,7 @@ export function buildConcourse(world, M, Z) {
       // under-balcony ceiling (coffered look) + solid mass filling behind the stair (under landing) is done in stairs
       B.box(M.plaster, [bx0, y0 - 0.3, Z0], [bx1, y0, Z1], { uvScale: 0.5 });
       // sign band on the arcade lintel
-      const sgn = M.sign(side < 0 ? 'VANDERBILT AVENUE  ·  SHUTTLE  ·  42 ST' : 'LEXINGTON AVENUE  ·  GRAYBAR PASSAGE', { bg: '#3a2c18', fg: '#e8c56a', font: 'bold 60px Georgia, serif' });
+      const sgn = M.sign(side < 0 ? 'WEST AVENUE  ·  SHUTTLE  ·  MAIN ST' : 'MARKET AVENUE  ·  EAST PASSAGE', { bg: '#3a2c18', fg: '#e8c56a', font: 'bold 60px Georgia, serif' });
       const sg = new THREE.PlaneGeometry(14, 0.9); B.add(sgn, sg, mat4(fx - side * 0.01, y0 - 0.55, side < 0 ? 0 : 0, 0, side < 0 ? Math.PI / 2 : -Math.PI / 2));
     }
     // north balcony
@@ -227,7 +227,7 @@ export function buildConcourse(world, M, Z) {
     const fxw = sx(-P.BAL_X) - side * 0.03, yaww = side < 0 ? Math.PI / 2 : -Math.PI / 2;
     B.add(M.glassDim, new THREE.ShapeGeometry(archShapeAt(0, 3, 3, 2.3)), placeXY(fxw, 0, 0, yaww), { uvScale: uv(M.glassDim) });
     B.add(M.bronze, grilleGeo(3, 2.3, { arch: true }), placeXY(fxw - side * 0.05, 3, 0, yaww));
-    const sgn = M.sign(side < 0 ? 'VANDERBILT AVENUE  ·  DINING CONCOURSE  ·  SUBWAY' : 'LEXINGTON AVENUE  ·  EAST BALCONY  ·  SUBWAY', { bg: '#2a1e10', fg: '#e8c56a', font: 'bold 52px Georgia, serif' });
+    const sgn = M.sign(side < 0 ? 'WEST AVENUE  ·  DINING CONCOURSE  ·  SUBWAY' : 'MARKET AVENUE  ·  EAST BALCONY  ·  SUBWAY', { bg: '#2a1e10', fg: '#e8c56a', font: 'bold 52px Georgia, serif' });
     B.add(sgn, new THREE.PlaneGeometry(9, 0.45), mat4(fxw - side * 0.05, BAL_Y - 0.3, 0, 0, yaww, 0));
   }
 
@@ -262,7 +262,7 @@ export function buildConcourse(world, M, Z) {
     const x0 = Math.min(side * P.TICK_X0, side * P.TICK_X1), x1 = Math.max(side * P.TICK_X0, side * P.TICK_X1);
     B.box(M.marble, [x0, 0, P.TICK_Z0], [x1, P.TICK_H, Z1], { uvScale: uv(M.marble), collide: true });
     B.box(M.brassDark, [x0, P.TICK_H - 0.5, P.TICK_Z0 - 0.06], [x1, P.TICK_H, P.TICK_Z0 - 0.02], { uvScale: 1 });
-    const sgn = M.sign('TICKETS   ·   METRO-NORTH   ·   TICKETS', { bg: '#1b1611', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
+    const sgn = M.sign('TICKETS   ·   REGIONAL RAIL   ·   TICKETS', { bg: '#1b1611', fg: '#e8c56a', font: 'bold 56px Georgia, serif' });
     B.add(sgn, new THREE.PlaneGeometry(x1 - x0 - 0.4, 0.45), mat4((x0 + x1) / 2, P.TICK_H - 0.25, P.TICK_Z0 - 0.07, 0, Math.PI, 0));
     for (let x = x0 + 1.2; x < x1 - 0.8; x += 2.4) { B.add(M.bronze, grilleGeo(1.4, 1.5), mat4(x, 1.85, P.TICK_Z0 - 0.04, 0, Math.PI, 0)); B.box(M.darkGlass, [x - 0.7, 1.1, P.TICK_Z0 - 0.02], [x + 0.7, 2.6, P.TICK_Z0], { uvScale: 1 }); B.box(M.marbleDark, [x - 0.8, 0.95, P.TICK_Z0 - 0.35], [x + 0.8, 1.1, P.TICK_Z0], { uvScale: 1 }); }
     // departure board above (canvas emissive) framed in brass

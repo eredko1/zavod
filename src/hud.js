@@ -66,10 +66,11 @@ export async function init(ctx) {
 
   // ---- events ----
   const bus = ctx.bus;
+  bus.on('state', ({ state, prev }) => { if (state === 'playing' && (prev === 'menu' || prev === 'boot')) { const b = H.root.querySelector('.deploybrief'); if (b && !ctx.qa) { b.classList.add('on'); clearTimeout(H._bt); H._bt = setTimeout(() => b.classList.remove('on'), 6500); } } });
   bus.on('hit', (d) => { H.shotsHit++; hitmarker(H, !!d?.headshot, false); });
   bus.on('enemyKilled', (d) => {
     hitmarker(H, !!d?.headshot, true);
-    killfeed(H, `<span class="me">YOU</span>${ICON_AR}${d?.headshot ? ICON_HS : ''}<span>${d?.name || 'OPERATOR'}</span>`, true);
+    killfeed(H, `<span class="me">YOU</span>${ICON_AR}${d?.headshot ? ICON_HS : ''}<span>${d?.name || 'MERCENARY'}</span>`, true);
     const cur = d?.score ?? ctx.ai?.score ?? 0; const delta = cur - H.lastScore; H.lastScore = cur;
     const streak = d?.streak ?? ctx.ai?.streak ?? 0;
     scorePopup(H, `+${delta > 0 ? delta : (d?.headshot ? 150 : 100)}${d?.headshot ? ' HEADSHOT' : ''}${streak >= 3 ? ` · ×${streak}` : ''}`, !!d?.headshot);
@@ -341,7 +342,7 @@ function toast(H, text, ms) {
 function showWave(H, n, total, enemies) {
   H.waveT.textContent = `WAVE ${n} / ${total}`;
   const cnt = enemies ? `${enemies} ` : '';
-  H.waveS.textContent = n >= total ? `FINAL WAVE — ${cnt}HOSTILES · HOLD THE YARD` : `${cnt}HOSTILES INBOUND`;
+  H.waveS.textContent = n >= total ? `FINAL WAVE — ${cnt}MERCENARIES · HOLD UNTIL EXTRACTION` : `${cnt}MERCENARIES INBOUND`;
   H.wave.classList.remove('on'); void H.wave.offsetWidth; H.wave.classList.add('on');
 }
 
@@ -551,14 +552,15 @@ function buildDOM() {
   <div class="layer game">
     <div class="vig"></div>
     <div class="compass"><canvas></canvas><div class="mark"></div><div class="bearing">000</div></div>
-    <div class="obj"><span>Wave</span><b class="w">00</b><i></i><span>Score</span><b class="sc">0</b><i></i><span class="hostile">Hostiles <b>00</b></span></div>
+    <div class="obj"><span>Wave</span><b class="w">00</b><i></i><span>Score</span><b class="sc">0</b><i></i><span class="hostile">Mercs <b>00</b></span></div>
     <div class="feed"></div>
     <canvas class="dmg"></canvas>
     <div class="xh"><i></i><i></i><i></i><i></i></div>
     <div class="hm"><i></i><i></i><i></i><i></i></div>
     <div class="pops"></div>
     <div class="prompt"></div>
-    <div class="wave"><div class="t">WAVE 1 / 6</div><div class="ln"></div><div class="s">HOSTILES INBOUND</div></div>
+    <div class="wave"><div class="t">WAVE 1 / 6</div><div class="ln"></div><div class="s">MERCENARIES INBOUND</div></div>
+    <div class="deploybrief"><div class="k">REAPER-1 · NAVAL SPECIAL WARFARE</div><div class="v">Hostile mercenaries hold this site. You are the only friendly on the ground. Defend it until extraction.</div></div>
     <div class="hp"><div class="lab"><b>100</b><span>Health</span></div><div class="bar"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
     <div class="wpn">
       <div class="name"><span class="nm">—</span><span class="mode">AUTO</span></div>
@@ -573,24 +575,26 @@ function buildDOM() {
   <div class="layer ui mainmenu">
     <div class="backdrop"></div>
     <div class="col">
-      <div class="eyebrow in" style="--i:0">Special operations</div>
+      <div class="eyebrow in" style="--i:0">Naval Special Warfare · Counter-terror unit</div>
       <h1 class="title in" style="--i:1">Zavod</h1>
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
+      <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
       <nav class="menu">${mi('deploy', 0, 'Deploy', 'primary')}${mi('maps', 1, 'Select map')}${mi('loadout', 2, 'Loadout')}${mi('settings', 3, 'Settings')}${mi('controls', 4, 'Controls')}</nav>
     </div>
-    <div class="tag-tr in" style="--i:2"><i></i>Operator <b>Online</b><br>Sector <b>Zavod-7</b></div>
-    <div class="tag-bl in up" style="--i:6">Build <b>${VERSION}</b> · three r186 · webgl2<br>Zavod is a non-commercial tech demo</div>
+    <div class="tag-tr in" style="--i:2"><i></i>Callsign <b>REAPER-1</b><br>Status <b>Sole operator on site</b></div>
+    <div class="tag-bl in up" style="--i:6">Build <b>${VERSION}</b> · three r186 · webgl2<br>Zavod is a non-commercial tech demo · fictional locations, no real people or groups</div>
     <div class="tag-br in up" style="--i:7"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Back</span></div>
   </div>
 
   <div class="layer ui pause">
     <div class="backdrop"></div>
     <div class="col">
-      <div class="eyebrow in" style="--i:0">Mission suspended</div>
+      <div class="eyebrow in" style="--i:0">Operation suspended</div>
       <h1 class="title sm in" style="--i:1">Paused</h1>
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
+      <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
       <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('settings', 1, 'Settings')}${mi('menu', 2, 'Quit to menu')}</nav>
     </div>
     <div class="tag-br in up" style="--i:6"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Resume</span></div>
@@ -600,7 +604,7 @@ function buildDOM() {
     <div class="backdrop"></div><div class="flash"></div>
     <div class="center">
       <div class="kia">K.I.A.</div>
-      <div class="sub in up" style="--i:3">Killed in action</div>
+      <div class="sub in up" style="--i:3">Killed in action — the site fell to the mercenaries</div>
       <div class="rule in up" style="--i:4"></div>
       ${stats(true)}
       <div class="btns in up" style="--i:7"><button class="btn primary" data-act="retry">Retry</button><button class="btn" data-act="menu">Quit to menu</button></div>
@@ -612,7 +616,7 @@ function buildDOM() {
     <div class="shut t"></div><div class="shut b"></div><div class="seam"></div>
     <div class="center">
       <div class="mc">Mission complete</div>
-      <div class="sub in up" style="--i:0">Container yard secured</div>
+      <div class="sub in up" style="--i:0">Site secured — civilians safe, extraction inbound</div>
       <div class="rule in up" style="--i:1"></div>
       ${stats(true)}
       <div class="btns in up" style="--i:4"><button class="btn primary" data-act="retry">Play again</button><button class="btn" data-act="menu">Main menu</button></div>

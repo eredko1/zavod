@@ -65,7 +65,7 @@ export function buildProps(world, M) {
   // mall rows (both sides), library lawn, plaza ring, east lawn, Staller terraces edges, perimeter belts
   for (let x = -100; x < 190; x += 12) { if (!(x > 120 && x < 152)) tree(x + j(1.5), MALL.z1 - 3.4 + j(0.6), 1.0); }
   for (let x = -100; x < 12; x += 12) tree(x + j(1.5), MALL.z0 - 2.5 + j(0.6), 0.95);
-  for (let x = LIB.x0 + 6; x < LIB.x1; x += 10) tree(x + j(2), LIB_LAWN.z0 + 5 + j(2), 0.9);
+  for (let x = LIB.x0 + 8; x < LIB.x1; x += 15) { if (x > LIB.entX0 - 6 && x < LIB.entX1 + 6) continue; tree(x + j(2), LIB_LAWN.z0 + 5.5 + j(1.5), 0.8); }
   for (let x = 80; x < 120; x += 10) tree(x + j(2), MALL.z0 - 4 + j(1.5), 0.95);
   for (let k = 0; k < 14; k++) { const a = k * Math.PI * 2 / 14; if (a > 0.3 && a < 2.9) continue; tree(PLAZA_C.x + Math.cos(a) * (PLAZA_C.r + 4), PLAZA_C.z + Math.sin(a) * (PLAZA_C.r + 4), 1.0); }
   for (let i = 0; i < 22; i++) tree(EAST_LAWN.x0 + 5 + R() * (EAST_LAWN.x1 - EAST_LAWN.x0 - 10), EAST_LAWN.z0 + 8 + R() * (EAST_LAWN.z1 - EAST_LAWN.z0 - 16), 1.05, R() < 0.3 ? 'pine' : 'dec');
@@ -75,7 +75,7 @@ export function buildProps(world, M) {
   for (let z = 30; z < 120; z += 9) tree(14.5 + j(1), z + j(2), 0.8);
   for (let x = 20; x < 118; x += 9) tree(x + j(2), 84 + j(1.5), 0.9);
   for (let x = 120; x < 176; x += 10) tree(x + j(2), 112 + j(1.5), 0.9, 'pine');
-  for (let i = 0; i < 16; i++) tree(-124 + R() * 24, 40 + R() * 30, 0.9, R() < 0.5 ? 'pine' : 'dec');       // between plaza and loop
+  for (let i = 0; i < 6; i++) tree(-136 + R() * 14, 56 + R() * 18, 0.9, R() < 0.5 ? 'pine' : 'dec');       // between plaza and loop
   for (let i = 0; i < 12; i++) tree(-100 + R() * 40, 100 + R() * 36, 1.0, 'pine');                         // south-west belt
   for (let i = 0; i < 10; i++) tree(-30 + R() * 50, 108 + R() * 30, 1.0, 'pine');                          // south belt (ECC west)
   for (let x = -160; x < -100; x += 8) tree(x + j(2), -146 + j(2), 1.0, 'pine');                            // north-west belt
@@ -86,6 +86,20 @@ export function buildProps(world, M) {
   for (let x = -260; x < 400; x += 12) tree(x + j(3), 262 + j(6), 1.2, R() < 0.6 ? 'pine' : 'dec');        // far south
   for (let z = -220; z < 260; z += 12) tree(-272 + j(4), z + j(3), 1.2, 'pine');                             // far west
   for (let z = -220; z < 260; z += 12) tree(372 + j(4), z + j(3), 1.2, R() < 0.6 ? 'pine' : 'dec');        // far east
+  // groves: Zebra Path rows, Frey/Harriman lawns, SAC south woods, Psychology–ECC strip, backdrop forest
+  const grove = (x0, z0, x1, z1, n, pineP = 0.5, s = 1.0) => { for (let i = 0; i < n; i++) tree(x0 + R() * (x1 - x0), z0 + R() * (z1 - z0), s, R() < pineP ? 'pine' : 'dec'); };
+  for (let z = -108; z < -42; z += 9) { tree(ZEBRA.x - 6.5 + j(0.8), z + j(1.5), 0.85); tree(ZEBRA.x + 6.5 + j(0.8), z + 4 + j(1.5), 0.85); }
+  grove(FREY.x0, FREY.z1 + 8, FREY.x1 - 14, MALL.z0 - 4, 7, 0.3, 0.9);
+  grove(-160, HARRIMAN.z1 + 8, -128, -20, 10, 0.5);
+  grove(-95, 106, 8, 136, 26, 0.6);
+  grove(22, 90, 116, 106, 12, 0.3, 0.9);
+  grove(LIB.x1 + 8, -146, 146, -142, 0, 0.5);
+  grove(-260, -300, 400, -216, 70, 0.6, 1.2);
+  grove(-260, 262, 400, 400, 60, 0.6, 1.2);
+  grove(-420, -300, -268, 400, 60, 0.7, 1.2);
+  grove(380, -300, 520, 400, 50, 0.6, 1.2);
+  grove(STALLER.nx0, STALLER.nz0 - 4, STALLER.nx1, STALLER.nz0 - 4, 0, 0.5);
+  grove(-118, -140, -100, -60, 8, 0.5, 0.9);
   inst(world, decGeo, M.bark, dec, 'wood', { name: 'trunks' });
   inst(world, canopyGeo, canopyMat, dec, 'wood', { name: 'canopy' });
   inst(world, pineTrunk, M.bark, pines, 'wood', { name: 'pineTrunks' });
@@ -146,6 +160,13 @@ export function buildProps(world, M) {
   for (let x = -90; x < 190; x += 24) { if (x > 118 && x < 154) continue; bin(x + 1.5, MALL.z1 - 1.6); bin(x + 2.3, MALL.z1 - 1.6, true); }
   bin(LIB.entX1 + 3, LIB.z1 + 1.2); bin(LIB.entX1 + 3.8, LIB.z1 + 1.2, true); bin(SAC.x0 - 5.5, SAC.z0 + 22, true); bin(SAC.x0 - 5.5, SAC.z0 + 7); bin(PIT.floorX0 + 2, PIT.z0 + 34, true); bin(121.5, 40); bin(121.5, 40.9, true);
   inst(world, binGeo, M.binGreen, bins, 'metal', { name: 'bins' }); inst(world, binGeo, M.binBlue, binsB, 'metal', { name: 'binsBlue' });
+  // blue-light emergency phones
+  const phoneGeo = (() => { const p = new THREE.CylinderGeometry(0.09, 0.11, 2.6, 8); p.translate(0, 1.3, 0); const bx = new THREE.BoxGeometry(0.34, 0.5, 0.22); bx.translate(0, 1.25, 0.12); const cap = new THREE.CylinderGeometry(0.12, 0.12, 0.3, 8); cap.translate(0, 2.75, 0); return merge([p, bx, cap]); })();
+  const phones = [[-60, 14], [20, -16], [90, 14], [-35, -60], [122, -20], [-100, 62], [60, 78], [PIT.floorX0 + 3, -66]].map(([x, z]) => ({ x, z, y: W.groundHeight(x, z), ry: R() * 6 }));
+  for (const p of phones) ctx.colliders.push(new THREE.Box3(new THREE.Vector3(p.x - 0.2, 0, p.z - 0.2), new THREE.Vector3(p.x + 0.2, 2.9, p.z + 0.2)));
+  inst(world, phoneGeo, M.busBlue, phones, 'metal', { name: 'phones' });
+  const phoneLight = (() => { const s = new THREE.SphereGeometry(0.13, 8, 6); s.translate(0, 2.95, 0); return s; })();
+  inst(world, phoneLight, new THREE.MeshStandardMaterial({ color: 0x2244ff, emissive: 0x2255ff, emissiveIntensity: 2.5, name: 'blueLight' }), phones, 'metal', { name: 'phoneLights', shadow: false });
 
   // bollards at the SAC front and the bus loop
   const bolGeo = (() => { const g = new THREE.CylinderGeometry(0.11, 0.13, 1.0, 10); g.translate(0, 0.5, 0); return g; })();
@@ -219,6 +240,8 @@ export function buildProps(world, M) {
   for (let z = ENG_DRIVE.z0 + 6; z < BOUNDS.z1 - 4; z += 7.5) if (R() < 0.7) car(ENG_DRIVE.x0 + 1.5, z, Math.PI / 2);
   for (let x = -260; x < 400; x += 14) if (R() < 0.5) car(x, -207 + (R() < 0.5 ? 2.5 : -2.5), R() < 0.5 ? 0 : Math.PI);   // Toll Drive backdrop traffic
   car(-108, 112, Math.PI / 2); car(-108, 118.5, Math.PI / 2);
+  for (let z = -880; z < 880; z += 26) { if (R() < 0.6) car(-705 + (R() < 0.5 ? 3.2 : -3.2), z, Math.PI / 2); if (R() < 0.6) car(-683 + (R() < 0.5 ? 3.2 : -3.2), z + 13, -Math.PI / 2); }   // Nicolls Road traffic
+  for (let z = -240; z < 250; z += 22) if (R() < 0.5) car(-257 + (R() < 0.5 ? 2.4 : -2.4), z, R() < 0.5 ? Math.PI / 2 : -Math.PI / 2);   // Circle Road
   inst(world, carBody, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.6, envMapIntensity: 1.0, name: 'car' }), cars, 'metal', { name: 'cars' });
   inst(world, carGlass, M.glass, cars, 'metal', { name: 'carGlass', shadow: false });
   inst(world, carWheels, M.rubber, cars, 'metal', { name: 'carWheels', shadow: false });
@@ -250,9 +273,9 @@ export function buildProps(world, M) {
   { // abstract painted-steel sculpture (Glaser-style) east of the entrance walk
     const sx2 = LIB.entX1 + 16, sz2 = LIB.z1 + 6;
     B.box('concreteGrey', [sx2 - 1.6, 0, sz2 - 1.6], [sx2 + 1.6, 0.4, sz2 + 1.6]);
-    const g1 = boxGeo([-0.25, 0, -1.6], [0.25, 5.5, 1.6]); g1.rotateY(0.5); g1.translate(sx2, 0.4, sz2); B.add('red', g1, { uv: false });
-    const g2 = boxGeo([-1.8, 0, -0.25], [1.8, 4.2, 0.25]); g2.rotateY(-0.35); g2.translate(sx2 + 0.3, 0.4, sz2 + 0.2); B.add('busBlue', g2, { uv: false });
-    const g3 = new THREE.TorusGeometry(1.4, 0.16, 8, 24); g3.translate(sx2 - 0.4, 3.2, sz2 - 0.6); B.add('paintY', g3, { uv: false });
+    const g1 = boxGeo([-0.12, 0, -1.1], [0.12, 4.6, 1.1]); g1.rotateY(0.5); g1.translate(sx2, 0.4, sz2); B.add('red', g1, { uv: false });
+    const g2 = boxGeo([-1.3, 0, -0.12], [1.3, 3.6, 0.12]); g2.rotateY(-0.35); g2.translate(sx2 + 0.3, 0.4, sz2 + 0.2); B.add('steelDark', g2, { uv: false });
+    const g3 = new THREE.TorusGeometry(1.0, 0.1, 8, 24); g3.translate(sx2 - 0.4, 2.8, sz2 - 0.6); B.add('paintY', g3, { uv: false });
     world.cover(sx2, sz2 + 2.4, 0, 1); world.cover(sx2, sz2 - 2.4, 0, -1);
   }
 

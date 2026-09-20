@@ -9,8 +9,8 @@ import { buildProps } from '../sbu/props.js';
 import { BOUNDS, MALL, SAC_PLAZA, PIT, BUS_LOOP, ENG_DRIVE, LIB, SAC, FREY, ZEBRA, PSY, STALLER, FOUNTAIN, EAST_LAWN } from '../sbu/layout.js';
 
 export const meta = {
-  id: 'sbu', name: 'STONY BROOK', subtitle: 'DAY OPS · ACADEMIC MALL', time: 'day', weather: 'clear',
-  description: 'Stony Brook University, Long Island, 1:1: the Academic Mall between the Melville Library and the SAC, the Zebra Path and Frey Hall, the Staller Steps and sunken plaza, the fountain, the bus loop on Campus Drive, and the halls that close the campus around them.',
+  id: 'sbu', name: 'UNIVERSITY', subtitle: 'DAY OPS · ACADEMIC MALL', time: 'day', weather: 'clear',
+  description: 'A sprawling state university campus: the brutalist library tower over the academic mall, the student center, arts plaza and lecture halls, ringed by campus drives.',
   grade: 'day', ambience: 'sbu-day', thumb: 'assets/thumbs/sbu.jpg',
 };
 
@@ -19,11 +19,11 @@ export function build(world) {
   W.bounds.set(new THREE.Vector3(BOUNDS.x0, -4, BOUNDS.z0), new THREE.Vector3(BOUNDS.x1, 60, BOUNDS.z1));
   W.groundHeight = groundHeight;
 
-  ctx.progress(0.13, 'stony brook: sky'); buildSky(world);
+  ctx.progress(0.13, 'university: sky'); buildSky(world);
   const M = makeMats(world); world.mats = M;
-  ctx.progress(0.15, 'stony brook: ground'); buildGround(world, M);
-  ctx.progress(0.18, 'stony brook: buildings'); buildBuildings(world, M);
-  ctx.progress(0.22, 'stony brook: props'); buildProps(world, M);
+  ctx.progress(0.15, 'university: ground'); buildGround(world, M);
+  ctx.progress(0.18, 'university: buildings'); buildBuildings(world, M);
+  ctx.progress(0.22, 'university: props'); buildProps(world, M);
 
   // ---- gameplay ------------------------------------------------------------------------------------------------------
   const v = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -46,9 +46,9 @@ export function build(world) {
   W.poses = {
     spawn: [-104, 0, 24, -1.5, 0.0],                       // SAC plaza, looking east along the mall
     hero: [-62, 0, 3, -1.32, 0.06],                        // the mall: library on the left, SAC drum on the right, fountain far ahead
-    overview: [-150, 95, 140, -0.8, -0.52],                // high from the SW over the plaza, mall and library
+    overview: [-165, 80, 120, -0.9, -0.42],                // high from the SW over the plaza, mall and library
     library: [27, 0, 4, 0.0, 0.12],                        // the entrance walk, "LIBRARY" over the doors
-    sac: [-112, 0, 38, -1.62, 0.08],                       // the glass front from the plaza
+    sac: [-106, 0, 40, -1.62, 0.08],                       // the glass front from the plaza
     staller: [96, 0, -96, -1.55, -0.08],                   // on the terraces, Staller entrance canopy ahead, fly tower left
     wang: [150, 0, -58, -0.62, 0.1],                       // NE over the pond to the Wang lantern tower
     frey: [-28, 0, -34, 0.35, 0.1],                        // Zebra Path mouth, Frey's ribbed concrete on the left
@@ -56,6 +56,8 @@ export function build(world) {
     roads: [-118, 0, 66, 2.6, -0.02],                      // the bus loop on Campus Drive
     fountain: [124, 0, 9, -1.15, 0.05],                    // fountain with the Administration building beyond
     terrace: [-83.5, 4.6, 35, -1.4, -0.15],                // SAC vestibule roof (ladder)
+    javits: [70, 0, 96, 2.3, 0.08],                        // south alley toward the round lecture halls of Javits
+    plaza: [-96, 0, 24, 1.0, -0.05],                        // centre of the SAC plaza, radial bands, buses beyond
   };
   W.surfaceAt = (p) => {
     const { x, z } = p;

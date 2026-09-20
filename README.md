@@ -9,9 +9,9 @@ A browser first-person shooter built in Three.js (r186, WebGL 2) — no engine, 
 |---|---|
 | Zavod | Rainy night container yard / shipyard (`?map=zavod`) |
 | Railyard | Daytime multi-level freight yard: overpass, platform, office roof, wagon decks (`?map=railyard`) |
-| Grand Central | Real Grand Central Terminal: Main Concourse, balconies, Vanderbilt Hall, Dining Concourse, subway (`?map=terminal`) |
-| Washington Square | in progress (`?map=wsp`) |
-| Stony Brook | in progress (`?map=sbu`) |
+| Central Station | Beaux-Arts rail terminal: main concourse, balconies, waiting hall, dining concourse, subway (`?map=terminal`) |
+| City Square | Downtown park + surrounding blocks: memorial arch, fountain plaza, row houses, village streets (`?map=wsp`) |
+| University | State-university campus: library tower, academic mall, student center, arts plaza (`?map=sbu`) |
 
 ## Controls
 WASD move · Shift sprint · Space jump (3 quick jumps → super jump) · C/Ctrl crouch · LMB fire · RMB or E aim · R reload · G grenade · 1/2 weapons · walk into a ladder to climb · Esc pause · Tab scoreboard.

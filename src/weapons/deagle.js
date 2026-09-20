@@ -113,6 +113,6 @@ export function buildDeagle(mats) {
   }, mats);
   group.add(left); parts.armL = left;
 
-  group.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true; } });
+  group.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (!/^arm_/.test(o.parent?.name || '')) o.castShadow = false; o.receiveShadow = true; } });
   return { group, parts, spec: DEAGLE_SPEC };
 }

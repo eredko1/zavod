@@ -202,15 +202,15 @@ export function buildRifle(mats, opts = {}) {
     fore.position.copy(hand.position); fore.lookAt(0.13, -0.30, 0.47); fore.rotateX(Math.PI / 2); // +Y of forearm toward the elbow
   }, mats);
   group.add(right); parts.armR = right;
-  // Left hand under the handguard, C-clamp on the hand stop. Fingers → right, palm → up.
-  const left = buildArm('left', { curl: [0.5, 0.8, 0.9, 0.95, 1.0], spread: 0.02, thumbUp: 0.55, forearmLen: 0.32 }, (hand, fore) => {
-    hand.position.set(-0.053, 0.03, -0.215);
-    orient(hand, [0.05, 0.06, -1], [0.42, -0.9, 0]); // C-clamp: palm on the left face, thumb forward over the top, fingers wrap under to the right; back of the hand faces the eye
-    fore.position.copy(hand.position); fore.lookAt(-0.21, -0.34, -0.12); fore.rotateX(Math.PI / 2);
+  // Left hand cups the handguard from below (palm up): thumb along the left face, fingers wrap up the right side; forearm runs down to the bottom-left corner.
+  const left = buildArm('left', { curl: [0.4, 0.85, 0.92, 0.95, 1.0], spread: 0.03, thumbUp: 0.5, forearmLen: 0.3, scale: 1.1 }, (hand, fore) => {
+    hand.position.set(-0.054, -0.012, -0.235);
+    orient(hand, [0.05, 0.15, -0.99], [-0.4, -0.9, 0.05]); // palm on the left face, fingers hang down and curl under to the right, thumb over the top; back of the hand + knuckles face up-left to the eye
+    fore.position.copy(hand.position); fore.lookAt(-0.44, -0.30, -0.10); fore.rotateX(Math.PI / 2);
   }, mats);
   group.add(left); parts.armL = left;
 
-  group.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true; } });
+  group.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (!/^arm_/.test(o.parent?.name || '')) o.castShadow = false; o.receiveShadow = true; } });
   return { group, parts, spec: RIFLE_SPEC };
 }
 

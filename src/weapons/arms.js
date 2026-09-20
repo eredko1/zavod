@@ -16,10 +16,11 @@ export function buildHand(side, pose = {}) {
   const add = (parent, geom, key, p = [0, 0, 0], r = [0, 0, 0], ud = {}) => { const m = new THREE.Mesh(geom); m.position.set(...p); m.rotation.set(...r); m.userData.key = key; Object.assign(m.userData, ud); parent.add(m); return m; };
 
   // palm: beveled block, thicker at the heel, slight taper toward the wrist
-  const palmW = 0.082, palmL = 0.09, palmT = 0.031;
+  const palmW = 0.084, palmL = 0.092, palmT = 0.03;
+  const wedge = (geom) => { const p = geom.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const t = (y + palmL / 2) / palmL; const sx = 0.78 + 0.22 * t; const sz = (1.1 - 0.35 * t) * (z > 0 ? 1 + 0.25 * (1 - Math.abs(x) / (palmW / 2)) * t : 1); p.setXYZ(i, x * sx, y, z * sz); } geom.computeVertexNormals(); return geom; };
   const sm = (v, a, b) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
   // baked occlusion (adds to the grime channel): palm side, finger roots under the knuckle plate, wrist/cuff junction
-  add(g, rbox(palmW, palmL, palmT, 0.012, 2), 'glove', [0, palmL / 2 - 0.004, 0], [0, 0, 0], { ao: (x, y, z) => 0.5 * sm(-z, 0.004, 0.012) + 0.55 * sm(y, 0.022, 0.04) * sm(z, 0.0, 0.01) + 0.5 * sm(-y, 0.02, 0.04) });
+  add(g, wedge(rbox(palmW, palmL, palmT, 0.012, 3)), 'glove', [0, palmL / 2 - 0.004, 0], [0, 0, 0], { ao: (x, y, z) => 0.5 * sm(-z, 0.004, 0.012) + 0.55 * sm(y, 0.022, 0.04) * sm(z, 0.0, 0.01) + 0.5 * sm(-y, 0.02, 0.04) });
   add(g, rbox(palmW * 0.78, 0.042, palmT * 0.92, 0.011, 1), 'glove', [0, 0.006, 0], [0, 0, 0], { ao: () => 0.6 }); // wrist taper (in the cuff shadow)
   add(g, box(palmW * 0.8, palmL * 0.78, 0.006), 'glove', [0, palmL / 2 + 0.002, -palmT / 2 - 0.001], [0, 0, 0], { palm: 1 }); // dark pebbled palm patch
   add(g, sphere(0.021, 8), 'glove', [sgn * 0.027, 0.03, -0.006], [0, 0, 0], { palm: 1, ao: () => 0.45 }); // thenar pad
@@ -29,8 +30,8 @@ export function buildHand(side, pose = {}) {
   add(g, box(0.03, 0.012, 0.006), 'rubber', [-sgn * 0.02, -0.006, palmT / 2 + 0.006], [0, 0, 0.2]); // strap tab
   add(g, box(0.012, 0.014, 0.008), 'knuckle', [-sgn * 0.006, -0.006, palmT / 2 + 0.007]); // buckle
   // hard knuckle plate (raised, follows the MCP line) + individual finger knuckle caps
-  add(g, rbox(0.074, 0.03, 0.011, 0.005, 2), 'knuckle', [0, palmL - 0.012, palmT / 2 + 0.003], [0.3, 0, 0]);
-  add(g, rbox(0.06, 0.012, 0.006, 0.003, 1), 'knuckle', [0, palmL - 0.03, palmT / 2 + 0.004], [0.15, 0, 0]); // rear plate segment
+  add(g, rbox(0.072, 0.03, 0.011, 0.005, 2), 'knuckle', [0, palmL - 0.012, palmT / 2 + 0.006], [0.35, 0, 0]);
+  add(g, rbox(0.06, 0.012, 0.006, 0.003, 1), 'knuckle', [0, palmL - 0.03, palmT / 2 + 0.007], [0.15, 0, 0]); // rear plate segment
   // watch on the left wrist: strap ring, case, dark face, crown
   if (pose.watch) {
     add(g, torus(0.0325, 0.004, 5, 14), 'rubber', [0, -0.014, 0], [Math.PI / 2, 0, 0], { sx: 1.05, sy: 0.42 }); // strap hugs the wrist oval
@@ -78,14 +79,30 @@ export function buildHand(side, pose = {}) {
   return g;
 }
 
-/** Forearm from wrist point back toward the elbow: length along +Y of the returned group. Tapered camo sleeve + rolled cuff. */
+/** Forearm from wrist point back toward the elbow: length along +Y of the returned group. Elliptical sleeve with cloth folds, wrist bone, rolled cuff. */
 export function buildForearm(len = 0.3) {
   const g = new THREE.Group(); g.name = 'forearm';
   len = Math.min(len, 0.26); // keep the elbow off-screen: a long fat sleeve was covering ~20% of the frame (Tarkov shows hand + wrist + a little sleeve)
-  const prof = [[0.03, 0.0], [0.033, 0.02], [0.036, 0.08], [0.039, 0.16], [0.041, len * 0.85], [0.042, len], [0.0, len]];
-  const m = new THREE.Mesh(lathe(prof, 14)); m.userData.key = 'sleeve'; m.position.y = -0.005; g.add(m);
-  const cuff = new THREE.Mesh(torus(0.037, 0.012, 6, 14)); cuff.userData.key = 'sleeve'; cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.02; cuff.userData.wear = 'all'; cuff.userData.wearAmt = 0.25; g.add(cuff); // rolled cuff
-  const cuff2 = new THREE.Mesh(torus(0.041, 0.008, 5, 14)); cuff2.userData.key = 'sleeve'; cuff2.rotation.x = Math.PI / 2; cuff2.position.y = 0.032; g.add(cuff2); // second roll
+  // radius profile: wrist → folds → swelling upper forearm; folds are soft rings that get irregular below
+  const prof = [[0.026, 0.0], [0.03, 0.012], [0.034, 0.03], [0.031, 0.042], [0.036, 0.056], [0.033, 0.07], [0.038, 0.09], [0.0365, 0.105], [0.041, 0.13], [0.044, 0.17], [0.047, len * 0.85], [0.047, len], [0.0, len]];
+  const geo = lathe(prof, 16);
+  {
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const a = Math.atan2(z, x); const r = Math.hypot(x, z); if (r < 1e-6) continue;
+      // elliptical cross-section (wider side-to-side), plus wandering wrinkle displacement that fades toward the wrist
+      const fold = 1 + 0.06 * Math.sin(a * 3 + y * 40) * Math.sin(y * 55 + 1.3) * Math.min(1, y / 0.05) + 0.03 * Math.sin(a * 5 + 2.0) * Math.min(1, y / 0.08);
+      const rr = r * fold; p.setXYZ(i, Math.cos(a) * rr * 1.18, y, Math.sin(a) * rr * 0.86);
+    }
+    geo.computeVertexNormals();
+  }
+  const m = new THREE.Mesh(geo); m.userData.key = 'sleeve'; m.position.y = -0.002; g.add(m);
+  // wrist bone (ulna) bump under the cuff edge, on the little-finger side
+  const bone = new THREE.Mesh(sphere(0.009, 6)); bone.userData.key = 'glove'; bone.position.set(0.026, 0.004, 0.004); g.add(bone);
+  // rolled cuff: thick, slightly irregular double roll
+  const cuffGeo = torus(0.034, 0.013, 7, 16); { const p = cuffGeo.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); const a = Math.atan2(y, x); const k = 1 + 0.08 * Math.sin(a * 4 + 0.7) + 0.05 * Math.sin(a * 7); p.setXYZ(i, x * k * 1.15, y * k * 0.88, p.getZ(i) * (1 + 0.15 * Math.sin(a * 3))); } cuffGeo.computeVertexNormals(); }
+  const cuff = new THREE.Mesh(cuffGeo); cuff.userData.key = 'sleeve'; cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.022; cuff.userData.wear = 'all'; cuff.userData.wearAmt = 0.3; g.add(cuff);
+  const cuff2 = new THREE.Mesh(torus(0.038, 0.007, 5, 16)); cuff2.userData.key = 'sleeve'; cuff2.rotation.x = Math.PI / 2; cuff2.position.y = 0.036; cuff2.scale.set(1.15, 1, 0.88); g.add(cuff2);
   return g;
 }
 
@@ -99,6 +116,10 @@ export function bakeGroup(root, builder, wear = 'none') {
     if (o.userData.sx || o.userData.sy || o.userData.sz) geo.scale(o.userData.sx || 1, o.userData.sy || 1, o.userData.sz || 1); // flattened bands (wrist is an oval)
     if (o.userData.ao) { const p = geo.attributes.position, a = new Float32Array(p.count); for (let i = 0; i < p.count; i++) a[i] = Math.min(1, o.userData.ao(p.getX(i), p.getY(i), p.getZ(i))); geo.setAttribute('ao', new THREE.BufferAttribute(a, 1)); }
     geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(_m, o.matrixWorld));
+    { // subtle baked gradient: surfaces facing down (weapon-space -y) sit in the arm's own shadow
+      geo.computeVertexNormals(); const n = geo.attributes.normal; let ao = geo.attributes.ao; if (!ao) { ao = new THREE.BufferAttribute(new Float32Array(n.count), 1); geo.setAttribute('ao', ao); }
+      for (let i = 0; i < n.count; i++) ao.setX(i, Math.min(1, ao.getX(i) + 0.4 * Math.max(0, -n.getY(i)) + 0.12 * Math.max(0, -n.getX(i))));
+    }
     const key = o.userData.key || 'glove';
     builder.add(geo, key, { wear: o.userData.wear || (key === 'knuckle' ? 'box' : wear), wearAmt: o.userData.wearAmt ?? 0.8, grime: key === 'sleeve' ? 0.6 : 0.45, palm: o.userData.palm || 0 });
   });
@@ -119,6 +140,7 @@ export function buildArm(side, pose, place, mats) {
   const b = new Builder();
   bakeGroup(root, b, 'none');
   const g = b.build(mats, `arm_${side}`);
+  for (const m of g.children) { m.castShadow = true; m.receiveShadow = true; }
   // re-origin the arm at the wrist so rotating the group swings the hand naturally
   const wrist = hand.position.clone();
   for (const m of g.children) m.geometry.translate(-wrist.x, -wrist.y, -wrist.z);

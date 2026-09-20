@@ -34,11 +34,11 @@ export function buildSubway(world, M, Z) {
   // framed generic posters between the tablets
   for (let i = 0; i < 6; i++) { const px = -42 + i * 16.8 + 6; const po = M.poster(i); B.box(M.ironDark, [px - 1.0, SUB + 0.9, z0 - 0.02], [px + 1.0, SUB + 3.0, z0 + 0.04], { uvScale: 1 }); B.add(po, new THREE.PlaneGeometry(1.9, 2.0), mat4(px, SUB + 1.95, z0 + 0.045)); }
   // mosaic tablets on the north wall
-  for (const mx of [-36, -24, 0, 24, 36]) { const mo = M.mosaic('GRAND CONCOURSE', '42 ST · LEXINGTON AV'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(mx, bandY + 0.2, z0 + 0.02)); }
+  for (const mx of [-36, -24, 0, 24, 36]) { const mo = M.mosaic('CENTRAL STATION', 'MAIN ST · MARKET AV'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(mx, bandY + 0.2, z0 + 0.02)); }
   // far wall (south of the track)
   B.box(M.tile, [PLAT.x0 - T, SUB - 1.8, TRACK.z1 + 0.5], [PLAT.x1 + T, CEIL, TRACK.z1 + 0.5 + T], { uvScale: 1 }); world.box([PLAT.x0 - T, SUB - 2, TRACK.z1 + 0.5], [PLAT.x1 + T, CEIL, TRACK.z1 + 1.5]);
   B.box(M.tileBand, [PLAT.x0, bandY, TRACK.z1 + 0.49], [PLAT.x1, bandY + 0.4, TRACK.z1 + 0.5], { uvScale: 1 });
-  for (const mx of [-30, -10, 10, 30]) { const mo = M.mosaic('GRAND CONCOURSE', '42 ST'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(mx, bandY + 0.2, TRACK.z1 + 0.48, 0, Math.PI, 0)); }
+  for (const mx of [-30, -10, 10, 30]) { const mo = M.mosaic('CENTRAL STATION', 'MAIN ST'); B.add(mo, new THREE.PlaneGeometry(4.2, 1.05), mat4(mx, bandY + 0.2, TRACK.z1 + 0.48, 0, Math.PI, 0)); }
   // pilasters on the far wall + grime band at the bottom
   for (let x = PLAT.x0 + 4; x < PLAT.x1; x += 9.2) B.box(M.tile, [x - 0.4, SUB - 1.8, TRACK.z1 + 0.2], [x + 0.4, CEIL, TRACK.z1 + 0.5], { uvScale: 1 });
   B.box(M.asphalt, [PLAT.x0 - T, SUB - 1.8, TRACK.z1 + 0.45], [PLAT.x1 + T, SUB - 0.6, TRACK.z1 + 0.5], { uvScale: 1 });
@@ -68,7 +68,7 @@ export function buildSubway(world, M, Z) {
     for (let x = PLAT.x0 + 2.3; x < PLAT.x1; x += 4.6) { mats.push(mat4(x, y, z1 + 0.3)); world.box([x - 0.25, SUB - 1.2, z1 + 0.05], [x + 0.25, CEIL, z1 + 0.55]); }
     instanced(world, col, M.steelGreen, mats, 'metal', { name: 'ibeams' });
     // "42" tile signs on both faces of every column
-    const sg = M.sign('42', { w: 128, h: 128, bg: '#f0ece2', fg: '#111', font: 'bold 84px Helvetica, Arial, sans-serif' }); sg.map.repeat.set(1, 1);
+    const sg = M.sign('CS', { w: 128, h: 128, bg: '#f0ece2', fg: '#111', font: 'bold 84px Helvetica, Arial, sans-serif' }); sg.map.repeat.set(1, 1);
     const sgGeo = mergeSimple([new THREE.PlaneGeometry(0.34, 0.34).translate(0, -0.9, 0.2), new THREE.PlaneGeometry(0.34, 0.34).rotateY(Math.PI).translate(0, -0.9, -0.2)]);
     instanced(world, sgGeo, sg, mats, 'metal', { name: 'colSigns', shadow: false });
     // rivet rows (tiny instanced spheres) skipped → painted rivet feel via roughness
@@ -87,7 +87,7 @@ export function buildSubway(world, M, Z) {
     // ceiling over the stair (sloped concrete): approximate with a box at mezz ceiling height
     { const L = Math.hypot(64.5 - zTop, (LOW + 3.4) - CEIL); const ang = Math.atan2((LOW + 3.4) - CEIL, 64.5 - zTop); const g = new THREE.BoxGeometry(w + 0.6, 0.4, L); B.add(M.concrete, g, mat4(cx, ((LOW + 3.4) + CEIL) / 2 + 0.2, (zTop + 64.5) / 2, ang), { uvScale: 0.5 }); }
     world.cover(cx + s_(side) * (w / 2 + 0.9), zBot + 0.5, s_(side), 0, SUB);
-    const sgn = M.sign('4 · 5 · 6   DOWNTOWN & BROOKLYN', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial' }); B.add(sgn, new THREE.PlaneGeometry(3.6, 0.45), mat4(cx, LOW + 2.6, zTop - 0.02, 0, 0, 0));
+    const sgn = M.sign('4 · 5 · 6   DOWNTOWN & HARBOR', { bg: '#0d0d0d', fg: '#ffffff', font: 'bold 56px Helvetica, Arial' }); B.add(sgn, new THREE.PlaneGeometry(3.6, 0.45), mat4(cx, LOW + 2.6, zTop - 0.02, 0, 0, 0));
   }
 
   // ---- platform furniture: benches (wood slat), trash cans, help point, vending --------------------------------------

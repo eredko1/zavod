@@ -218,7 +218,7 @@ export function makeMats(ctx, R, env) {
     const W = 1024, H = 512, [c, g] = canvas(W, H); g.fillStyle = '#0b0d10'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#e6c26a'; g.font = 'bold 44px "Helvetica Neue", Arial, sans-serif'; g.textAlign = 'left'; g.fillText(title, 30, 60);
     g.fillStyle = '#9fb3c8'; g.font = '22px "Helvetica Neue", Arial'; g.fillText('TIME     DESTINATION                    TRACK   STATUS', 30, 100);
-    const dest = ['NEW HAVEN', 'STAMFORD', 'WHITE PLAINS', 'POUGHKEEPSIE', 'CROTON-HARMON', 'NORTH WHITE PLAINS', 'WASSAIC', 'SOUTHEAST', 'NEW CANAAN', 'DANBURY', 'BRIDGEPORT', 'HARLEM-125 ST'];
+    const dest = ['NORTH HAVEN', 'RIVERSIDE', 'WHITE HILLS', 'LAKE JUNCTION', 'HARBOR POINT', 'NORTH FALLS', 'WESTFIELD', 'SOUTHGATE', 'NEW CANTON', 'OAKRIDGE', 'BRIDGETOWN', 'UPTOWN-125 ST'];
     for (let i = 0; i < 12; i++) {
       const y = 140 + i * 30; const hh = 9 + Math.floor(i / 4), mm = (i * 17 + 5) % 60;
       g.fillStyle = '#e8b64a'; g.font = 'bold 22px "Courier New", monospace'; g.fillText(`${hh}:${mm < 10 ? '0' : ''}${mm}`, 30, y);
@@ -231,7 +231,7 @@ export function makeMats(ctx, R, env) {
     return m;
   };
   // ---- mosaic station name tablet -------------------------------------------------
-  M.mosaic = (text = 'GRAND CONCOURSE', sub = '42 ST') => {
+  M.mosaic = (text = 'CENTRAL STATION', sub = 'MAIN ST') => {
     const W = 1024, H = 256, [c, g] = canvas(W, H); g.fillStyle = '#e9e4d6'; g.fillRect(0, 0, W, H);
     for (let x = 0; x < W; x += 12) for (let y = 0; y < H; y += 12) { const v = 215 + R() * 35; g.fillStyle = `rgb(${v},${v - 4},${v - 14})`; g.fillRect(x + 1, y + 1, 10, 10); }
     g.fillStyle = '#1c5a3c'; g.fillRect(0, 0, W, 26); g.fillRect(0, H - 26, W, 26); g.fillRect(0, 0, 26, H); g.fillRect(W - 26, 0, 26, H);

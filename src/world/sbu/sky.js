@@ -19,7 +19,7 @@ export function buildSky(world, { shadowHalf = 175, center = [8, 0, -5] } = {}) 
   scene.backgroundRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.environmentRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.background = FOG_COLOR.clone();
-  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0022);
+  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0030);
 
   const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6f6a5a, 0.55);
   scene.add(hemi); ctx.lights.hemi = hemi;

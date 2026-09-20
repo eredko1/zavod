@@ -11,8 +11,8 @@ import { buildFurniture } from '../wsp/furniture.js';
 import { buildTrees } from '../wsp/trees.js';
 
 export const meta = {
-  id: 'wsp', name: 'WASHINGTON SQUARE', subtitle: 'DAY OPS · GREENWICH VILLAGE', time: 'day', weather: 'clear',
-  description: 'Washington Square Park, Manhattan, 1:1: the marble arch (climb the west pier to the attic), the sunken fountain plaza, Garibaldi, the chess plaza and mounds, The Row, Judson, Bobst and Kimmel, and the streets of the Village around it.',
+  id: 'wsp', name: 'CITY SQUARE', subtitle: 'DAY OPS · DOWNTOWN PARK', time: 'day', weather: 'clear',
+  description: 'A downtown park and the blocks around it: the marble memorial arch (climb the pier ladder to the attic), the fountain plaza, chess corner and mounds, row houses, a university library and the village streets.',
   grade: 'day', ambience: 'wsp-day', thumb: 'assets/thumbs/wsp.jpg',
 };
 
