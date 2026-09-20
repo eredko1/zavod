@@ -12,16 +12,16 @@ const ENV_SUN_CAP = 3.0;
 export function buildSky(world, { shadowHalf = 175, center = [8, 0, -5] } = {}) {
   const { ctx, scene } = world;
   const { renderer } = ctx;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 0.85;
 
   const sunDir = HDRI_SUN.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), SKY_ROT_Y);
   { const az = Math.atan2(sunDir.z, sunDir.x), el = 50 * Math.PI / 180; sunDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)); }
   scene.backgroundRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.environmentRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.background = FOG_COLOR.clone();
-  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0030);
+  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0016);
 
-  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6f6a5a, 0.55);
+  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6f6a5a, 0.45);
   scene.add(hemi); ctx.lights.hemi = hemi;
 
   const sun = new THREE.DirectionalLight(0xffe9cf, 10.5);
@@ -47,7 +47,7 @@ export function buildSky(world, { shadowHalf = 175, center = [8, 0, -5] } = {}) 
     const envTex = new THREE.DataTexture(clamped, w, h, THREE.RGBAFormat, THREE.FloatType); envTex.mapping = THREE.EquirectangularReflectionMapping; envTex.flipY = hdr.flipY; envTex.needsUpdate = true;
     const pmrem = new THREE.PMREMGenerator(renderer); pmrem.compileEquirectangularShader();
     const env = pmrem.fromEquirectangular(envTex).texture; pmrem.dispose(); envTex.dispose();
-    scene.environment = env; scene.environmentIntensity = 1.0;
+    scene.environment = env; scene.environmentIntensity = 0.75;
     scene.background = hdr; scene.backgroundIntensity = 1.0;
     ctx.bus?.emit?.('skyReady', { map: 'sbu' });
   }, undefined, (e) => console.warn('[sbu] HDRI failed', e));

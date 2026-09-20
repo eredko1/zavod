@@ -37,18 +37,21 @@ export function buildProps(world, M) {
   const canopyMat = new THREE.MeshStandardMaterial({ map: leafDec, color: 0x9fb26e, roughness: 1, alphaTest: 0.45, side: THREE.DoubleSide, name: 'canopy' });
   const pineMat = new THREE.MeshStandardMaterial({ map: leafPine, color: 0x6e8a5a, roughness: 1, alphaTest: 0.45, side: THREE.DoubleSide, name: 'pine' });
   // deciduous: trunk + 3 lumpy spheres
-  const decGeo = (() => {
-    const parts = [];
-    const trunk = new THREE.CylinderGeometry(0.16, 0.26, 5.2, 7); trunk.translate(0, 2.6, 0); parts.push(trunk);
-    const b1 = new THREE.CylinderGeometry(0.1, 0.14, 3.2, 5); b1.rotateZ(0.6); b1.translate(1.0, 5.8, 0.2); parts.push(b1);
-    const b2 = new THREE.CylinderGeometry(0.1, 0.14, 3.0, 5); b2.rotateZ(-0.55); b2.rotateY(1.2); b2.translate(-0.8, 5.9, -0.5); parts.push(b2);
+  // deciduous species: plane (tall, open), oak (wide, low), maple (round, dense) — trunk + 1st/2nd-order branches, lumpy canopy
+  const treeGeo = (trunkH, trunkR, branches) => {
+    const parts = []; const trunk = new THREE.CylinderGeometry(trunkR * 0.6, trunkR, trunkH, 8); trunk.translate(0, trunkH / 2, 0); parts.push(trunk);
+    for (const [ang, tilt, len, y] of branches) {
+      const b = new THREE.CylinderGeometry(trunkR * 0.28, trunkR * 0.5, len, 6); b.translate(0, len / 2, 0); b.rotateZ(tilt); b.rotateY(ang); b.translate(0, y, 0); parts.push(b);
+      for (const s2 of [-0.5, 0.55]) { const b2 = new THREE.CylinderGeometry(trunkR * 0.12, trunkR * 0.26, len * 0.6, 5); b2.translate(0, len * 0.3, 0); b2.rotateZ(tilt + s2); b2.rotateY(ang + s2 * 0.4); const ex = Math.sin(tilt) * len * 0.7, ey = Math.cos(tilt) * len * 0.7; b2.translate(Math.cos(ang) * ex, y + ey, -Math.sin(ang) * ex); parts.push(b2); }
+    }
     return merge(parts);
-  })();
-  const canopyGeo = (() => {
-    const parts = [];
-    for (const [x, y, z, r] of [[0, 7.6, 0, 3.4], [2.1, 6.6, 0.8, 2.6], [-1.9, 6.9, -1.2, 2.5], [0.4, 6.2, 2.2, 2.2], [-0.6, 6.4, -2.4, 2.1]]) { const s = new THREE.SphereGeometry(r, 9, 7); s.scale(1, 0.82, 1); s.translate(x, y, z); parts.push(s); }
-    const g = merge(parts); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3); return g;
-  })();
+  };
+  const canopy = (blobs, yScale = 0.82) => { const parts = []; for (const [x, y, z, r] of blobs) { const s = new THREE.SphereGeometry(r, 9, 7); s.scale(1, yScale, 1); s.translate(x, y, z); parts.push(s); } const g = merge(parts); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3); return g; };
+  const species = [
+    { trunk: treeGeo(5.6, 0.27, [[0.3, 0.55, 3.4, 5.0], [2.4, 0.5, 3.2, 5.3], [4.3, 0.6, 3.0, 4.8], [1.4, 0.25, 3.6, 5.6]]), leaf: canopy([[0, 8.2, 0, 3.2], [2.2, 7.3, 0.6, 2.5], [-2.0, 7.5, -1.0, 2.4], [0.5, 6.8, 2.3, 2.1], [-0.8, 7.0, -2.4, 2.0], [0.2, 9.6, 0.3, 2.0]], 0.8) },   // plane
+    { trunk: treeGeo(3.6, 0.36, [[0.2, 0.9, 3.6, 3.0], [1.8, 0.85, 3.8, 3.2], [3.4, 0.95, 3.4, 2.9], [5.0, 0.8, 3.6, 3.3], [2.6, 0.3, 3.0, 3.6]]), leaf: canopy([[0, 6.4, 0, 4.2], [3.2, 5.6, 1.0, 3.0], [-3.0, 5.9, -1.4, 2.9], [0.8, 5.4, 3.4, 2.7], [-1.2, 5.6, -3.4, 2.6], [2.0, 7.6, -1.5, 2.4]], 0.7) },   // oak
+    { trunk: treeGeo(4.2, 0.24, [[0.6, 0.45, 2.8, 3.8], [2.7, 0.5, 2.6, 4.0], [4.6, 0.4, 2.8, 3.7]]), leaf: canopy([[0, 6.6, 0, 3.0], [1.6, 5.9, 0.9, 2.3], [-1.5, 6.1, -1.1, 2.2], [0.3, 5.6, 1.9, 1.9], [-0.5, 8.0, 0, 2.0]], 0.95) },   // maple
+  ];
   const pineTrunk = (() => { const t = new THREE.CylinderGeometry(0.14, 0.3, 9, 7); t.translate(0, 4.5, 0); return t; })();
   const pineGeo = (() => {
     const parts = [];
@@ -56,14 +59,15 @@ export function buildProps(world, M) {
     const g = merge(parts); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 4, uv.getY(i) * 2); return g;
   })();
 
-  const dec = [], pines = [];
+  const dec = [[], [], []], pines = [];
   const tree = (x, z, s = 1, kind = 'dec') => {
-    const p = { x, z, ry: R() * Math.PI * 2, s: s * (0.85 + R() * 0.3), color: new THREE.Color().setHSL(0.22 + R() * 0.07, 0.35 + R() * 0.2, 0.36 + R() * 0.12) };
-    (kind === 'pine' ? pines : dec).push(p);
+    const sp = kind === 'pine' ? -1 : (kind === 'oak' ? 1 : kind === 'maple' ? 2 : kind === 'plane' ? 0 : (R() * 3) | 0);
+    const p = { x, z, ry: R() * Math.PI * 2, s: s * (0.8 + R() * 0.4), color: new THREE.Color().setHSL(sp === 2 ? 0.16 + R() * 0.08 : 0.22 + R() * 0.07, 0.35 + R() * 0.2, 0.34 + R() * 0.12) };
+    (sp < 0 ? pines : dec[sp]).push(p);
     ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.3, 0, z - 0.3), new THREE.Vector3(x + 0.3, 5, z + 0.3)));
   };
   // mall rows (both sides), library lawn, plaza ring, east lawn, Staller terraces edges, perimeter belts
-  for (let x = -100; x < 190; x += 12) { if (!(x > 120 && x < 152)) tree(x + j(1.5), MALL.z1 - 3.4 + j(0.6), 1.0); }
+  for (let x = -100; x < 190; x += 12) { if (!(x > 120 && x < 152)) tree(x + j(1.5), MALL.z1 - 3.4 + j(0.6), 1.0, 'plane'); }
   for (let x = -100; x < 12; x += 12) tree(x + j(1.5), MALL.z0 - 2.5 + j(0.6), 0.95);
   for (let x = LIB.x0 + 8; x < LIB.x1; x += 15) { if (x > LIB.entX0 - 6 && x < LIB.entX1 + 6) continue; tree(x + j(2), LIB_LAWN.z0 + 5.5 + j(1.5), 0.8); }
   for (let x = 80; x < 120; x += 10) tree(x + j(2), MALL.z0 - 4 + j(1.5), 0.95);
@@ -100,8 +104,7 @@ export function buildProps(world, M) {
   grove(380, -300, 520, 400, 50, 0.6, 1.2);
   grove(STALLER.nx0, STALLER.nz0 - 4, STALLER.nx1, STALLER.nz0 - 4, 0, 0.5);
   grove(-118, -140, -100, -60, 8, 0.5, 0.9);
-  inst(world, decGeo, M.bark, dec, 'wood', { name: 'trunks' });
-  inst(world, canopyGeo, canopyMat, dec, 'wood', { name: 'canopy' });
+  for (let i = 0; i < 3; i++) { inst(world, species[i].trunk, M.bark, dec[i], 'wood', { name: 'trunks' + i }); inst(world, species[i].leaf, canopyMat, dec[i], 'wood', { name: 'canopy' + i }); }
   inst(world, pineTrunk, M.bark, pines, 'wood', { name: 'pineTrunks' });
   inst(world, pineGeo, pineMat, pines, 'wood', { name: 'pines' });
 
@@ -243,17 +246,18 @@ export function buildProps(world, M) {
   for (let z = -880; z < 880; z += 26) { if (R() < 0.6) car(-705 + (R() < 0.5 ? 3.2 : -3.2), z, Math.PI / 2); if (R() < 0.6) car(-683 + (R() < 0.5 ? 3.2 : -3.2), z + 13, -Math.PI / 2); }   // Nicolls Road traffic
   for (let z = -240; z < 250; z += 22) if (R() < 0.5) car(-257 + (R() < 0.5 ? 2.4 : -2.4), z, R() < 0.5 ? Math.PI / 2 : -Math.PI / 2);   // Circle Road
   inst(world, carBody, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.6, envMapIntensity: 1.0, name: 'car' }), cars, 'metal', { name: 'cars' });
-  inst(world, carGlass, M.glass, cars, 'metal', { name: 'carGlass', shadow: false });
+  inst(world, carGlass, M.glassDark, cars, 'metal', { name: 'carGlass', shadow: false });
   inst(world, carWheels, M.rubber, cars, 'metal', { name: 'carWheels', shadow: false });
   // buses: white body with blue band + dark window strip, at the loop stops
-  const busBody = (() => { const b = new THREE.BoxGeometry(12, 3.0, 2.55); b.translate(0, 1.9, 0); return b; })();
+  const busBody = (() => { const b = new THREE.BoxGeometry(12, 3.0, 2.55); b.translate(0, 1.9, 0); const h = new THREE.BoxGeometry(3.2, 0.5, 1.9); h.translate(-1.5, 3.65, 0); const h2 = new THREE.BoxGeometry(2.0, 0.4, 1.6); h2.translate(3.5, 3.6, 0); const bump = new THREE.BoxGeometry(0.3, 0.9, 2.2); bump.translate(6.0, 1.0, 0); return merge([b, h, h2, bump]); })();
+  const busDoors = (() => { const d1 = new THREE.BoxGeometry(1.2, 2.2, 0.06); d1.translate(4.6, 1.5, 1.28); const d2 = new THREE.BoxGeometry(1.6, 2.2, 0.06); d2.translate(-1.2, 1.5, 1.28); const fr = new THREE.BoxGeometry(0.08, 2.2, 0.08); const f1 = fr.clone(); f1.translate(4.0, 1.5, 1.3); const f2 = fr.clone(); f2.translate(5.2, 1.5, 1.3); const f3 = fr.clone(); f3.translate(-2.0, 1.5, 1.3); const f4 = fr.clone(); f4.translate(-0.4, 1.5, 1.3); return merge([d1, d2, f1, f2, f3, f4]); })();
   const busWin = (() => { const b = new THREE.BoxGeometry(12.04, 1.1, 2.59); b.translate(0, 2.55, 0); return b; })();
   const busBand = (() => { const b = new THREE.BoxGeometry(12.04, 0.5, 2.59); b.translate(0, 1.2, 0); return b; })();
-  const busWheels = (() => { const parts = []; for (const [x, z] of [[-4, -1.15], [3.6, -1.15], [-4, 1.15], [3.6, 1.15]]) { const w = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 12); w.rotateX(Math.PI / 2); w.translate(x, 0.5, z); parts.push(w); } return merge(parts); })();
+  const busWheels = (() => { const parts = []; for (const [x, z] of [[-4, -1.15], [-3.0, -1.15], [3.6, -1.15], [-4, 1.15], [-3.0, 1.15], [3.6, 1.15]]) { const w = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 12); w.rotateX(Math.PI / 2); w.translate(x, 0.5, z); parts.push(w); } return merge(parts); })();
   const buses = [];
   const bus = (a) => { const x = BUS_LOOP.x + Math.cos(a) * BUS_LOOP.r, z = BUS_LOOP.z + Math.sin(a) * BUS_LOOP.r; const ry = -a - Math.PI / 2; buses.push({ x, z, ry }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 6.5, 0, z - 6.5), new THREE.Vector3(x + 6.5, 3.5, z + 6.5))); world.cover(x + Math.cos(a) * 2.6, z + Math.sin(a) * 2.6, Math.cos(a), Math.sin(a)); };
   bus(0.25); bus(2.1); bus(4.2);
-  inst(world, busBody, M.bus, buses, 'metal', { name: 'buses' }); inst(world, busWin, M.glass, buses, 'metal', { name: 'busWin', shadow: false }); inst(world, busBand, M.busBlue, buses, 'metal', { name: 'busBand', shadow: false }); inst(world, busWheels, M.rubber, buses, 'metal', { name: 'busWheels', shadow: false });
+  inst(world, busBody, M.bus, buses, 'metal', { name: 'buses' }); inst(world, busWin, M.glassDark, buses, 'metal', { name: 'busWin', shadow: false }); inst(world, busDoors, M.glassDark, buses, 'metal', { name: 'busDoors', shadow: false }); inst(world, busBand, M.busBlue, buses, 'metal', { name: 'busBand', shadow: false }); inst(world, busWheels, M.rubber, buses, 'metal', { name: 'busWheels', shadow: false });
   // bus shelter on the island
   const sx = BUS_LOOP.x, sz = BUS_LOOP.z - 8;
   for (const [dx, dz] of [[-3, -1.2], [3, -1.2], [-3, 1.2], [3, 1.2]]) B.cyl('steelDark', sx + dx, sz + dz, 0, 2.8, 0.06, 8);
@@ -262,13 +266,18 @@ export function buildProps(world, M) {
   B.box('bench', [sx - 2.6, 0.45, sz - 0.9], [sx + 2.6, 0.5, sz - 0.4]); world.cover(sx, sz + 1.2, 0, 1);
 
   // ---- fountain jet + Glaser-style steel sculpture on the library forecourt --------------------------------------------------------
-  { const jet = new THREE.Mesh(new THREE.ConeGeometry(0.9, 6.5, 12, 1, true), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, roughness: 0.2, depthWrite: false, side: THREE.DoubleSide }));
-    jet.position.set(FOUNTAIN.x, 3.25, FOUNTAIN.z); jet.name = 'sbu:jet'; scene.add(jet);
-    const spray = new THREE.Mesh(new THREE.ConeGeometry(2.6, 3.2, 14, 1, true), new THREE.MeshStandardMaterial({ color: 0xf4f8ff, transparent: true, opacity: 0.3, roughness: 0.2, depthWrite: false, side: THREE.DoubleSide }));
-    spray.position.set(FOUNTAIN.x, 1.6, FOUNTAIN.z); spray.name = 'sbu:spray'; scene.add(spray);
-    world.updaters.push((dt) => { jet.scale.y = 1 + Math.sin(ctx.time.elapsed * 6) * 0.05; spray.rotation.y += dt * 0.6; });
-    // splash pad water sheen
-    const sheen = new THREE.Mesh(new THREE.CircleGeometry(FOUNTAIN.r - 0.4, 32), M.water); sheen.rotation.x = -Math.PI / 2; sheen.position.set(FOUNTAIN.x, 0.05, FOUNTAIN.z); sheen.name = 'sbu:sheen'; scene.add(sheen); world.solid(sheen, 'water', { collide: false, shadow: false });
+  { // jets: central 8 m spire (tapered, soft-alpha) + 6 arcs from the rim inward (tube along a parabola), gently pulsing
+    const jetMat = new THREE.MeshStandardMaterial({ color: 0xf6fbff, transparent: true, opacity: 0.5, roughness: 0.15, metalness: 0.0, depthWrite: false, side: THREE.DoubleSide, emissive: 0xdde8f0, emissiveIntensity: 0.2 });
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.16, 8, 10, 1, true), jetMat); spire.position.set(FOUNTAIN.x, 0.55 + 4, FOUNTAIN.z); spire.name = 'sbu:jet'; scene.add(spire);
+    const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.7, 7.6, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, roughness: 0.2, depthWrite: false, side: THREE.DoubleSide })); halo.position.copy(spire.position); halo.name = 'sbu:jetHalo'; scene.add(halo);
+    const arcs = [];
+    for (let k = 0; k < 6; k++) {
+      const a = k * Math.PI / 3 + 0.3; const p0 = new THREE.Vector3(FOUNTAIN.x + Math.cos(a) * 4.2, 0.6, FOUNTAIN.z + Math.sin(a) * 4.2), p2 = new THREE.Vector3(FOUNTAIN.x + Math.cos(a) * 1.2, 0.6, FOUNTAIN.z + Math.sin(a) * 1.2);
+      const p1 = p0.clone().lerp(p2, 0.5); p1.y = 3.2;
+      const curve = new THREE.QuadraticBezierCurve3(p0, p1, p2);
+      const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.045, 6, false), jetMat); m.name = 'sbu:arc'; scene.add(m); arcs.push(m);
+    }
+    world.updaters.push(() => { const t = ctx.time.elapsed; spire.scale.y = 1 + Math.sin(t * 5) * 0.04; halo.scale.y = 1 + Math.sin(t * 5 + 1) * 0.06; for (let i = 0; i < arcs.length; i++) arcs[i].scale.y = 1 + Math.sin(t * 4 + i) * 0.05; });
   }
   { // abstract painted-steel sculpture (Glaser-style) east of the entrance walk
     const sx2 = LIB.entX1 + 16, sz2 = LIB.z1 + 6;

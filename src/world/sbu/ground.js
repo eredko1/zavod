@@ -64,6 +64,12 @@ export function buildGround(world, M) {
   for (let x = MALL.x0 + 8; x < MALL.x1; x += 8) pav('brickPav', x - 0.22, MALL.z0, x + 0.22, MALL.z1, { y: PAV_Y + 0.004, t: 0.02 });
   pav('brickPav', MALL.x0, MALL.z0 + 5.6, MALL.x1, MALL.z0 + 6.0, { y: PAV_Y + 0.004, t: 0.02 });
   pav('brickPav', MALL.x0, MALL.z1 - 6.0, MALL.x1, MALL.z1 - 5.6, { y: PAV_Y + 0.004, t: 0.02 });
+  S.box('curb', [MALL.x0, 0, MALL.z0 - 0.3], [MALL.x1, 0.15, MALL.z0], { collide: false });
+  S.box('curb', [MALL.x0, 0, MALL.z1], [MALL.x1, 0.15, MALL.z1 + 0.3], { collide: false });
+  S.box('curb', [LIB.x0 - 8, 0, LIB_LAWN.z1 - 0.15], [LIB.x1 + 6, 0.15, LIB_LAWN.z1], { collide: false });
+  S.box('curb', [EAST_LAWN.x0 - 0.3, 0, EAST_LAWN.z0], [EAST_LAWN.x0, 0.15, EAST_LAWN.z1], { collide: false });
+  S.box('curb', [EAST_LAWN.x1, 0, EAST_LAWN.z0], [EAST_LAWN.x1 + 0.3, 0.15, EAST_LAWN.z1], { collide: false });
+  S.box('curb', [PIT.x0, 0, PIT.z1 + 0.5], [PIT.floorX0 - 4, 0.15, PIT.z1 + 0.8], { collide: false });
   // tree-pit strips (ivy) along the mall's south edge and the library lawn edge
   for (let x = -100; x < 190; x += 12) {
     if (x > 120 && x < 152) continue; // fountain circle
@@ -112,10 +118,19 @@ export function buildGround(world, M) {
 
   // ---- east lawn, fountain, pond, Staller ---------------------------------------------------------------------------------
   const F = FOUNTAIN;
-  B.poly('cobble', circlePts(F.x, F.z, F.ring, 48), PAV_Y + 0.006);
-  B.poly('concretePav', circlePts(F.x, F.z, F.r + 0.6, 40), PAV_Y + 0.012);
-  B.poly('cobble', circlePts(F.x, F.z, F.r, 40), PAV_Y + 0.016);
-  B.cyl('steelDark', F.x, F.z, PAV_Y, PAV_Y + 0.08, 0.6, 16);
+  // granite basin: split-face ring wall r 6 (1.1 m high, 0.9 thick) with a cap slab, wet cobble floor inside, 4-ring cobble apron outside
+  const ring = (key, r0, r1, y0, y1, seg = 64) => { const o = circlePts(F.x, F.z, r1, seg), i2 = circlePts(F.x, F.z, r0, seg).reverse(); const sh = new THREE.Shape(o.map(p => new THREE.Vector2(p[0], -p[1]))); sh.holes.push(new THREE.Path(i2.map(p => new THREE.Vector2(p[0], -p[1])))); const gg = new THREE.ExtrudeGeometry(sh, { depth: y1 - y0, bevelEnabled: false }); gg.rotateX(-Math.PI / 2); gg.translate(0, y0, 0); return gg; };
+  const cylWall = (key, r, y0, y1, inward = false, seg = 64, scale = 1 / 1.2) => { const g = new THREE.CylinderGeometry(r, r, y1 - y0, seg, 1, true); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2 * Math.PI * r * scale, uv.getY(i) * (y1 - y0) * scale); if (inward) g.scale(-1, 1, 1); g.translate(F.x, (y0 + y1) / 2, F.z); S.add(key, g, { uv: false }); };
+  cylWall('granite', 6.1, 0, 1.0); cylWall('granite', 5.2, 0.3, 1.0, true);
+  S.add('graniteCap', ring('graniteCap', 5.05, 6.25, 1.0, 1.12));
+  for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; const g = boxGeo([-0.03, 0.05, -0.025], [0.03, 0.98, 0.025]); g.rotateY(-a); g.translate(F.x + Math.cos(a) * 6.1, 0, F.z + Math.sin(a) * 6.1); S.add('steelDark', g, { uv: false }); }  // block joints
+  for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; world.box([F.x + Math.cos(a) * 5.65 - 0.8, 0, F.z + Math.sin(a) * 5.65 - 0.8], [F.x + Math.cos(a) * 5.65 + 0.8, 1.12, F.z + Math.sin(a) * 5.65 + 0.8]); }
+  B.poly('cobbleWet', circlePts(F.x, F.z, 5.2, 48), 0.3);
+  B.cyl('steelDark', F.x, F.z, 0.3, 0.55, 0.7, 16, { r0: 0.9 });
+  { const g = new THREE.CircleGeometry(5.15, 48); g.rotateX(-Math.PI / 2); g.translate(F.x, 0.55, F.z); B.add('water', g); }
+  B.add('cobble', ring('cobble', 6.3, F.ring + 1.5, PAV_Y, PAV_Y + 0.012));
+  for (const rr of [7.4, 8.5, 9.6]) B.add('graniteCap', ring('graniteCap', rr - 0.06, rr + 0.06, PAV_Y + 0.012, PAV_Y + 0.02));
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) world.cover(F.x + Math.cos(a) * 7.0, F.z + Math.sin(a) * 7.0, Math.cos(a), Math.sin(a));
   pav('hex', 120, -14, 178, 12);                                              // mall continues to the Admin forecourt
   pav('hex', F.x - 8, -60, F.x + 8, -14);                                     // walk north to the Staller plaza stair
   pav('hex', 100, -61, 146, -50);                                             // pit south rim walk
@@ -143,8 +158,8 @@ export function buildGround(world, M) {
   B.box('concretePav', [T.floorX0, T.floor - 0.5, T.z0], [T.x1, T.floor, T.z1], { collide: true });
   for (let i = 0; i < T.steps; i++) {
     const x1 = T.floorX0 - i * T.tread, x0 = x1 - T.tread; const top = T.floor + T.rise * (i + 1);
-    S.box('grass', [x0, T.floor - 0.5, T.z0], [x1 - 0.5, top, T.z1], { walkable: true });
-    S.box('concreteGrey', [x1 - 0.5, T.floor - 0.5, T.z0], [x1, top + 0.03, T.z1], { collide: false }); // riser lip (concrete edge people sit on)
+    S.box('grass', [x0, T.floor - 0.5, T.z0], [x1 - 0.14, top, T.z1], { walkable: true });
+    S.box('concreteGrey', [x1 - 0.14, T.floor - 0.5, T.z0], [x1, top + 0.02, T.z1], { collide: false }); // concrete riser face + thin lip
     world.cover(x0 + 1.2, T.z0 + 12, 1, 0, top); world.cover(x0 + 1.2, T.z1 - 12, 1, 0, top);
   }
   S.box('grass', [T.x0, -0.5, T.z0], [T.floorX0 - T.steps * T.tread, 0, T.z1], { collide: true });          // upper lawn
@@ -188,6 +203,11 @@ export function buildGround(world, M) {
   pav('concretePav', E.x1 + 0.25, E.z0, E.x1 + 3, BOUNDS.z1 + 30);
   for (let z = E.z0 + 4; z < BOUNDS.z1 + 30; z += 6) pav('paintY', (E.x0 + E.x1) / 2 - 0.08, z, (E.x0 + E.x1) / 2 + 0.08, z + 3, { y: 0.035, t: 0.015 });
   for (let x = E.x0 + 0.6; x < E.x1; x += 1.2) pav('paint', x, E.z0 + 1, x + 0.6, E.z0 + 4, { y: 0.035, t: 0.015 });
+  // lane arrows (straight) on Engineering Drive and at the loop entry
+  for (const [ax, az, dir] of [[(E.x0 + E.x1) / 2 - 2, E.z0 + 14, 1], [(E.x0 + E.x1) / 2 + 2, E.z0 + 30, -1], [L.x - L.r - 12, L.z + 2.4, 0], [L.x - L.r - 12, L.z - 2.4, 0]]) {
+    if (dir === 0) { pav('paint', ax - 2, az - 0.12, ax + 1, az + 0.12, { y: 0.035, t: 0.015 }); const g = new THREE.ConeGeometry(0.5, 1.2, 3); g.rotateX(Math.PI / 2); g.rotateY(Math.PI / 2); g.scale(1, 0.02, 1); g.translate(ax + 1.5, 0.035, az); B.add('paint', g, { uv: false }); }
+    else { pav('paint', ax - 0.12, az - 1.5 * dir, ax + 0.12, az + 1.5 * dir, { y: 0.035, t: 0.015 }); const g = new THREE.ConeGeometry(0.5, 1.2, 3); g.rotateX(dir > 0 ? -Math.PI / 2 : Math.PI / 2); g.scale(1, 0.02, 1); g.translate(ax, 0.035, az + 2.1 * dir); B.add('paint', g, { uv: false }); }
+  }
   pav('concretePav', -100, 96, E.x0, 104);                                  // walk from the loop to Engineering Drive
   pav('concretePav', E.x1, 96, 18, 104);                                    // walk to the SAC south alley
   // John S. Toll Drive (backdrop, north of Chemistry / Staller) + Circle-Road-style west backdrop road

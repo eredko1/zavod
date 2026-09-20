@@ -49,14 +49,15 @@ export function build(world) {
     overview: [-165, 80, 120, -0.9, -0.42],                // high from the SW over the plaza, mall and library
     library: [27, 0, 4, 0.0, 0.12],                        // the entrance walk, "LIBRARY" over the doors
     sac: [-106, 0, 40, -1.62, 0.08],                       // the glass front from the plaza
-    staller: [96, 0, -96, -1.55, -0.08],                   // on the terraces, Staller entrance canopy ahead, fly tower left
-    wang: [150, 0, -58, -0.62, 0.1],                       // NE over the pond to the Wang lantern tower
+    staller: [88, 0, -100, -1.45, -0.12],                  // top of the lawn steps: arts-center balcony and fly tower ahead
+    steps: [138, PIT.floor, -92, 1.35, 0.12],             // from the sunken plaza floor up the grass terraces to the library's east face
+    wang: [176, 0, -66, -0.86, 0.12],                      // east of the arts wing, NE to the arts-center portal, towers and spire
     frey: [-28, 0, -34, 0.35, 0.1],                        // Zebra Path mouth, Frey's ribbed concrete on the left
     zebra: [-35, 0, -104, 3.14, 0.02],                     // down the Zebra Path toward the mall
-    roads: [-118, 0, 66, 2.6, -0.02],                      // the bus loop on Campus Drive
+    roads: [-112, 0, 71, 2.75, -0.02],                      // the bus loop on Campus Drive
     fountain: [124, 0, 9, -1.15, 0.05],                    // fountain with the Administration building beyond
-    terrace: [-83.5, 4.6, 35, -1.4, -0.15],                // SAC vestibule roof (ladder)
-    javits: [70, 0, 96, 2.3, 0.08],                        // south alley toward the round lecture halls of Javits
+    terrace: [-83.2, 4.6, 33, 2.2, -0.1],                  // SAC vestibule roof (ladder), looking SW over the plaza
+    javits: [142, 0, 116, 2.95, 0.1],                      // SE lawn edge, south to the round lecture-hall drums
     plaza: [-96, 0, 24, 1.0, -0.05],                        // centre of the SAC plaza, radial bands, buses beyond
   };
   W.surfaceAt = (p) => {

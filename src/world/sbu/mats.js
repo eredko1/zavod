@@ -77,6 +77,20 @@ export function slitWindowTexture(R) {
   return finish(c);
 }
 
+/** Granite setts (cobbles): grey blocks with dark joints. 512 px = 1.5 m. */
+export function cobbleTexture(R, { dark = false } = {}) {
+  const S = 512; const [c, g] = canvas(S, S);
+  g.fillStyle = dark ? '#3a3835' : '#6e6a62'; g.fillRect(0, 0, S, S);
+  const bw = 40, bh = 30;
+  for (let y = 0; y < S; y += bh) for (let x = (y / bh) % 2 ? -bw / 2 : 0; x < S; x += bw) {
+    const v = (dark ? 78 : 150) + (R() - 0.5) * 40; const t = R() < 0.5 ? 1.03 : 0.97;
+    g.fillStyle = `rgb(${(v * t) | 0},${(v * 0.98) | 0},${(v * 0.92 / t) | 0})`; g.fillRect(x + 2, y + 2, bw - 4, bh - 4);
+    g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(x + 2, y + 2, bw - 4, 3);
+  }
+  for (let i = 0; i < 7000; i++) { const d = R() < 0.5; g.fillStyle = `rgba(${d ? 30 : 230},${d ? 30 : 225},${d ? 30 : 215},${R() * 0.14})`; g.fillRect(R() * S, R() * S, 1 + R() * 2, 1 + R() * 2); }
+  return finish(c);
+}
+
 /** Zebra Path: black/white bands across a 2 m tile (bands run across the path = along U). */
 export function zebraTexture(R) {
   const S = 512; const [c, g] = canvas(S, S);
@@ -110,9 +124,13 @@ export function signTexture({ text = 'ACADEMIC MALL', sub = null, w = 512, h = 1
 }
 
 /** Facade lettering (dark text on transparent). */
-export function letteringTexture({ text = 'LIBRARY', w = 1024, h = 128, color = '#2a2d31', font = 'bold 92px Helvetica, Arial, sans-serif' } = {}) {
+export function letteringTexture({ text = 'LIBRARY', w = 1024, h = 128, color = '#2a2d31', font = null } = {}) {
   const [c, g] = canvas(w, h); g.clearRect(0, 0, w, h);
-  g.fillStyle = color; g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2);
+  let px = Math.round(h * 0.72); g.font = font || `bold ${px}px Helvetica, Arial, sans-serif`;
+  if (!font) { const tw = g.measureText(text).width; if (tw > w * 0.94) { px = Math.floor(px * w * 0.94 / tw); g.font = `bold ${px}px Helvetica, Arial, sans-serif`; } }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillText(text, w / 2 + px * 0.04, h / 2 + px * 0.04);   // offset shadow
+  g.fillStyle = color; g.fillText(text, w / 2, h / 2);
   return finish(c, { wrap: false });
 }
 
@@ -149,20 +167,20 @@ export function makeMats(world) {
   reg('brickPav', pbr('brickPav', 'wsp_brick', '1k', { color: 0x9a6a58, normalScale: 0.7, arm: false, roughness: 0.9, envMapIntensity: 0.4 }), 'concrete', 1 / 1.2);
   reg('concretePav', pbr('concretePav', 'concrete_floor_02', '1k', { color: 0xd3cfc6, normalScale: 0.5, grime: { strength: 0.3, height: 0.2, wet: 0, tint: [0.5, 0.48, 0.44] } }), 'concrete', 1 / 3);
   reg('asphalt', pbr('asphalt', 'asphalt_02', '2k', { color: 0x8f8f8d, normalScale: 0.6, envMapIntensity: 0.5 }), 'concrete', 1 / 5);
-  reg('cobble', pbr('cobble', 'rail_church_bricks_03', '1k', { color: 0xc9bca6, normalScale: 0.9, envMapIntensity: 0.4 }), 'concrete', 1 / 1.4);
+  reg('cobble', new THREE.MeshStandardMaterial({ map: cobbleTexture(R), color: 0xd6d2ca, roughness: 0.9, envMapIntensity: 0.4, name: 'cobble' }), 'concrete', 1 / 1.5);
   reg('curb', plain('curb', 0xb9b6ae, { roughness: 0.85 }), 'concrete', 0.5);
   reg('paint', plain('paint', 0xe8e6df, { roughness: 0.7 }), 'concrete', 0.5);
   reg('paintY', plain('paintY', 0xd9b23a, { roughness: 0.7 }), 'concrete', 0.5);
   reg('zebra', new THREE.MeshStandardMaterial({ map: zebraTexture(R), roughness: 0.85, name: 'zebra' }), 'concrete', 1 / 2);
   reg('water', new THREE.MeshStandardMaterial({ color: 0x3e5a5a, roughness: 0.05, metalness: 0.6, envMapIntensity: 1.4, transparent: true, opacity: 0.86, name: 'water' }), 'water', 0.2);
   reg('mud', plain('mud', 0x4a3f33, { roughness: 1 }), 'ground', 0.5);
-  reg('ivy', plain('ivy', 0x3f5a2c, { roughness: 1 }), 'ground', 0.5);
+  reg('ivy', pbr('ivy', 'wsp_grass', '1k', { color: 0x4a6a34, normalScale: 1.2, arm: false, roughness: 1, envMapIntensity: 0.2 }), 'ground', 1 / 1.2);
   reg('mulch', plain('mulch', 0x5a4331, { roughness: 1 }), 'ground', 0.5);
   // ---- buildings -----------------------------------------------------------------------------
   const rib = ribbedConcreteTexture(R);
   reg('ribbed', new THREE.MeshStandardMaterial({ map: rib.map, normalMap: rib.normalMap, normalScale: new THREE.Vector2(0.8, 0.8), color: 0xd3cbbd, roughness: 0.92, envMapIntensity: 0.5, name: 'ribbed' }), 'concrete', 1 / 2);
   addGrime(M.ribbed, R, { key: 'ribbed', strength: 0.5, height: 2.5, wet: 0, tint: [0.45, 0.42, 0.37] });
-  reg('precast', new THREE.MeshStandardMaterial({ map: precastTexture(R), color: 0xc2b6a3, roughness: 0.88, envMapIntensity: 0.55, name: 'precast' }), 'concrete', 1 / 4);
+  reg('precast', new THREE.MeshStandardMaterial({ map: precastTexture(R), color: 0xcdc4b4, roughness: 0.88, envMapIntensity: 0.55, name: 'precast' }), 'concrete', 1 / 4);
   addGrime(M.precast, R, { key: 'precast', strength: 0.4, height: 2.2, wet: 0, tint: [0.45, 0.42, 0.37] });
   reg('precastDark', new THREE.MeshStandardMaterial({ map: M.precast.map, color: 0xa79d8e, roughness: 0.9, envMapIntensity: 0.45, name: 'precastDark' }), 'concrete', 1 / 4);
   reg('slit', new THREE.MeshStandardMaterial({ map: slitWindowTexture(R), color: 0xc8bcaa, roughness: 0.85, envMapIntensity: 0.5, name: 'slit' }), 'concrete', 1 / 4.2);
@@ -171,27 +189,37 @@ export function makeMats(world) {
   reg('brickRed', pbr('brickRed', 'factory_brick', '1k', { color: 0xc9887a, normalScale: 0.9, grime: { strength: 0.45, height: 1.8, wet: 0, tint: [0.4, 0.33, 0.28] } }), 'concrete', 1 / 1.6);
   reg('brickBrown', pbr('brickBrown', 'rail_church_bricks_03', '1k', { color: 0x6e5245, normalScale: 0.9, grime: { strength: 0.45, height: 2, wet: 0, tint: [0.35, 0.3, 0.26] } }), 'concrete', 1 / 1.6);
   reg('brickDark', pbr('brickDark', 'factory_brick', '1k', { color: 0x5a3d35, normalScale: 0.9 }), 'concrete', 1 / 1.6);
-  reg('brickStaller', pbr('brickStaller', 'factory_brick', '1k', { color: 0x7a5744, normalScale: 0.9, grime: { strength: 0.4, height: 2, wet: 0, tint: [0.35, 0.3, 0.26] } }), 'concrete', 1 / 1.6);
-  reg('stucco', pbr('stucco', 'painted_concrete', '1k', { color: 0x9a9894, normalScale: 0.4, grime: { strength: 0.35, height: 2.5, wet: 0 } }), 'concrete', 1 / 3);
-  reg('stuccoLight', pbr('stuccoLight', 'painted_concrete', '1k', { color: 0xc4c1bb, normalScale: 0.4 }), 'concrete', 1 / 3);
-  reg('glass', plain('glass', 0x7d95a8, { roughness: 0.12, metalness: 0.8, envMapIntensity: 1.3 }), 'metal', 0.5);
-  reg('glassDark', plain('glassDark', 0x4a5c68, { roughness: 0.15, metalness: 0.85, envMapIntensity: 1.1 }), 'metal', 0.5);
-  reg('glassLight', plain('glassLight', 0x8fb2c2, { roughness: 0.06, metalness: 0.9, envMapIntensity: 1.5 }), 'metal', 0.5);
+  reg('brickStaller', pbr('brickStaller', 'factory_brick', '1k', { color: 0x9c7a62, normalScale: 0.9, grime: { strength: 0.4, height: 2, wet: 0, tint: [0.35, 0.3, 0.26] } }), 'concrete', 1 / 1.6);
+  reg('stucco', pbr('stucco', 'concrete_wall_006', '1k', { color: 0xc9c2b4, normalScale: 0.3, roughness: 0.8, grime: { strength: 0.35, height: 2.5, wet: 0, tint: [0.4, 0.38, 0.34] } }), 'concrete', 1 / 4);
+  reg('stuccoLight', pbr('stuccoLight', 'concrete_wall_006', '1k', { color: 0xbdb9b0, normalScale: 0.3 }), 'concrete', 1 / 4);
+  reg('glass', plain('glass', 0x5c7a74, { roughness: 0.04, metalness: 0.95, envMapIntensity: 1.2 }), 'metal', 0.5);
+  reg('glassLit', plain('glassLit', 0x5f746e, { roughness: 0.05, metalness: 0.9, envMapIntensity: 1.0, emissive: 0xffd9a0, emissiveIntensity: 0.14 }), 'metal', 0.5);
+  reg('granite', pbr('granite', 'cracked_concrete', '1k', { color: 0xcfcabe, normalScale: 1.6, envMapIntensity: 0.4 }), 'concrete', 1 / 1.2);
+  reg('graniteCap', plain('graniteCap', 0xa8a294, { roughness: 0.75 }), 'concrete', 0.5);
+  reg('cobbleWet', new THREE.MeshStandardMaterial({ map: cobbleTexture(R, { dark: true }), color: 0xffffff, roughness: 0.35, metalness: 0.05, envMapIntensity: 0.8, name: 'cobbleWet' }), 'concrete', 1 / 1.5);
+  reg('terrazzo', pbr('terrazzo', 'concrete_floor_02', '1k', { color: 0xa9a6a0, normalScale: 0.3, envMapIntensity: 0.6 }), 'concrete', 1 / 2);
+  reg('fascia', plain('fascia', 0xd2d2ce, { roughness: 0.5, metalness: 0.15, envMapIntensity: 0.6 }), 'metal', 0.5);
+  reg('parapetMetal', plain('parapetMetal', 0xb9b9b4, { roughness: 0.4, metalness: 0.35, envMapIntensity: 0.7 }), 'metal', 0.5);
+  reg('gravelRoof', pbr('gravelRoof', 'rail_gravel_road', '2k', { color: 0x8e8a80, normalScale: 0.7, envMapIntensity: 0.25 }), 'concrete', 1 / 3);
+  reg('hvac', plain('hvac', 0x9a9c98, { roughness: 0.6, metalness: 0.5, envMapIntensity: 0.6 }), 'metal', 0.5);
+  reg('redSteel', plain('redSteel', 0xc8262a, { roughness: 0.45, metalness: 0.4, envMapIntensity: 0.7 }), 'metal', 0.5);
+  reg('glassDark', plain('glassDark', 0x3f5250, { roughness: 0.06, metalness: 0.95, envMapIntensity: 1.1 }), 'metal', 0.5);
+  reg('glassLight', plain('glassLight', 0x6f8f8a, { roughness: 0.05, metalness: 0.9, envMapIntensity: 1.2 }), 'metal', 0.5);
   reg('glassRed', plain('glassRed', 0x8c1a22, { roughness: 0.12, metalness: 0.85, envMapIntensity: 1.2 }), 'metal', 0.5);
-  reg('white', plain('white', 0xe9e8e2, { roughness: 0.55, metalness: 0.1, envMapIntensity: 0.7 }), 'metal', 0.5);
-  reg('whiteMullion', plain('whiteMullion', 0xf0efe9, { roughness: 0.45, metalness: 0.2, envMapIntensity: 0.8 }), 'metal', 0.5);
+  reg('white', plain('white', 0xdedcd6, { roughness: 0.55, metalness: 0.15, envMapIntensity: 0.6 }), 'metal', 0.5);
+  reg('whiteMullion', plain('whiteMullion', 0xd9d8d2, { roughness: 0.45, metalness: 0.3, envMapIntensity: 0.7 }), 'metal', 0.5);
   reg('darkMullion', plain('darkMullion', 0x2a2c2e, { roughness: 0.5, metalness: 0.5, envMapIntensity: 0.6 }), 'metal', 0.5);
   reg('red', plain('red', 0xb3232c, { roughness: 0.5, metalness: 0.3, envMapIntensity: 0.7 }), 'metal', 0.5);
   reg('steel', plain('steel', 0x8e9296, { roughness: 0.45, metalness: 0.85, envMapIntensity: 0.9 }), 'metal', 0.5);
   reg('steelDark', plain('steelDark', 0x2f3234, { roughness: 0.55, metalness: 0.7, envMapIntensity: 0.7 }), 'metal', 0.5);
   reg('alu', plain('alu', 0xb9bcbe, { roughness: 0.35, metalness: 0.9, envMapIntensity: 1.0 }), 'metal', 0.5);
-  reg('roof', pbr('roof', 'worn_asphalt', '2k', { color: 0x777572, normalScale: 0.4, envMapIntensity: 0.3 }), 'concrete', 1 / 4);
+  reg('roof', pbr('roof', 'rail_gravel_road', '2k', { color: 0x8e8a80, normalScale: 0.7, envMapIntensity: 0.25 }), 'concrete', 1 / 3);
   reg('roofMetal', pbr('roofMetal', 'corrugated_iron_02', '2k', { color: 0x9a9c9c, normalScale: 0.8, envMapIntensity: 0.6 }), 'metal', 1 / 2);
   reg('bench', plain('bench', 0x23262a, { roughness: 0.6, metalness: 0.5 }), 'wood', 0.5);
   reg('binGreen', plain('binGreen', 0x1f4a2e, { roughness: 0.6, metalness: 0.4 }), 'metal', 0.5);
   reg('binBlue', plain('binBlue', 0x1e3f8a, { roughness: 0.6, metalness: 0.4 }), 'metal', 0.5);
-  reg('bark', pbr('bark', 'rail_dark_wooden_planks', '1k', { color: 0x9a8a78, normalScale: 0.8, envMapIntensity: 0.3 }), 'wood', 1 / 1.5);
-  reg('hedge', plain('hedge', 0x2f4f27, { roughness: 1 }), 'ground', 0.5);
+  reg('bark', pbr('bark', 'rail_dark_wooden_planks', '1k', { color: 0xb3a898, normalScale: 0.8, envMapIntensity: 0.3 }), 'wood', 1 / 1.5);
+  reg('hedge', pbr('hedge', 'wsp_grass', '1k', { color: 0x5a7a40, normalScale: 1.2, arm: false, roughness: 1, envMapIntensity: 0.2 }), 'ground', 1 / 1.0);
   reg('black', plain('black', 0x141414, { roughness: 0.9 }), 'metal', 0.5);
   reg('rubber', plain('rubber', 0x1a1a1a, { roughness: 0.95 }), 'metal', 0.5);
   reg('bus', plain('bus', 0xe8e8e4, { roughness: 0.45, metalness: 0.3, envMapIntensity: 0.9 }), 'metal', 0.5);
@@ -201,5 +229,19 @@ export function makeMats(world) {
   reg('banner', plain('banner', 0x9b1b2a, { roughness: 0.8, side: THREE.DoubleSide }), 'wood', 0.5);
   reg('cream', plain('cream', 0xd8cfbd, { roughness: 0.85 }), 'concrete', 0.5);
 
+  // macro luminance variation (±8 %, ~20 m) on ground materials so tiling doesn't read
+  for (const m of [M.hex, M.grass, M.asphalt, M.concretePav, M.cobble]) {
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (sh, r) => {
+      if (prev) prev(sh, r);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vMPos;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvMPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\nvarying vec3 vMPos;
+        float mh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float mn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mh(i), mh(i + vec2(1, 0)), f.x), mix(mh(i + vec2(0, 1)), mh(i + vec2(1, 1)), f.x), f.y); }`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+        { float v = mn(vMPos.xz * 0.05) * 0.6 + mn(vMPos.xz * 0.21) * 0.4; diffuseColor.rgb *= 0.90 + 0.18 * v; }`);
+    };
+    const pk = m.customProgramCacheKey; m.customProgramCacheKey = () => (pk ? pk.call(m) : '') + '|macro';
+  }
   return M;
 }

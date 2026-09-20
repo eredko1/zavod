@@ -11,9 +11,10 @@ let MATS = null;
 export function bikeMaterials() {
   if (MATS) return MATS;
   MATS = {
-    paint: new THREE.MeshStandardMaterial({ color: 0x1c2420, roughness: 0.62, metalness: 0.35 }),           // dark matte olive-black
+    paint: new THREE.MeshStandardMaterial({ color: 0x2b332e, roughness: 0.55, metalness: 0.35 }),           // dark matte olive-black
     chrome: new THREE.MeshStandardMaterial({ color: 0xd8dde2, roughness: 0.18, metalness: 1.0 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.95, metalness: 0.0 }),
+    trim: new THREE.MeshStandardMaterial({ color: 0x2a2521, roughness: 0.7, metalness: 0.05 }),
     lens: new THREE.MeshStandardMaterial({ color: 0xfff4dc, emissive: 0xfff0c8, emissiveIntensity: 0.15, roughness: 0.25, metalness: 0.1 }),
     tail: new THREE.MeshStandardMaterial({ color: 0x8a0a0a, emissive: 0xff1a0a, emissiveIntensity: 0.6, roughness: 0.3 }),
   };
@@ -63,8 +64,8 @@ function geometries() {
   // front fender (on fork assembly → separate list F)
   // panniers (hard cases) + racks
   for (const sx of [-1, 1]) {
-    put(P, new THREE.BoxGeometry(0.16, 0.34, 0.46), sx * 0.34, 0.60, 0.62);
-    tube(P, sx * 0.30, 0.44, 0.40, sx * 0.30, 0.44, 0.86, 0.012); tube(P, sx * 0.30, 0.78, 0.40, sx * 0.30, 0.78, 0.86, 0.012);
+    put(P, new THREE.BoxGeometry(0.15, 0.30, 0.42), sx * 0.33, 0.76, 0.58);
+    tube(P, sx * 0.30, 0.60, 0.36, sx * 0.30, 0.60, 0.82, 0.012); tube(P, sx * 0.30, 0.92, 0.36, sx * 0.30, 0.92, 0.82, 0.012);
   }
   // side panels
   for (const sx of [-1, 1]) put(P, new THREE.BoxGeometry(0.03, 0.18, 0.30), sx * 0.19, 0.62, 0.30, E(0, 0, 0));
@@ -99,11 +100,12 @@ function geometries() {
   tube(FC, -0.36, 1.06, -0.10, -0.42, 1.08, 0.10, 0.014); tube(FC, 0.36, 1.06, -0.10, 0.42, 1.08, 0.10, 0.014);
   for (const sx of [-1, 1]) {
     put(FR, new THREE.CylinderGeometry(0.02, 0.02, 0.13, 8), sx * 0.40, 1.075, 0.04, E(Math.PI / 2 - 0.3, 0, 0)); // grips
-    tube(FC, sx * 0.30, 1.08, -0.05, sx * 0.40, 1.34, -0.12, 0.009);        // mirror stems
-    put(FP, new THREE.BoxGeometry(0.13, 0.08, 0.02), sx * 0.40, 1.35, -0.12, E(0.1, sx * 0.25, 0));
+    tube(FC, sx * 0.30, 1.08, -0.06, sx * 0.44, 1.26, -0.10, 0.007);        // mirror stems (short)
+    put(FP, new THREE.BoxGeometry(0.12, 0.075, 0.018), sx * 0.45, 1.27, -0.10, E(0.08, sx * 0.3, 0));
+    put(FC, new THREE.BoxGeometry(0.10, 0.06, 0.004), sx * 0.45 - Math.sin(sx * 0.3) * 0.011, 1.27, -0.10 + Math.cos(sx * 0.3) * 0.011, E(0.08, sx * 0.3, 0)); // glass
   }
-  put(FP, new THREE.CylinderGeometry(0.16, 0.13, 0.20, 16), 0, 0.86, -0.62, E(Math.PI / 2, 0, 0));  // headlight shell
-  put(FC, new THREE.TorusGeometry(0.15, 0.012, 6, 20), 0, 0.86, -0.72);                             // headlight bezel
+  put(FP, new THREE.CylinderGeometry(0.115, 0.09, 0.16, 16), 0, 0.86, -0.46, E(Math.PI / 2, 0, 0));  // headlight shell
+  put(FC, new THREE.TorusGeometry(0.112, 0.01, 6, 20), 0, 0.86, -0.54);                             // headlight bezel
   put(FP, new THREE.BoxGeometry(0.20, 0.06, 0.12), 0, 1.02, -0.30);                                // instrument pod
   put(FP, new THREE.CylinderGeometry(0.40, 0.40, 0.16, 22, 1, true, Math.PI * 0.12, Math.PI * 0.76), 0, 0.02 + WHEEL_R, FRONT_Z, E(0, 0, Math.PI / 2)); // front fender
   // ---- wheels ----
@@ -119,7 +121,7 @@ function geometries() {
     paint: merged(P), chrome: merged(C), rubber: merged(RB),
     forkPaint: merged(FP), forkChrome: merged(FC), forkRubber: merged(FR),
     tyre, wheelChrome,
-    lens: new THREE.CircleGeometry(0.135, 20),
+    lens: new THREE.CircleGeometry(0.10, 20),
     tail: new THREE.BoxGeometry(0.16, 0.06, 0.02),
   };
   return GEO;
@@ -132,7 +134,7 @@ export function buildBike(ctx) {
   const body = new THREE.Group(); group.add(body);            // leans (roll) and bobs (suspension)
   const meshes = [];
   const mk = (geo, mat, parent) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; m.userData.surface = 'metal'; parent.add(m); meshes.push(m); return m; };
-  mk(G.paint, M.paint, body); mk(G.chrome, M.chrome, body); mk(G.rubber, M.rubber, body);
+  mk(G.paint, M.paint, body); mk(G.chrome, M.chrome, body); mk(G.rubber, M.trim, body);
   const tail = mk(G.tail, M.tail, body); tail.position.set(0, 0.80, 0.865); tail.castShadow = false;
   // rear wheel
   const wheelR = new THREE.Group(); wheelR.position.set(0, WHEEL_R, REAR_Z); body.add(wheelR);
@@ -141,13 +143,13 @@ export function buildBike(ctx) {
   const PIV = new THREE.Vector3(0, 0.9, -0.08);
   const fork = new THREE.Group(); fork.position.copy(PIV); body.add(fork);       // steering pivot (rotate fork.rotation.y)
   const fi = new THREE.Group(); fi.position.copy(PIV).negate(); fork.add(fi);
-  mk(G.forkPaint, M.paint, fi); mk(G.forkChrome, M.chrome, fi); mk(G.forkRubber, M.rubber, fi);
-  const lens = mk(G.lens, M.lens, fi); lens.position.set(0, 0.86, -0.73); lens.rotation.y = Math.PI; lens.castShadow = false;
+  mk(G.forkPaint, M.paint, fi); mk(G.forkChrome, M.chrome, fi); mk(G.forkRubber, M.trim, fi);
+  const lens = mk(G.lens, M.lens.clone(), fi); lens.position.set(0, 0.86, -0.545); lens.rotation.y = Math.PI; lens.castShadow = false;
   const wheelF = new THREE.Group(); wheelF.position.set(0, WHEEL_R, FRONT_Z); fi.add(wheelF);
   mk(G.tyre, M.rubber, wheelF); mk(G.wheelChrome, M.chrome, wheelF);
   // headlight (only on while mounted)
   const headlight = new THREE.SpotLight(0xfff1cf, 0, 45, 0.48, 0.55, 1.2);
-  headlight.position.set(0, 0.86, -0.72); headlight.target.position.set(0, 0.35, -12); headlight.castShadow = false; headlight.visible = false;
+  headlight.position.set(0, 0.86, -0.56); headlight.target.position.set(0, 0.35, -12); headlight.castShadow = false; headlight.visible = false;
   fi.add(headlight); fi.add(headlight.target);
   return { group, body, fork, wheelF, wheelR, headlight, lens, meshes };
 }
