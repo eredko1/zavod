@@ -1,5 +1,7 @@
 // SBU props: instanced trees (planes/oaks + pines), lampposts with banners, benches, bins, bollards, bike racks, hoop fences, hedges, cars, buses, bus shelter, fountain jet, sculpture. SBU agent.
 import * as THREE from 'three';
+import { carGeometries, carMaterials } from '../carkit.js';
+import { leafTexture as wspLeafTexture } from '../wsp/textures.js';
 import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch, boxGeo, circlePts } from './geo.js';
 import { leafTexture, signTexture } from './mats.js';
@@ -37,7 +39,11 @@ export function buildProps(world, M) {
 
   // ---- trees --------------------------------------------------------------------------------------------------------------------
   const leafDec = leafTexture(R), leafPine = leafTexture(R, { pine: true });
-  const canopyMat = new THREE.MeshStandardMaterial({ map: leafDec.map, alphaMap: leafDec.alphaMap, color: 0xb8cc88, roughness: 1, metalness: 0, alphaTest: 0.42, side: THREE.DoubleSide, envMapIntensity: 0.5, name: 'canopy' });
+  const clumpLeaf = wspLeafTexture(R, { hue: 92 });
+  // Lambert + normals bent toward +Y (cards never go black facing away) + a little emissive "translucency" — see wsp/trees.js for the perf notes
+  const canopyMat = new THREE.MeshLambertMaterial({ map: clumpLeaf, color: 0xb9c2a2, alphaTest: 0.5, side: THREE.DoubleSide, emissiveMap: clumpLeaf, emissive: 0x34441e, emissiveIntensity: 0.22, name: 'canopy' });
+  canopyMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, 0.45));'); };
+  canopyMat.customProgramCacheKey = () => 'sbu-leafcards';
   const pineMat = new THREE.MeshStandardMaterial({ map: leafPine.map, alphaMap: leafPine.alphaMap, color: 0x84a06a, roughness: 1, metalness: 0, alphaTest: 0.42, side: THREE.DoubleSide, envMapIntensity: 0.45, name: 'pine' });
   // deciduous: trunk + 3 lumpy spheres
   // deciduous species: plane (tall, open), oak (wide, low), maple (round, dense) — trunk + 1st/2nd-order branches, lumpy canopy
@@ -49,7 +55,17 @@ export function buildProps(world, M) {
     }
     return merge(parts);
   };
-  const canopy = (blobs, yScale = 0.82) => { const parts = []; for (const [x, y, z, r] of blobs) { const s = new THREE.SphereGeometry(r, 9, 7); s.scale(1, yScale, 1); s.translate(x, y, z); parts.push(s); } const g = merge(parts); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3); return g; };
+  // canopy = alpha-card clusters, one crossed pair + a tilted cap card per blob (the old sphere blobs read as lollipops).
+  // Cards use the clumped-leaf texture shared with City Square; seams are hidden by random roll per card.
+  const canopy = (blobs, yScale = 0.82) => {
+    const parts = [];
+    for (const [x, y, z, r] of blobs) {
+      const a0 = R() * Math.PI;
+      for (let k = 0; k < 2; k++) { const q = new THREE.PlaneGeometry(r * 2.5, r * 2.4 * yScale); q.rotateZ((R() - 0.5) * 0.5); q.rotateX((R() - 0.5) * 0.5); q.rotateY(a0 + k * Math.PI / 2 + (R() - 0.5) * 0.3); q.translate(x, y, z); parts.push(q); }
+      const c = new THREE.PlaneGeometry(r * 2.3, r * 2.3); c.rotateX(-Math.PI / 2 + (R() - 0.5) * 0.6); c.rotateY(R() * 6.3); c.translate(x, y + r * 0.25 * yScale, z); parts.push(c);
+    }
+    return merge(parts);
+  };
   const species = [
     { trunk: treeGeo(5.6, 0.27, [[0.3, 0.55, 3.4, 5.0], [2.4, 0.5, 3.2, 5.3], [4.3, 0.6, 3.0, 4.8], [1.4, 0.25, 3.6, 5.6]]), leaf: canopy([[0, 8.2, 0, 3.2], [2.2, 7.3, 0.6, 2.5], [-2.0, 7.5, -1.0, 2.4], [0.5, 6.8, 2.3, 2.1], [-0.8, 7.0, -2.4, 2.0], [0.2, 9.6, 0.3, 2.0]], 0.8) },   // plane
     { trunk: treeGeo(3.6, 0.36, [[0.2, 0.9, 3.6, 3.0], [1.8, 0.85, 3.8, 3.2], [3.4, 0.95, 3.4, 2.9], [5.0, 0.8, 3.6, 3.3], [2.6, 0.3, 3.0, 3.6]]), leaf: canopy([[0, 6.4, 0, 4.2], [3.2, 5.6, 1.0, 3.0], [-3.0, 5.9, -1.4, 2.9], [0.8, 5.4, 3.4, 2.7], [-1.2, 5.6, -3.4, 2.6], [2.0, 7.6, -1.5, 2.4]], 0.7) },   // oak
@@ -65,7 +81,7 @@ export function buildProps(world, M) {
   const dec = [[], [], []], pines = [];
   const tree = (x, z, s = 1, kind = 'dec') => {
     const sp = kind === 'pine' ? -1 : (kind === 'oak' ? 1 : kind === 'maple' ? 2 : kind === 'plane' ? 0 : (R() * 3) | 0);
-    const p = { x, z, ry: R() * Math.PI * 2, s: s * (0.8 + R() * 0.4), color: new THREE.Color().setHSL(sp === 2 ? 0.16 + R() * 0.08 : 0.22 + R() * 0.07, 0.35 + R() * 0.2, 0.34 + R() * 0.12) };
+    const p = { x, z, ry: R() * Math.PI * 2, s: s * (0.8 + R() * 0.4), color: new THREE.Color().setHSL(sp === 2 ? 0.15 + R() * 0.06 : 0.2 + R() * 0.06, 0.12 + R() * 0.12, 0.72 + R() * 0.16) };
     (sp < 0 ? pines : dec[sp]).push(p);
     ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.3, 0, z - 0.3), new THREE.Vector3(x + 0.3, 5, z + 0.3)));
     if (Math.abs(x) < 230 && z > -250 && z < 210) ao(x, z, (sp < 0 ? 2.0 : 3.1) * p.s, W.groundHeight(x, z));
@@ -273,9 +289,16 @@ export function buildProps(world, M) {
   car(-108, 112, Math.PI / 2); car(-108, 118.5, Math.PI / 2);
   for (let z = -880; z < 880; z += 26) { if (R() < 0.6) car(-705 + (R() < 0.5 ? 3.2 : -3.2), z, Math.PI / 2); if (R() < 0.6) car(-683 + (R() < 0.5 ? 3.2 : -3.2), z + 13, -Math.PI / 2); }   // Nicolls Road traffic
   for (let z = -240; z < 250; z += 22) if (R() < 0.5) car(-257 + (R() < 0.5 ? 2.4 : -2.4), z, R() < 0.5 ? Math.PI / 2 : -Math.PI / 2);   // Circle Road
-  inst(world, carBody, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.6, envMapIntensity: 1.0, name: 'car' }), cars, 'metal', { name: 'cars' });
-  inst(world, carGlass, M.glassDark, cars, 'metal', { name: 'carGlass', shadow: false });
-  inst(world, carWheels, M.rubber, cars, 'metal', { name: 'carWheels', shadow: false });
+  { // lofted car kit (shared with City Square / Central Station): 4 body styles, per-instance paint
+    const CM = carMaterials(); const byKind = { sedan: [], hatch: [], suv: [], van: [] }; const ks = Object.keys(byKind);
+    for (const c of cars) { const r = R(); byKind[r < 0.4 ? 'sedan' : r < 0.62 ? 'suv' : r < 0.88 ? 'hatch' : 'van'].push(c); }
+    for (const k of ks) {
+      const P = byKind[k]; if (!P.length) continue; const G = carGeometries(k).geos;
+      inst(world, G.paint, CM.paint, P, 'metal', { name: 'cars_' + k });
+      const P0 = P.map(({ color, ...r }) => r);
+      for (const slot of ['glass', 'rubber', 'rim', 'trim', 'lampW', 'lampR', 'plate']) inst(world, G[slot], CM[slot], P0, 'metal', { name: slot + '_' + k, shadow: false });
+    }
+  }
   // ---- buses: real transit coach — body with a skirt, 6 wheels, tinted window band, folding doors,
   // roof HVAC hump, destination sign, mirrors, lights, fictional livery -------------------------------------
   const BL = 12.0, BW = 2.55, BHW = BW / 2;
