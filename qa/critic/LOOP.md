@@ -22,9 +22,14 @@ Stop when overall >= 8.0 or after round 8.
 ## Status
 | Map | r1 | r2 | r3 | r4 | Current |
 |---|---|---|---|---|---|
-| wsp (City Square) | 5.9 | — | — | — | r1 fixes landing |
-| sbu (University) | 3.5 | 4.6 | — | — | r2 fixes landing |
-| terminal (Central Station) | — | — | — | — | r1 capture done |
+| wsp (City Square) | 5.9 | — | — | — | **r1 fixes all landed** (6992606, 7b51f99) — needs r2 capture + critique |
+| sbu (University) | 3.5 | 4.6 | — | — | **r2 fixes partially landed** (806d600, detail.js) — finish, then r3 capture |
+| terminal (Central Station) | 5.3 | — | — | — | **critiqued, 12 fixes queued, builder never launched** |
+
+## Next session — start here
+1. `./qa/serve.sh`, then `./qa/critic-shots.sh wsp 2` and `./qa/critic-shots.sh sbu 3`; critique each into `qa/critic/<map>-r<N>.md`.
+2. Launch the Central Station builder on `qa/critic/terminal-r1.md`. Highest value first: **(1) cove lighting, (2) the four-faced clock + information booth, (4) the two ruined poses, (8) people in the hall** — those four are most of the 5.3 → ~7 gap and are cheap. Ornament / street exterior / platform grime can follow.
+3. Perf watch: `zavod` is at **713 draw calls / 6.8 M tri** (was 581–621) and `wsp` dropped to **52 fps / 1.78 M tri** after the r1 detail pass. Both need a look before adding more.
 
 ## Rules for builders
 - No real institution / street / person names in rendered text or `name:` data fields (de-branded at 210af80).
