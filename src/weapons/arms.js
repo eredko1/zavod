@@ -131,12 +131,12 @@ export function bakeGroup(root, builder, wear = 'none') {
  */
 export function buildArm(side, pose, place, mats) {
   const root = new THREE.Group();
-  const hand = buildHand(side, { watch: side === 'left', ...pose }); const fore = buildForearm(pose.forearmLen ?? 0.32);
+  const hand = buildHand(side, { watch: side === 'left' && !pose.keepFore, ...pose }); const fore = buildForearm(pose.forearmLen ?? 0.32);
   root.add(hand); root.add(fore);
   place(hand, fore);
   hand.scale.setScalar(pose.scale ?? (side === 'left' ? 1.08 : 1.0));
   // Elbow off-screen: whatever the weapon pose asked for, bend the forearm steeply down and away from the eye (weapon space: -y down, +z toward the camera).
-  { const d = new THREE.Vector3(0, 1, 0).applyQuaternion(fore.quaternion); d.y -= 0.55; d.z -= 0.15; d.x *= 0.9; d.normalize(); fore.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); }
+  if (!pose.keepFore) { const d = new THREE.Vector3(0, 1, 0).applyQuaternion(fore.quaternion); d.y -= 0.55; d.z -= 0.15; d.x *= 0.9; d.normalize(); fore.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); }
   const b = new Builder();
   bakeGroup(root, b, 'none');
   const g = b.build(mats, `arm_${side}`);
@@ -148,4 +148,20 @@ export function buildArm(side, pose, place, mats) {
   g.userData.wrist = wrist.clone();
   g.userData.home = { pos: wrist.clone(), rot: new THREE.Euler() };
   return g;
+}
+
+/**
+ * Modern "C-clamp" support grip: palm flat on the left face of the handguard, thumb hooked over the top, fingers
+ * wrapping forward-down and under; the back of the hand + knuckle plate face the eye (the MW/Tarkov read), wrist low-left
+ * and behind, forearm dropping to the lower-left corner. `c` = handguard centre [x, y, z] level with the palm, `r` = radius.
+ */
+export function supportGrip(hand, fore, c, r = 0.022, elbow = [-0.46, -0.36, 0.06]) {
+  const Y = new THREE.Vector3(0.32, -0.45, -0.83).normalize();   // wrist → knuckles: forward, angling down so the fingers wrap under
+  const Zb = new THREE.Vector3(-0.93, 0.34, 0.0).normalize();  // back of the hand: left and a little up (toward the eye)
+  const X = new THREE.Vector3().crossVectors(Y, Zb).normalize(); // thumb: up and over the top
+  const Z = new THREE.Vector3().crossVectors(X, Y).normalize();
+  hand.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
+  const palm = new THREE.Vector3(c[0] - r - 0.015, c[1] - 0.016, c[2]); // palm surface against the left face
+  hand.position.copy(palm).addScaledVector(Y, -0.05);
+  fore.position.copy(hand.position); fore.lookAt(...elbow); fore.rotateX(Math.PI / 2);
 }

@@ -1,198 +1,96 @@
 {
   "asset": {
-    "generator": "Khronos glTF Blender I/O v4.1.63",
+    "generator": "glTF-Transform v4.5.0",
     "version": "2.0"
   },
-  "scene": 0,
-  "scenes": [
-    {
-      "name": "Scene",
-      "nodes": [
-        0,
-        1,
-        2
-      ]
-    }
-  ],
-  "nodes": [
-    {
-      "mesh": 0,
-      "name": "wooden_crate_01_lid"
-    },
-    {
-      "mesh": 1,
-      "name": "wooden_crate_01"
-    },
-    {
-      "mesh": 2,
-      "name": "wooden_crate_01_latch"
-    }
-  ],
-  "materials": [
-    {
-      "doubleSided": true,
-      "name": "wooden_crate_01",
-      "normalTexture": {
-        "index": 0
-      },
-      "pbrMetallicRoughness": {
-        "baseColorTexture": {
-          "index": 1
-        },
-        "metallicRoughnessTexture": {
-          "index": 2
-        }
-      }
-    }
-  ],
-  "meshes": [
-    {
-      "name": "Cube.005",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 0,
-            "NORMAL": 1,
-            "TEXCOORD_0": 2
-          },
-          "indices": 3,
-          "material": 0
-        }
-      ]
-    },
-    {
-      "name": "Cube.020",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 4,
-            "NORMAL": 5,
-            "TEXCOORD_0": 6
-          },
-          "indices": 7,
-          "material": 0
-        }
-      ]
-    },
-    {
-      "name": "Cube.001",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 8,
-            "NORMAL": 9,
-            "TEXCOORD_0": 10
-          },
-          "indices": 11,
-          "material": 0
-        }
-      ]
-    }
-  ],
-  "textures": [
-    {
-      "sampler": 0,
-      "source": 0
-    },
-    {
-      "sampler": 0,
-      "source": 1
-    },
-    {
-      "sampler": 0,
-      "source": 2
-    }
-  ],
-  "images": [
-    {
-      "mimeType": "image/jpeg",
-      "name": "wooden_crate_01_nor_gl",
-      "uri": "textures/wooden_crate_01_nor_gl_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "wooden_crate_01_diff",
-      "uri": "textures/wooden_crate_01_diff_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "wooden_crate_01_metal-wooden_crate_01_rough",
-      "uri": "textures/wooden_crate_01_arm_1k.jpg"
-    }
-  ],
   "accessors": [
     {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 786,
       "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 6276,
+      "bufferView": 0,
+      "byteOffset": 1572
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 1062,
+      "bufferView": 0,
+      "byteOffset": 14124
+    },
+    {
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 596,
+      "count": 298,
       "max": [
-        0.3539096713066101,
-        0.3416849374771118,
-        0.1961396187543869
+        0.35362547636032104,
+        0.34155240654945374,
+        0.1953081637620926
       ],
       "min": [
-        -0.3539096713066101,
+        -0.35362547636032104,
         0.29946234822273254,
-        -0.1961396187543869
+        -0.1953081637620926
       ],
-      "type": "VEC3"
-    },
-    {
       "bufferView": 1,
-      "componentType": 5126,
-      "count": 596,
-      "type": "VEC3"
+      "byteOffset": 0
     },
     {
-      "bufferView": 2,
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 596,
-      "type": "VEC2"
+      "count": 298,
+      "bufferView": 1,
+      "byteOffset": 12
     },
     {
-      "bufferView": 3,
-      "componentType": 5123,
-      "count": 2076,
-      "type": "SCALAR"
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 298,
+      "bufferView": 1,
+      "byteOffset": 24
     },
     {
-      "bufferView": 4,
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 3706,
+      "count": 1620,
       "max": [
-        0.4126364588737488,
-        0.3139750361442566,
-        0.2128141224384308
+        0.41224801540374756,
+        0.3136237561702728,
+        0.211556538939476
       ],
       "min": [
-        -0.4126364588737488,
+        -0.41224801540374756,
         -0.00793334562331438,
-        -0.19549614191055298
+        -0.19544559717178345
       ],
-      "type": "VEC3"
+      "bufferView": 2,
+      "byteOffset": 0
     },
     {
-      "bufferView": 5,
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 3706,
-      "type": "VEC3"
+      "count": 1620,
+      "bufferView": 2,
+      "byteOffset": 12
     },
     {
-      "bufferView": 6,
+      "type": "VEC2",
       "componentType": 5126,
-      "count": 3706,
-      "type": "VEC2"
+      "count": 1620,
+      "bufferView": 2,
+      "byteOffset": 24
     },
     {
-      "bufferView": 7,
-      "componentType": 5123,
-      "count": 16524,
-      "type": "SCALAR"
-    },
-    {
-      "bufferView": 8,
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 384,
+      "count": 362,
       "max": [
         0.009643923491239548,
         0.3357900381088257,
@@ -203,111 +101,185 @@
         0.2390938252210617,
         0.1312473714351654
       ],
-      "type": "VEC3"
+      "bufferView": 3,
+      "byteOffset": 0
     },
     {
-      "bufferView": 9,
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 384,
-      "type": "VEC3"
+      "count": 362,
+      "bufferView": 3,
+      "byteOffset": 12
     },
     {
-      "bufferView": 10,
+      "type": "VEC2",
       "componentType": 5126,
-      "count": 384,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 11,
-      "componentType": 5123,
-      "count": 1128,
-      "type": "SCALAR"
+      "count": 362,
+      "bufferView": 3,
+      "byteOffset": 24
     }
   ],
   "bufferViews": [
     {
       "buffer": 0,
-      "byteLength": 7152,
       "byteOffset": 0,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 7152,
-      "byteOffset": 7152,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 4768,
-      "byteOffset": 14304,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 4152,
-      "byteOffset": 19072,
+      "byteLength": 16248,
       "target": 34963
     },
     {
       "buffer": 0,
-      "byteLength": 44472,
-      "byteOffset": 23224,
+      "byteOffset": 16248,
+      "byteLength": 9536,
+      "byteStride": 32,
       "target": 34962
     },
     {
       "buffer": 0,
-      "byteLength": 44472,
-      "byteOffset": 67696,
+      "byteOffset": 25784,
+      "byteLength": 51840,
+      "byteStride": 32,
       "target": 34962
     },
     {
       "buffer": 0,
-      "byteLength": 29648,
-      "byteOffset": 112168,
+      "byteOffset": 77624,
+      "byteLength": 11584,
+      "byteStride": 32,
       "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 33048,
-      "byteOffset": 141816,
-      "target": 34963
-    },
-    {
-      "buffer": 0,
-      "byteLength": 4608,
-      "byteOffset": 174864,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 4608,
-      "byteOffset": 179472,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 3072,
-      "byteOffset": 184080,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 2256,
-      "byteOffset": 187152,
-      "target": 34963
     }
   ],
   "samplers": [
     {
       "magFilter": 9729,
-      "minFilter": 9987
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "wooden_crate_01_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/wooden_crate_01_nor_gl_1k.jpg"
+    },
+    {
+      "name": "wooden_crate_01_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/wooden_crate_01_diff_1k.jpg"
+    },
+    {
+      "name": "wooden_crate_01_metal-wooden_crate_01_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/wooden_crate_01_arm_1k.jpg"
     }
   ],
   "buffers": [
     {
-      "byteLength": 189408,
-      "uri": "wooden_crate_01.bin"
+      "uri": "wooden_crate_01.bin",
+      "byteLength": 89208
     }
-  ]
+  ],
+  "materials": [
+    {
+      "name": "wooden_crate_01",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cube.005",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 3,
+            "NORMAL": 4,
+            "TEXCOORD_0": 5
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    },
+    {
+      "name": "Cube.020",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 1
+        }
+      ]
+    },
+    {
+      "name": "Cube.001",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 9,
+            "NORMAL": 10,
+            "TEXCOORD_0": 11
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 2
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "wooden_crate_01_lid",
+      "mesh": 0
+    },
+    {
+      "name": "wooden_crate_01",
+      "mesh": 1
+    },
+    {
+      "name": "wooden_crate_01_latch",
+      "mesh": 2
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "scene": 0
 }

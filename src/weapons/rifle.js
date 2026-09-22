@@ -1,7 +1,7 @@
 // Procedural M4A1-class carbine viewmodel (bore axis = -Z, +Y up, +X right; units = meters). Owned by: WEAPONS agent.
 import * as THREE from 'three';
 import { Builder, rbox, box, cylZ, cylY, cylX, torus, extrude, lathe, sphere, addRail } from './geo.js';
-import { buildArm } from './arms.js';
+import { buildArm, supportGrip } from './arms.js';
 
 export const RIFLE_SPEC = {
   id: 'm4a1', name: 'M4A1', class: 'AR', slot: 0, mode: 'AUTO',
@@ -203,10 +203,8 @@ export function buildRifle(mats, opts = {}) {
   }, mats);
   group.add(right); parts.armR = right;
   // Left hand cups the handguard from below (palm up): thumb along the left face, fingers wrap up the right side; forearm runs down to the bottom-left corner.
-  const left = buildArm('left', { curl: [0.4, 0.85, 0.92, 0.95, 1.0], spread: 0.03, thumbUp: 0.5, forearmLen: 0.3, scale: 1.1 }, (hand, fore) => {
-    hand.position.set(-0.054, -0.012, -0.235);
-    orient(hand, [0.05, 0.15, -0.99], [-0.4, -0.9, 0.05]); // palm on the left face, fingers hang down and curl under to the right, thumb over the top; back of the hand + knuckles face up-left to the eye
-    fore.position.copy(hand.position); fore.lookAt(-0.44, -0.30, -0.10); fore.rotateX(Math.PI / 2);
+  const left = buildArm('left', { curl: [0.9, 0.72, 0.8, 0.86, 0.9], spread: 0.03, thumbUp: 0.15, forearmLen: 0.3, scale: 1.1, keepFore: true }, (hand, fore) => {
+    supportGrip(hand, fore, [0, hgY, -0.19], hgR);
   }, mats);
   group.add(left); parts.armL = left;
 

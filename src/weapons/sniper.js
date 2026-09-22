@@ -1,7 +1,7 @@
 // Procedural M24 SWS-class bolt-action sniper viewmodel (bore = -Z, +Y up, +X right; meters). Owned by: WEAPONS agent.
 import * as THREE from 'three';
 import { Builder, rbox, box, cylZ, cylY, cylX, torus, extrude, lathe, sphere, addRail } from './geo.js';
-import { buildArm } from './arms.js';
+import { buildArm, supportGrip } from './arms.js';
 import { orient } from './rifle.js';
 
 export const SNIPER_SPEC = {
@@ -149,10 +149,8 @@ export function buildSniper(mats) {
     fore.position.copy(hand.position); fore.lookAt(0.13, -0.30, 0.44); fore.rotateX(Math.PI / 2);
   }, mats);
   group.add(right); parts.armR = right;
-  const left = buildArm('left', { curl: [0.45, 0.7, 0.85, 0.9, 0.95], spread: 0.03, thumbUp: 0.6, forearmLen: 0.32 }, (hand, fore) => {
-    hand.position.set(-0.058, -0.016, -0.30);
-    orient(hand, [0, 0, -1], [0.6, -0.8, 0]);
-    fore.position.copy(hand.position); fore.lookAt(-0.22, -0.37, -0.15); fore.rotateX(Math.PI / 2);
+  const left = buildArm('left', { curl: [0.9, 0.72, 0.8, 0.86, 0.9], spread: 0.03, thumbUp: 0.15, forearmLen: 0.3, scale: 1.1, keepFore: true }, (hand, fore) => {
+    supportGrip(hand, fore, [0, -0.018, -0.325], 0.03);
   }, mats);
   group.add(left); parts.armL = left;
 

@@ -1,7 +1,7 @@
 // Procedural Remington 870-class pump shotgun viewmodel (bore = -Z, +Y up, +X right; meters). Owned by: WEAPONS agent.
 import * as THREE from 'three';
 import { Builder, rbox, box, cylZ, cylY, cylX, torus, extrude, lathe, sphere } from './geo.js';
-import { buildArm } from './arms.js';
+import { buildArm, supportGrip } from './arms.js';
 import { orient } from './rifle.js';
 
 export const SHOTGUN_SPEC = {
@@ -128,10 +128,8 @@ export function buildShotgun(mats) {
   }, mats);
   group.add(right); parts.armR = right;
   // left hand cups the pump forend from below-left
-  const left = buildArm('left', { curl: [0.5, 0.75, 0.85, 0.9, 0.95], spread: 0.03, thumbUp: 0.6, forearmLen: 0.32 }, (hand, fore) => {
-    hand.position.set(-0.056, -0.004, -0.245);
-    orient(hand, [0, 0, -1], [0.6, -0.8, 0]);
-    fore.position.copy(hand.position); fore.lookAt(-0.22, -0.36, -0.10); fore.rotateX(Math.PI / 2);
+  const left = buildArm('left', { curl: [0.9, 0.72, 0.8, 0.86, 0.9], spread: 0.03, thumbUp: 0.15, forearmLen: 0.3, scale: 1.1, keepFore: true }, (hand, fore) => {
+    supportGrip(hand, fore, [0, -0.006, -0.265], 0.03);
   }, mats);
   group.add(left); parts.armL = left;
   // a loose shell carried by the left hand during reloads (hidden otherwise)

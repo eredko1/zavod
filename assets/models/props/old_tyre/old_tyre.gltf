@@ -1,93 +1,20 @@
 {
   "asset": {
-    "generator": "Khronos glTF Blender I/O v3.6.27",
+    "generator": "glTF-Transform v4.5.0",
     "version": "2.0"
   },
-  "scene": 0,
-  "scenes": [
-    {
-      "name": "Scene",
-      "nodes": [
-        0
-      ]
-    }
-  ],
-  "nodes": [
-    {
-      "mesh": 0,
-      "name": "old_tyre"
-    }
-  ],
-  "materials": [
-    {
-      "doubleSided": true,
-      "name": "old_tyre",
-      "normalTexture": {
-        "index": 0
-      },
-      "pbrMetallicRoughness": {
-        "baseColorTexture": {
-          "index": 1
-        },
-        "metallicFactor": 0,
-        "metallicRoughnessTexture": {
-          "index": 2
-        }
-      }
-    }
-  ],
-  "meshes": [
-    {
-      "name": "tire_lo",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 0,
-            "NORMAL": 1,
-            "TEXCOORD_0": 2
-          },
-          "indices": 3,
-          "material": 0
-        }
-      ]
-    }
-  ],
-  "textures": [
-    {
-      "sampler": 0,
-      "source": 0
-    },
-    {
-      "sampler": 0,
-      "source": 1
-    },
-    {
-      "sampler": 0,
-      "source": 2
-    }
-  ],
-  "images": [
-    {
-      "mimeType": "image/jpeg",
-      "name": "old_tyre_nor_gl",
-      "uri": "textures/old_tyre_nor_gl_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "old_tyre_diff",
-      "uri": "textures/old_tyre_diff_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "old_tyre_rough",
-      "uri": "textures/old_tyre_arm_1k.jpg"
-    }
-  ],
   "accessors": [
     {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 7500,
       "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 2090,
+      "count": 1900,
       "max": [
         0.30000001192092896,
         0.30000001192092896,
@@ -98,63 +25,132 @@
         -0.30000001192092896,
         -0.08276332169771194
       ],
-      "type": "VEC3"
-    },
-    {
       "bufferView": 1,
-      "componentType": 5126,
-      "count": 2090,
-      "type": "VEC3"
+      "byteOffset": 0
     },
     {
-      "bufferView": 2,
+      "type": "VEC3",
       "componentType": 5126,
-      "count": 2090,
-      "type": "VEC2"
+      "count": 1900,
+      "bufferView": 1,
+      "byteOffset": 12
     },
     {
-      "bufferView": 3,
-      "componentType": 5123,
-      "count": 8640,
-      "type": "SCALAR"
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 1900,
+      "bufferView": 1,
+      "byteOffset": 24
     }
   ],
   "bufferViews": [
     {
       "buffer": 0,
-      "byteLength": 25080,
       "byteOffset": 0,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 25080,
-      "byteOffset": 25080,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 16720,
-      "byteOffset": 50160,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 17280,
-      "byteOffset": 66880,
+      "byteLength": 15000,
       "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 15000,
+      "byteLength": 60800,
+      "byteStride": 32,
+      "target": 34962
     }
   ],
   "samplers": [
     {
       "magFilter": 9729,
-      "minFilter": 9987
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "old_tyre_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/old_tyre_nor_gl_1k.jpg"
+    },
+    {
+      "name": "old_tyre_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/old_tyre_diff_1k.jpg"
+    },
+    {
+      "name": "old_tyre_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/old_tyre_arm_1k.jpg"
     }
   ],
   "buffers": [
     {
-      "byteLength": 84160,
-      "uri": "old_tyre.bin"
+      "uri": "old_tyre.bin",
+      "byteLength": 75800
     }
-  ]
+  ],
+  "materials": [
+    {
+      "name": "old_tyre",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "tire_lo",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "old_tyre",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
 }

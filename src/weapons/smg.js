@@ -1,7 +1,7 @@
 // Procedural MP5A3-class SMG viewmodel (bore = -Z, +Y up, +X right; meters). Owned by: WEAPONS agent.
 import * as THREE from 'three';
 import { Builder, rbox, box, cylZ, cylY, cylX, torus, extrude, lathe, sphere } from './geo.js';
-import { buildArm } from './arms.js';
+import { buildArm, supportGrip } from './arms.js';
 import { orient } from './rifle.js';
 
 export const SMG_SPEC = {
@@ -118,10 +118,8 @@ export function buildSmg(mats) {
     fore.position.copy(hand.position); fore.lookAt(0.13, -0.29, 0.43); fore.rotateX(Math.PI / 2);
   }, mats);
   group.add(right); parts.armR = right;
-  const left = buildArm('left', { curl: [0.5, 0.8, 0.9, 0.95, 1.0], spread: 0.02, thumbUp: 0.55, forearmLen: 0.32 }, (hand, fore) => {
-    hand.position.set(-0.05, 0.012, -0.27);
-    orient(hand, [0, 0, -1], [0.55, -0.83, 0]);
-    fore.position.copy(hand.position); fore.lookAt(-0.21, -0.35, -0.13); fore.rotateX(Math.PI / 2);
+  const left = buildArm('left', { curl: [0.9, 0.72, 0.8, 0.86, 0.9], spread: 0.02, thumbUp: 0.15, forearmLen: 0.3, scale: 1.1, keepFore: true }, (hand, fore) => {
+    supportGrip(hand, fore, [0, 0.01, -0.29], 0.026);
   }, mats);
   group.add(left); parts.armL = left;
 

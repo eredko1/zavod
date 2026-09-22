@@ -1,37 +1,122 @@
 {
   "asset": {
-    "generator": "Khronos glTF Blender I/O v5.1.18",
+    "generator": "glTF-Transform v4.5.0",
     "version": "2.0"
   },
-  "scene": 0,
-  "scenes": [
+  "accessors": [
     {
-      "name": "Scene",
-      "nodes": [
-        0
-      ]
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 7497,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1740,
+      "max": [
+        0.18004146218299866,
+        0.45486611127853394,
+        0.08313123136758804
+      ],
+      "min": [
+        -0.17000055313110352,
+        0.00006935097917448729,
+        -0.0886126384139061
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1740,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 1740,
+      "bufferView": 1,
+      "byteOffset": 24
     }
   ],
-  "nodes": [
+  "bufferViews": [
     {
-      "mesh": 0,
-      "name": "metal_jerrycan"
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 14996,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 14996,
+      "byteLength": 55680,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "metal_jerrycan_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/metal_jerrycan_nor_gl_1k.jpg"
+    },
+    {
+      "name": "metal_jerrycan_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/metal_jerrycan_diff_1k.jpg"
+    },
+    {
+      "name": "metal_jerrycan_metal-metal_jerrycan_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/metal_jerrycan_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "metal_jerrycan.bin",
+      "byteLength": 70676
     }
   ],
   "materials": [
     {
-      "doubleSided": true,
       "name": "metal_jerrycan",
-      "normalTexture": {
-        "index": 0
-      },
+      "doubleSided": true,
       "pbrMetallicRoughness": {
         "baseColorTexture": {
-          "index": 1
+          "index": 0
         },
         "metallicRoughnessTexture": {
           "index": 2
         }
+      },
+      "normalTexture": {
+        "index": 1
       }
     }
   ],
@@ -41,119 +126,30 @@
       "primitives": [
         {
           "attributes": {
-            "POSITION": 0,
-            "NORMAL": 1,
-            "TEXCOORD_0": 2
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3
           },
-          "indices": 3,
-          "material": 0
+          "mode": 4,
+          "material": 0,
+          "indices": 0
         }
       ]
     }
   ],
-  "textures": [
+  "nodes": [
     {
-      "sampler": 0,
-      "source": 0
-    },
-    {
-      "sampler": 0,
-      "source": 1
-    },
-    {
-      "sampler": 0,
-      "source": 2
+      "name": "metal_jerrycan",
+      "mesh": 0
     }
   ],
-  "images": [
+  "scenes": [
     {
-      "mimeType": "image/jpeg",
-      "name": "metal_jerrycan_nor_gl",
-      "uri": "textures/metal_jerrycan_nor_gl_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "metal_jerrycan_diff",
-      "uri": "textures/metal_jerrycan_diff_1k.jpg"
-    },
-    {
-      "mimeType": "image/jpeg",
-      "name": "metal_jerrycan_metal-metal_jerrycan_rough",
-      "uri": "textures/metal_jerrycan_arm_1k.jpg"
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
     }
   ],
-  "accessors": [
-    {
-      "bufferView": 0,
-      "componentType": 5126,
-      "count": 11392,
-      "max": [
-        0.18016786873340607,
-        0.4551738500595093,
-        0.08313124626874924
-      ],
-      "min": [
-        -0.17016199231147766,
-        0.000013880239748687018,
-        -0.0886126458644867
-      ],
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 1,
-      "componentType": 5126,
-      "count": 11392,
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 2,
-      "componentType": 5126,
-      "count": 11392,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 3,
-      "componentType": 5123,
-      "count": 60066,
-      "type": "SCALAR"
-    }
-  ],
-  "bufferViews": [
-    {
-      "buffer": 0,
-      "byteLength": 136704,
-      "byteOffset": 0,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 136704,
-      "byteOffset": 136704,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 91136,
-      "byteOffset": 273408,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 120132,
-      "byteOffset": 364544,
-      "target": 34963
-    }
-  ],
-  "samplers": [
-    {
-      "magFilter": 9729,
-      "minFilter": 9987
-    }
-  ],
-  "buffers": [
-    {
-      "byteLength": 484676,
-      "uri": "metal_jerrycan.bin"
-    }
-  ]
+  "scene": 0
 }

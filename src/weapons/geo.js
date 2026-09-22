@@ -60,15 +60,19 @@ export function bakeWear(geom, mode = 'box', amount = 1, grime = 0.5, palm = 0) 
   const n = geom.attributes.normal, pos = geom.attributes.position, ao = geom.attributes.ao || null;
   const count = pos.count; const col = new Float32Array(count * 3);
   geom.computeBoundingBox(); const bb = geom.boundingBox; const size = new THREE.Vector3(); bb.getSize(size);
+  const rimAx = size.x >= size.y && size.x >= size.z ? 'x' : size.y >= size.z ? 'y' : 'z';
+  // a long part with vertices only at its two ends (unsegmented cylinder) cannot express a worn rim: every vertex would be
+  // "on the rim" and the whole part would interpolate to bare metal (the chrome-handguard bug). Give it no rim wear instead.
+  let rimOK = true;
+  if (mode === 'rim' && size[rimAx] > 0.02) { rimOK = false; const g = pos['get' + rimAx.toUpperCase()].bind(pos); for (let i = 0; i < count; i++) { const v = g(i); if (Math.min(v - bb.min[rimAx], bb.max[rimAx] - v) > 0.006) { rimOK = true; break; } } }
   for (let i = 0; i < count; i++) {
     const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
     let wear = 0;
     if (mode === 'box') { const mx = Math.max(nx, ny, nz); wear = THREE.MathUtils.smoothstep(1 - mx, 0.1, 0.42); } // only genuinely angled bevel verts wear, so flat faces don't inherit a tint through interpolation
     else if (mode === 'rim') {
       // distance to the nearest bounding-box face along the longest axis
-      const ax = size.x >= size.y && size.x >= size.z ? 'x' : size.y >= size.z ? 'y' : 'z';
-      const v = pos['get' + ax.toUpperCase()](i); const d = Math.min(v - bb.min[ax], bb.max[ax] - v);
-      wear = 1 - THREE.MathUtils.smoothstep(d, 0, 0.006);
+      const v = pos['get' + rimAx.toUpperCase()](i); const d = Math.min(v - bb.min[rimAx], bb.max[rimAx] - v);
+      wear = rimOK ? 1 - THREE.MathUtils.smoothstep(d, 0, 0.006) : 0;
     } else if (mode === 'none') wear = 0;
     else if (mode === 'all') wear = 1;
     // pseudo-random per-vertex grime so it isn't uniform
