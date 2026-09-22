@@ -207,6 +207,32 @@ export function makeMats(ctx, R, env) {
   M.lampGlass = std('lampGlass', { color: 0xfff1cc, emissive: 0xffc77a, emissiveIntensity: 3.5, roughness: 0.4, metalness: 0, transparent: true, opacity: 0.9 }); M.lampGlass.userData.castShadow = false;
   M.shopGlow = std('shopGlow', { color: 0xf3dcb0, emissive: 0xffd9a0, emissiveIntensity: 0.9, roughness: 0.8, metalness: 0 }); M.shopGlow.userData.castShadow = false;
   M.clockFace = std('clockFace', { color: 0xfff6e6, emissive: 0xffe6b8, emissiveIntensity: 1.4, roughness: 0.3, metalness: 0 });
+  // continuous cove strip (the warm line along every cornice / arch head). Basic + >1 colour so bloom picks it up.
+  M.cove = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.3, 2.35, 1.35), toneMapped: true }); M.cove.name = 'cove'; M.cove.userData.castShadow = false;
+  // polished brass bezel for the four-faced clock
+  M.brassBezel = std('brassBezel', { color: 0xb08d3f, metalness: 0.9, roughness: 0.22, envMapIntensity: 1.5 });
+  // ---- four-faced clock dial: opal glass, black numerals + minute ticks -----------------
+  {
+    const S = 512, [c, g] = canvas(S, S); const cxp = S / 2;
+    g.fillStyle = '#0a0a08'; g.fillRect(0, 0, S, S);
+    g.beginPath(); g.arc(cxp, cxp, S * 0.485, 0, 7); g.fillStyle = '#f3e6c8'; g.fill();
+    // warm falloff toward the rim (backlit opal glass)
+    const rg = g.createRadialGradient(cxp, cxp * 0.86, S * 0.05, cxp, cxp, S * 0.5);
+    rg.addColorStop(0, 'rgba(255,252,238,0.95)'); rg.addColorStop(0.62, 'rgba(243,230,200,0.0)'); rg.addColorStop(1, 'rgba(198,176,135,0.45)');
+    g.beginPath(); g.arc(cxp, cxp, S * 0.485, 0, 7); g.fillStyle = rg; g.fill();
+    g.strokeStyle = '#141008'; g.lineCap = 'butt';
+    for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2; const big = i % 5 === 0; const r0 = S * (big ? 0.40 : 0.435), r1 = S * 0.462; g.lineWidth = big ? 4.5 : 2; g.beginPath(); g.moveTo(cxp + Math.sin(a) * r0, cxp - Math.cos(a) * r0); g.lineTo(cxp + Math.sin(a) * r1, cxp - Math.cos(a) * r1); g.stroke(); }
+    g.fillStyle = '#121008'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 56px Georgia, "Times New Roman", serif';
+    for (let i = 1; i <= 12; i++) { const a = i / 12 * Math.PI * 2; g.fillText(String(i), cxp + Math.sin(a) * S * 0.345, cxp - Math.cos(a) * S * 0.345 + 3); }
+    const t = tex(c, { repeat: false, aniso: 8 });
+    M.clockDial = std('clockDial', { map: t, emissiveMap: t, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0.42, roughness: 0.34, metalness: 0 });
+    M.clockDial.userData.castShadow = false;
+  }
+  // ---- crowd: coat / trousers / skin+hair (instanceColor tints each figure) ----------------
+  M.coat = std('coat', { color: 0xffffff, roughness: 0.86, metalness: 0 });
+  M.trouser = std('trouser', { color: 0xffffff, roughness: 0.88, metalness: 0 });
+  M.skin = std('skin', { color: 0xffffff, roughness: 0.72, metalness: 0 });
+  M.luggage = std('luggage', { color: 0xffffff, roughness: 0.6, metalness: 0.05 });
   M.darkGlass = std('darkGlass', { color: 0x0e1418, roughness: 0.08, metalness: 0.9, envMapIntensity: 1.3 });
   M.trainWindow = std('trainWindow', { color: 0x1a2530, roughness: 0.1, metalness: 0.6, emissive: 0x4a5560, emissiveIntensity: 0.6 });
   M.redSeat = std('redSeat', { color: 0xa8451f, roughness: 0.7, metalness: 0 });
@@ -249,8 +275,11 @@ export function makeMats(ctx, R, env) {
     const uvGeo = (w, h, r) => { const g = new THREE.PlaneGeometry(w, h); const u0 = (r.x + 1.5) / A, u1 = (r.x + r.w - 1.5) / A, v0 = 1 - (r.y + r.h - 1.5) / A, v1 = 1 - (r.y + 1.5) / A; g.setAttribute('uv', new THREE.Float32BufferAttribute([u0, v1, u1, v1, u0, v0, u1, v0], 2)); return g; };
     const fontOf = (font, px) => font.replace(/(\d+)px/, `${px}px`);
     /** A sign quad (w×h m) whose text lives in the shared atlas: B.add(M.atlas, M.signGeo(text, opts, w, h), matrix). */
-    M.signGeo = (text, opts = {}, w = 4, h = 0.5) => {
-      if (typeof text === 'object' && text && text.__sign) { h = opts; w = text.w; opts = text.opts; text = text.text; }
+    M.signGeo = (text, opts, w, h) => {
+      // ref form: signGeo(M.sign(...), w, h) — explicit metres; signGeo(M.sign(...), h) — width from the ref's aspect
+      if (typeof text === 'object' && text && text.__sign) { const ref = text; const a = opts, b = w; text = ref.text; opts = ref.opts;
+        if (b !== undefined) { w = a; h = b; } else { h = a ?? 0.5; w = h * (ref.w || 8); } }
+      opts = opts ?? {}; w = w ?? 4; h = h ?? 0.5;
       const { bg = '#111', fg = '#e6c26a', font = 'bold 72px Georgia, serif' } = opts;
       const key = `s|${text}|${bg}|${fg}|${font}|${(w / h).toFixed(1)}`;
       let r = cache.get(key);

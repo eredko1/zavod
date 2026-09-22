@@ -23,7 +23,7 @@ export function buildLighting(world, M) {
   new RGBELoader().load(HDRI_URL, (t) => { t.mapping = THREE.EquirectangularReflectionMapping; const env = pmrem.fromEquirectangular(t).texture; scene.environment = env; scene.environmentIntensity = 0.22; t.dispose(); pmrem.dispose(); }, undefined, () => { console.warn('[terminal] HDRI missing'); pmrem.dispose(); });
 
   // ---- ambient: hemisphere (cool from the windows above, warm bounce from the pink marble) ----------------
-  const hemi = new THREE.HemisphereLight(0xb9c6d4, 0x6e5a48, 0.22); scene.add(hemi); ctx.lights.hemi = hemi;
+  const hemi = new THREE.HemisphereLight(0xb9c6d4, 0x6e5a48, 0.16); scene.add(hemi); ctx.lights.hemi = hemi;
 
   // ---- sun -------------------------------------------------------------------------------------------------
   const sun = new THREE.DirectionalLight(0xfff0d2, 4.4);
@@ -48,6 +48,12 @@ export function buildLighting(world, M) {
 
   // ---- warm interior points (budget: 8) ----------------------------------------------------------------------
   const pt = (x, y, z, color, intensity, dist, decay = 2) => { const l = new THREE.PointLight(color, intensity, dist, decay); l.position.set(x, y, z); scene.add(l); return l; };
+  // ---- cove wash: a few very broad, low-intensity warm lights backing the cornice/arch strips ------------
+  // (the strips themselves are emissive geometry in concourse.js — these make the stone actually receive the wash)
+  // physical falloff (decay 2) keeps the wash tight to the stone near the strip instead of flat-filling the room
+  for (const x of [-30, -10, 10, 30]) for (const z of [P.Z1 - 2.1, P.Z0 + 2.1]) pt(x, P.CORNICE - 2.4, z, 0xffd6a0, 540, 24);
+  pt(P.X0 + 4.5, 22.0, 0, 0xffdcaa, 900, 30); pt(P.X1 - 4.5, 22.0, 0, 0xffdcaa, 900, 30);   // end lunettes
+  for (const x of [-34, 34]) pt(x, P.BAL_Y - 1.3, 0, 0xffd2a0, 120, 16);                    // balcony soffit / arcade
   pt(0, 4.6, 0, 0xffd9a0, 60, 22);                                  // info booth / clock
   pt(-12, 8.2, 40, 0xffd2a0, 140, 34); pt(12, 8.2, 40, 0xffd2a0, 140, 34);   // Vanderbilt Hall chandeliers
   pt(0, -1.6, 24.5, 0xffd0a0, 70, 24);                              // Whispering Gallery

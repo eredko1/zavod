@@ -278,8 +278,57 @@ export function buildConcourse(world, M, Z) {
     for (let i = 0; i < 3; i++) world.cover(x0 + 2 + i * (x1 - x0 - 4) / 2, P.TICK_Z0 - 0.7, 0, -1);
   }
 
-  const meshes = B.flush((m) => (m === M.brass || m === M.brassDark || m === M.bronze || m === M.ironDark ? 'metal' : m === M.wood ? 'wood' : 'concrete'), { name: 'concourse' });
+  buildCoves(B, M);
+
+  const meshes = B.flush((m) => (m === M.brass || m === M.brassDark || m === M.brassBezel || m === M.bronze || m === M.ironDark ? 'metal' : m === M.wood ? 'wood' : 'concrete'), { name: 'concourse' });
   return meshes;
+}
+
+/**
+ * Cove lighting — the defining light of the hall (ref concourse_wide / concourse_east):
+ * one continuous warm strip under every cornice, around every arch head and along every balcony front.
+ * All strips merge into a single M.cove draw call; the wash itself comes from a handful of broad
+ * point lights in lighting.js (coveWash) so the stone actually receives it.
+ */
+function buildCoves(B, M) {
+  const { X0, X1, Z0, Z1, CORNICE, BAL_Y, BAL_X, WALL_T: T } = P;
+  const strip = (min, max) => B.box(M.cove, min, max, { uvScale: 1 });
+  /** Thin ribbon following an arc in a plane. axis 'x' = arc lies in the y/z plane (end walls). */
+  const arc = (cx, cy, cz, r, axis, a0 = 0, a1 = Math.PI, segs = 26, t = 0.085) => {
+    const pts = [];
+    for (let i = 0; i <= segs; i++) { const a = a0 + (a1 - a0) * i / segs;
+      pts.push(axis === 'x' ? new THREE.Vector3(cx, cy + Math.sin(a) * r, cz + Math.cos(a) * r)
+                            : new THREE.Vector3(cx + Math.cos(a) * r, cy + Math.sin(a) * r, cz)); }
+    B.add(M.cove, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), segs, t, 4, false), null, { uvScale: 1 });
+  };
+
+  // 1. main cornice, long walls — tucked under the projecting molding, washing down the stone
+  for (const [zi, zo] of [[Z1 - 0.58, Z1 - 0.30], [Z0 + 0.30, Z0 + 0.58]]) strip([X0 - T, CORNICE - 1.80, Math.min(zi, zo)], [X1 + T, CORNICE - 1.64, Math.max(zi, zo)]);
+  // 2. end walls — the line follows the vault edge round the great lunette
+  for (const side of [-1, 1]) {
+    const bx = side < 0 ? X0 + 1.9 : X1 - 1.9; const pts = [];
+    for (let i = 0; i <= 34; i++) { const z = Z0 + (Z1 - Z0) * i / 34; pts.push(new THREE.Vector3(bx, vaultY(z) - 1.55, z)); }
+    B.add(M.cove, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 34, 0.085, 4, false), null, { uvScale: 1 });
+    // 3. arch head of each of the three great windows (r 4.5 opening → strip at 5.05) + springing line
+    const fx = side < 0 ? X0 + 0.45 : X1 - 0.45;
+    for (const cz of [-12.5, 0, 12.5]) {
+      arc(fx, 24.5, cz, 5.05, 'x', 0, Math.PI, 22);
+      strip([Math.min(fx, fx + 0.14), 24.35, cz - 5.1], [Math.max(fx, fx + 0.14), 24.5, cz - 4.98]);
+      strip([Math.min(fx, fx + 0.14), 24.35, cz + 4.98], [Math.max(fx, fx + 0.14), 24.5, cz + 5.1]);
+    }
+  }
+  // 4. clerestory arch heads, south + north walls (5 each, opening r 3.2 → strip at 3.75)
+  for (const zf of [Z1 - 0.42, Z0 + 0.42]) for (const cx of [-24, -12, 0, 12, 24]) arc(cx, 18.3, zf, 3.75, 'z', 0, Math.PI, 18);
+  // 5. frieze line over the balcony arcade (continuous, under the existing bulb dots)
+  for (const [zi, zo] of [[Z1 - 0.80, Z1 - 0.62], [Z0 + 0.62, Z0 + 0.80]]) strip([X0, BAL_Y + 4.50, Math.min(zi, zo)], [X1, BAL_Y + 4.64, Math.max(zi, zo)]);
+  // 6. balcony fronts + undersides (W/E full depth, north strip)
+  for (const side of [-1, 1]) {
+    const fx = side * BAL_X;
+    strip([Math.min(fx, fx - side * 0.14), BAL_Y - 0.74, Z0], [Math.max(fx, fx - side * 0.14), BAL_Y - 0.60, Z1]);       // fascia line
+    strip([Math.min(fx - side * 0.5, fx - side * 0.9), BAL_Y - 0.93, Z0], [Math.max(fx - side * 0.5, fx - side * 0.9), BAL_Y - 0.86, Z1]); // soffit wash over the arcade
+  }
+  strip([-BAL_X, BAL_Y - 0.74, P.BAL_NZ - 0.14], [BAL_X, BAL_Y - 0.60, P.BAL_NZ]);
+  strip([-BAL_X, BAL_Y - 0.93, P.BAL_NZ + 0.5], [BAL_X, BAL_Y - 0.86, P.BAL_NZ + 0.9]);
 }
 
 // ---- helpers ------------------------------------------------------------------------------------------------
