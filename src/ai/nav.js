@@ -65,8 +65,9 @@ export class NavGrid {
     const cols = []; const seen = new Set();
     for (const src of [ctx.colliders || [], ctx.world?.walkables || []]) for (const box of src) { if (!box || !box.min || seen.has(box)) continue; if (!(box.max.x > box.min.x && box.max.z > box.min.z && box.max.y >= box.min.y)) continue; if (!isFinite(box.min.x + box.max.x + box.min.y + box.max.y + box.min.z + box.max.z)) continue; seen.add(box); cols.push(box); }
     this.solids = cols;
-    const slabs = this.slabs = new Set(); // big thin non-walkable boxes = terrain slabs (ground colliders under sunken areas): never floors, never walls
-    for (const box of cols) { const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (!walk.has(box) && sx * sz > 400 && box.max.y - box.min.y <= 1.5) slabs.add(box); }
+    const slabs = this.slabs = new Set(); // map-wide thin non-walkable boxes = terrain slabs (ground colliders that also span sunken pits): never floors, never walls
+    const slabArea = Math.max(2000, 0.2 * (maxX - minX) * (maxZ - minZ));
+    for (const box of cols) { const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; if (!walk.has(box) && sx * sz > slabArea && box.max.y - box.min.y <= 1.5) slabs.add(box); }
     // 4 m spatial hash of the non-slab solids (resolveCircle, hop checks, ragdolls)
     const HC = this.hashCell = 4; const hash = this.hash = new Map(); const hk = (ix, iz) => ix * 65536 + iz;
     // (0.6 m insertion margin → one-bucket lookups are exact for query radii ≤ 0.6)
@@ -81,7 +82,7 @@ export class NavGrid {
     for (const box of cols) {
       const sx = box.max.x - box.min.x, sz = box.max.z - box.min.z; const thin = Math.min(sx, sz) < 0.35; if (Math.min(sx, sz) < 0.12) continue; // fence panels / poles never carry a floor
       const isW = walk.has(box) ? 2 : thin ? 0 : 1;
-      if (isW !== 2 && (sx * sz > 400 || slabs.has(box))) continue; // big non-walkable masses (buildings, ground slabs) carry no floor unless registered walkable
+      if (slabs.has(box)) continue;
       const x0 = Math.max(0, Math.ceil((box.min.x - minX) / cell - 0.5)), x1 = Math.min(w - 1, Math.floor((box.max.x - minX) / cell - 0.5));
       const z0 = Math.max(0, Math.ceil((box.min.z - minZ) / cell - 0.5)), z1 = Math.min(h - 1, Math.floor((box.max.z - minZ) / cell - 0.5));
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) addCand(z * w + x, box.max.y, isW);
@@ -102,17 +103,17 @@ export class NavGrid {
     // border
     for (let x = 0; x < w; x++) { candN[x] = 0; candN[(h - 1) * w + x] = 0; }
     for (let z = 0; z < h; z++) { candN[z * w] = 0; candN[z * w + w - 1] = 0; }
-    // ---- 3. acceptance: base + walkables + low tops are seeds; other tops (stair steps) are accepted by flooding from an
-    //         accepted neighbour with |Δfloor| ≤ STEP while the height-above-base stays continuous (kills phantom slabs over pits) ----
+    // ---- 3. acceptance: base + walkables + wide tops ≤ 2.2 m above base are seeds; other tops (stair steps, mezzanine slabs over a
+    //         lower level, roofs with a stair) are accepted by flooding from an accepted neighbour with |Δfloor| ≤ STEP ----
     const acc = new Uint8Array(n * K); const queue = new Int32Array(n * K); let qh = 0, qt = 0;
     for (let i = 0; i < n; i++) { const o = i * K, c = candN[i]; for (let j = 0; j < c; j++) { if (blocked[o + j]) continue; if (j === 0 || candW[o + j] === 2 || (candW[o + j] === 1 && cand[o + j] - base[i] <= LOW_FLOOR)) { acc[o + j] = 1; queue[qt++] = o + j; } } }
     while (qh < qt) {
-      const s = queue[qh++]; const i = (s / K) | 0; const f = cand[s]; const hab = f - base[i];
+      const s = queue[qh++]; const i = (s / K) | 0; const f = cand[s];
       const x = i % w, z = (i - x) / w;
       for (let k = 0; k < 8; k++) {
         const nx = x + DX[k], nz = z + DZ[k]; if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
         const ni = nz * w + nx, no = ni * K, nc = candN[ni];
-        for (let j = 1; j < nc; j++) { if (acc[no + j] || blocked[no + j]) continue; const nf = cand[no + j]; if (Math.abs(nf - f) > STEP) continue; if (Math.abs((nf - base[ni]) - hab) > 1.0) continue; acc[no + j] = 1; queue[qt++] = no + j; }
+        for (let j = 1; j < nc; j++) { if (acc[no + j] || blocked[no + j]) continue; const nf = cand[no + j]; if (Math.abs(nf - f) > STEP) continue; acc[no + j] = 1; queue[qt++] = no + j; }
       }
     }
     // ---- 4. final layers (ascending; keep base + highest) ----

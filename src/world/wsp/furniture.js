@@ -99,21 +99,36 @@ export function buildFurniture(world, T) {
   instance(world, boards, mat('board', { map: chessTexture(), roughness: 0.6 }), tables, { surface: 'concrete', name: 'chessBoards', shadow: false, ray: false });
   for (const t of tables) { world.cover(t.x + 1.1, t.z, 1, 0); world.cover(t.x - 1.1, t.z, -1, 0); }
 
-  // ---- statues: Garibaldi (bronze on a 2.6 m granite pedestal, sword-drawing pose) and the Holley bust (west) --------
-  const bronze = mat('bronze', { color: 0x3f4a3c, roughness: 0.45, metalness: 0.7 });
-  const gran = mat('graniteDark', { color: 0x7a7570, roughness: 0.65 });
+  // ---- statues: bronze general with drawn sword (east) on a grey granite pedestal w/ inscription band + step; bronze bust (west) --
+  const bronze = new THREE.MeshStandardMaterial({ map: patinaTexture(R), color: 0xffffff, roughness: 0.5, metalness: 0.8, envMapIntensity: 0.9 });
+  const gran = mat('graniteDark', { map: world.tex.granite, color: 0x8e8c88, roughness: 0.7 });
+  const bandMat = mat('inscription', { color: 0x2a2724, roughness: 0.6, metalness: 0.2 });
   const statue = (x, z, pedH, figH, w, ry = 0, bust = false) => {
-    const ped = new THREE.Mesh(new THREE.BoxGeometry(2.4, pedH, 2.4), gran); ped.position.set(x, pedH / 2, z); scene.add(ped); world.solid(ped, 'concrete');
-    const step = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.35, 3.6), gran); step.position.set(x, 0.175, z); scene.add(step); world.solid(step, 'concrete');
-    const g = new THREE.Group(); g.position.set(x, pedH, z); g.rotation.y = ry; scene.add(g);
+    const step = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.6, 4.2), gran); step.position.set(x, 0.3, z); scene.add(step); world.solid(step, 'concrete');
+    const ped = new THREE.Mesh(new THREE.BoxGeometry(2.2, pedH, 2.2), gran); ped.position.set(x, 0.6 + pedH / 2, z); scene.add(ped); world.solid(ped, 'concrete');
+    const capG = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.25, 2.6), gran); capG.position.set(x, 0.6 + pedH + 0.12, z); scene.add(capG); capG.castShadow = true;
+    const band = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.3, 2.24), bandMat); band.position.set(x, 0.6 + pedH * 0.55, z); scene.add(band);   // dark inscription band (name fictional, no text)
+    const g = new THREE.Group(); g.position.set(x, 0.6 + pedH + 0.25, z); g.rotation.y = ry; scene.add(g);
     const parts = [];
-    if (bust) { parts.push(box(w * 1.3, figH * 0.55, w * 0.7, 0, figH * 0.27, 0), sph(w * 0.32, 0, figH * 0.75, 0)); }
-    else { parts.push(cyl(w * 0.5, w * 0.6, figH * 0.5, 0, figH * 0.25, 0), box(w * 1.1, figH * 0.32, w * 0.6, 0, figH * 0.66, 0), sph(w * 0.24, 0, figH * 0.92, 0), box(w * 0.2, figH * 0.4, w * 0.2, w * 0.7, figH * 0.72, 0, 0.9), box(w * 0.2, figH * 0.36, w * 0.2, -w * 0.62, figH * 0.6, 0, -0.3), box(0.06, figH * 0.45, 0.06, w * 0.95, figH * 0.55, 0.3, 0.9)); }
+    if (bust) { parts.push(box(w * 1.3, figH * 0.55, w * 0.7, 0, figH * 0.27, 0), sph(w * 0.32, 0, figH * 0.75, 0), cyl(w * 0.2, w * 0.28, figH * 0.2, 0, figH * 0.5, 0)); }
+    else {
+      const h = figH;
+      parts.push(cyl(w * 0.16, w * 0.2, h * 0.46, -w * 0.18, h * 0.23, 0), cyl(w * 0.16, w * 0.2, h * 0.46, w * 0.2, h * 0.23, 0.05));       // legs (boots)
+      parts.push(box(w * 0.9, h * 0.14, w * 0.5, 0, h * 0.5, 0));                                                                                // coat skirt / hips
+      parts.push(box(w * 1.0, h * 0.28, w * 0.55, 0, h * 0.68, 0));                                                                              // torso
+      parts.push(box(w * 1.35, h * 0.07, w * 0.6, 0, h * 0.83, 0));                                                                              // shoulders / epaulettes
+      parts.push(cyl(w * 0.12, w * 0.14, h * 0.06, 0, h * 0.87, 0), sph(w * 0.2, 0, h * 0.93, 0), cyl(w * 0.22, w * 0.22, h * 0.04, 0, h * 1.0, 0)); // neck, head, cap
+      parts.push(box(w * 0.2, h * 0.36, w * 0.2, w * 0.72, h * 0.72, 0.05, 1.25));                                                              // raised sword arm
+      parts.push(box(0.05, h * 0.55, 0.12, w * 0.9, h * 1.15, 0.05, 0.25), box(0.22, 0.05, 0.14, w * 0.85, h * 0.9, 0.05));                    // sword blade + guard
+      parts.push(box(w * 0.2, h * 0.34, w * 0.2, -w * 0.68, h * 0.62, 0.1, -0.35));                                                             // other arm (hand on hip)
+      parts.push(box(w * 1.1, h * 0.5, 0.06, -w * 0.1, h * 0.55, -w * 0.32, 0.15));                                                              // cloak falling behind
+    }
     const m = new THREE.Mesh(mergeGeos(parts), bronze); g.add(m); m.castShadow = true; m.userData.surface = 'metal'; ctx.raycastTargets.push(m);
-    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) world.cover(x + nx * 2.3, z + nz * 2.3, nx, nz);
+    ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 1.3, 0.6 + pedH, z - 1.3), new THREE.Vector3(x + 1.3, 0.6 + pedH + figH * 1.3, z + 1.3)));
+    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) world.cover(x + nx * 2.4, z + nz * 2.4, nx, nz);
   };
-  statue(GARIBALDI.x, GARIBALDI.z, 2.6, 3.0, 1.0, Math.PI / 2);
-  statue(HOLLEY.x, HOLLEY.z, 2.0, 1.4, 0.9, -Math.PI / 2, true);
+  statue(GARIBALDI.x, GARIBALDI.z, 2.4, 2.9, 1.0, Math.PI / 2);
+  statue(HOLLEY.x, HOLLEY.z, 1.8, 1.3, 0.9, -Math.PI / 2, true);
 
   // ---- park house (comfort station): brick, hipped roof, ladder on the south side → walkable roof ------------------
   { const P = PARKHOUSE; const cx = (P.x0 + P.x1) / 2, cz = (P.z0 + P.z1) / 2, w = P.x1 - P.x0, d = P.z1 - P.z0;
@@ -166,43 +181,71 @@ export function buildFurniture(world, T) {
   buildStreet(world, T);
 }
 
+/** Bronze with green verdigris streaks (canvas). */
+function patinaTexture(R) {
+  const S = 256; const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  g.fillStyle = '#4b3f2a'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 1200; i++) { g.fillStyle = `rgba(${60 + R() * 40 | 0},${50 + R() * 30 | 0},${25 + R() * 20 | 0},${R() * 0.5})`; g.fillRect(R() * S, R() * S, 2 + R() * 4, 2 + R() * 4); }
+  for (let i = 0; i < 70; i++) { const x = R() * S, y0 = R() * S * 0.6, h = 30 + R() * 120; const gr = g.createLinearGradient(0, y0, 0, y0 + h); gr.addColorStop(0, `rgba(80,140,110,${0.25 + R() * 0.45})`); gr.addColorStop(1, 'rgba(80,140,110,0)'); g.fillStyle = gr; g.fillRect(x, y0, 2 + R() * 6, h); }
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(95,160,125,${0.15 + R() * 0.3})`; g.beginPath(); g.ellipse(R() * S, R() * S, 4 + R() * 14, 3 + R() * 8, R() * 3, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
 function box(w, h, d, x = 0, y = 0, z = 0, rz = 0) { const g = new THREE.BoxGeometry(w, h, d); if (rz) g.rotateZ(rz); g.translate(x, y, z); return g; }
 function cyl(r0, r1, h, x, y, z) { const g = new THREE.CylinderGeometry(r0, r1, h, 10); g.translate(x, y, z); return g; }
 function sph(r, x, y, z) { const g = new THREE.SphereGeometry(r, 10, 8); g.translate(x, y, z); return g; }
 
 function buildStreet(world, T) {
   const { ctx, scene, R } = world; const V = world.maskSample;
-  // ---- car: body + cabin + wheels (one InstancedMesh with per-instance colour) --------------------------------------
-  // sedan side profile extruded across the width; cabin glass as a second, slightly wider extrusion band
-  const prof = new THREE.Shape(); [[-2.25, 0.32], [2.25, 0.32], [2.3, 0.72], [1.75, 0.82], [0.95, 1.32], [-0.75, 1.38], [-1.85, 0.92], [-2.3, 0.85]].forEach(([x, y], i) => i ? prof.lineTo(x, y) : prof.moveTo(x, y)); prof.closePath();
-  const carGeo = new THREE.ExtrudeGeometry(prof, { depth: 1.76, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 1 }); carGeo.translate(0, 0, -0.88);
-  const gl = new THREE.Shape(); [[0.9, 0.86], [1.55, 0.84], [0.85, 1.28], [-0.7, 1.33], [-1.7, 0.92], [-1.0, 0.86]].forEach(([x, y], i) => i ? gl.lineTo(x, y) : gl.moveTo(x, y)); gl.closePath();
-  const glassG = new THREE.ExtrudeGeometry(gl, { depth: 1.8, bevelEnabled: false }); glassG.translate(0, 0.02, -0.9);
-  const wheelG = []; for (const [x, z] of [[1.45, 0.85], [1.45, -0.85], [-1.45, 0.85], [-1.45, -0.85]]) { const w = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12); w.rotateX(Math.PI / 2); w.translate(x, 0.33, z); wheelG.push(w); }
-  const wheels = mergeGeos(wheelG);
-  const cars = []; const carCols = [0x1a1a1c, 0xd8d8d8, 0x8a8f96, 0x2b3a6b, 0x6b1f1f, 0xe8e6e0, 0x3a3a3a, 0xf1c232, 0x232323, 0xb5b8bd].map(c => new THREE.Color(c));
+  // ---- vehicles: sedan / cab / van — extruded side profiles, tinted glass band, 0.33 m rubber wheels + hubcaps, lights, plates; clearcoat paint ----
+  const profile = (pts, depth, y = 0) => { const sh = new THREE.Shape(); pts.forEach(([x, yy], i) => i ? sh.lineTo(x, yy) : sh.moveTo(x, yy)); sh.closePath(); const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2 }); g.translate(0, y, -depth / 2); return g; };
+  const KIT = {
+    sedan: { body: [[-2.25, 0.34], [2.25, 0.34], [2.32, 0.7], [1.8, 0.82], [0.95, 1.32], [-0.75, 1.38], [-1.85, 0.94], [-2.32, 0.86]], glass: [[0.92, 0.86], [1.62, 0.84], [0.86, 1.28], [-0.7, 1.33], [-1.72, 0.93], [-1.02, 0.86]], w: 1.78, wheels: [1.45, -1.45], hl: [2.3, 0.62], tl: [-2.3, 0.7], len: 4.6 },
+    cab: { body: [[-2.3, 0.34], [2.3, 0.34], [2.36, 0.72], [1.7, 0.86], [0.9, 1.42], [-0.9, 1.46], [-1.95, 0.98], [-2.36, 0.9]], glass: [[0.86, 0.9], [1.5, 0.88], [0.8, 1.38], [-0.85, 1.42], [-1.8, 0.97], [-1.0, 0.9]], w: 1.8, wheels: [1.5, -1.5], hl: [2.34, 0.64], tl: [-2.34, 0.72], len: 4.7, sign: true },
+    van: { body: [[-2.5, 0.36], [2.5, 0.36], [2.56, 0.86], [2.35, 1.02], [1.75, 1.06], [1.3, 1.96], [-2.45, 2.0], [-2.56, 1.4]], glass: [[1.68, 1.1], [1.25, 1.9], [-2.4, 1.92], [-2.45, 1.42], [1.2, 1.42]], w: 1.95, wheels: [1.55, -1.7], hl: [2.52, 0.72], tl: [-2.52, 1.0], len: 5.1 },
+  };
+  const paintMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0.55, clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
+  const glassMat = mat('vglass', { color: 0x3a4a50, roughness: 0.08, metalness: 0.7, envMapIntensity: 1.3 });
+  const rubber = mat('rubber', { color: 0x1c1c1c, roughness: 0.92 }); const chrome = mat('hubcap', { color: 0xb9bcc0, roughness: 0.3, metalness: 0.9 });
+  const lampW = mat('headlamp', { color: 0xdfe6ea, roughness: 0.2, metalness: 0.4, emissive: 0x556066 }); const lampR = mat('taillamp', { color: 0x9a1212, roughness: 0.3, emissive: 0x3a0505 });
+  const plateMat = mat('plate', { color: 0xe9e4d2, roughness: 0.5 });
+  const carCols = [0x1a1a1c, 0xd8d8d8, 0x8a8f96, 0x2b3a6b, 0x6b1f1f, 0xe8e6e0, 0x3a3a3a, 0x232323, 0xb5b8bd, 0x1f4d3a].map(c => new THREE.Color(c));
+  const placements = { sedan: [], cab: [], van: [] };
   for (const s of STREETS) {
     if (s.cobble) continue;
-    const L = s.a1 - s.a0; const n = Math.floor(L / 7.2);
+    const n = Math.floor((s.a1 - s.a0) / 7.4);
     for (let i = 0; i < n; i++) {
-      const t = s.a0 + 3.5 + i * 7.2 + (R() - 0.5) * 1.5; if (R() < 0.3) continue;
+      const t = s.a0 + 3.7 + i * 7.4 + (R() - 0.5) * 1.2; if (R() < 0.3) continue;
       for (const side of [0, 1]) {
-        if (s.name.startsWith('LaGuardia') && side === 1) continue;
-        const lane = side ? s.r1 - 1.1 : s.r0 + 1.1;
+        if (s.id === 'laguardia' && side === 1) continue;
+        const lane = side ? s.r1 - 1.15 : s.r0 + 1.15;
         const x = s.axis === 'x' ? t : lane, z = s.axis === 'x' ? lane : t;
         if (x < BOUNDS.x0 + 4 || x > BOUNDS.x1 - 4 || z < BOUNDS.z0 + 4 || z > BOUNDS.z1 - 4) continue;
-        if (Math.abs(x - ARCH.cx) < 22 && z < -70 && z > -100) continue;   // keep the Fifth Ave axis view clear
+        if (Math.abs(x - ARCH.cx) < 22 && z < -70 && z > -100) continue;   // keep the arch axis view clear
         const ry = s.axis === 'x' ? (side ? Math.PI : 0) : (side ? -Math.PI / 2 : Math.PI / 2);
-        cars.push({ x, z, ry });
+        const kind = R() < 0.18 ? 'cab' : R() < 0.3 ? 'van' : 'sedan';
+        placements[kind].push({ x, z, ry, kind });
       }
     }
   }
-  const im = new THREE.InstancedMesh(carGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.5, envMapIntensity: 1.0 }), cars.length);
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1), e = new THREE.Euler();
-  cars.forEach((c, i) => { e.set(0, c.ry, 0); q.setFromEuler(e); p.set(c.x, 0, c.z); im.setMatrixAt(i, m.compose(p, q, sc)); im.setColorAt(i, carCols[(R() * carCols.length) | 0]); const ax = Math.abs(Math.cos(c.ry)) > 0.5; const ex = ax ? 2.3 : 0.95, ez = ax ? 0.95 : 2.3; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(c.x - ex, 0, c.z - ez), new THREE.Vector3(c.x + ex, 1.4, c.z + ez))); const nx = ax ? 0 : 1, nz = ax ? 1 : 0; world.cover(c.x + nx * 1.8, c.z + nz * 1.8, nx, nz); world.cover(c.x - nx * 1.8, c.z - nz * 1.8, -nx, -nz); });
-  im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; im.castShadow = im.receiveShadow = true; im.userData.surface = 'metal'; im.name = 'cars'; im.frustumCulled = false; scene.add(im); ctx.raycastTargets.push(im);
-  instance(world, wheels, mat('tyre', { color: 0x1a1a1a, roughness: 0.9 }), cars, { surface: 'metal', name: 'wheels', shadow: false });
-  instance(world, glassG, mat('carglass', { color: 0x1c2630, roughness: 0.1, metalness: 0.6 }), cars, { surface: 'metal', name: 'carGlass', shadow: false });
+  for (const kind in KIT) {
+    const K = KIT[kind]; const P = placements[kind]; if (!P.length) continue;
+    const body = profile(K.body, K.w); const glass = profile(K.glass, K.w + 0.3, 0.0);
+    const wh = [], caps = [], hl = [], tl = [], plates = [];
+    for (const wx of K.wheels) for (const wz of [K.w / 2 + 0.1, -K.w / 2 - 0.1]) { const t = new THREE.CylinderGeometry(0.33, 0.33, 0.24, 14); t.rotateX(Math.PI / 2); t.translate(wx, 0.33, wz); wh.push(t); const c = new THREE.CylinderGeometry(0.19, 0.19, 0.26, 10); c.rotateX(Math.PI / 2); c.translate(wx, 0.33, wz); caps.push(c); }
+    for (const sz of [-1, 1]) { const h = new THREE.BoxGeometry(0.06, 0.16, 0.34); h.translate(K.hl[0], K.hl[1], sz * (K.w / 2 - 0.3)); hl.push(h); const r = new THREE.BoxGeometry(0.06, 0.14, 0.3); r.translate(K.tl[0], K.tl[1], sz * (K.w / 2 - 0.28)); tl.push(r); }
+    for (const px of [K.hl[0] + 0.02, K.tl[0] - 0.02]) { const p = new THREE.BoxGeometry(0.02, 0.15, 0.32); p.translate(px, 0.5, 0); plates.push(p); }
+    if (K.sign) { const sg = new THREE.BoxGeometry(0.5, 0.14, 0.2); sg.translate(0.1, 1.55, 0); plates.push(sg); }
+    const cols = kind === 'cab' ? [new THREE.Color(0xf2b820)] : carCols;
+    const im = instance(world, body, paintMat, P, { surface: 'metal', name: 'cars_' + kind, colors: cols, collide: null });
+    P.forEach((c, i) => { if (kind !== 'cab') im.setColorAt(i, carCols[(R() * carCols.length) | 0]); const ax = Math.abs(Math.cos(c.ry)) > 0.5; const hx = K.len / 2, hz = K.w / 2; const ex = ax ? hx : hz, ez = ax ? hz : hx; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(c.x - ex, 0, c.z - ez), new THREE.Vector3(c.x + ex, kind === 'van' ? 2.0 : 1.45, c.z + ez))); const nx = ax ? 0 : 1, nz = ax ? 1 : 0; world.cover(c.x + nx * (hz + 0.6), c.z + nz * (hz + 0.6), nx, nz); world.cover(c.x - nx * (hz + 0.6), c.z - nz * (hz + 0.6), -nx, -nz); });
+    im.instanceColor.needsUpdate = true;
+    instance(world, glass, glassMat, P, { surface: 'metal', name: 'glass_' + kind, shadow: false, ray: false });
+    instance(world, mergeGeos(wh), rubber, P, { surface: 'metal', name: 'wheels_' + kind, shadow: false, ray: false });
+    instance(world, mergeGeos(caps), chrome, P, { surface: 'metal', name: 'caps_' + kind, shadow: false, ray: false });
+    instance(world, mergeGeos(hl), lampW, P, { surface: 'metal', name: 'hl_' + kind, shadow: false, ray: false });
+    instance(world, mergeGeos(tl), lampR, P, { surface: 'metal', name: 'tl_' + kind, shadow: false, ray: false });
+    instance(world, mergeGeos(plates), plateMat, P, { surface: 'metal', name: 'plates_' + kind, shadow: false, ray: false });
+  }
 
   // ---- hydrants (red), one-way signs, bike racks, tree pits, street trees positions ----------------------------------
   const hyd = mergeGeos([cyl(0.14, 0.16, 0.7, 0, 0.35, 0), cyl(0.09, 0.09, 0.18, 0, 0.78, 0), sph(0.12, 0, 0.9, 0), box(0.5, 0.1, 0.1, 0, 0.55, 0)]);

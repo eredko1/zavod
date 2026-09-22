@@ -61,10 +61,10 @@ export function build(world) {
     mounds: [-92, 0, 40, 1.3, 0.05],
     row: [30, 0, -70, 0.15, 0.12],              // The Row from the north walk
     bobst: [28, 0, 76.5, -1.75, 0.12],          // along Washington Sq S: Bobst ahead-right, Kimmel right
-    macdougal: [-168, 0, 90, 0.0, 0.05],
+    macdougal: [-164.5, 0, 118, 0.42, 0.04],     // on the west sidewalk of MacDougal, looking north up the shopfronts
     kimmel: [-10, 0, 62, -2.6, 0.16],
     judson: [-2, 0, 75.5, 2.2, 0.22],
-    garibaldi: [48, 0, 4, -1.2, 0.05],
+    garibaldi: [52, 0, 1.5, -2.2, 0.25],
     fifth: [0, 0, -100, 0, 0.08],
   };
   // cover along the fountain coping, paths, lawn fences (more from furniture builders)
@@ -76,7 +76,7 @@ export function build(world) {
     const x = p.x, z = p.z, y = p.y;
     if (y > 22 && Math.abs(x - A.cx) < 10 && Math.abs(z - A.cz) < 5) return 'concrete';
     const r = Math.hypot(x, z);
-    if (r < FOUNTAIN.basinR && y < FOUNTAIN.floor + FOUNTAIN.basinH + 0.1) return 'water';
+    if (r < FOUNTAIN.basinR && r > FOUNTAIN.plinthR && y < FOUNTAIN.floor + 0.5) return 'water';
     if (r < FOUNTAIN.plaza) return 'concrete';
     if (world.groundMask && world.maskSample) { const s = world.maskSample(x, z); if (s === 'lawn') return 'ground'; return 'concrete'; }
     return 'ground';

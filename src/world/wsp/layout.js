@@ -17,11 +17,11 @@ export const STREETS = [
   { name: 'Fifth Avenue', axis: 'z', r0: -11, r1: 9, a0: -142, a1: -83, oneway: 1 },
   { name: 'Thompson Street', axis: 'z', r0: -17, r1: -11, a0: 83, a1: 166, oneway: -1 },
   { name: 'Sullivan Street', axis: 'z', r0: -90, r1: -84, a0: 83, a1: 166, oneway: 1 },
-  { name: 'LaGuardia Place', axis: 'z', r0: 54, r1: 63, a0: 83, a1: 166, oneway: 0 },
+  { id: 'laguardia', name: 'LaGuardia Place', axis: 'z', r0: 54, r1: 63, a0: 83, a1: 166, oneway: 0 },
 ];
 
 // fountain plaza (2009 layout): sunken floor r 11.5 @ -0.9, three 0.3 m steps to r 14.5, coping to 16.4, hex-paved plaza to r 31
-export const FOUNTAIN = { r: 11.5, floor: -0.9, steps: 3, rise: 0.3, tread: 1.0, coping: 16.4, plaza: 31, basinR: 2.6, basinH: 0.45, ringPath: 18 };
+export const FOUNTAIN = { r: 11.5, floor: -1.05, steps: 3, rise: 0.35, tread: 1.0, coping: 16.4, plaza: 31, basinR: 4.2, basinH: 0.45, plinthR: 2.0, plinthH: 0.95, ringPath: 18 };
 
 // Washington Square Arch: footprint x[-8,11] z[-57.5,-50.5]
 export const ARCH = {
@@ -115,7 +115,6 @@ export const BUILDINGS = [
   { id: 'tisch', name: 'Tisch Hall (Stern)', x0: 184, x1: 233, z0: 127, z1: 146, h: 45, style: 'stone', bays: 8, floors: 12 },
   { id: 'sullivanS', name: 'Sullivan / W 3rd block', x0: -160, x1: -95, z0: 86, z1: 124, h: 22, style: 'brick', bays: 12, floors: 6, shops: 'n' },
   { id: 'dagostino', name: "D'Agostino Hall", x0: -160, x1: -107, z0: 128, z1: 150, h: 45.6, style: 'brick', bays: 10, floors: 14 },
-  { id: 'macdS', name: 'MacDougal / W 3rd shops', x0: -176, x1: -160, z0: 100, z1: 150, h: 16, style: 'brick', bays: 3, floors: 5, shops: 'e' },
   { id: 'thirdS', name: 'W 3rd St south block', x0: -110, x1: 50, z0: 166, z1: 200, h: 17, style: 'brick', bays: 24, floors: 5, shops: 'n' },
   { id: 'thirdSE', name: 'W 3rd / LaGuardia', x0: 64, x1: 150, z0: 166, z1: 200, h: 24, style: 'tan', bays: 14, floors: 7 },
   // ---- west: Washington Square West / MacDougal ---------------------------------------------------------------

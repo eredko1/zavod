@@ -42,17 +42,17 @@ export function hexPaverTexture(R) {
 }
 
 /** Grey granite flags (fountain floor / steps): 512 px = 2 m, 2×4 slabs with thin joints. */
-export function graniteTexture(R, { tone = 150, joints = true } = {}) {
+export function graniteTexture(R, { tone = 150, slabs = [2, 4], joint = 3 } = {}) {
   const S = 512; const [c, g] = canvas(S, S);
-  g.fillStyle = `rgb(${tone - 40},${tone - 40},${tone - 38})`; g.fillRect(0, 0, S, S);
-  const sw = S / 2, sh = S / 4;
-  for (let j = 0; j < 4; j++) for (let i = 0; i < 2; i++) {
-    const v = rnd(R, -10, 10); g.fillStyle = `rgb(${tone + v | 0},${tone + v - 1 | 0},${tone + v - 4 | 0})`;
+  g.fillStyle = `rgb(${tone - 45},${tone - 45},${tone - 42})`; g.fillRect(0, 0, S, S);
+  const [nx, ny] = slabs; const sw = S / nx, sh = S / ny;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const v = rnd(R, -9, 9); g.fillStyle = `rgb(${tone + v | 0},${tone + v - 1 | 0},${tone + v - 5 | 0})`;
     const off = j & 1 ? sw / 2 : 0; const x = ((i * sw + off) % S);
-    g.fillRect(x + 2, j * sh + 2, sw - 4, sh - 4); if (x + sw > S) g.fillRect(x - S + 2, j * sh + 2, sw - 4, sh - 4);
+    g.fillRect(x + joint, j * sh + joint, sw - 2 * joint, sh - 2 * joint); if (x + sw > S) g.fillRect(x - S + joint, j * sh + joint, sw - 2 * joint, sh - 2 * joint);
   }
-  for (let i = 0; i < 26000; i++) { const v = R(); g.fillStyle = `rgba(${v < 0.5 ? '30,30,34' : '230,228,222'},${R() * 0.28})`; g.fillRect(R() * S, R() * S, 1, 1); }
-  if (!joints) { /* seamless speckle only */ }
+  for (let i = 0; i < 30000; i++) { const v = R(); g.fillStyle = `rgba(${v < 0.5 ? '30,30,34' : '235,232,226'},${R() * 0.26})`; g.fillRect(R() * S, R() * S, 1, 1); }
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(20,20,22,${R() * 0.08})`; g.beginPath(); g.ellipse(R() * S, R() * S, 10 + R() * 40, 6 + R() * 20, R() * 3, 0, 7); g.fill(); }   // damp / wear patches
   return finish(c);
 }
 

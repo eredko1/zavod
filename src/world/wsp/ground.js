@@ -23,7 +23,7 @@ export function groundHeight(x, z) {
 
 export function buildGround(world, T) {
   const { ctx, scene, R } = world;
-  const hex = hexPaverTexture(R), side = sidewalkTexture(R), granite = graniteTexture(R, { tone: 176 });
+  const hex = hexPaverTexture(R), side = sidewalkTexture(R), granite = graniteTexture(R, { tone: 168 });
   world.tex = Object.assign(world.tex || {}, { hex, side, granite });
 
   // ---- mask (R hex pavers · G asphalt · B sidewalk · R+G rubber · R+B gravel) ------------------------------------------
@@ -124,34 +124,46 @@ export function buildGround(world, T) {
   const apron = new THREE.Mesh(apGeo, new THREE.MeshStandardMaterial({ map: T.asphalt, roughness: 0.9, color: 0x9a9a98 }));
   apron.position.y = -0.03; apron.receiveShadow = true; apron.name = 'apron'; scene.add(apron);
 
-  // ---- fountain: floor slab, steps, coping, basin, water ---------------------------------------------------------
-  const granMat = new THREE.MeshStandardMaterial({ map: granite, roughness: 0.6, metalness: 0.02, color: 0xbfbdb6, side: THREE.DoubleSide });
-  granite.repeat.set(1, 1);
+  // ---- fountain: sunken granite plaza (3 step rings, 1.05 m), basin, central plinth, jets + mist -------------------
+  const floorTex = graniteTexture(R, { tone: 141, slabs: [2, 2], joint: 4 });      // 512 px = 2.4 m → 1.2 m slabs, #8d8d88
+  const granMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.7, metalness: 0.0, color: 0x9d9d99, side: THREE.DoubleSide });
   const parts = [];
-  const ring = (r0, r1, y) => { const g = new THREE.RingGeometry(r0, r1, 96, 1); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); worldUV(g, 2); parts.push(g); };
-  const wall = (r, y0, y1) => { const g = new THREE.CylinderGeometry(r, r, y1 - y0, 96, 1, true); g.translate(0, (y0 + y1) / 2, 0); worldUV(g, 2); parts.push(g); };
+  const ring = (r0, r1, y) => { const g = new THREE.RingGeometry(r0, r1, 96, 1); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); worldUV(g, 2.4); parts.push(g); };
+  const wall = (r, y0, y1) => { const g = new THREE.CylinderGeometry(r, r, y1 - y0, 96, 1, true); g.translate(0, (y0 + y1) / 2, 0); worldUV(g, 2.4); parts.push(g); };
   ring(0, F.r, F.floor);                       // sunken floor
   for (let i = 0; i < F.steps; i++) { const r0 = F.r + i * F.tread, y = F.floor + F.rise * (i + 1); wall(r0, y - F.rise, y); ring(r0, r0 + F.tread, y); }
   ring(F.r + F.steps * F.tread, F.coping, 0.02); // coping band at grade
   wall(F.coping, -0.3, 0.02);
-  const fountainGeo = mergeGeos(parts);
-  const fm = new THREE.Mesh(fountainGeo, granMat); fm.name = 'fountainSteps'; fm.receiveShadow = true; fm.castShadow = true; fm.userData.surface = 'concrete'; scene.add(fm); ctx.raycastTargets.push(fm);
-  // steps are handled by groundHeight (player + AI); the floor is walkable
-  // central basin: low granite rim + inner floor + water plane, jets
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(F.basinR + 0.45, F.basinR + 0.45, F.basinH, 64, 1, false), granMat);
-  rim.position.y = F.floor + F.basinH / 2; rim.castShadow = rim.receiveShadow = true; rim.userData.surface = 'concrete'; scene.add(rim); ctx.raycastTargets.push(rim);
-  ctx.colliders.push(new THREE.Box3(new THREE.Vector3(-F.basinR - 0.45, F.floor - 0.1, -F.basinR - 0.45), new THREE.Vector3(F.basinR + 0.45, F.floor + F.basinH, F.basinR + 0.45)));
-  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x4f8797, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.9, envMapIntensity: 1.4, clearcoat: 1, clearcoatRoughness: 0.04 });
-  const water = new THREE.Mesh(new THREE.CircleGeometry(F.basinR, 48), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = F.floor + F.basinH + 0.005; water.name = 'water'; water.userData.surface = 'water'; scene.add(water); ctx.raycastTargets.push(water);
-  // jets: a ring of spray quads (crossed, additive-ish alpha) merged into one mesh; scaled in updaters via uniform time
-  const sprTex = sprayTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: sprTex, color: 0xf4f8fa, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: true });
-  const jgeos = []; const jets = 12;
-  const jet = (x, z, h, w) => { for (const rot of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) { const q = new THREE.PlaneGeometry(w, h); q.translate(0, h / 2, 0); q.rotateY(rot); q.translate(x, F.floor + F.basinH, z); jgeos.push(q); } };
-  for (let i = 0; i < jets; i++) { const a = i / jets * Math.PI * 2; jet(Math.cos(a) * 1.9, Math.sin(a) * 1.9, 2.4, 0.5); }
-  jet(0, 0, 6.5, 1.3); jet(0.2, 0.1, 5.2, 1.0);
+  const fm = new THREE.Mesh(mergeGeos(parts), granMat); fm.name = 'fountainSteps'; fm.receiveShadow = true; fm.castShadow = true; fm.userData.surface = 'concrete'; scene.add(fm); ctx.raycastTargets.push(fm);
+  // step ring colliders: 48 tangential AABB segments per ring (step-up ≤ 0.45 m keeps them walkable); groundHeight mirrors them for the player/AI floor
+  for (let i = 0; i < F.steps; i++) { const r0 = F.r + i * F.tread, r1 = r0 + F.tread, top = F.floor + F.rise * (i + 1); const n = 48; for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; const xs = [Math.cos(a0) * r0, Math.cos(a1) * r0, Math.cos(a0) * r1, Math.cos(a1) * r1], zs = [Math.sin(a0) * r0, Math.sin(a1) * r0, Math.sin(a0) * r1, Math.sin(a1) * r1]; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(Math.min(...xs), F.floor - 0.2, Math.min(...zs)), new THREE.Vector3(Math.max(...xs), top, Math.max(...zs)))); } }
+  // basin: granite rim r 4.2 (0.45 high, 0.5 wide), water inside, raised dark-granite plinth r 2 in the centre
+  const rimMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.65, color: 0xb5b3ad });
+  const rimG = new THREE.RingGeometry(F.basinR, F.basinR + 0.5, 64); rimG.rotateX(-Math.PI / 2); rimG.translate(0, F.floor + F.basinH, 0); worldUV(rimG, 2.4);
+  const rimW = new THREE.CylinderGeometry(F.basinR + 0.5, F.basinR + 0.5, F.basinH, 64, 1, true); rimW.translate(0, F.floor + F.basinH / 2, 0); worldUV(rimW, 2.4);
+  const rimIn = new THREE.CylinderGeometry(F.basinR, F.basinR, F.basinH, 64, 1, true); rimIn.translate(0, F.floor + F.basinH / 2, 0); worldUV(rimIn, 2.4);
+  const rim = new THREE.Mesh(mergeGeos([rimG, rimW, rimIn]), rimMat); rim.material.side = THREE.DoubleSide; rim.castShadow = rim.receiveShadow = true; rim.userData.surface = 'concrete'; scene.add(rim); ctx.raycastTargets.push(rim);
+  { const n = 32; for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; const r0 = F.basinR - 0.05, r1 = F.basinR + 0.5; const xs = [Math.cos(a0) * r0, Math.cos(a1) * r0, Math.cos(a0) * r1, Math.cos(a1) * r1], zs = [Math.sin(a0) * r0, Math.sin(a1) * r0, Math.sin(a0) * r1, Math.sin(a1) * r1]; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(Math.min(...xs), F.floor - 0.1, Math.min(...zs)), new THREE.Vector3(Math.max(...xs), F.floor + F.basinH, Math.max(...zs)))); } }
+  const plinthMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75, color: 0x7c7c78 });
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR, F.plinthR + 0.25, F.plinthH, 48), plinthMat); plinth.position.y = F.floor + F.plinthH / 2; plinth.castShadow = plinth.receiveShadow = true; plinth.userData.surface = 'concrete'; scene.add(plinth); ctx.raycastTargets.push(plinth);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR + 0.2, F.plinthR + 0.2, 0.12, 48), plinthMat); cap.position.y = F.floor + F.plinthH + 0.06; cap.castShadow = true; scene.add(cap);
+  ctx.colliders.push(new THREE.Box3(new THREE.Vector3(-F.plinthR - 0.25, F.floor - 0.1, -F.plinthR - 0.25), new THREE.Vector3(F.plinthR + 0.25, F.floor + F.plinthH + 0.12, F.plinthR + 0.25)));
+  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x3d6d7c, roughness: 0.05, metalness: 0.0, transparent: true, opacity: 0.88, envMapIntensity: 1.5, clearcoat: 1, clearcoatRoughness: 0.03 });
+  const water = new THREE.Mesh(new THREE.RingGeometry(F.plinthR + 0.1, F.basinR, 64), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = F.floor + 0.32; water.name = 'water'; water.userData.surface = 'water'; scene.add(water); ctx.raycastTargets.push(water);
+  // jets: translucent tapered columns (additive, alpha-blended) from the plinth top and a ring of 12 on the basin floor, plus mist quads near the tops
+  const jetTex = jetColumnTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: jetTex, color: 0xdfeef6, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
+  const jgeos = [];
+  const jet = (x, z, y0, h, r) => { const g = new THREE.CylinderGeometry(r * 0.35, r, h, 12, 1, true); g.translate(0, h / 2, 0); g.translate(x, y0, z); jgeos.push(g); const cone = new THREE.CylinderGeometry(0.02, r * 0.9, h * 1.15, 10, 1, true); cone.translate(0, h * 1.15 / 2, 0); cone.translate(x, y0, z); jgeos.push(cone); };
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; jet(Math.cos(a) * 3.3, Math.sin(a) * 3.3, F.floor + 0.3, 2.6, 0.22); }
+  jet(0, 0, F.floor + F.plinthH + 0.1, 7.5, 0.55); jet(0.3, 0.2, F.floor + F.plinthH + 0.1, 5.5, 0.35); jet(-0.3, -0.2, F.floor + F.plinthH + 0.1, 4.8, 0.3);
   const jetsMesh = new THREE.Mesh(mergeGeos(jgeos), jetMat); jetsMesh.name = 'jets'; jetsMesh.renderOrder = 5; scene.add(jetsMesh);
+  const mistTex = mistTexture(); const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, fog: true });
+  const mistG = [];
+  const mist = (x, y, z, s) => { for (const rot of [0.3, 1.35, 2.4]) { const q = new THREE.PlaneGeometry(s, s * 0.8); q.rotateY(rot); q.translate(x, y, z); mistG.push(q); } };
+  mist(0, F.floor + F.plinthH + 6.8, 0, 4.5); mist(0, F.floor + F.plinthH + 4.6, 0, 3.2); mist(0, F.floor + 1.4, 0, 6.5);
+  const mistMesh = new THREE.Mesh(mergeGeos(mistG), mistMat); mistMesh.name = 'mist'; mistMesh.renderOrder = 6; scene.add(mistMesh);
   let t = 0;
-  world.updaters.push((dt) => { t += dt; jetsMesh.scale.y = 1 + Math.sin(t * 2.3) * 0.06; jetMat.opacity = 0.55 + Math.sin(t * 3.1) * 0.06; });
+  world.updaters.push((dt) => { t += dt; jetsMesh.scale.y = 1 + Math.sin(t * 2.3) * 0.05; jetMat.opacity = 0.46 + Math.sin(t * 3.1) * 0.06; mistMat.opacity = 0.3 + Math.sin(t * 1.7) * 0.07; mistMesh.rotation.y = t * 0.15; });
 
   return ground;
 }
@@ -164,6 +176,21 @@ export function mergeGeos(geos) {
   for (const q of geos) { const n = q.index ? q.toNonIndexed() : q; pos.push(...n.attributes.position.array); nor.push(...n.attributes.normal.array); uv.push(...n.attributes.uv.array); }
   out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return out;
+}
+function jetColumnTexture() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(255,255,255,0.05)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0.75)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 256);
+  const gx = g.createLinearGradient(0, 0, 64, 0); gx.addColorStop(0, 'rgba(0,0,0,1)'); gx.addColorStop(0.35, 'rgba(0,0,0,0)'); gx.addColorStop(0.65, 'rgba(0,0,0,0)'); gx.addColorStop(1, 'rgba(0,0,0,1)');
+  g.globalCompositeOperation = 'destination-out'; g.fillStyle = gx; g.fillRect(0, 0, 64, 256); g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.35})`; g.fillRect(8 + Math.random() * 48, Math.random() * 256, 1, 4 + Math.random() * 14); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapT = THREE.ClampToEdgeWrapping; return t;
+}
+function mistTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,0.8)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 function sprayTexture() {
   const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
