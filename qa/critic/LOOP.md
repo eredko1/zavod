@@ -24,12 +24,23 @@ Stop when overall >= 8.0 or after round 8.
 |---|---|---|---|---|---|
 | wsp (City Square) | 5.9 | — | — | — | **r1 fixes all landed** (6992606, 7b51f99) — needs r2 capture + critique |
 | sbu (University) | 3.5 | 4.6 | — | — | **r2 fixes partially landed** (806d600, detail.js) — finish, then r3 capture |
-| terminal (Central Station) | 5.3 | — | — | — | **critiqued, 12 fixes queued, builder never launched** |
+| terminal (Central Station) | 5.3 | — | — | — | **items 1+2 partially built** (cove strips, booth+clock, mullions); items 4, 8 not started; 3,5,6,7,9,10,11,12 untouched |
 
 ## Next session — start here
-1. `./qa/serve.sh`, then `./qa/critic-shots.sh wsp 2` and `./qa/critic-shots.sh sbu 3`; critique each into `qa/critic/<map>-r<N>.md`.
-2. Launch the Central Station builder on `qa/critic/terminal-r1.md`. Highest value first: **(1) cove lighting, (2) the four-faced clock + information booth, (4) the two ruined poses, (8) people in the hall** — those four are most of the 5.3 → ~7 gap and are cheap. Ornament / street exterior / platform grime can follow.
-3. Perf watch: `zavod` is at **713 draw calls / 6.8 M tri** (was 581–621) and `wsp` dropped to **52 fps / 1.78 M tri** after the r1 detail pass. Both need a look before adding more.
+
+**Nothing has been re-scored since its fixes landed.** All three maps carry stale numbers. Re-measuring is
+step 1, before any new building — otherwise the loop is open, not closed.
+
+1. `./qa/serve.sh`, then `./qa/critic-shots.sh wsp 2`, `./qa/critic-shots.sh sbu 3`, `./qa/critic-shots.sh terminal 2`.
+   Critique each into `qa/critic/<map>-r<N>.md` using the round protocol above. Compare against the stale
+   scores (wsp 5.9, sbu 4.6, terminal 5.3) so the delta per axis is explicit.
+2. Finish Central Station from `qa/critic/terminal-r1.md`: item 2 (booth + clock) was mid-rebuild when the
+   session stopped, and items **4 (the two ruined poses)** and **8 (people in the hall)** are untouched and
+   are the cheapest remaining points. Then items 3, 5, 6, 7.
+3. Finish University from `sbu-r2.md`: Wang massing + real portal geometry (2), buses (5), mullion
+   aliasing (9), and the motorcycles parked on the pedestrian plaza (`plaza`/`spawn` poses).
+4. Standing perf note: Central Station's exposure now reads washed out and the ceiling teal over-saturated
+   versus the warm, deep-shadow refs — the cove lighting went in but the grade was never pulled back.
 
 ## Rules for builders
 - No real institution / street / person names in rendered text or `name:` data fields (de-branded at 210af80).
