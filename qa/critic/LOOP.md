@@ -36,3 +36,30 @@ Stop when overall >= 8.0 or after round 8.
 - Perf gate: 60 fps @ 1280x720 on M3 Pro, <= ~600 draw calls, <= ~3 M triangles. Bar: railyard 482 dc / 1.85 M tri.
 - Every solid → `ctx.colliders` Box3; every hittable mesh → `ctx.raycastTargets` with `userData.surface`.
 - `ctx.rng()`, never `Math.random()`, for anything affecting layout.
+
+## Perf findings (2026-09-22)
+
+**City Square canopy — fixed, 31 -> 60 fps.** The two-layer canopy is fill-bound, not geometry-bound: ~9 large
+alpha-tested cards overlap per tree, so standing under one shaded every pixel ~9x through a full Standard
+material. Measured at 1280x720 hero: 31 baseline · 40 inner layer off · 42 Lambert · 45 all-FrontSide ·
+**60 Lambert + FrontSide inner core** (shipped, 9395f63). Outer shell stays DoubleSide so the silhouette is
+unchanged. General lesson for every map: big alpha-tested DoubleSide cards wreck the frame rate while draw
+calls and triangle counts still look healthy — measure fps from a pose standing directly under them.
+
+**Zavod's 6.8 M triangles is NOT an SBU leak — it is unoptimized Poly Haven props** (the issue already noted
+in CONTRACT/handoff as "World agent was mid-fix when stopped"). Scene total is 1.58 M tris; the 6.8 M in
+`stats` is the rendered figure across the shadow passes. Per-instance triangle counts from a scene profile:
+
+| Prop | Tris each | Should be |
+|---|---|---|
+| `street_lamp_01` post | 30,050 | ~500 |
+| `portable_generator` | 26,245 | ~800 |
+| `concrete_road_barrier_02` | 23,822 | ~50 (it is a box) |
+| `metal_jerrycan` | 20,022 | ~300 |
+| `plastic_crate_01` | 18,320 | ~100 |
+| `cardboard_box_01` | 16,952 | ~12 (it is a box) |
+| `wooden_military_crate` | 14,548 | ~100 |
+
+They are correctly instanced, so draw calls are fine; the meshes themselves were never decimated. Fix is a
+one-off decimation pass over `assets/props/*` — worth doing before Zavod's perf score (4/10) can move, and it
+would cut the shadow cost across every map that reuses these props. Out of scope for the three new maps.
