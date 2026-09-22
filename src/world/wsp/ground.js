@@ -72,7 +72,7 @@ export function buildGround(world, T) {
         gLawn = clamp(1.0 - gHex - gAsp - gSide - gRub - gGrv, 0.0, 1.0);
         vec2 wp = vWPos.xz;
         vec4 grassA = texture2D(map, wp / 4.0); vec4 grassB = texture2D(map, wp / 9.7 + 0.37);
-        vec4 lawn = mix(grassA, grassB, 0.45); lawn.rgb *= vec3(0.52, 0.68, 0.36);
+        vec4 lawn = mix(grassA, grassB, 0.45); lawn.rgb *= vec3(0.40, 0.55, 0.29);
         float wear = nz(wp * 0.08) * 0.6 + nz(wp * 0.31) * 0.4;  // worn / dry patches
         lawn.rgb = mix(lawn.rgb, lawn.rgb * vec3(1.06, 1.02, 0.84), smoothstep(0.62, 0.9, wear) * 0.3);
         vec4 hexc = texture2D(uHex, wp / 2.0);

@@ -66,14 +66,20 @@ export function buildTrees(world, T) {
   const trunkMat = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.9, color: 0xc9c2b0 });
   /** Leaf card material. `lit` = the sunlit outer shell, otherwise the shaded inner core.
    *  Normals are bent toward +Y so cards do not go black when they face away; a fake translucency term
-   *  (emissiveMap = the leaf alpha) puts light back through the canopy the way real backlit foliage does. */
+   *  (emissiveMap = the leaf alpha) puts light back through the canopy the way real backlit foliage does.
+   *  PERF: the canopy is fill-bound, not geometry-bound — ~9 large alpha-tested cards overlap per tree, so
+   *  under a canopy every pixel is shaded ~9x. Two choices buy that back (31 -> 60 fps at 1280x720, measured):
+   *    - Lambert, not Standard. Foliage gains nothing from the PBR BRDF and this is the cheaper fragment path.
+   *    - Only the outer shell is DoubleSide (it owns the silhouette); the inner core is FrontSide, which halves
+   *      its overdraw. The core is a darkening layer seen through gaps, so the culled backs are not missed.
+   *  Do not switch either back without re-measuring the under-canopy poses (spawn, kimmel, bobst). */
   const leafMat = (tex, lit) => {
-    const m = new THREE.MeshStandardMaterial({
-      map: tex, alphaTest: lit ? 0.5 : 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0,
+    const m = new THREE.MeshLambertMaterial({
+      map: tex, alphaTest: lit ? 0.5 : 0.42, side: lit ? THREE.DoubleSide : THREE.FrontSide,
       color: lit ? 0x6a9a3c : 0x38592a, emissiveMap: tex, emissive: lit ? 0x54782c : 0x2a4620,
       emissiveIntensity: lit ? 0.3 : 0.26, transparent: false,
     });
-    m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, ' + (lit ? '0.42' : '0.25') + ')); nonPerturbedNormal = normal;'); };
+    m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, ' + (lit ? '0.42' : '0.52') + ')); '); };
     m.customProgramCacheKey = () => 'wsp-leaf-' + (lit ? 'o' : 'i');
     return m;
   };

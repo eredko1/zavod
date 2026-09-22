@@ -80,9 +80,9 @@ export function leafTexture(R, { hue = 95 } = {}) {
   for (let i = 0; i < 900; i++) {
     const ang = R() * Math.PI * 2, d = Math.pow(R(), 0.6) * S * 0.46;
     const x = S / 2 + Math.cos(ang) * d, y = S / 2 + Math.sin(ang) * d * 0.95;
-    const depth = d / (S * 0.46); leaf(x, y, rnd(R, 14, 30), R() * 6.3, rnd(R, 20, 36) + (1 - depth) * -5);
+    const depth = d / (S * 0.46); leaf(x, y, rnd(R, 14, 30), R() * 6.3, rnd(R, 29, 45) + (1 - depth) * -5);
   }
-  for (let i = 0; i < 260; i++) { const ang = R() * 6.3, d = Math.pow(R(), 0.5) * S * 0.42; leaf(S / 2 + Math.cos(ang) * d, S / 2 + Math.sin(ang) * d, rnd(R, 12, 22), R() * 6.3, rnd(R, 30, 44)); }
+  for (let i = 0; i < 260; i++) { const ang = R() * 6.3, d = Math.pow(R(), 0.5) * S * 0.42; leaf(S / 2 + Math.cos(ang) * d, S / 2 + Math.sin(ang) * d, rnd(R, 12, 22), R() * 6.3, rnd(R, 38, 53)); }
   // sky holes: punch gaps so the canopy shadow breaks into dapple instead of one solid blob
   g.globalCompositeOperation = 'destination-out';
   for (let i = 0; i < 46; i++) {
