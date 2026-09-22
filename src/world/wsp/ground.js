@@ -1,4 +1,4 @@
-// WSP ground: one fine grid mesh (1 m cells) over the core with a painted mask blending lawn / hex pavers / asphalt / sidewalk / rubber / gravel;
+// CITY SQUARE ground: one fine grid mesh (1 m cells) over the core with a painted mask blending lawn / hex pavers / asphalt / sidewalk / rubber / gravel;
 // mounds + the sunken fountain pit come from W.groundHeight (also used by player + AI). Fountain steps, basin, water. WSP agent.
 import * as THREE from 'three';
 import { CORE, PARK, STREETS, FOUNTAIN, PATHS, PAVED_RECTS, MOUNDS, CIRCLES, PLAY_NE, PLAY_NW, DOG_L, DOG_S, BUILDINGS } from './layout.js';
@@ -32,7 +32,7 @@ export function buildGround(world, T) {
     m.rect('b', CORE.x0, CORE.z0, CORE.x1, PARK.z0); m.rect('b', CORE.x0, PARK.z1, CORE.x1, CORE.z1);
     m.rect('b', CORE.x0, CORE.z0, PARK.x0, CORE.z1); m.rect('b', PARK.x1, CORE.z0, CORE.x1, CORE.z1);
     for (const s of STREETS) { if (s.axis === 'x') m.rect('g', s.a0, s.r0, s.a1, s.r1); else m.rect('g', s.r0, s.a0, s.r1, s.a1); }
-    // Bobst raised plaza + Schwartz plaza + Gould plaza are paved (hex/granite)
+    // the library raised plaza + the two side plazas are paved (hex/granite)
     m.rect('r', 64, 83, 134, 89); m.rect('r', 128, 86, 146, 160); m.rect('r', 140, 83, 150, 89);
     // park: paths + plazas
     for (const p of PATHS) m.path('r', p.pts, p.w);
@@ -44,7 +44,7 @@ export function buildGround(world, T) {
     for (const p of [PLAY_NE, PLAY_NW]) { m.rect('r', p.x0, p.z0, p.x1, p.z1); m.rect('g', p.x0, p.z0, p.x1, p.z1); }
     for (const d of [DOG_L, DOG_S]) { m.rect('r', d.x0, d.z0, d.x1, d.z1); m.rect('b', d.x0, d.z0, d.x1, d.z1); }
     m.g.globalCompositeOperation = 'source-over';
-    // tree pits along the outer sidewalks are drawn later as meshes; lawn strips on LaGuardia median
+    // tree pits along the outer sidewalks are drawn later as meshes; lawn strips on the College Place median
     m.rect('k', 57.5, 88, 59.5, 150);
   });
 
@@ -126,7 +126,7 @@ export function buildGround(world, T) {
 
   // ---- fountain: sunken granite plaza (3 step rings, 1.05 m), basin, central plinth, jets + mist -------------------
   const floorTex = graniteTexture(R, { tone: 141, slabs: [2, 2], joint: 4 });      // 512 px = 2.4 m → 1.2 m slabs, #8d8d88
-  const granMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.7, metalness: 0.0, color: 0x9d9d99, side: THREE.DoubleSide });
+  const granMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.72, metalness: 0.0, color: 0x84847e, side: THREE.DoubleSide });
   const parts = [];
   const ring = (r0, r1, y) => { const g = new THREE.RingGeometry(r0, r1, 96, 1); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); worldUV(g, 2.4); parts.push(g); };
   const wall = (r, y0, y1) => { const g = new THREE.CylinderGeometry(r, r, y1 - y0, 96, 1, true); g.translate(0, (y0 + y1) / 2, 0); worldUV(g, 2.4); parts.push(g); };
@@ -134,28 +134,33 @@ export function buildGround(world, T) {
   for (let i = 0; i < F.steps; i++) { const r0 = F.r + i * F.tread, y = F.floor + F.rise * (i + 1); wall(r0, y - F.rise, y); ring(r0, r0 + F.tread, y); }
   ring(F.r + F.steps * F.tread, F.coping, 0.02); // coping band at grade
   wall(F.coping, -0.3, 0.02);
+  // scribed concentric joint rings across the sunken floor (the ref plaza is set out in circles, not a plain slab field)
+  const jointG = [];
+  for (let r0 = 2.2; r0 < F.r - 0.3; r0 += 1.55) { const rg = new THREE.RingGeometry(r0, r0 + 0.05, 96, 1); rg.rotateX(-Math.PI / 2); rg.translate(0, F.floor + 0.012, 0); jointG.push(rg); }
+  { const jm = new THREE.Mesh(mergeGeos(jointG), new THREE.MeshStandardMaterial({ color: 0x585853, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    jm.name = 'fountainJoints'; jm.receiveShadow = true; scene.add(jm); }
   const fm = new THREE.Mesh(mergeGeos(parts), granMat); fm.name = 'fountainSteps'; fm.receiveShadow = true; fm.castShadow = true; fm.userData.surface = 'concrete'; scene.add(fm); ctx.raycastTargets.push(fm);
   // step ring colliders: 48 tangential AABB segments per ring (step-up ≤ 0.45 m keeps them walkable); groundHeight mirrors them for the player/AI floor
   for (let i = 0; i < F.steps; i++) { const r0 = F.r + i * F.tread, r1 = r0 + F.tread, top = F.floor + F.rise * (i + 1); const n = 48; for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; const xs = [Math.cos(a0) * r0, Math.cos(a1) * r0, Math.cos(a0) * r1, Math.cos(a1) * r1], zs = [Math.sin(a0) * r0, Math.sin(a1) * r0, Math.sin(a0) * r1, Math.sin(a1) * r1]; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(Math.min(...xs), F.floor - 0.2, Math.min(...zs)), new THREE.Vector3(Math.max(...xs), top, Math.max(...zs)))); } }
   // basin: granite rim r 4.2 (0.45 high, 0.5 wide), water inside, raised dark-granite plinth r 2 in the centre
-  const rimMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.65, color: 0xb5b3ad });
+  const rimMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.66, color: 0x93918a });
   const rimG = new THREE.RingGeometry(F.basinR, F.basinR + 0.5, 64); rimG.rotateX(-Math.PI / 2); rimG.translate(0, F.floor + F.basinH, 0); worldUV(rimG, 2.4);
   const rimW = new THREE.CylinderGeometry(F.basinR + 0.5, F.basinR + 0.5, F.basinH, 64, 1, true); rimW.translate(0, F.floor + F.basinH / 2, 0); worldUV(rimW, 2.4);
   const rimIn = new THREE.CylinderGeometry(F.basinR, F.basinR, F.basinH, 64, 1, true); rimIn.translate(0, F.floor + F.basinH / 2, 0); worldUV(rimIn, 2.4);
   const rim = new THREE.Mesh(mergeGeos([rimG, rimW, rimIn]), rimMat); rim.material.side = THREE.DoubleSide; rim.castShadow = rim.receiveShadow = true; rim.userData.surface = 'concrete'; scene.add(rim); ctx.raycastTargets.push(rim);
   { const n = 32; for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; const r0 = F.basinR - 0.05, r1 = F.basinR + 0.5; const xs = [Math.cos(a0) * r0, Math.cos(a1) * r0, Math.cos(a0) * r1, Math.cos(a1) * r1], zs = [Math.sin(a0) * r0, Math.sin(a1) * r0, Math.sin(a0) * r1, Math.sin(a1) * r1]; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(Math.min(...xs), F.floor - 0.1, Math.min(...zs)), new THREE.Vector3(Math.max(...xs), F.floor + F.basinH, Math.max(...zs)))); } }
-  const plinthMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75, color: 0x7c7c78 });
+  const plinthMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.78, color: 0x6b6b66 });
   const plinth = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR, F.plinthR + 0.25, F.plinthH, 48), plinthMat); plinth.position.y = F.floor + F.plinthH / 2; plinth.castShadow = plinth.receiveShadow = true; plinth.userData.surface = 'concrete'; scene.add(plinth); ctx.raycastTargets.push(plinth);
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR + 0.2, F.plinthR + 0.2, 0.12, 48), plinthMat); cap.position.y = F.floor + F.plinthH + 0.06; cap.castShadow = true; scene.add(cap);
   ctx.colliders.push(new THREE.Box3(new THREE.Vector3(-F.plinthR - 0.25, F.floor - 0.1, -F.plinthR - 0.25), new THREE.Vector3(F.plinthR + 0.25, F.floor + F.plinthH + 0.12, F.plinthR + 0.25)));
-  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x3d6d7c, roughness: 0.05, metalness: 0.0, transparent: true, opacity: 0.88, envMapIntensity: 1.5, clearcoat: 1, clearcoatRoughness: 0.03 });
+  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x415e60, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.8, envMapIntensity: 1.2, clearcoat: 1, clearcoatRoughness: 0.04 });
   const water = new THREE.Mesh(new THREE.RingGeometry(F.plinthR + 0.1, F.basinR, 64), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = F.floor + 0.32; water.name = 'water'; water.userData.surface = 'water'; scene.add(water); ctx.raycastTargets.push(water);
   // jets: translucent tapered columns (additive, alpha-blended) from the plinth top and a ring of 12 on the basin floor, plus mist quads near the tops
-  const jetTex = jetColumnTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: jetTex, color: 0xdfeef6, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
+  const jetTex = jetColumnTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: jetTex, color: 0xd6e6ef, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
   const jgeos = [];
   const jet = (x, z, y0, h, r) => { const g = new THREE.CylinderGeometry(r * 0.35, r, h, 12, 1, true); g.translate(0, h / 2, 0); g.translate(x, y0, z); jgeos.push(g); const cone = new THREE.CylinderGeometry(0.02, r * 0.9, h * 1.15, 10, 1, true); cone.translate(0, h * 1.15 / 2, 0); cone.translate(x, y0, z); jgeos.push(cone); };
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; jet(Math.cos(a) * 3.3, Math.sin(a) * 3.3, F.floor + 0.3, 2.6, 0.22); }
-  jet(0, 0, F.floor + F.plinthH + 0.1, 7.5, 0.55); jet(0.3, 0.2, F.floor + F.plinthH + 0.1, 5.5, 0.35); jet(-0.3, -0.2, F.floor + F.plinthH + 0.1, 4.8, 0.3);
+  jet(0, 0, F.floor + F.plinthH + 0.1, 7.0, 0.34); jet(0.35, 0.22, F.floor + F.plinthH + 0.1, 5.2, 0.22); jet(-0.35, -0.22, F.floor + F.plinthH + 0.1, 4.4, 0.19);
   const jetsMesh = new THREE.Mesh(mergeGeos(jgeos), jetMat); jetsMesh.name = 'jets'; jetsMesh.renderOrder = 5; scene.add(jetsMesh);
   const mistTex = mistTexture(); const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, fog: true });
   const mistG = [];
@@ -163,7 +168,7 @@ export function buildGround(world, T) {
   mist(0, F.floor + F.plinthH + 6.8, 0, 4.5); mist(0, F.floor + F.plinthH + 4.6, 0, 3.2); mist(0, F.floor + 1.4, 0, 6.5);
   const mistMesh = new THREE.Mesh(mergeGeos(mistG), mistMat); mistMesh.name = 'mist'; mistMesh.renderOrder = 6; scene.add(mistMesh);
   let t = 0;
-  world.updaters.push((dt) => { t += dt; jetsMesh.scale.y = 1 + Math.sin(t * 2.3) * 0.05; jetMat.opacity = 0.46 + Math.sin(t * 3.1) * 0.06; mistMat.opacity = 0.3 + Math.sin(t * 1.7) * 0.07; mistMesh.rotation.y = t * 0.15; });
+  world.updaters.push((dt) => { t += dt; jetsMesh.scale.y = 1 + Math.sin(t * 2.3) * 0.05; jetMat.opacity = 0.3 + Math.sin(t * 3.1) * 0.05; mistMat.opacity = 0.3 + Math.sin(t * 1.7) * 0.07; mistMesh.rotation.y = t * 0.15; });
 
   return ground;
 }

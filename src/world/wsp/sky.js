@@ -1,4 +1,4 @@
-// WSP sky: Poly Haven urban_street_04 (2k) as background + PMREM env (sun disc clamped), late-morning sun from the SE with a 4096 shadow map. WSP agent.
+// CITY SQUARE sky: Poly Haven (2k) as background + PMREM env (sun disc clamped), late-morning sun from the SE with a 4096 shadow map. WSP agent.
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
@@ -13,7 +13,7 @@ export function buildSky(world) {
   renderer.toneMappingExposure = 0.95;
   const sunDir = new THREE.Vector3(Math.cos(SUN_EL) * Math.cos(SUN_AZ), Math.sin(SUN_EL), Math.cos(SUN_EL) * Math.sin(SUN_AZ));
   scene.background = FOG_COLOR.clone();
-  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0022);
+  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0025);
 
   const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6b6a5e, 0.7); scene.add(hemi); ctx.lights.hemi = hemi;
   const sun = new THREE.DirectionalLight(0xfff0d8, 5.5);

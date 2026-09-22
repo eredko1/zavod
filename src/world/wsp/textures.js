@@ -1,4 +1,4 @@
-// WSP procedural + loaded textures. WSP agent.
+// CITY SQUARE procedural + loaded textures. WSP agent.
 import * as THREE from 'three';
 
 const loader = new THREE.TextureLoader();
@@ -83,6 +83,15 @@ export function leafTexture(R, { hue = 95 } = {}) {
     const depth = d / (S * 0.46); leaf(x, y, rnd(R, 14, 30), R() * 6.3, rnd(R, 20, 36) + (1 - depth) * -5);
   }
   for (let i = 0; i < 260; i++) { const ang = R() * 6.3, d = Math.pow(R(), 0.5) * S * 0.42; leaf(S / 2 + Math.cos(ang) * d, S / 2 + Math.sin(ang) * d, rnd(R, 12, 22), R() * 6.3, rnd(R, 30, 44)); }
+  // sky holes: punch gaps so the canopy shadow breaks into dapple instead of one solid blob
+  g.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 46; i++) {
+    const ang = R() * 6.3, d = Math.pow(R(), 0.55) * S * 0.44, r = rnd(R, 9, 34);
+    const x = S / 2 + Math.cos(ang) * d, y = S / 2 + Math.sin(ang) * d;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.65, 'rgba(0,0,0,0.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
   const t = finish(c, { wrap: false }); return t;
 }
 
@@ -115,7 +124,7 @@ export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {})
     g.fillStyle = P.wall2; for (let y = 0; y < S; y += 4) for (let x = ((y / 4) & 1) * 5; x < S; x += 10) if (R() < 0.5) g.fillRect(x, y, 4, 2);
     g.fillStyle = 'rgba(0,0,0,0.10)'; for (let y = 0; y < S; y += 4) g.fillRect(0, y, S, 1);
   } else if (style === 'sandstone') {
-    // Bobst: strong vertical piers + horizontal bands (grid of red sandstone)
+    // library: strong vertical piers + horizontal bands (grid of red sandstone)
     g.fillStyle = P.wall2; for (let y = 0; y < S; y += 3) g.fillRect(0, y, S, 1);
   } else if (style === 'stone' || style === 'white') {
     g.fillStyle = 'rgba(0,0,0,0.10)'; for (let y = 0; y < S; y += 32) g.fillRect(0, y, S, 2); for (let x = 0; x < S; x += 64) g.fillRect(x, 0, 2, S);
@@ -143,7 +152,7 @@ export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {})
     if (style === 'glass') { g.fillStyle = '#b9bcbf'; g.fillRect(x0, y0 + fh * 0.72, bw, fh * 0.28); g.fillStyle = '#8e9296'; g.fillRect(x0, y0, 4, fh); g.fillRect(x0 + bw / 2 - 1, y0, 2, fh * 0.72); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x0, y0 + fh * 0.72, bw, 3); continue; }
     if (style === 'sandstone') {
       // deep-set narrow window in a grid: pier | window | pier
-      // Bobst: two narrow slot windows per bay between deep sandstone piers, spandrel band
+      // library: two narrow slot windows per bay between deep sandstone piers, spandrel band
       g.fillStyle = P.trim; g.fillRect(x0, y0, bw, 10); g.fillRect(x0, y0, 12, fh); g.fillRect(x0 + bw / 2 - 5, y0, 10, fh);
       for (const sx of [0.16, 0.6]) { const wx = x0 + bw * sx, ww = bw * 0.24; g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(wx - 3, y0 + 10, ww + 6, fh - 10); g.fillStyle = P.glass; g.fillRect(wx, y0 + 14, ww, fh - 18); g.fillStyle = 'rgba(120,150,170,0.25)'; g.fillRect(wx, y0 + 14, ww, (fh - 18) * 0.4); }
       continue;
@@ -165,7 +174,7 @@ export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {})
   return finish(c);
 }
 
-/** Storefront strip (ground floor of a MacDougal / W 3rd block): 1024×256 = 4 shops × 6 m, 4.2 m tall. */
+/** Storefront strip (ground floor of a village shopping block): 1024×256 = 4 shops × 6 m, 4.2 m tall. */
 export function storefrontTexture(R) {
   const W = 1024, H = 256; const [c, g] = canvas(W, H);
   const names = ['CAFFE', 'FALAFEL', 'BOOKS', 'PIZZA', 'RECORDS', 'ESPRESSO', 'COMEDY', 'NOODLES', 'TATTOO', 'BAR', 'BAGELS', 'VINTAGE'];
@@ -247,7 +256,7 @@ export function makeMask(area, px, draw) {
   return t;
 }
 
-/** Tuckahoe-marble canvas: near-white warm grey with faint veins and weathering (512 px ≈ 2.4 m). */
+/** Arch marble canvas: near-white warm grey with faint veins and weathering (512 px ≈ 2.4 m). */
 export function marbleTexture(R) {
   const S = 512; const [c, g] = canvas(S, S);
   g.fillStyle = '#e6e2d9'; g.fillRect(0, 0, S, S);

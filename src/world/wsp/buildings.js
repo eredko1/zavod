@@ -1,8 +1,9 @@
-// WSP surrounding blocks: OSM building footprints as textured boxes merged per style, ground-floor storefronts/doors/awnings,
-// The Row's Greek-Revival stoops, Judson campanile, One Fifth Avenue setbacks, Bobst raised plaza, fire-escape ladders to two roofs. WSP agent.
+// CITY SQUARE surrounding blocks: measured building footprints as textured boxes merged per style, ground-floor storefronts/doors/awnings,
+// Greek-Revival stoops on the terrace rows, the chapel campanile, the avenue tower setbacks, the library's raised plaza, fire-escape ladders to two roofs. WSP agent.
 import * as THREE from 'three';
 import { BUILDINGS, BOUNDS, STREETS } from './layout.js';
 import { facadeTexture, storefrontTexture } from './textures.js';
+import { gravelTexture } from './arch.js';
 import { mergeGeos } from './ground.js';
 
 const FLOOR_H = 3.3, BAY_W = 3.6;
@@ -26,10 +27,11 @@ export function buildBuildings(world, T) {
   const push = (st, geo) => (groups[st] || (groups[st] = [])).push(geo);
   const box3 = (x0, y0, z0, x1, y1, z1) => new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));
 
+  const rooftop = { parapet: [], coping: [], tank: [], frame: [], hvac: [], bulk: [], vent: [] };
   for (const B of BUILDINGS) {
     const { x0, x1, z0, z1, h, style } = B;
     if (B.setbacks) {
-      // One Fifth Avenue: 3 setbacks + crown (Art Deco)
+      // avenue tower: 3 setbacks + crown (Art Deco)
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
       const tiers = [[w, d, 0, 30], [w * 0.78, d * 0.8, 30, 58], [w * 0.5, d * 0.55, 58, 85], [w * 0.22, d * 0.25, 85, 92]];
       for (const [tw, td, ya, yb] of tiers) { push(style, facadeBox(cx - tw / 2, cx + tw / 2, cz - td / 2, cz + td / 2, ya, yb)); roofs.push(roofGeo(cx - tw / 2, cx + tw / 2, cz - td / 2, cz + td / 2, yb)); }
@@ -38,6 +40,7 @@ export function buildBuildings(world, T) {
     }
     push(style, facadeBox(x0, x1, z0, z1, 0, h, 4 * BAY_W, style === 'row' ? 17.2 : style === 'sandstone' ? 4 * 3.6 : style === 'church' ? 20 : 4 * FLOOR_H));
     roofs.push(roofGeo(x0, x1, z0, z1, h));
+    dressRoof(B, rooftop, R);
     // parapet / cornice ledge
     push(style, cornice(x0, x1, z0, z1, h));
     ctx.colliders.push(box3(x0, 0, z0, x1, h, z1));
@@ -77,7 +80,17 @@ export function buildBuildings(world, T) {
     if (st === 'brick' || st === 'row') { mat.normalMap = T.brickN; mat.normalScale = new THREE.Vector2(0.4, 0.4); }
     solidMesh(groups[st], mat, 'bld_' + st);
   }
-  solidMesh(roofs, new THREE.MeshStandardMaterial({ color: 0x5a5753, roughness: 0.95 }), 'roofs');
+  const gravel = gravelTexture(R);
+  solidMesh(roofs, new THREE.MeshStandardMaterial({ map: gravel, color: 0x5a5652, roughness: 1.0, metalness: 0 }), 'roofs');
+  // rooftops: parapet + coping on every block, then water tanks / HVAC / bulkheads on the big low roofs
+  const parMat = new THREE.MeshStandardMaterial({ map: gravel, color: 0x6a655e, roughness: 0.98 });
+  solidMesh(rooftop.parapet, parMat, 'roofParapets');
+  solidMesh(rooftop.coping, new THREE.MeshStandardMaterial({ color: 0x8e887e, roughness: 0.8 }), 'roofCoping');
+  solidMesh(rooftop.tank, new THREE.MeshStandardMaterial({ color: 0x5f4634, roughness: 0.95 }), 'waterTanks', 'wood');
+  solidMesh(rooftop.frame, new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.65, metalness: 0.6 }), 'tankFrames', 'metal');
+  solidMesh(rooftop.hvac, new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.5, metalness: 0.65 }), 'roofHVAC', 'metal');
+  solidMesh(rooftop.bulk, new THREE.MeshStandardMaterial({ color: 0x7b6a5c, roughness: 0.92 }), 'roofBulkheads');
+  solidMesh(rooftop.vent, new THREE.MeshStandardMaterial({ color: 0x3f4448, roughness: 0.6, metalness: 0.5 }), 'roofVents', 'metal');
   solidMesh(doors, new THREE.MeshStandardMaterial({ color: 0x1d1c1a, roughness: 0.6, metalness: 0.2 }), 'doors', 'wood', false);
   const sf = new THREE.MeshStandardMaterial({ map: storefrontTexture(R), roughness: 0.4, metalness: 0.1 });
   solidMesh(glassG, sf, 'storefronts', 'metal', false);
@@ -86,11 +99,53 @@ export function buildBuildings(world, T) {
   solidMesh(stoopStone, new THREE.MeshStandardMaterial({ color: 0xd8d2c4, roughness: 0.75 }), 'stoops');
   solidMesh(iron, new THREE.MeshStandardMaterial({ color: 0x141516, roughness: 0.5, metalness: 0.7 }), 'ironwork', 'metal');
 
-  buildJudsonTower(world);
-  buildBobstPlaza(world, T);
+  buildCampanile(world);
+  buildLibraryPlaza(world, T);
   buildRoofLadders(world);
   buildStreetEnds(world);
   buildBackdrop(world, styleTex);
+}
+
+/** Tar roofs read as bare planes from the arch attic: give each one a 0.6 m parapet with coping, a cedar water tank on a
+ *  steel frame, a stair bulkhead and 2-4 HVAC boxes. Everything merges into a handful of meshes. */
+function dressRoof(B, out, R) {
+  const { x0, x1, z0, z1, h } = B; const w = x1 - x0, d = z1 - z0;
+  if (w < 6 || d < 6) return;
+  const PH = 0.6, PT = 0.32;
+  const bar = (ax0, az0, ax1, az1) => { const g = new THREE.BoxGeometry(ax1 - ax0, PH, az1 - az0); g.translate((ax0 + ax1) / 2, h + PH / 2, (az0 + az1) / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (ax1 - ax0) / 4, uv.getY(i) * 0.2); out.parapet.push(g); };
+  bar(x0, z0, x1, z0 + PT); bar(x0, z1 - PT, x1, z1); bar(x0, z0 + PT, x0 + PT, z1 - PT); bar(x1 - PT, z0 + PT, x1, z1 - PT);
+  const cap = (ax0, az0, ax1, az1) => { const g = new THREE.BoxGeometry(ax1 - ax0, 0.1, az1 - az0); g.translate((ax0 + ax1) / 2, h + PH + 0.05, (az0 + az1) / 2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.01, 0.01); out.coping.push(g); };
+  cap(x0 - 0.08, z0 - 0.08, x1 + 0.08, z0 + PT + 0.08); cap(x0 - 0.08, z1 - PT - 0.08, x1 + 0.08, z1 + 0.08);
+  cap(x0 - 0.08, z0 + PT, x0 + PT + 0.08, z1 - PT); cap(x1 - PT - 0.08, z0 + PT, x1 + 0.08, z1 - PT);
+  if (w * d < 260) return;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const at = (fx, fz) => [x0 + 2.4 + fx * (w - 4.8), z0 + 2.4 + fz * (d - 4.8)];
+  // cedar water tank on a steel frame, conical cap
+  { const [tx, tz] = at(0.22 + R() * 0.14, 0.24 + R() * 0.5);
+    const legH = 2.2, tankH = 3.4, r = 1.25;
+    const body = new THREE.CylinderGeometry(r, r * 1.04, tankH, 14); body.translate(tx, h + legH + tankH / 2, tz); out.tank.push(body);
+    const conic = new THREE.ConeGeometry(r * 1.12, 1.15, 14); conic.translate(tx, h + legH + tankH + 0.55, tz); out.tank.push(conic);
+    for (const hoopY of [0.5, tankH - 0.5]) { const hp = new THREE.TorusGeometry(r * 1.02, 0.05, 5, 16); hp.rotateX(Math.PI / 2); hp.translate(tx, h + legH + hoopY, tz); out.frame.push(hp); }
+    for (const [lx, lz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) { const lg = new THREE.BoxGeometry(0.13, legH, 0.13); lg.translate(tx + lx, h + legH / 2, tz + lz); out.frame.push(lg); }
+    const plat = new THREE.BoxGeometry(2.4, 0.12, 2.4); plat.translate(tx, h + legH, tz); out.frame.push(plat);
+    const pipe = new THREE.CylinderGeometry(0.09, 0.09, legH + 1.2, 7); pipe.translate(tx + r * 0.9, h + (legH + 1.2) / 2, tz); out.frame.push(pipe);
+  }
+  // stair bulkhead with a sloped roof
+  { const [bx, bz] = at(0.72, 0.3 + R() * 0.3);
+    const bb = new THREE.BoxGeometry(3.2, 2.6, 2.6); bb.translate(bx, h + 1.3, bz); out.bulk.push(bb);
+    const br = new THREE.BoxGeometry(3.6, 0.22, 3.0); br.rotateX(0.14); br.translate(bx, h + 2.68, bz); out.bulk.push(br);
+    const dr = new THREE.BoxGeometry(0.12, 2.0, 1.0); dr.translate(bx - 1.6, h + 1.0, bz); out.vent.push(dr);
+  }
+  // 2-4 HVAC boxes + a few vent stacks
+  const n = 2 + ((R() * 3) | 0);
+  for (let i = 0; i < n; i++) {
+    const [hx, hz] = at(0.3 + R() * 0.55, 0.15 + R() * 0.7);
+    const bw = 1.4 + R() * 1.6, bd = 1.0 + R() * 1.2, bh = 0.8 + R() * 0.8;
+    const bx2 = new THREE.BoxGeometry(bw, bh, bd); bx2.translate(hx, h + bh / 2 + 0.12, hz); out.hvac.push(bx2);
+    const skid = new THREE.BoxGeometry(bw + 0.2, 0.12, bd + 0.2); skid.translate(hx, h + 0.06, hz); out.vent.push(skid);
+    if (R() < 0.6) { const fan = new THREE.CylinderGeometry(bd * 0.32, bd * 0.32, 0.22, 10); fan.translate(hx, h + bh + 0.22, hz); out.hvac.push(fan); }
+  }
+  for (let i = 0; i < 3; i++) { const [vx, vz] = at(R(), R()); const st = new THREE.CylinderGeometry(0.13, 0.15, 1.1 + R() * 0.9, 8); st.translate(vx, h + 0.7, vz); out.vent.push(st); }
 }
 
 function roofGeo(x0, x1, z0, z1, y) { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, y + 0.02, (z0 + z1) / 2); return g; }
@@ -133,8 +188,8 @@ function buildStoops(B, stone, iron, doors, ctx) {
   }
 }
 
-/** Judson Memorial Church campanile (≈ 40 m, yellow brick, open belfry, pyramid roof) at the church's NE corner. */
-function buildJudsonTower(world) {
+/** Memorial Chapel campanile (≈ 40 m, yellow brick, open belfry, pyramid roof) at the church's NE corner. */
+function buildCampanile(world) {
   const { ctx, scene } = world;
   const mat = new THREE.MeshStandardMaterial({ map: facadeTexture(world.R, 'church', { bays: 2 }), roughness: 0.85 }); mat.map.repeat.set(1, 1);
   const cx = -18.5, cz = 91, w = 7.5;
@@ -149,8 +204,8 @@ function buildJudsonTower(world) {
   const gable = new THREE.Mesh(new THREE.BoxGeometry(18, 3.2, 26), new THREE.MeshStandardMaterial({ color: 0x7a5a48, roughness: 0.9 })); gable.position.set(-31, 21.5, 103); gable.scale.set(1, 1, 1); scene.add(gable); gable.castShadow = true;
 }
 
-/** Bobst Library forecourt: raised granite plaza (0.9 m) with steps down to Washington Sq S, planters as cover. */
-function buildBobstPlaza(world, T) {
+/** Central Library forecourt: raised granite plaza (0.9 m) with steps down to Park Row South, planters as cover. */
+function buildLibraryPlaza(world, T) {
   const { ctx, scene } = world;
   const mat = new THREE.MeshStandardMaterial({ map: world.tex.granite, roughness: 0.7, color: 0xb0aaa0 });
   const x0 = 72, x1 = 126, z0 = 83.2, z1 = 89;
@@ -163,10 +218,10 @@ function buildBobstPlaza(world, T) {
   world.cover(x0 + 15, z0 - 1.6, 0, -1); world.cover(x1 - 15, z0 - 1.6, 0, -1);
 }
 
-/** Fire-escape ladders onto two low roofs: Washington Mews south row (7.2 m) and the MacDougal Alley studios (10 m). */
+/** Fire-escape ladders onto two low roofs: the Carriage Mews south row (7.2 m) and the Lantern Alley studios (10 m). */
 function buildRoofLadders(world) {
   const { ctx } = world;
-  const mews = BUILDINGS.find(b => b.id === 'mewsS'), alley = BUILDINGS.find(b => b.id === 'alleyN');
+  const mews = BUILDINGS.find(b => b.id === 'mewsSouth'), alley = BUILDINGS.find(b => b.id === 'alleyStudios');
   const roofOf = (B, parapet = 0.5) => {
     world.walkable([B.x0, B.h - 0.5, B.z0], [B.x1, B.h, B.z1]);
     for (const [a, b] of [[[B.x0, B.z0], [B.x1, B.z0 + 0.3]], [[B.x0, B.z1 - 0.3], [B.x1, B.z1]], [[B.x0, B.z0], [B.x0 + 0.3, B.z1]], [[B.x1 - 0.3, B.z0], [B.x1, B.z1]]])
@@ -179,8 +234,8 @@ function buildRoofLadders(world) {
     world.cover(cx - 6, cz - 2.2, 0, -1, B.h); world.cover(cx - 6, cz + 2.2, 0, 1, B.h); world.cover(cx + 8, cz - 2.2, 0, -1, B.h); world.cover(cx + 8, cz + 2.2, 0, 1, B.h);
     world.cover(cx, B.z0 + 0.9, 0, 1, B.h); world.cover(cx, B.z1 - 0.9, 0, -1, B.h);
   };
-  if (mews) { world.ladder(mews.x0 + 30, mews.z0 - 0.05, 0, mews.h, 0, -1); roofOf(mews); }     // from Washington Mews (north side of the row)
-  if (alley) { world.ladder(alley.x0 + 20, alley.z1 + 0.05, 0, alley.h, 0, 1); roofOf(alley); }  // from MacDougal Alley (south face)
+  if (mews) { world.ladder(mews.x0 + 30, mews.z0 - 0.05, 0, mews.h, 0, -1); roofOf(mews); }     // from the mews (north side of the row)
+  if (alley) { world.ladder(alley.x0 + 20, alley.z1 + 0.05, 0, alley.h, 0, 1); roofOf(alley); }  // from the alley (south face)
 }
 
 /** Street ends at the playable bounds: police barriers + parked box trucks close the perimeter; colliders. */
@@ -188,7 +243,7 @@ function buildStreetEnds(world) {
   const { ctx, scene } = world;
   const barMat = new THREE.MeshStandardMaterial({ color: 0x2d4a8a, roughness: 0.7 });
   const geos = [];
-  const bar = (x, z, along) => { // NYPD-style blue sawhorse barrier 2.4 m
+  const bar = (x, z, along) => { // blue sawhorse police barrier 2.4 m
     const top = new THREE.BoxGeometry(along ? 2.4 : 0.12, 0.12, along ? 0.12 : 2.4); top.translate(x, 1.05, z); geos.push(top);
     const mid = new THREE.BoxGeometry(along ? 2.4 : 0.12, 0.35, along ? 0.12 : 2.4); mid.translate(x, 0.55, z); geos.push(mid);
     for (const s of [-1, 1]) { const leg = new THREE.BoxGeometry(along ? 0.08 : 0.9, 1.1, along ? 0.9 : 0.08); leg.translate(x + (along ? s * 1.1 : 0), 0.55, z + (along ? 0 : s * 1.1)); geos.push(leg); }
@@ -201,20 +256,27 @@ function buildStreetEnds(world) {
   const m = new THREE.Mesh(mergeGeos(geos), barMat); m.name = 'barriers'; m.castShadow = true; m.userData.surface = 'wood'; scene.add(m); ctx.raycastTargets.push(m);
 }
 
-/** Distant blocks beyond the playable bounds (no colliders): the Village continues, Fifth Avenue runs north to a Midtown skyline. */
+/** Distant blocks beyond the playable bounds (no colliders): the district continues, the avenue runs north to a downtown skyline. */
 function buildBackdrop(world, styleTex) {
   const { scene, R } = world; const geos = {}; const push = (st, g) => (geos[st] || (geos[st] = [])).push(g);
   const roofs = [];
-  const blk = (x0, x1, z0, z1, h, st) => { push(st, facadeBox(x0, x1, z0, z1, 0, h)); roofs.push(roofGeo(x0, x1, z0, z1, h)); };
+  const parapets = [];
+  const blk = (x0, x1, z0, z1, h, st) => {
+    push(st, facadeBox(x0, x1, z0, z1, 0, h)); roofs.push(roofGeo(x0, x1, z0, z1, h));
+    // a 1 m parapet band caps every distant block so the skyline has a cut top edge, not a bare extrusion
+    const p = new THREE.BoxGeometry(x1 - x0 + 0.7, 1.0, z1 - z0 + 0.7); p.translate((x0 + x1) / 2, h + 0.5, (z0 + z1) / 2);
+    const uv = p.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.01, 0.01); parapets.push(p);
+  };
   const styles = ['brick', 'tan', 'brick', 'stone', 'brick', 'white'];
-  // Fifth Avenue north: 3 more blocks each side, 8th → 11th St
+  // avenue north: 3 more blocks each side
   for (let z = -190; z > -520; z -= 70) for (const [x0, x1] of [[-90, -16], [14, 90]]) blk(x0, x1, z - 60, z, 20 + R() * 40, styles[(R() * styles.length) | 0]);
   // ring of blocks outside the bounds (north, south, east, west)
   for (let x = -600; x < 600; x += 60) { if (x > -100 && x < 100) continue; blk(x, x + 55, -260, -190, 18 + R() * 30, styles[(R() * 6) | 0]); blk(x, x + 55, 210, 280, 18 + R() * 30, styles[(R() * 6) | 0]); }
   for (let z = -260; z < 280; z += 60) { blk(-330, -260, z, z + 55, 18 + R() * 35, styles[(R() * 6) | 0]); blk(240, 310, z, z + 55, 18 + R() * 35, styles[(R() * 6) | 0]); }
-  // Midtown skyline far up Fifth Avenue (scaled down for fog): Empire State on the axis, a few slabs
+  // distant skyline far up the avenue (scaled down for fog): a spire on the axis, a few slabs
   blk(-20, 22, -1000, -960, 130, 'stone'); blk(-10, 12, -990, -970, 175, 'stone'); blk(-3, 5, -983, -977, 205, 'stone');
   for (const [x, z, h] of [[-120, -900, 90], [90, -950, 110], [-60, -1050, 120], [160, -1000, 95], [-200, -980, 80], [40, -1100, 140]]) blk(x, x + 40, z, z + 40, h, 'glass');
   for (const st in geos) { const m = new THREE.Mesh(mergeGeos(geos[st]), new THREE.MeshStandardMaterial({ map: styleTex(st), roughness: 0.85 })); m.name = 'backdrop_' + st; m.receiveShadow = true; scene.add(m); }
-  const rm = new THREE.Mesh(mergeGeos(roofs), new THREE.MeshStandardMaterial({ color: 0x5a5753, roughness: 0.95 })); rm.name = 'backdropRoofs'; scene.add(rm);
+  const rm = new THREE.Mesh(mergeGeos(roofs), new THREE.MeshStandardMaterial({ color: 0x55514c, roughness: 0.98 })); rm.name = 'backdropRoofs'; scene.add(rm);
+  const pm = new THREE.Mesh(mergeGeos(parapets), new THREE.MeshStandardMaterial({ color: 0x7c7468, roughness: 0.9 })); pm.name = 'backdropParapets'; scene.add(pm);
 }

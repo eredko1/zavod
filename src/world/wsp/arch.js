@@ -1,4 +1,4 @@
-// Washington Square Arch: 17.4 × 7.0 × 23.5 m Tuckahoe marble, 9.1 m span, 14.3 m opening; hollow west pier with a ladder to the attic roof. WSP agent.
+// Memorial Arch: 17.4 × 7.0 × 23.5 m Tuckahoe marble, 9.1 m span, 14.3 m opening; hollow west pier with a ladder to the attic roof. WSP agent.
 import * as THREE from 'three';
 import { ARCH } from './layout.js';
 import { inscriptionTexture, friezeTexture, cofferTexture, marbleTexture } from './textures.js';
@@ -6,7 +6,8 @@ import { mergeGeos } from './ground.js';
 
 export function buildArch(world, T) {
   const { ctx, scene } = world; const A = ARCH;
-  const marble = new THREE.MeshStandardMaterial({ map: marbleTexture(world.R), normalMap: T.marbleN, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.62, metalness: 0, color: 0xffffff });
+  const marble = new THREE.MeshStandardMaterial({ map: marbleTexture(world.R), normalMap: T.marbleN, normalScale: new THREE.Vector2(0.28, 0.28), roughness: 0.72, metalness: 0, color: 0xd9d4c8 });
+  grimeShader(marble, [A.corniceY, A.atticTop + 0.7, A.baseH + 0.5, A.openH - A.span / 2 + 0.45]);
   world.marbleMat = marble;
   const g = new THREE.Group(); g.name = 'arch'; g.position.set(A.cx, 0, A.cz); scene.add(g);
   const hw = A.width / 2, hd = A.depth / 2, R = A.span / 2, springY = A.openH - R;
@@ -53,12 +54,32 @@ export function buildArch(world, T) {
     boxAt(cx, A.baseH + 0.9, -hd - 0.9, 3.4, 1.8, 1.8);
   }
   boxAt(0, A.openH + 0.6, 0, 1.2, 1.9, A.depth + 0.4);                        // keystone
-  boxAt(0, A.corniceY + 0.3, 0, A.width + 1.2, 0.6, A.depth + 1.2);           // main cornice
-  boxAt(0, A.atticTop + 0.35, 0, A.width + 0.9, 0.7, A.depth + 0.9);          // attic cornice
-  boxAt(0, A.atticTop + 1.0, 0, A.width + 0.9, 0.5, A.depth + 0.9);           // blocking course
+  // cornices: each sits 0.1 m INTO the course below it so no two caps are coplanar (that coplanarity was the magenta edge line)
+  boxAt(0, A.corniceY + 0.22, 0, A.width + 1.2, 0.72, A.depth + 1.2);         // main cornice  (bottom 17.46, top 18.18)
+  boxAt(0, A.atticTop + 0.30, 0, A.width + 0.9, 0.78, A.depth + 0.9);         // attic cornice (bottom 22.21, top 22.99)
+  // blocking course: a RING of four bars, not a solid block — a solid one caps the roof deck and reads as a bare white plane
+  { const bw = A.width + 0.94, bd = A.depth + 0.94, t = 0.55, by = A.atticTop + 0.92;
+    boxAt(0, by, -(bd - t) / 2, bw, 0.58, t); boxAt(0, by, (bd - t) / 2, bw, 0.58, t);
+    boxAt(-(bw - t) / 2, by, 0, t, 0.58, bd - 2 * t); boxAt((bw - t) / 2, by, 0, t, 0.58, bd - 2 * t); }
   const ornMesh = new THREE.Mesh(mergeGeos(ornament), marble); g.add(ornMesh); ornMesh.castShadow = ornMesh.receiveShadow = true; ornMesh.userData.surface = 'concrete'; ctx.raycastTargets.push(ornMesh);
-  // attic (inscription band) both faces + attic sides
-  const attic = new THREE.Mesh(new THREE.BoxGeometry(A.width, A.atticTop - A.corniceY - 0.6, A.depth), marble); attic.position.set(0, (A.atticTop + A.corniceY + 0.6) / 2, 0); g.add(attic); attic.castShadow = attic.receiveShadow = true; attic.userData.surface = 'concrete'; ctx.raycastTargets.push(attic);
+  // attic (inscription band) both faces + attic sides — overlaps the main cornice by 0.15 m
+  const atticH = A.atticTop - A.corniceY - 0.45;
+  const attic = new THREE.Mesh(new THREE.BoxGeometry(A.width, atticH, A.depth), marble); attic.position.set(0, A.corniceY + 0.45 + atticH / 2 - 0.08, 0); g.add(attic); attic.castShadow = attic.receiveShadow = true; attic.userData.surface = 'concrete'; ctx.raycastTargets.push(attic);
+  // ---- 0.1 m dark AO bands tucked under every projecting cornice / impost / base cap ------------------------------
+  const aoMat = new THREE.MeshStandardMaterial({ color: 0x4e4a42, roughness: 0.95, metalness: 0 });
+  const aoG = [];
+  const aoBand = (y, w, d) => { const b = new THREE.BoxGeometry(w, 0.1, d); b.translate(0, y - 0.05, 0); aoG.push(b); };
+  const aoBandAt = (x, y, w, d) => { const b = new THREE.BoxGeometry(w, 0.1, d); b.translate(x, y - 0.05, 0); aoG.push(b); };
+  aoBand(A.corniceY + 0.22 - 0.36, A.width + 1.12, A.depth + 1.12);            // under the main cornice
+  aoBand(A.atticTop + 0.30 - 0.39, A.width + 0.82, A.depth + 0.82);            // under the attic cornice
+  aoBand(A.atticTop + 0.92 - 0.29, A.width + 0.88, A.depth + 0.88);            // under the blocking course
+  for (const [x0, x1] of [[xW0, xW1], [xE0, xE1]]) {
+    const cx = (x0 + x1) / 2;
+    aoBandAt(cx, A.baseH - 0.25, A.pier + 0.28, A.depth + 0.28);               // under the base cap
+    aoBandAt(cx, springY - 0.225, A.pier + 0.22, A.depth + 0.22);              // under the impost band
+    aoBandAt(cx, 0.7 - 0.02, A.pier + 0.42, A.depth + 0.42);                   // top of the plinth (contact line)
+  }
+  const aoMesh = new THREE.Mesh(mergeGeos(aoG), aoMat); g.add(aoMesh); aoMesh.receiveShadow = true;
   const insTex = inscriptionTexture(); const insMat = new THREE.MeshStandardMaterial({ map: insTex, roughness: 0.6, color: 0xf0ebe0 });
   for (const zs of [-1, 1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(A.width - 2, 1.3), insMat); p.position.set(0, (A.atticTop + A.atticY) / 2, zs * (hd + 0.01)); p.rotation.y = zs > 0 ? 0 : Math.PI; g.add(p); }
   // frieze band (stars + W's) across both faces between the spandrels and the cornice
@@ -66,22 +87,47 @@ export function buildArch(world, T) {
   for (const zs of [-1, 1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(A.width, 1.2), frz); p.position.set(0, A.corniceY - 0.9, zs * (hd + 0.02)); p.rotation.y = zs > 0 ? 0 : Math.PI; g.add(p); }
   // spandrel medallions (wreaths) + winged-victory blocks
   for (const zs of [-1, 1]) for (const xs of [-1, 1]) {
-    const m = new THREE.TorusGeometry(0.9, 0.22, 8, 24); m.translate(xs * (hw - A.pier / 2), A.baseH + 6.5, zs * (hd + 0.15)); ornament.push(m);
-    for (const fg of figure(2.6, 0.7, 0, 0, 0)) { fg.scale(1, 1, 0.35); fg.rotateZ(xs * 0.5); fg.translate(xs * (R + 1.6), springY + 1.6, zs * (hd + 0.12)); ornament.push(fg); }   // winged victory relief
-    const wing = new THREE.BoxGeometry(1.6, 0.5, 0.12); wing.rotateZ(xs * -0.6); wing.translate(xs * (R + 2.6), springY + 3.4, zs * (hd + 0.1)); ornament.push(wing);
-    // recessed pier panels (raised frames)
-    const fr = new THREE.BoxGeometry(A.pier - 1.2, 5.6, 0.12); fr.translate(xs * (hw - A.pier / 2), A.baseH + 3.6, zs * (hd + 0.05)); ornament.push(fr);
+    // spandrel roundel: a moulded wreath with a carved field, in the triangle over each arch haunch
+    const rx = xs * (R + 1.55), ry = springY + 2.5;
+    const m = new THREE.TorusGeometry(1.0, 0.2, 7, 22); m.translate(rx, ry, zs * (hd + 0.16)); ornament.push(m);
+    const mIn = new THREE.CylinderGeometry(0.84, 0.84, 0.16, 20); mIn.rotateX(Math.PI / 2); mIn.translate(rx, ry, zs * (hd + 0.09)); ornament.push(mIn);
+    for (let k = 0; k < 6; k++) { const pl = new THREE.BoxGeometry(0.5, 0.16, 0.12); pl.rotateZ(k / 6 * Math.PI); pl.translate(rx, ry, zs * (hd + 0.2)); ornament.push(pl); }   // wreath binding
+    // swags falling from the roundel toward the impost
+    for (const sgn of [-1, 1]) { const sw = new THREE.BoxGeometry(1.5, 0.22, 0.12); sw.rotateZ(sgn * 0.55); sw.translate(rx + sgn * 1.25, ry - 1.15, zs * (hd + 0.12)); ornament.push(sw); }
+    // pier panels: a proud moulded FRAME around a recessed field (4 bars, not a slab — a slab reads as a blank plate)
+    const pw = A.pier - 1.2, ph = 5.6, py = A.baseH + 3.6, px = xs * (hw - A.pier / 2);
+    for (const [bw, bh, bx, by] of [[pw, 0.16, 0, ph / 2], [pw, 0.16, 0, -ph / 2], [0.16, ph, -pw / 2, 0], [0.16, ph, pw / 2, 0]]) {
+      const b = new THREE.BoxGeometry(bw, bh, 0.1); b.translate(px + bx, py + by, zs * (hd + 0.05)); ornament.push(b);
+    }
+    // dentil course under the entablature (small blocks)
+    for (let k = 0; k < 9; k++) { const dn = new THREE.BoxGeometry(0.22, 0.26, 0.2); dn.translate(xs * (hw - 0.55 - k * 0.72), A.corniceY - 0.42, zs * (hd + 0.1)); ornament.push(dn); }
   }
   ornMesh.geometry.dispose(); ornMesh.geometry = mergeGeos(ornament);
-  // coffered vault: a cylinder segment just inside the intrados with the coffer texture
-  const cof = new THREE.MeshStandardMaterial({ map: cofferTexture(), roughness: 0.7, color: 0xe6e0d3, side: THREE.BackSide }); cof.map.repeat.set(6, 3);
-  const vaultGeo = new THREE.CylinderGeometry(R - 0.05, R - 0.05, A.depth - 0.1, 32, 1, true, 0, Math.PI); vaultGeo.rotateX(Math.PI / 2); vaultGeo.rotateZ(Math.PI / 2);
-  const vault = new THREE.Mesh(vaultGeo, cof); vault.position.set(0, springY, 0); g.add(vault); vault.userData.surface = 'concrete'; ctx.raycastTargets.push(vault);
+  // ---- coffered barrel vault: a recessed shell 0.15 m behind the intrados + a real rib grid on the intrados line ----
+  const cof = new THREE.MeshStandardMaterial({ map: cofferTexture(), roughness: 0.9, color: 0x8b857a, side: THREE.BackSide }); cof.map.repeat.set(3, 1.5);
+  const vaultGeo = new THREE.CylinderGeometry(R - 0.01, R - 0.01, A.depth - 0.02, 48, 1, true, 0, Math.PI); vaultGeo.rotateX(Math.PI / 2); vaultGeo.rotateZ(Math.PI / 2);
+  const vault = new THREE.Mesh(vaultGeo, cof); vault.position.set(0, springY, 0); g.add(vault); vault.receiveShadow = true; vault.userData.surface = 'concrete'; ctx.raycastTargets.push(vault);
+  { // rib grid standing 0.15 m proud of the coffer field, so each coffer reads as a 0.15 m recess
+    const ribs = []; const rr = R - 0.15, tube = 0.075;
+    for (let i = 0; i < 6; i++) {
+      const z = -hd + 0.12 + i * (A.depth - 0.24) / 5;
+      const t = new THREE.TorusGeometry(rr, tube, 5, 26, Math.PI); t.translate(0, springY, z); ribs.push(t);
+    }
+    for (let i = 0; i <= 8; i++) {
+      const a = i / 8 * Math.PI; const b = new THREE.BoxGeometry(0.15, 0.15, A.depth - 0.1);
+      b.rotateZ(a); b.translate(Math.cos(a) * rr, springY + Math.sin(a) * rr, 0); ribs.push(b);
+    }
+    const ribMesh = new THREE.Mesh(mergeGeos(ribs), marble); g.add(ribMesh); ribMesh.castShadow = ribMesh.receiveShadow = true; ribMesh.userData.surface = 'concrete'; ctx.raycastTargets.push(ribMesh);
+    // soffit shadow band where the vault springs from the piers
+    const soff = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, A.depth - 0.08), aoMat);
+    for (const sx of [-1, 1]) { const m2 = soff.clone(); m2.position.set(sx * (R + 0.02), springY - 0.25, 0); g.add(m2); }
+  }
 
   // ---- roof: walkable attic top with a low parapet; exit hole over the shaft ----------------------------------------
   const roofY = A.height; // 23.5
-  const slabMat = new THREE.MeshStandardMaterial({ color: 0xb9b3a6, roughness: 0.85 });
+  const slabMat = new THREE.MeshStandardMaterial({ map: gravelTexture(world.R), roughness: 1.0, metalness: 0, color: 0x6e6a64 });
   const roof = new THREE.Mesh(new THREE.BoxGeometry(A.width + 0.9, 0.3, A.depth + 0.9), slabMat); roof.position.set(0, roofY - 0.15, 0); g.add(roof); roof.receiveShadow = true; roof.userData.surface = 'concrete'; ctx.raycastTargets.push(roof);
+  { const uv = roof.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 3); }
   // walkable slab pieces (hole over the shaft)
   world.walkable([A.cx + sx1, roofY - 0.4, A.cz - hd - 0.45], [A.cx + hw + 0.45, roofY, A.cz + hd + 0.45]);
   world.walkable([A.cx - hw - 0.45, roofY - 0.4, A.cz - hd - 0.45], [A.cx + sx1, roofY, A.cz + sz0]);
@@ -94,7 +140,7 @@ export function buildArch(world, T) {
   pb(0, -hd - 0.45 + pw / 2, A.width + 0.9, pw); pb(0, hd + 0.45 - pw / 2, A.width + 0.9, pw); pb(-hw - 0.45 + pw / 2, 0, pw, A.depth + 0.9); pb(hw + 0.45 - pw / 2, 0, pw, A.depth + 0.9);
   const parMesh = new THREE.Mesh(mergeGeos(parapets), parMat); g.add(parMesh); parMesh.castShadow = parMesh.receiveShadow = true; parMesh.userData.surface = 'concrete'; ctx.raycastTargets.push(parMesh);
 
-  // ---- statue groups (north face): Washington + two allegorical figures per pier, blocky, merged into one mesh -----
+  // ---- statue groups (north face): a commander + two allegorical figures per pier, blocky, merged into one mesh -----
   const statMat = new THREE.MeshStandardMaterial({ color: 0xd6cfc0, roughness: 0.75 });
   const figGeos = [];
   for (const [x0, x1] of [[xW0, xW1], [xE0, xE1]]) {
@@ -124,3 +170,47 @@ function figure(h = 4.5, w = 1.0, x = 0, y = 0, z = 0) {
 }
 
 export function scaleUV(geo, k) { const uv = geo.attributes.uv; if (!uv) return; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * k, uv.getY(i) * k); }
+
+/** Macro grime (8 m blotches, ±8%) + soot streaks running down from each cornice/impost height. */
+export function grimeShader(mat, bandTops, key = 'wsp-grime') {
+  const tops = new Float32Array(8); bandTops.slice(0, 8).forEach((v, i) => (tops[i] = v));
+  const n = Math.min(bandTops.length, 8);
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTops = { value: tops };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGPos;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvGPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vGPos; uniform float uTops[8];
+        float gh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float gn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+          return mix(mix(gh(i), gh(i+vec2(1,0)), f.x), mix(gh(i+vec2(0,1)), gh(i+vec2(1,1)), f.x), f.y); }`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        vec3 wp = vGPos;
+        float macro = gn(wp.xz * 0.125) * 0.55 + gn(wp.xy * 0.125 + 4.7) * 0.45;
+        diffuseColor.rgb *= mix(0.88, 1.10, macro);
+        float streak = 0.35 + 0.65 * gn(vec2(wp.x, wp.z) * 2.3);
+        float soot = 0.0, ao = 0.0;
+        for (int i = 0; i < ${n}; i++) {
+          float d = uTops[i] - wp.y;
+          soot += smoothstep(0.0, 0.05, d) * (1.0 - smoothstep(0.1, 2.4, d));
+          ao   += smoothstep(0.0, 0.02, d) * (1.0 - smoothstep(0.02, 0.22, d));
+        }
+        diffuseColor.rgb *= 1.0 - clamp(soot, 0.0, 1.0) * 0.38 * streak;
+        diffuseColor.rgb *= 1.0 - clamp(ao, 0.0, 1.0) * 0.30;`);
+  };
+  mat.customProgramCacheKey = () => key;
+  return mat;
+}
+
+/** Tar-and-gravel roof: dark grey aggregate with tar patches and seam lines. 512 px ≈ 4 m. */
+export function gravelTexture(R) {
+  const S = 512, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  g.fillStyle = '#5a5652'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 24000; i++) { const v = R(); g.fillStyle = `rgba(${v < 0.45 ? '32,30,28' : v < 0.8 ? '124,120,112' : '158,152,142'},${0.25 + R() * 0.5})`; g.fillRect(R() * S, R() * S, 1 + R() * 2.4, 1 + R() * 2.4); }
+  for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(22,20,19,${0.12 + R() * 0.3})`; g.beginPath(); g.ellipse(R() * S, R() * S, 18 + R() * 70, 12 + R() * 44, R() * 3, 0, 7); g.fill(); }   // tar patches
+  g.strokeStyle = 'rgba(28,26,24,0.55)'; g.lineWidth = 3;
+  for (let y = 0; y < S; y += S / 4) { g.beginPath(); g.moveTo(0, y + (R() - 0.5) * 4); g.lineTo(S, y + (R() - 0.5) * 4); g.stroke(); }                                           // felt seams
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; return t;
+}

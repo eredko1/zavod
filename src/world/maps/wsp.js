@@ -1,7 +1,7 @@
-// MAP: WASHINGTON SQUARE — Washington Square Park + the surrounding Greenwich Village blocks, 1:1 from an OSM plan. Owned by: WSP agent (this file + ../wsp/*).
-// Levels: park floor y=0 · fountain pit -0.9 (3 steps) · mounds to +3.6 · Bobst plaza +0.9 · Row stoops +1.4 · Mews roof 7.2 · Alley studios roof 10 · arch attic 23.5 (ladder in the west pier).
+// MAP: CITY SQUARE — a downtown park + the surrounding village blocks, 1:1 from a measured plan. Owned by: WSP agent (this file + ../wsp/*).
+// Levels: park floor y=0 · fountain pit -0.9 (3 steps) · mounds to +3.6 · library plaza +0.9 · terrace stoops +1.4 · mews roof 7.2 · alley studios roof 10 · arch attic 23.5 (ladder in the west pier).
 import * as THREE from 'three';
-import { BOUNDS, ARCH, CHESS, MOUNDS, GARIBALDI, PARKHOUSE, BUILDINGS, FOUNTAIN } from '../wsp/layout.js';
+import { BOUNDS, ARCH, CHESS, MOUNDS, STATUE_E, PARKHOUSE, BUILDINGS, FOUNTAIN } from '../wsp/layout.js';
 import { loadedTextures } from '../wsp/textures.js';
 import { buildSky } from '../wsp/sky.js';
 import { buildGround, groundHeight } from '../wsp/ground.js';
@@ -36,32 +36,32 @@ export function build(world) {
   // ---- gameplay ------------------------------------------------------------------------------------------------------
   const v = (x, y, z) => new THREE.Vector3(x, y, z);
   const A = ARCH; const roofY = A.height;
-  W.playerSpawns = [v(-13, 0, 80), v(2, 0, 76), v(-28, 0, 76), v(20, 0, 75.5)];               // Washington Sq S sidewalk / Thompson St mouth
+  W.playerSpawns = [v(-13, 0, 80), v(2, 0, 76), v(-28, 0, 76), v(20, 0, 75.5)];               // Park Row South sidewalk / Cooper St mouth
   W.enemySpawns = [
     v(A.cx + 5, roofY, A.cz), v(A.cx - 5, roofY, A.cz),                                       // arch attic
     v(-112, groundHeight(-112, 38), 38), v(-100, groundHeight(-100, 46), 46),                  // mounds
     v(-135, 0, 46), v(-142, 0, 56),                                                            // chess plaza
-    v(GARIBALDI.x + 4, 0, GARIBALDI.z + 3), v(30, 0, -20), v(-30, 0, -22),                     // around the plaza
+    v(STATUE_E.x + 4, 0, STATUE_E.z + 3), v(30, 0, -20), v(-30, 0, -22),                     // around the plaza
     v(0, FOUNTAIN.floor, 6),                                                                   // fountain pit
-    v(-9.5, 0, -66), v(12.5, 0, -66), v(1, 0, -95),                                            // arch forecourt + Fifth Ave
+    v(-9.5, 0, -66), v(12.5, 0, -66), v(1, 0, -95),                                            // arch forecourt + the avenue
     v(60, 0, -60), v(-60, 0, -60), v(110, 0, -30), v(-110, 0, -30),                            // north walk / lawns
     v(100, 0, 40), v(-60, 0, 30), v(120, 0, 5),                                                // south / east
     v(48, 0, -80), v(-100, 0, -80), v(145, 0, 30), v(-168, 0, 20),                             // streets
     v(60, 7.2, -124), v(-125, 10, -142),                                                       // roofs (Mews / Alley studios)
-    v(100, 0.9, 86),                                                                           // Bobst plaza
+    v(100, 0.9, 86),                                                                           // library plaza
   ];
   W.poses = {
     spawn: [-13, 0, 80, 0.05, 0.0],
-    hero: [-17, 0, 15, -0.24, 0.05],            // from the S rim of the fountain plaza: basin + jets, arch behind, One Fifth through it
+    hero: [-17, 0, 15, -0.24, 0.05],            // from the S rim of the fountain plaza: basin + jets, arch behind, the tower through it
     overview: [-215, 95, 135, -0.95, -0.5],
-    arch: [1.5, 0, -22, 0, 0.12],               // on the axis, looking north through the arch up Fifth Avenue
+    arch: [1.5, 0, -22, 0, 0.12],               // on the axis, looking north through the arch up the avenue
     attic: [A.cx + 5, roofY, A.cz - 1, 0.25, -0.35],
     fountain: [-6, FOUNTAIN.floor, 9, -0.55, 0.04],
     chess: [-118, 0, 42, 1.25, 0.0],
     mounds: [-92, 0, 40, 1.3, 0.05],
-    row: [30, 0, -70, 0.15, 0.12],              // The Row from the north walk
-    bobst: [28, 0, 76.5, -1.75, 0.12],          // along Washington Sq S: Bobst ahead-right, Kimmel right
-    macdougal: [-164.5, 0, 118, 0.42, 0.04],     // on the west sidewalk of MacDougal, looking north up the shopfronts
+    row: [30, 0, -70, 0.15, 0.12],              // the terrace row from the north walk
+    bobst: [28, 0, 76.5, -1.75, 0.12],          // along Park Row South: the library ahead-right, the student centre right
+    macdougal: [-164.5, 0, 118, 0.42, 0.04],     // on the west sidewalk of Park Row West, looking north up the shopfronts
     kimmel: [-10, 0, 62, -2.6, 0.16],
     judson: [-2, 0, 75.5, 2.2, 0.22],
     garibaldi: [52, 0, 1.5, -2.2, 0.25],
