@@ -139,6 +139,22 @@ export function buildArch(world, T) {
   const pb = (x, z, w, d) => { const b = new THREE.BoxGeometry(w, par, d); b.translate(x, roofY + par / 2, z); scaleUV(b, 1 / 2.4); parapets.push(b); ctx.colliders.push(wbox(x - w / 2, roofY, z - d / 2, x + w / 2, roofY + par, z + d / 2)); };
   pb(0, -hd - 0.45 + pw / 2, A.width + 0.9, pw); pb(0, hd + 0.45 - pw / 2, A.width + 0.9, pw); pb(-hw - 0.45 + pw / 2, 0, pw, A.depth + 0.9); pb(hw + 0.45 - pw / 2, 0, pw, A.depth + 0.9);
   const parMesh = new THREE.Mesh(mergeGeos(parapets), parMat); g.add(parMesh); parMesh.castShadow = parMesh.receiveShadow = true; parMesh.userData.surface = 'concrete'; ctx.raycastTargets.push(parMesh);
+  // roof furniture: hatch coaming + propped lid, an aerial mast with guys, conduit runs, a drain sump and a gravel drift
+  { const ironM = new THREE.MeshStandardMaterial({ color: 0x33373b, roughness: 0.6, metalness: 0.55 });
+    const iron = [], hx = (sx0 + sx1) / 2;
+    const coam = new THREE.BoxGeometry(s + 0.5, 0.36, s + 0.5); coam.translate(hx, roofY + 0.18, 0); iron.push(coam);
+    const lid = new THREE.BoxGeometry(s + 0.55, 0.08, s + 0.55); lid.rotateZ(-0.85); lid.translate(hx + 1.1, roofY + 1.0, 0); iron.push(lid);
+    const mast = new THREE.CylinderGeometry(0.05, 0.07, 3.6, 8); mast.translate(hw - 1.4, roofY + 1.8, -hd + 1.2); iron.push(mast);
+    for (let k = 0; k < 3; k++) { const arm = new THREE.BoxGeometry(0.9, 0.04, 0.04); arm.translate(hw - 1.4, roofY + 2.4 + k * 0.4, -hd + 1.2); iron.push(arm); }
+    for (const zz of [-1.6, 1.6]) { const con = new THREE.CylinderGeometry(0.05, 0.05, 9.0, 6); con.rotateZ(Math.PI / 2); con.translate(1.2, roofY + 0.09, zz); iron.push(con); }
+    const sump = new THREE.CylinderGeometry(0.28, 0.24, 0.1, 12); sump.translate(-hw + 1.6, roofY + 0.02, hd - 1.1); iron.push(sump);
+    const im = new THREE.Mesh(mergeGeos(iron), ironM); g.add(im); im.castShadow = im.receiveShadow = true; im.userData.surface = 'metal'; ctx.raycastTargets.push(im);
+    ctx.colliders.push(wbox(hx - (s + 0.5) / 2, roofY, -(s + 0.5) / 2, hx + (s + 0.5) / 2, roofY + 0.36, (s + 0.5) / 2));
+    // gravel drifts blown against the parapet
+    const drift = [];
+    for (let k = 0; k < 7; k++) { const d = new THREE.BoxGeometry(1.4 + k % 3, 0.06, 0.55); d.translate(-hw + 2 + k * 2.5, roofY + 0.03, hd + 0.2 - 0.5); drift.push(d); }
+    const dm = new THREE.Mesh(mergeGeos(drift), slabMat); g.add(dm); dm.receiveShadow = true;
+  }
 
   // ---- statue groups (north face): a commander + two allegorical figures per pier, blocky, merged into one mesh -----
   const statMat = new THREE.MeshStandardMaterial({ color: 0xd6cfc0, roughness: 0.75 });

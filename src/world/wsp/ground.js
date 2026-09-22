@@ -149,23 +149,27 @@ export function buildGround(world, T) {
   const rimIn = new THREE.CylinderGeometry(F.basinR, F.basinR, F.basinH, 64, 1, true); rimIn.translate(0, F.floor + F.basinH / 2, 0); worldUV(rimIn, 2.4);
   const rim = new THREE.Mesh(mergeGeos([rimG, rimW, rimIn]), rimMat); rim.material.side = THREE.DoubleSide; rim.castShadow = rim.receiveShadow = true; rim.userData.surface = 'concrete'; scene.add(rim); ctx.raycastTargets.push(rim);
   { const n = 32; for (let k = 0; k < n; k++) { const a0 = k / n * Math.PI * 2, a1 = (k + 1) / n * Math.PI * 2; const r0 = F.basinR - 0.05, r1 = F.basinR + 0.5; const xs = [Math.cos(a0) * r0, Math.cos(a1) * r0, Math.cos(a0) * r1, Math.cos(a1) * r1], zs = [Math.sin(a0) * r0, Math.sin(a1) * r0, Math.sin(a0) * r1, Math.sin(a1) * r1]; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(Math.min(...xs), F.floor - 0.1, Math.min(...zs)), new THREE.Vector3(Math.max(...xs), F.floor + F.basinH, Math.max(...zs)))); } }
-  const plinthMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.78, color: 0x6b6b66 });
-  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR, F.plinthR + 0.25, F.plinthH, 48), plinthMat); plinth.position.y = F.floor + F.plinthH / 2; plinth.castShadow = plinth.receiveShadow = true; plinth.userData.surface = 'concrete'; scene.add(plinth); ctx.raycastTargets.push(plinth);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR + 0.2, F.plinthR + 0.2, 0.12, 48), plinthMat); cap.position.y = F.floor + F.plinthH + 0.06; cap.castShadow = true; scene.add(cap);
+  const plinthMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.78, color: 0x8c8c85 });
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR + 0.35, F.plinthR + 0.6, F.plinthH * 0.62, 48), plinthMat); plinth.position.y = F.floor + F.plinthH * 0.31; plinth.castShadow = plinth.receiveShadow = true; plinth.userData.surface = 'concrete'; scene.add(plinth); ctx.raycastTargets.push(plinth);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(F.plinthR + 0.5, F.plinthR + 0.5, 0.1, 48), plinthMat); cap.position.y = F.floor + F.plinthH * 0.62 + 0.05; cap.castShadow = true; scene.add(cap);
   ctx.colliders.push(new THREE.Box3(new THREE.Vector3(-F.plinthR - 0.25, F.floor - 0.1, -F.plinthR - 0.25), new THREE.Vector3(F.plinthR + 0.25, F.floor + F.plinthH + 0.12, F.plinthR + 0.25)));
-  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x415e60, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.8, envMapIntensity: 1.2, clearcoat: 1, clearcoatRoughness: 0.04 });
+  { const holes = [];
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, r = F.plinthR * 0.55; const hg = new THREE.CircleGeometry(0.14, 12); hg.rotateX(-Math.PI / 2); hg.translate(Math.cos(a) * r, F.floor + F.plinthH * 0.62 + 0.105, Math.sin(a) * r); holes.push(hg); }
+    const hg2 = new THREE.CircleGeometry(0.2, 14); hg2.rotateX(-Math.PI / 2); hg2.translate(0, F.floor + F.plinthH * 0.62 + 0.105, 0); holes.push(hg2);
+    const hm = new THREE.Mesh(mergeGeos(holes), new THREE.MeshStandardMaterial({ color: 0x2a2c2b, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })); hm.name = 'jetHoles'; scene.add(hm); }
+  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x4c625e, roughness: 0.14, metalness: 0.0, transparent: true, opacity: 0.72, envMapIntensity: 0.9, clearcoat: 1, clearcoatRoughness: 0.08 });
   const water = new THREE.Mesh(new THREE.RingGeometry(F.plinthR + 0.1, F.basinR, 64), waterMat); water.rotation.x = -Math.PI / 2; water.position.y = F.floor + 0.32; water.name = 'water'; water.userData.surface = 'water'; scene.add(water); ctx.raycastTargets.push(water);
   // jets: translucent tapered columns (additive, alpha-blended) from the plinth top and a ring of 12 on the basin floor, plus mist quads near the tops
   const jetTex = jetColumnTexture(); const jetMat = new THREE.MeshBasicMaterial({ map: jetTex, color: 0xd6e6ef, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true });
   const jgeos = [];
   const jet = (x, z, y0, h, r) => { const g = new THREE.CylinderGeometry(r * 0.35, r, h, 12, 1, true); g.translate(0, h / 2, 0); g.translate(x, y0, z); jgeos.push(g); const cone = new THREE.CylinderGeometry(0.02, r * 0.9, h * 1.15, 10, 1, true); cone.translate(0, h * 1.15 / 2, 0); cone.translate(x, y0, z); jgeos.push(cone); };
-  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; jet(Math.cos(a) * 3.3, Math.sin(a) * 3.3, F.floor + 0.3, 2.6, 0.22); }
-  jet(0, 0, F.floor + F.plinthH + 0.1, 7.0, 0.34); jet(0.35, 0.22, F.floor + F.plinthH + 0.1, 5.2, 0.22); jet(-0.35, -0.22, F.floor + F.plinthH + 0.1, 4.4, 0.19);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; jet(Math.cos(a) * 3.35, Math.sin(a) * 3.35, F.floor + 0.3, 2.4, 0.16); }
+  jet(0, 0, F.floor + F.plinthH * 0.62 + 0.12, 7.0, 0.3); jet(0.4, 0.26, F.floor + F.plinthH * 0.62 + 0.12, 5.2, 0.2); jet(-0.4, -0.26, F.floor + F.plinthH * 0.62 + 0.12, 4.4, 0.17);
   const jetsMesh = new THREE.Mesh(mergeGeos(jgeos), jetMat); jetsMesh.name = 'jets'; jetsMesh.renderOrder = 5; scene.add(jetsMesh);
   const mistTex = mistTexture(); const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, fog: true });
   const mistG = [];
   const mist = (x, y, z, s) => { for (const rot of [0.3, 1.35, 2.4]) { const q = new THREE.PlaneGeometry(s, s * 0.8); q.rotateY(rot); q.translate(x, y, z); mistG.push(q); } };
-  mist(0, F.floor + F.plinthH + 6.8, 0, 4.5); mist(0, F.floor + F.plinthH + 4.6, 0, 3.2); mist(0, F.floor + 1.4, 0, 6.5);
+  mist(0, F.floor + 6.4, 0, 4.2); mist(0, F.floor + 4.2, 0, 3.0); mist(0, F.floor + 1.2, 0, 6.2);
   const mistMesh = new THREE.Mesh(mergeGeos(mistG), mistMat); mistMesh.name = 'mist'; mistMesh.renderOrder = 6; scene.add(mistMesh);
   let t = 0;
   world.updaters.push((dt) => { t += dt; jetsMesh.scale.y = 1 + Math.sin(t * 2.3) * 0.05; jetMat.opacity = 0.3 + Math.sin(t * 3.1) * 0.05; mistMat.opacity = 0.3 + Math.sin(t * 1.7) * 0.07; mistMesh.rotation.y = t * 0.15; });

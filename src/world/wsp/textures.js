@@ -24,17 +24,17 @@ const rnd = (R, a, b) => a + R() * (b - a);
 /** Hexagonal asphalt pavers (WSP paths): dark blue-grey hex tiles, pale mortar joints. Tile = 512 px covers ~2.0 m (hex ≈ 30 cm across flats). */
 export function hexPaverTexture(R) {
   const S = 512; const [c, g] = canvas(S, S);
-  g.fillStyle = '#66676a'; g.fillRect(0, 0, S, S);                 // mortar (dark, low contrast)
+  g.fillStyle = '#6b6963'; g.fillRect(0, 0, S, S);                 // mortar (dark, low contrast)
   const cols = 8; const a = S / (cols * 1.5);                       // hex circumradius so the tile wraps: width per column = 1.5a
   const hgt = Math.sqrt(3) * a; const rows = Math.round(S / hgt);   // approximately wrap in y
   const aY = S / rows / Math.sqrt(3);
   for (let r = -1; r <= rows + 1; r++) for (let q = -1; q <= cols + 1; q++) {
     const cx = q * 1.5 * a, cy = r * Math.sqrt(3) * aY + (q & 1 ? Math.sqrt(3) * aY / 2 : 0);
-    const v = rnd(R, -12, 12); const base = [86 + v, 87 + v, 90 + v];
+    const v = rnd(R, -12, 12); const base = [92 + v, 90 + v, 85 + v];
     g.fillStyle = `rgb(${base[0] | 0},${base[1] | 0},${base[2] | 0})`;
     g.beginPath(); for (let i = 0; i < 6; i++) { const t = Math.PI / 3 * i; const px = cx + (a - 2.2) * Math.cos(t), py = cy + (aY - 2.2) * Math.sin(t); i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill();
     // wear highlights
-    if (R() < 0.35) { g.fillStyle = `rgba(160,162,165,${rnd(R, 0.04, 0.12)})`; g.beginPath(); g.ellipse(cx + rnd(R, -6, 6), cy + rnd(R, -6, 6), a * 0.5, aY * 0.35, R() * 3, 0, Math.PI * 2); g.fill(); }
+    if (R() < 0.35) { g.fillStyle = `rgba(168,164,154,${rnd(R, 0.04, 0.12)})`; g.beginPath(); g.ellipse(cx + rnd(R, -6, 6), cy + rnd(R, -6, 6), a * 0.5, aY * 0.35, R() * 3, 0, Math.PI * 2); g.fill(); }
   }
   // grime speckle
   for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(${R() < 0.5 ? '20,22,26' : '150,150,150'},${R() * 0.22})`; g.fillRect(R() * S, R() * S, 1 + R() * 2, 1 + R() * 2); }

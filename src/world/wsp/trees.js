@@ -166,7 +166,7 @@ function buildSunflecks(world, trees) {
   const geos = [];
   for (const p of places) { const q = new THREE.PlaneGeometry(p.s, p.s); q.rotateX(-Math.PI / 2); q.rotateY(p.ry); q.translate(p.x, p.y + 0.035, p.z); geos.push(q); }
   const m = new THREE.Mesh(mergeGeos(geos), new THREE.MeshBasicMaterial({
-    map: tex, color: 0xfff0cc, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending, fog: true,
+    map: tex, color: 0xfff0cc, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: true,
   }));
   m.name = 'sunflecks'; m.renderOrder = 3; m.frustumCulled = false; scene.add(m);
 }

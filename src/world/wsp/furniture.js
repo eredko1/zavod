@@ -130,7 +130,7 @@ export function buildFurniture(world, T) {
     for (let x = wx0 + 2; x < wx1; x += 5) { world.cover(x, wz + 1.0, 0, 1); contact.push({ x, z: wz, s: 3.0 }); } }
 
   // ---- statues: bronze general with drawn sword (east) on a grey granite pedestal w/ inscription band + step; bronze bust (west) --
-  const bronze = new THREE.MeshStandardMaterial({ map: patinaTexture(R), color: 0xffffff, roughness: 0.5, metalness: 0.8, envMapIntensity: 0.9 });
+  const bronze = new THREE.MeshStandardMaterial({ map: patinaTexture(R), color: 0xe8ddc4, roughness: 0.42, metalness: 0.5, envMapIntensity: 1.5 });
   const gran = mat('graniteDark', { map: world.tex.granite, color: 0x8e8c88, roughness: 0.7 });
   const bandMat = mat('inscription', { color: 0x2a2724, roughness: 0.6, metalness: 0.2 });
   const statue = (x, z, pedH, figH, w, ry = 0, bust = false) => {
@@ -143,15 +143,21 @@ export function buildFurniture(world, T) {
     if (bust) { parts.push(box(w * 1.3, figH * 0.55, w * 0.7, 0, figH * 0.27, 0), sph(w * 0.32, 0, figH * 0.75, 0), cyl(w * 0.2, w * 0.28, figH * 0.2, 0, figH * 0.5, 0)); }
     else {
       const h = figH;
-      parts.push(cyl(w * 0.16, w * 0.2, h * 0.46, -w * 0.18, h * 0.23, 0), cyl(w * 0.16, w * 0.2, h * 0.46, w * 0.2, h * 0.23, 0.05));       // legs (boots)
-      parts.push(box(w * 0.9, h * 0.14, w * 0.5, 0, h * 0.5, 0));                                                                                // coat skirt / hips
-      parts.push(box(w * 1.0, h * 0.28, w * 0.55, 0, h * 0.68, 0));                                                                              // torso
-      parts.push(box(w * 1.35, h * 0.07, w * 0.6, 0, h * 0.83, 0));                                                                              // shoulders / epaulettes
-      parts.push(cyl(w * 0.12, w * 0.14, h * 0.06, 0, h * 0.87, 0), sph(w * 0.2, 0, h * 0.93, 0), cyl(w * 0.22, w * 0.22, h * 0.04, 0, h * 1.0, 0)); // neck, head, cap
-      parts.push(box(w * 0.2, h * 0.36, w * 0.2, w * 0.72, h * 0.72, 0.05, 1.25));                                                              // raised sword arm
-      parts.push(box(0.05, h * 0.55, 0.12, w * 0.9, h * 1.15, 0.05, 0.25), box(0.22, 0.05, 0.14, w * 0.85, h * 0.9, 0.05));                    // sword blade + guard
-      parts.push(box(w * 0.2, h * 0.34, w * 0.2, -w * 0.68, h * 0.62, 0.1, -0.35));                                                             // other arm (hand on hip)
-      parts.push(box(w * 1.1, h * 0.5, 0.06, -w * 0.1, h * 0.55, -w * 0.32, 0.15));                                                              // cloak falling behind
+      // heavier, more readable massing: boots → greatcoat → chest → shoulders → head, with a cloak that gives silhouette
+      parts.push(cyl(w * 0.2, w * 0.26, h * 0.42, -w * 0.21, h * 0.21, 0.02), cyl(w * 0.2, w * 0.26, h * 0.42, w * 0.23, h * 0.21, 0.06));   // legs / boots
+      parts.push(box(w * 0.34, h * 0.06, w * 0.52, -w * 0.21, h * 0.03, 0.06), box(w * 0.34, h * 0.06, w * 0.52, w * 0.23, h * 0.03, 0.1));   // boot soles
+      parts.push(cyl(w * 0.62, w * 0.78, h * 0.3, 0, h * 0.5, 0.02));                                                                          // greatcoat skirt (flared)
+      parts.push(box(w * 1.06, h * 0.26, w * 0.62, 0, h * 0.72, 0));                                                                           // torso
+      parts.push(box(w * 0.9, h * 0.1, w * 0.66, 0, h * 0.62, 0.03));                                                                          // belted waist
+      parts.push(box(w * 1.46, h * 0.09, w * 0.66, 0, h * 0.87, 0));                                                                           // shoulders / epaulettes
+      parts.push(cyl(w * 0.15, w * 0.18, h * 0.07, 0, h * 0.92, 0), sph(w * 0.24, 0, h * 0.99, 0));                                            // neck, head
+      parts.push(cyl(w * 0.27, w * 0.27, h * 0.045, 0, h * 1.06, 0), cyl(w * 0.2, w * 0.24, h * 0.05, 0, h * 1.09, 0));                        // brimmed cap
+      parts.push(box(w * 0.26, h * 0.4, w * 0.26, w * 0.78, h * 0.78, 0.05, 1.2));                                                             // raised sword arm
+      parts.push(box(0.07, h * 0.62, 0.15, w * 1.0, h * 1.26, 0.05, 0.22), box(0.3, 0.07, 0.17, w * 0.94, h * 0.98, 0.05));                    // sword blade + guard
+      parts.push(box(w * 0.26, h * 0.38, w * 0.26, -w * 0.74, h * 0.66, 0.1, -0.3));                                                           // other arm (hand on hip)
+      parts.push(box(w * 1.25, h * 0.78, w * 0.2, -w * 0.05, h * 0.5, -w * 0.42, 0.06));                                                        // cloak falling behind (flat panel, keeps the silhouette readable)
+      parts.push(box(w * 0.7, h * 0.3, w * 0.16, w * 0.42, h * 0.3, -w * 0.4, 0.35));                                                             // cloak sweep
+      parts.push(box(w * 0.5, h * 0.1, w * 0.14, -w * 0.05, h * 0.9, -w * 0.4));                                                               // cloak collar
     }
     const m = new THREE.Mesh(mergeGeos(parts), bronze); g.add(m); m.castShadow = true; m.userData.surface = 'metal'; ctx.raycastTargets.push(m);
     ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 1.3, 0.6 + pedH, z - 1.3), new THREE.Vector3(x + 1.3, 0.6 + pedH + figH * 1.3, z + 1.3)));
@@ -354,12 +360,13 @@ function buildStreet(world, T) {
     cab: { body: [[-2.3, 0.34], [2.3, 0.34], [2.36, 0.72], [1.7, 0.86], [0.9, 1.42], [-0.9, 1.46], [-1.95, 0.98], [-2.36, 0.9]], glass: [[0.86, 0.9], [1.5, 0.88], [0.8, 1.38], [-0.85, 1.42], [-1.8, 0.97], [-1.0, 0.9]], w: 1.8, wheels: [1.5, -1.5], hl: [2.34, 0.64], tl: [-2.34, 0.72], len: 4.7, sign: true },
     van: { body: [[-2.5, 0.36], [2.5, 0.36], [2.56, 0.86], [2.35, 1.02], [1.75, 1.06], [1.3, 1.96], [-2.45, 2.0], [-2.56, 1.4]], glass: [[1.68, 1.1], [1.25, 1.9], [-2.4, 1.92], [-2.45, 1.42], [1.2, 1.42]], w: 1.95, wheels: [1.55, -1.7], hl: [2.52, 0.72], tl: [-2.52, 1.0], len: 5.1 },
   };
-  const paintMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0.55, clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
+  const paintMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.09, envMapIntensity: 0.85 });
   const glassMat = mat('vglass', { color: 0x3a4a50, roughness: 0.08, metalness: 0.7, envMapIntensity: 1.3 });
-  const rubber = mat('rubber', { color: 0x1c1c1c, roughness: 0.92 }); const chrome = mat('hubcap', { color: 0xb9bcc0, roughness: 0.3, metalness: 0.9 });
+  const rubber = mat('rubber', { color: 0x1c1c1c, roughness: 0.92 }); const chrome = mat('hubcap', { color: 0x8d9196, roughness: 0.42, metalness: 0.85 });
+  const trimDark = mat('carTrim', { color: 0x16181a, roughness: 0.55, metalness: 0.4 });
   const lampW = mat('headlamp', { color: 0xdfe6ea, roughness: 0.2, metalness: 0.4, emissive: 0x556066 }); const lampR = mat('taillamp', { color: 0x9a1212, roughness: 0.3, emissive: 0x3a0505 });
   const plateMat = mat('plate', { color: 0xe9e4d2, roughness: 0.5 });
-  const carCols = [0x1a1a1c, 0xd8d8d8, 0x8a8f96, 0x2b3a6b, 0x6b1f1f, 0xe8e6e0, 0x3a3a3a, 0x232323, 0xb5b8bd, 0x1f4d3a].map(c => new THREE.Color(c));
+  const carCols = [0x1a1a1c, 0x95999d, 0x5f656b, 0x22305c, 0x5c1b1b, 0xa8a69f, 0x33383c, 0x1d1f22, 0x7b8086, 0x1a4433, 0x4a4036, 0x2d4a55].map(c => new THREE.Color(c));
   const placements = { sedan: [], cab: [], van: [] };
   for (const s of STREETS) {
     if (s.cobble) continue;
@@ -381,11 +388,25 @@ function buildStreet(world, T) {
   for (const kind in KIT) {
     const K = KIT[kind]; const P = placements[kind]; if (!P.length) continue;
     const body = profile(K.body, K.w); const glass = profile(K.glass, K.w + 0.3, 0.0);
-    const wh = [], caps = [], hl = [], tl = [], plates = [];
-    for (const wx of K.wheels) for (const wz of [K.w / 2 + 0.1, -K.w / 2 - 0.1]) { const t = new THREE.CylinderGeometry(0.33, 0.33, 0.24, 14); t.rotateX(Math.PI / 2); t.translate(wx, 0.33, wz); wh.push(t); const c = new THREE.CylinderGeometry(0.19, 0.19, 0.26, 10); c.rotateX(Math.PI / 2); c.translate(wx, 0.33, wz); caps.push(c); }
+    const wh = [], caps = [], hl = [], tl = [], plates = [], trim = [];
+    for (const wx of K.wheels) for (const wz of [K.w / 2 + 0.1, -K.w / 2 - 0.1]) {
+      const t = new THREE.CylinderGeometry(0.33, 0.33, 0.26, 16); t.rotateX(Math.PI / 2); t.translate(wx, 0.33, wz); wh.push(t);
+      const c = new THREE.CylinderGeometry(0.155, 0.155, 0.28, 12); c.rotateX(Math.PI / 2); c.translate(wx, 0.33, wz); caps.push(c);
+      // dark wheel-arch recess so the wheel is cut into the body instead of stuck on the side
+      const arch2 = new THREE.CylinderGeometry(0.46, 0.46, 0.14, 14, 1, false, 0, Math.PI); arch2.rotateX(Math.PI / 2); arch2.rotateZ(Math.PI); arch2.translate(wx, 0.36, wz * 0.94); trim.push(arch2);
+    }
     for (const sz of [-1, 1]) { const h = new THREE.BoxGeometry(0.06, 0.16, 0.34); h.translate(K.hl[0], K.hl[1], sz * (K.w / 2 - 0.3)); hl.push(h); const r = new THREE.BoxGeometry(0.06, 0.14, 0.3); r.translate(K.tl[0], K.tl[1], sz * (K.w / 2 - 0.28)); tl.push(r); }
     for (const px of [K.hl[0] + 0.02, K.tl[0] - 0.02]) { const p = new THREE.BoxGeometry(0.02, 0.15, 0.32); p.translate(px, 0.5, 0); plates.push(p); }
     if (K.sign) { const sg = new THREE.BoxGeometry(0.5, 0.14, 0.2); sg.translate(0.1, 1.55, 0); plates.push(sg); }
+    // bumpers, rocker sills, door shut lines, handles and mirrors — the near-field detail a box has none of
+    for (const [bx, by] of [[K.hl[0] - 0.05, 0.52], [K.tl[0] + 0.05, 0.58]]) { const bm = new THREE.BoxGeometry(0.14, 0.22, K.w + 0.04); bm.translate(bx, by, 0); trim.push(bm); }
+    for (const sz of [-1, 1]) {
+      const sill = new THREE.BoxGeometry(K.len * 0.62, 0.11, 0.1); sill.translate(0, 0.36, sz * (K.w / 2 + 0.01)); trim.push(sill);
+      for (const dx of [-0.95, 0.15, 1.1]) { const sl = new THREE.BoxGeometry(0.035, 0.52, 0.035); sl.translate(dx, 0.78, sz * (K.w / 2 + 0.01)); trim.push(sl); }
+      for (const dx of [-0.6, 0.55]) { const hd = new THREE.BoxGeometry(0.2, 0.05, 0.05); hd.translate(dx, 0.92, sz * (K.w / 2 + 0.02)); trim.push(hd); }
+      const mir = new THREE.BoxGeometry(0.11, 0.1, 0.19); mir.translate(K.wheels[0] - 0.42, 1.12, sz * (K.w / 2 + 0.12)); trim.push(mir);
+      const stalk = new THREE.BoxGeometry(0.05, 0.05, 0.12); stalk.translate(K.wheels[0] - 0.42, 1.08, sz * (K.w / 2 + 0.03)); trim.push(stalk);
+    }
     const cols = kind === 'cab' ? [new THREE.Color(0xf2b820)] : carCols;
     const im = instance(world, body, paintMat, P, { surface: 'metal', name: 'cars_' + kind, colors: cols, collide: null });
     P.forEach((c, i) => { if (kind !== 'cab') im.setColorAt(i, carCols[(R() * carCols.length) | 0]); const ax = Math.abs(Math.cos(c.ry)) > 0.5; const hx = K.len / 2, hz = K.w / 2; const ex = ax ? hx : hz, ez = ax ? hz : hx; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(c.x - ex, 0, c.z - ez), new THREE.Vector3(c.x + ex, kind === 'van' ? 2.0 : 1.45, c.z + ez))); const nx = ax ? 0 : 1, nz = ax ? 1 : 0; world.cover(c.x + nx * (hz + 0.6), c.z + nz * (hz + 0.6), nx, nz); world.cover(c.x - nx * (hz + 0.6), c.z - nz * (hz + 0.6), -nx, -nz); });
@@ -397,6 +418,7 @@ function buildStreet(world, T) {
     instance(world, mergeGeos(hl), lampW, P, { surface: 'metal', name: 'hl_' + kind, shadow: false, ray: false });
     instance(world, mergeGeos(tl), lampR, P, { surface: 'metal', name: 'tl_' + kind, shadow: false, ray: false });
     instance(world, mergeGeos(plates), plateMat, P, { surface: 'metal', name: 'plates_' + kind, shadow: false, ray: false });
+    instance(world, mergeGeos(trim), trimDark, P, { surface: 'metal', name: 'trim_' + kind, shadow: false, ray: false });
   }
 
   // ---- hydrants (red), one-way signs, bike racks, tree pits, street trees positions ----------------------------------

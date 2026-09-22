@@ -55,18 +55,24 @@ export function build(world) {
     hero: [-17, 0, 15, -0.24, 0.05],            // from the S rim of the fountain plaza: basin + jets, arch behind, the tower through it
     overview: [-215, 95, 135, -0.95, -0.5],
     arch: [1.5, 0, -22, 0, 0.12],               // on the axis, looking north through the arch up the avenue
-    attic: [A.cx + 5, roofY, A.cz - 1, 0.25, -0.35],
+    attic: [A.cx + 6.2, roofY, A.cz + 2.6, 0.34, -0.055],  // over the north parapet: mews roofs, water tanks, the skyline
     fountain: [-6, FOUNTAIN.floor, 9, -0.55, 0.04],
     chess: [-118, 0, 42, 1.25, 0.0],
     mounds: [-92, 0, 40, 1.3, 0.05],
     row: [30, 0, -70, 0.15, 0.12],              // the terrace row from the north walk
-    bobst: [28, 0, 76.5, -1.75, 0.12],          // along Park Row South: the library ahead-right, the student centre right
-    macdougal: [-164.5, 0, 118, 0.42, 0.04],     // on the west sidewalk of Park Row West, looking north up the shopfronts
-    kimmel: [-10, 0, 62, -2.6, 0.16],
-    judson: [-2, 0, 75.5, 2.2, 0.22],
-    garibaldi: [52, 0, 1.5, -2.2, 0.25],
+    // — the four framing poses below are also aliased to fictional names; both keys work.
+    bobst: [72, 0, 69, -2.52, 0.27],            // the library's red sandstone mass over its raised plaza
+    macdougal: [-164.2, 0, 136, 0.30, 0.03],     // park-side sidewalk looking north up the shopfront row
+    kimmel: [-25, 0, 49, -2.68, 0.20],          // the chapel campanile left, the student-centre glass tower right
+    judson: [-4, 0, 68, 2.585, 0.30],           // the campanile head-on over the south walk
+    garibaldi: [52, 0, -1, -1.33, 0.26],        // the bronze on its granite pedestal, park behind
     fifth: [0, 0, -100, 0, 0.08],
   };
+  // fictional aliases for the landmark poses (the four above keep their historic keys for the QA harness)
+  Object.assign(W.poses, {
+    library: W.poses.bobst, shopfronts: W.poses.macdougal, studentctr: W.poses.kimmel,
+    campanile: W.poses.judson, statue: W.poses.garibaldi, avenue: W.poses.fifth,
+  });
   // cover along the fountain coping, paths, lawn fences (more from furniture builders)
   for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; const r = FOUNTAIN.coping + 0.6; world.cover(Math.cos(a) * r, Math.sin(a) * r, Math.cos(a), Math.sin(a)); }
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; const r = FOUNTAIN.r - 1; world.cover(Math.cos(a) * r, Math.sin(a) * r, -Math.cos(a), -Math.sin(a), FOUNTAIN.floor); }
