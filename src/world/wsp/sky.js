@@ -1,6 +1,7 @@
 // CITY SQUARE sky: Poly Haven (2k) as background + PMREM env (sun disc clamped), late-morning sun from the SE with a 4096 shadow map. WSP agent.
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { hazeSky } from '../hazesky.js';
 
 export const HDRI_URL = './assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr';
 // puresky: sun disc at elevation 48°, azimuth 34° from +x toward +z (SE in the park frame) — the urban_street_04 HDRI (also in assets) put its street buildings above our skyline
@@ -36,7 +37,7 @@ export function buildSky(world) {
     const pmrem = new THREE.PMREMGenerator(renderer); pmrem.compileEquirectangularShader();
     const env = pmrem.fromEquirectangular(envTex).texture; pmrem.dispose(); envTex.dispose();
     scene.environment = env; scene.environmentIntensity = 0.8;
-    scene.background = hdr; scene.backgroundIntensity = 1.0; scene.backgroundBlurriness = 0.0;
+    hazeSky(scene, hdr, { rotY: 0 });
     ctx.bus?.emit?.('skyReady', { map: 'wsp' });
   }, undefined, (e) => console.warn('[wsp] HDRI failed', e));
   return { sunDir };

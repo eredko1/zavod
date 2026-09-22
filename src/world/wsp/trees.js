@@ -76,8 +76,8 @@ export function buildTrees(world, T) {
   const leafMat = (tex, lit) => {
     const m = new THREE.MeshLambertMaterial({
       map: tex, alphaTest: lit ? 0.5 : 0.42, side: lit ? THREE.DoubleSide : THREE.FrontSide,
-      color: lit ? 0x6a9a3c : 0x38592a, emissiveMap: tex, emissive: lit ? 0x54782c : 0x2a4620,
-      emissiveIntensity: lit ? 0.3 : 0.26, transparent: false,
+      color: lit ? 0xb4bda0 : 0x7d8a6c, emissiveMap: tex, emissive: lit ? 0x3a4a22 : 0x1e2a16,
+      emissiveIntensity: lit ? 0.22 : 0.2, transparent: false,
     });
     m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, ' + (lit ? '0.42' : '0.52') + ')); '); };
     m.customProgramCacheKey = () => 'wsp-leaf-' + (lit ? 'o' : 'i');

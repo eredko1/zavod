@@ -68,30 +68,43 @@ export function sidewalkTexture(R) {
 
 /** Leaf-cluster alpha card (London plane): broad lobed leaves, olive/yellow-green. */
 export function leafTexture(R, { hue = 95 } = {}) {
-  const S = 512; const [c, g] = canvas(S, S);
+  // A 15 m canopy card at 1024 px = ~1.5 cm/px, so a real 12-18 cm plane-tree leaf is ~8-12 px. The old texture drew
+  // ~60 cm leaves in saturated green with round punched holes: it read as a cartoon at every distance.
+  // Now: ~45 irregular clumps (branchlets) of small leaves, lit from above (top of each clump lighter, underside and
+  // clump interior darker), olive-desaturated, with the sky showing through the natural gaps *between* clumps.
+  const S = 1024; const [c, g] = canvas(S, S);
   g.clearRect(0, 0, S, S);
-  const leaf = (x, y, r, rot, l) => {
-    g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = `hsl(${hue + rnd(R, -8, 8)},${28 + l * 0.6 | 0}%,${l | 0}%)`;
-    g.beginPath(); g.moveTo(0, -r);
-    for (let i = 0; i < 5; i++) { const t = -Math.PI / 2 + (i + 0.5) * Math.PI * 2 / 5; g.quadraticCurveTo(Math.cos(t - 0.35) * r * 1.15, Math.sin(t - 0.35) * r * 1.15, Math.cos(t) * r * 0.55, Math.sin(t) * r * 0.55); g.quadraticCurveTo(Math.cos(t + 0.35) * r * 1.15, Math.sin(t + 0.35) * r * 1.15, Math.cos(t + Math.PI * 2 / 10) * r, Math.sin(t + Math.PI * 2 / 10) * r); }
-    g.closePath(); g.fill(); g.restore();
+  const leaf = (x, y, r, rot, h, sat, l) => {
+    g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = `hsl(${h | 0},${sat | 0}%,${l | 0}%)`;
+    g.beginPath(); g.moveTo(0, -r); g.quadraticCurveTo(r * 0.95, -r * 0.2, 0, r * 0.75); g.quadraticCurveTo(-r * 0.95, -r * 0.2, 0, -r); g.fill(); g.restore();
   };
-  // clusters: denser in the middle, ragged silhouette
-  for (let i = 0; i < 900; i++) {
-    const ang = R() * Math.PI * 2, d = Math.pow(R(), 0.6) * S * 0.46;
-    const x = S / 2 + Math.cos(ang) * d, y = S / 2 + Math.sin(ang) * d * 0.95;
-    const depth = d / (S * 0.46); leaf(x, y, rnd(R, 14, 30), R() * 6.3, rnd(R, 29, 45) + (1 - depth) * -5);
+  const clumps = [];
+  for (let i = 0; i < 64 && clumps.length < 46; i++) {
+    const ang = R() * Math.PI * 2, d = Math.pow(R(), 0.7) * S * 0.36;
+    const x = S / 2 + Math.cos(ang) * d * 1.05, y = S * 0.5 + Math.sin(ang) * d * 0.85;
+    const rx = rnd(R, 60, 120), ry = rx * rnd(R, 0.55, 0.85);
+    if (clumps.some(k => Math.hypot(k.x - x, k.y - y) < (k.rx + rx) * 0.42)) continue;   // keep gaps between branchlets
+    clumps.push({ x, y, rx, ry, rot: rnd(R, -0.5, 0.5), depth: d / (S * 0.36) });
   }
-  for (let i = 0; i < 260; i++) { const ang = R() * 6.3, d = Math.pow(R(), 0.5) * S * 0.42; leaf(S / 2 + Math.cos(ang) * d, S / 2 + Math.sin(ang) * d, rnd(R, 12, 22), R() * 6.3, rnd(R, 38, 53)); }
-  // sky holes: punch gaps so the canopy shadow breaks into dapple instead of one solid blob
-  g.globalCompositeOperation = 'destination-out';
-  for (let i = 0; i < 46; i++) {
-    const ang = R() * 6.3, d = Math.pow(R(), 0.55) * S * 0.44, r = rnd(R, 9, 34);
-    const x = S / 2 + Math.cos(ang) * d, y = S / 2 + Math.sin(ang) * d;
-    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.65, 'rgba(0,0,0,0.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  // back to front: shaded (inner) clumps first, lit outer clumps on top
+  clumps.sort((a, b) => a.depth - b.depth);
+  for (const k of clumps) {
+    const n = (k.rx * k.ry / 26) | 0;
+    for (let i = 0; i < n; i++) {
+      const a = R() * Math.PI * 2, rr = Math.sqrt(R());
+      const lx = Math.cos(a) * rr * k.rx, ly = Math.sin(a) * rr * k.ry;
+      const x = k.x + lx * Math.cos(k.rot) - ly * Math.sin(k.rot), y = k.y + lx * Math.sin(k.rot) + ly * Math.cos(k.rot);
+      const up = -ly / k.ry;                                         // +1 at the clump top (sunlit), -1 underneath
+      const lit = 0.5 + 0.5 * up * (0.6 + 0.4 * rr);                 // rim of the top lit, core + underside shaded
+      const l = 13 + lit * 20 + k.depth * 7 + rnd(R, -3, 3);
+      leaf(x, y, rnd(R, 5, 9), R() * 6.3, hue + rnd(R, -9, 7) - lit * 6, 24 + lit * 12, l);
+    }
+    // a few specular-ish bright leaves on the top edge
+    for (let i = 0; i < n * 0.06; i++) { const a = -Math.PI / 2 + rnd(R, -1.1, 1.1); leaf(k.x + Math.cos(a) * k.rx * rnd(R, 0.55, 0.95), k.y + Math.sin(a) * k.ry * rnd(R, 0.55, 0.95), rnd(R, 5, 8), R() * 6.3, hue - 12, 40, 48); }
   }
-  g.globalCompositeOperation = 'source-over';
+  // twigs visible through the gaps
+  g.strokeStyle = 'rgba(58,50,40,0.9)'; g.lineCap = 'round';
+  for (const k of clumps) { g.lineWidth = rnd(R, 2, 4); g.beginPath(); g.moveTo(S / 2 + (k.x - S / 2) * 0.35, S * 0.62); g.quadraticCurveTo((S / 2 + k.x) / 2, (k.y + S * 0.62) / 2 + 20, k.x, k.y); g.stroke(); }
   const t = finish(c, { wrap: false }); return t;
 }
 

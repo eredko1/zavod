@@ -1,6 +1,7 @@
 // RAILYARD sky: Poly Haven daytime HDRI (background + PMREM environment), warm sun with a 4096 shadow map fitted to the yard, light haze. RAILYARD agent.
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { hazeSky } from '../hazesky.js';
 
 export const HDRI_URL = './assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr';
 // Sun direction baked in the HDRI (measured offline: brightest texel u=0.595, v=0.2335 from top → elev 48°, az 34° from +X toward +Z).
@@ -54,7 +55,7 @@ export function buildSky(world) {
     const pmrem = new THREE.PMREMGenerator(renderer); pmrem.compileEquirectangularShader();
     const env = pmrem.fromEquirectangular(envTex).texture; pmrem.dispose(); envTex.dispose();
     scene.environment = env; scene.environmentIntensity = 1.0;
-    scene.background = hdr; scene.backgroundIntensity = 1.0;
+    hazeSky(scene, hdr, { rotY: SKY_ROT_Y });
     ctx.bus?.emit?.('skyReady', { map: 'railyard' });
   }, undefined, (e) => console.warn('[railyard] HDRI failed', e));
 

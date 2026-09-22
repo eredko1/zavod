@@ -1,6 +1,7 @@
 // CITY SQUARE furniture: benches, cast-iron lampposts, lawn + perimeter fences, chess plaza, the two statues, park house (ladder → roof),
 // playgrounds, dog runs, and the street: parked cars, hydrants, one-way signs, bike racks, tree pits, road markings. All instanced/merged. WSP agent.
 import * as THREE from 'three';
+import { carGeometries, carMaterials, CAR_KINDS, CAR_COLORS } from '../carkit.js';
 import { PARK, PATHS, FOUNTAIN, CHESS, STATUE_E, STATUE_W, PLAY_NE, PLAY_NW, DOG_L, DOG_S, PARKHOUSE, STREETS, BOUNDS, ARCH, CIRCLES, BUILDINGS } from './layout.js';
 import { chessTexture } from './textures.js';
 import { mergeGeos } from './ground.js';
@@ -354,20 +355,8 @@ function sph(r, x, y, z) { const g = new THREE.SphereGeometry(r, 10, 8); g.trans
 function buildStreet(world, T) {
   const { ctx, scene, R } = world; const V = world.maskSample;
   // ---- vehicles: sedan / cab / van — extruded side profiles, tinted glass band, 0.33 m rubber wheels + hubcaps, lights, plates; clearcoat paint ----
-  const profile = (pts, depth, y = 0) => { const sh = new THREE.Shape(); pts.forEach(([x, yy], i) => i ? sh.lineTo(x, yy) : sh.moveTo(x, yy)); sh.closePath(); const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2 }); g.translate(0, y, -depth / 2); return g; };
-  const KIT = {
-    sedan: { body: [[-2.25, 0.34], [2.25, 0.34], [2.32, 0.7], [1.8, 0.82], [0.95, 1.32], [-0.75, 1.38], [-1.85, 0.94], [-2.32, 0.86]], glass: [[0.92, 0.86], [1.62, 0.84], [0.86, 1.28], [-0.7, 1.33], [-1.72, 0.93], [-1.02, 0.86]], w: 1.78, wheels: [1.45, -1.45], hl: [2.3, 0.62], tl: [-2.3, 0.7], len: 4.6 },
-    cab: { body: [[-2.3, 0.34], [2.3, 0.34], [2.36, 0.72], [1.7, 0.86], [0.9, 1.42], [-0.9, 1.46], [-1.95, 0.98], [-2.36, 0.9]], glass: [[0.86, 0.9], [1.5, 0.88], [0.8, 1.38], [-0.85, 1.42], [-1.8, 0.97], [-1.0, 0.9]], w: 1.8, wheels: [1.5, -1.5], hl: [2.34, 0.64], tl: [-2.34, 0.72], len: 4.7, sign: true },
-    van: { body: [[-2.5, 0.36], [2.5, 0.36], [2.56, 0.86], [2.35, 1.02], [1.75, 1.06], [1.3, 1.96], [-2.45, 2.0], [-2.56, 1.4]], glass: [[1.68, 1.1], [1.25, 1.9], [-2.4, 1.92], [-2.45, 1.42], [1.2, 1.42]], w: 1.95, wheels: [1.55, -1.7], hl: [2.52, 0.72], tl: [-2.52, 1.0], len: 5.1 },
-  };
-  const paintMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5, clearcoat: 1.0, clearcoatRoughness: 0.09, envMapIntensity: 0.85 });
-  const glassMat = mat('vglass', { color: 0x3a4a50, roughness: 0.08, metalness: 0.7, envMapIntensity: 1.3 });
-  const rubber = mat('rubber', { color: 0x1c1c1c, roughness: 0.92 }); const chrome = mat('hubcap', { color: 0x8d9196, roughness: 0.42, metalness: 0.85 });
-  const trimDark = mat('carTrim', { color: 0x16181a, roughness: 0.55, metalness: 0.4 });
-  const lampW = mat('headlamp', { color: 0xdfe6ea, roughness: 0.2, metalness: 0.4, emissive: 0x556066 }); const lampR = mat('taillamp', { color: 0x9a1212, roughness: 0.3, emissive: 0x3a0505 });
-  const plateMat = mat('plate', { color: 0xe9e4d2, roughness: 0.5 });
-  const carCols = [0x1a1a1c, 0x95999d, 0x5f656b, 0x22305c, 0x5c1b1b, 0xa8a69f, 0x33383c, 0x1d1f22, 0x7b8086, 0x1a4433, 0x4a4036, 0x2d4a55].map(c => new THREE.Color(c));
-  const placements = { sedan: [], cab: [], van: [] };
+  const CM = carMaterials();
+  const placements = {}; for (const k of CAR_KINDS) placements[k] = [];
   for (const s of STREETS) {
     if (s.cobble) continue;
     const n = Math.floor((s.a1 - s.a0) / 7.4);
@@ -380,49 +369,25 @@ function buildStreet(world, T) {
         if (x < BOUNDS.x0 + 4 || x > BOUNDS.x1 - 4 || z < BOUNDS.z0 + 4 || z > BOUNDS.z1 - 4) continue;
         if (Math.abs(x - ARCH.cx) < 22 && z < -70 && z > -100) continue;   // keep the arch axis view clear
         const ry = s.axis === 'x' ? (side ? Math.PI : 0) : (side ? -Math.PI / 2 : Math.PI / 2);
-        const kind = R() < 0.18 ? 'cab' : R() < 0.3 ? 'van' : 'sedan';
-        placements[kind].push({ x, z, ry, kind });
+        const r = R(); const kind = r < 0.16 ? 'cab' : r < 0.26 ? 'van' : r < 0.44 ? 'suv' : r < 0.6 ? 'hatch' : 'sedan';
+        placements[kind].push({ x, z, ry: ry + (R() - 0.5) * 0.04, kind });
       }
     }
   }
-  for (const kind in KIT) {
-    const K = KIT[kind]; const P = placements[kind]; if (!P.length) continue;
-    const body = profile(K.body, K.w); const glass = profile(K.glass, K.w + 0.3, 0.0);
-    const wh = [], caps = [], hl = [], tl = [], plates = [], trim = [];
-    for (const wx of K.wheels) for (const wz of [K.w / 2 + 0.1, -K.w / 2 - 0.1]) {
-      const t = new THREE.CylinderGeometry(0.33, 0.33, 0.26, 16); t.rotateX(Math.PI / 2); t.translate(wx, 0.33, wz); wh.push(t);
-      const c = new THREE.CylinderGeometry(0.155, 0.155, 0.28, 12); c.rotateX(Math.PI / 2); c.translate(wx, 0.33, wz); caps.push(c);
-      // dark wheel-arch recess so the wheel is cut into the body instead of stuck on the side
-      const arch2 = new THREE.CylinderGeometry(0.46, 0.46, 0.14, 14, 1, false, 0, Math.PI); arch2.rotateX(Math.PI / 2); arch2.rotateZ(Math.PI); arch2.translate(wx, 0.36, wz * 0.94); trim.push(arch2);
-    }
-    for (const sz of [-1, 1]) { const h = new THREE.BoxGeometry(0.06, 0.16, 0.34); h.translate(K.hl[0], K.hl[1], sz * (K.w / 2 - 0.3)); hl.push(h); const r = new THREE.BoxGeometry(0.06, 0.14, 0.3); r.translate(K.tl[0], K.tl[1], sz * (K.w / 2 - 0.28)); tl.push(r); }
-    for (const px of [K.hl[0] + 0.02, K.tl[0] - 0.02]) { const p = new THREE.BoxGeometry(0.02, 0.15, 0.32); p.translate(px, 0.5, 0); plates.push(p); }
-    if (K.sign) { const sg = new THREE.BoxGeometry(0.5, 0.14, 0.2); sg.translate(0.1, 1.55, 0); plates.push(sg); }
-    // bumpers, rocker sills, door shut lines, handles and mirrors — the near-field detail a box has none of
-    for (const [bx, by] of [[K.hl[0] - 0.05, 0.52], [K.tl[0] + 0.05, 0.58]]) { const bm = new THREE.BoxGeometry(0.14, 0.22, K.w + 0.04); bm.translate(bx, by, 0); trim.push(bm); }
-    for (const sz of [-1, 1]) {
-      const sill = new THREE.BoxGeometry(K.len * 0.62, 0.11, 0.1); sill.translate(0, 0.36, sz * (K.w / 2 + 0.01)); trim.push(sill);
-      for (const dx of [-0.95, 0.15, 1.1]) { const sl = new THREE.BoxGeometry(0.035, 0.52, 0.035); sl.translate(dx, 0.78, sz * (K.w / 2 + 0.01)); trim.push(sl); }
-      for (const dx of [-0.6, 0.55]) { const hd = new THREE.BoxGeometry(0.2, 0.05, 0.05); hd.translate(dx, 0.92, sz * (K.w / 2 + 0.02)); trim.push(hd); }
-      const mir = new THREE.BoxGeometry(0.11, 0.1, 0.19); mir.translate(K.wheels[0] - 0.42, 1.12, sz * (K.w / 2 + 0.12)); trim.push(mir);
-      const stalk = new THREE.BoxGeometry(0.05, 0.05, 0.12); stalk.translate(K.wheels[0] - 0.42, 1.08, sz * (K.w / 2 + 0.03)); trim.push(stalk);
-    }
-    const cols = kind === 'cab' ? [new THREE.Color(0xf2b820)] : carCols;
-    const im = instance(world, body, paintMat, P, { surface: 'metal', name: 'cars_' + kind, colors: cols, collide: null });
-    P.forEach((c, i) => { if (kind !== 'cab') im.setColorAt(i, carCols[(R() * carCols.length) | 0]); const ax = Math.abs(Math.cos(c.ry)) > 0.5; const hx = K.len / 2, hz = K.w / 2; const ex = ax ? hx : hz, ez = ax ? hz : hx; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(c.x - ex, 0, c.z - ez), new THREE.Vector3(c.x + ex, kind === 'van' ? 2.0 : 1.45, c.z + ez))); const nx = ax ? 0 : 1, nz = ax ? 1 : 0; world.cover(c.x + nx * (hz + 0.6), c.z + nz * (hz + 0.6), nx, nz); world.cover(c.x - nx * (hz + 0.6), c.z - nz * (hz + 0.6), -nx, -nz); });
-    im.instanceColor.needsUpdate = true;
-    for (const c of P) world.contactBlobs.push({ x: c.x, z: c.z, ry: c.ry, ax: K.len + 0.8, az: K.w + 0.9 });
-    instance(world, glass, glassMat, P, { surface: 'metal', name: 'glass_' + kind, shadow: false, ray: false });
-    instance(world, mergeGeos(wh), rubber, P, { surface: 'metal', name: 'wheels_' + kind, shadow: false, ray: false });
-    instance(world, mergeGeos(caps), chrome, P, { surface: 'metal', name: 'caps_' + kind, shadow: false, ray: false });
-    instance(world, mergeGeos(hl), lampW, P, { surface: 'metal', name: 'hl_' + kind, shadow: false, ray: false });
-    instance(world, mergeGeos(tl), lampR, P, { surface: 'metal', name: 'tl_' + kind, shadow: false, ray: false });
-    instance(world, mergeGeos(plates), plateMat, P, { surface: 'metal', name: 'plates_' + kind, shadow: false, ray: false });
-    instance(world, mergeGeos(trim), trimDark, P, { surface: 'metal', name: 'trim_' + kind, shadow: false, ray: false });
+  for (const kind of CAR_KINDS) {
+    const P = placements[kind]; if (!P.length) continue;
+    const kit = carGeometries(kind), G = kit.geos;
+    const cols = kind === 'cab' ? [new THREE.Color(0xf2b820)] : P.map(() => CAR_COLORS[(R() * CAR_COLORS.length) | 0]);
+    instance(world, G.paint, CM.paint, P, { surface: 'metal', name: 'cars_' + kind, colors: cols, collide: null });
+    P.forEach((c) => { const ax = Math.abs(Math.cos(c.ry)) > 0.5; const hx = kit.len / 2, hz = kit.w / 2; const ex = ax ? hx : hz, ez = ax ? hz : hx; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(c.x - ex, 0, c.z - ez), new THREE.Vector3(c.x + ex, Math.min(kit.h, 1.6), c.z + ez))); const nx = ax ? 0 : 1, nz = ax ? 1 : 0; world.cover(c.x + nx * (hz + 0.6), c.z + nz * (hz + 0.6), nx, nz); world.cover(c.x - nx * (hz + 0.6), c.z - nz * (hz + 0.6), -nx, -nz); });
+    for (const c of P) world.contactBlobs.push({ x: c.x, z: c.z, ry: c.ry, ax: kit.len + 0.8, az: kit.w + 0.9 });
+    for (const slot of ['glass', 'rubber', 'rim', 'trim', 'lampW', 'lampR', 'plate']) if (G[slot]) instance(world, G[slot], CM[slot], P, { surface: 'metal', name: slot + '_' + kind, shadow: slot === 'rubber', ray: slot === 'glass' });
   }
 
   // ---- hydrants (red), one-way signs, bike racks, tree pits, street trees positions ----------------------------------
-  const hyd = mergeGeos([cyl(0.14, 0.16, 0.7, 0, 0.35, 0), cyl(0.09, 0.09, 0.18, 0, 0.78, 0), sph(0.12, 0, 0.9, 0), box(0.5, 0.1, 0.1, 0, 0.55, 0)]);
+  // NYC-style hydrant: flanged foot, barrel, collar, domed bonnet with operating nut, two side outlets with caps + chains' lugs
+  const hydLathe = new THREE.LatheGeometry([[0, 0], [0.19, 0], [0.19, 0.05], [0.15, 0.07], [0.13, 0.1], [0.13, 0.52], [0.16, 0.55], [0.16, 0.6], [0.14, 0.62], [0.135, 0.66], [0.11, 0.74], [0.06, 0.78], [0.035, 0.8], [0.035, 0.86], [0, 0.87]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
+  const hyd = mergeGeos([hydLathe.toNonIndexed(), new THREE.CylinderGeometry(0.055, 0.06, 0.36, 10).rotateZ(Math.PI / 2).translate(0, 0.44, 0), new THREE.CylinderGeometry(0.075, 0.075, 0.04, 10).rotateZ(Math.PI / 2).translate(0.19, 0.44, 0), new THREE.CylinderGeometry(0.075, 0.075, 0.04, 10).rotateZ(Math.PI / 2).translate(-0.19, 0.44, 0), new THREE.CylinderGeometry(0.09, 0.09, 0.05, 10).rotateX(Math.PI / 2).translate(0, 0.42, 0.15)].map(g => g.index ? g.toNonIndexed() : g));
   const signPost = mergeGeos([cyl(0.03, 0.03, 3.0, 0, 1.5, 0), box(0.9, 0.3, 0.03, 0, 2.6, 0)]);
   const rack = mergeGeos([new THREE.TorusGeometry(0.4, 0.03, 6, 12, Math.PI).translate(0, 0.5, 0), box(0.06, 0.5, 0.06, -0.4, 0.25, 0), box(0.06, 0.5, 0.06, 0.4, 0.25, 0)]);
   const hydrants = [], signs = [], racks = [], pits = [];
@@ -445,7 +410,7 @@ function buildStreet(world, T) {
       }
     }
   }
-  instance(world, hyd, mat('hydrant', { color: 0xc8261a, roughness: 0.5, metalness: 0.2 }), hydrants, { surface: 'metal', name: 'hydrants', collide: [0.2, 1.0, 0.2] });
+  instance(world, hyd, mat('hydrant', { color: 0x8e2a1e, roughness: 0.62, metalness: 0.35 }), hydrants, { surface: 'metal', name: 'hydrants', collide: [0.2, 1.0, 0.2] });
   for (const a of hydrants) world.contactBlobs.push({ x: a.x, z: a.z, s: 0.8 });
   for (const a of signs) world.contactBlobs.push({ x: a.x, z: a.z, s: 0.5 });
   for (const a of racks) world.contactBlobs.push({ x: a.x, z: a.z, s: 1.4 });

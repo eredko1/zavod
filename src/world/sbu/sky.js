@@ -1,6 +1,7 @@
 // SBU sky: Poly Haven partly-cloudy HDRI (background + PMREM environment), afternoon sun ~50° from the SW, 4096 shadow map fitted to the campus. SBU agent.
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { hazeSky } from '../hazesky.js';
 
 export const HDRI_URL = './assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr';
 // Sun in the HDRI: elev 48°, az 34° from +X toward +Z. Rotate so the disc sits SW (az 135°).
@@ -49,7 +50,7 @@ export function buildSky(world, { shadowHalf = 200, center = [50, 0, -60] } = {}
     const pmrem = new THREE.PMREMGenerator(renderer); pmrem.compileEquirectangularShader();
     const env = pmrem.fromEquirectangular(envTex).texture; pmrem.dispose(); envTex.dispose();
     scene.environment = env; scene.environmentIntensity = 0.75;
-    scene.background = hdr; scene.backgroundIntensity = 1.0;
+    hazeSky(scene, hdr, { rotY: SKY_ROT_Y });
     ctx.bus?.emit?.('skyReady', { map: 'sbu' });
   }, undefined, (e) => console.warn('[sbu] HDRI failed', e));
 
