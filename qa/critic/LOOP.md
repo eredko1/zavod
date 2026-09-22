@@ -26,7 +26,30 @@ Stop when overall >= 8.0 or after round 8.
 | sbu (University) | 3.5 | 4.6 | — | — | **r2 fixes partially landed** (806d600, detail.js) — finish, then r3 capture |
 | terminal (Central Station) | 5.3 | — | — | — | **items 1+2 partially built** (cove strips, booth+clock, mullions); items 4, 8 not started; 3,5,6,7,9,10,11,12 untouched |
 
-## Next session — start here
+
+## 2026-09-22 session 3 — all five maps, strict re-baseline
+
+Scope widened to all five maps (user: "each map to 8/10"). Re-captured every pose (`qa/critic/r2/*`, sbu `r3/*`) and
+re-scored strictly: 10 = MW2019 hero shot, 8 = solid commercial shooter with nothing reading as placeholder.
+Old numbers were generous (railyard "7.0" does not hold up: empty brick-box interiors, white untextured skyline, bare dirt plane).
+
+| Map | Baseline (strict) | Landed this session | Est. now |
+|---|---|---|---|
+| zavod | 5.0 | props decimated 6.8M→2.5M tris; viewmodel | 5.3 |
+| railyard | 5.5 | haze sky; viewmodel | 5.7 |
+| terminal | 5.0 | viewmodel | 5.2 |
+| wsp | 5.5 | haze sky, real plane-tree foliage, lofted car kit, hydrant | 6.3 |
+| sbu | 4.5 | haze sky, leaf-card canopies, car kit | 5.4 |
+
+Cross-map fixes: C-clamp support grip on all long guns + chrome-handguard root cause (`bakeWear` rim mode on unsegmented
+parts), `src/world/hazesky.js`, `src/world/carkit.js`. Probe tool pattern: raycast a screen pixel from a pose → mesh/material/point.
+
+Next, by leverage: terminal exposure/grade + floor polish + people; zavod puddles reflecting a skyscraper HDRI, black
+background silhouettes, dock-ceiling moiré; railyard interiors (office/shed) + skyline textures + outer ground; wsp
+shopfront interiors, row poses; sbu roads-pose concrete apron + white curb slab (ground:concretePav at -109,78), pines,
+Staller lawn stripes, plaza blank walls. Apply car kit to terminal street.
+
+## Next session — start here (older)
 
 **Nothing has been re-scored since its fixes landed.** All three maps carry stale numbers. Re-measuring is
 step 1, before any new building — otherwise the loop is open, not closed.
