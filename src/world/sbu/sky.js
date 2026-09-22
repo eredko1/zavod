@@ -9,7 +9,7 @@ const SKY_ROT_Y = (34 - 135) * Math.PI / 180;
 export const FOG_COLOR = new THREE.Color(0xcdd8e3);
 const ENV_SUN_CAP = 3.0;
 
-export function buildSky(world, { shadowHalf = 175, center = [8, 0, -5] } = {}) {
+export function buildSky(world, { shadowHalf = 200, center = [50, 0, -60] } = {}) {
   const { ctx, scene } = world;
   const { renderer } = ctx;
   renderer.toneMappingExposure = 0.85;
@@ -19,19 +19,20 @@ export function buildSky(world, { shadowHalf = 175, center = [8, 0, -5] } = {}) 
   scene.backgroundRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.environmentRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.background = FOG_COLOR.clone();
-  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0016);
+  // exponential-squared haze: soft, no hard horizon stripe, distant tree line dissolves into it
+  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0032);
 
-  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x6f6a5a, 0.45);
+  const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x7d7666, 0.55);
   scene.add(hemi); ctx.lights.hemi = hemi;
 
   const sun = new THREE.DirectionalLight(0xffe9cf, 10.5);
-  sun.position.set(center[0] + sunDir.x * 260, sunDir.y * 260, center[2] + sunDir.z * 260); sun.target.position.set(center[0], 0, center[2]);
+  sun.position.set(center[0] + sunDir.x * 420, sunDir.y * 420, center[2] + sunDir.z * 420); sun.target.position.set(center[0], 0, center[2]);
   sun.castShadow = true;
   const sm = sun.shadow;
   sm.mapSize.set(4096, 4096);
   sm.camera.left = -shadowHalf; sm.camera.right = shadowHalf; sm.camera.top = shadowHalf; sm.camera.bottom = -shadowHalf;
-  sm.camera.near = 40; sm.camera.far = 520;
-  sm.bias = -0.0002; sm.normalBias = 0.05; sm.radius = 1.5;
+  sm.camera.near = 20; sm.camera.far = 700;
+  sm.bias = -0.00016; sm.normalBias = 0.04; sm.radius = 2.4;   // soft PCF: grounded contact shadows, no acne on the terraces
   sm.camera.updateProjectionMatrix();
   scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
 

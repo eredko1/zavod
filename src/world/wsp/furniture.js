@@ -451,8 +451,13 @@ function buildStreet(world, T) {
   for (const a of racks) world.contactBlobs.push({ x: a.x, z: a.z, s: 1.4 });
   instance(world, signPost, mat('signpost', { color: 0x6a6f74, roughness: 0.5, metalness: 0.6 }), signs, { surface: 'metal', name: 'signs', collide: [0.06, 3.0, 0.06] });
   instance(world, rack, BLACK(), racks, { surface: 'metal', name: 'bikeRacks', collide: [0.45, 0.6, 0.08] });
-  const pitG = new THREE.BoxGeometry(1.6, 0.04, 1.6); pitG.translate(0, 0.02, 0);
-  instance(world, pitG, mat('soil', { color: 0x3b2f24, roughness: 1 }), pits, { surface: 'ground', name: 'treePits', shadow: false, ray: false });
+  const pitG = new THREE.BoxGeometry(1.5, 0.05, 1.5); pitG.translate(0, 0.025, 0);
+  instance(world, pitG, mat('soil', { color: 0x584635, roughness: 1 }), pits, { surface: 'ground', name: 'treePits', shadow: false, ray: false });
+  // granite kerb around each pit + a couple of weed tufts, so it reads as a street tree pit not a collider plate
+  { const kerb = [];
+    for (const [kx, kz, kw, kd] of [[0, -0.8, 1.76, 0.16], [0, 0.8, 1.76, 0.16], [-0.8, 0, 0.16, 1.44], [0.8, 0, 0.16, 1.44]]) { const k = new THREE.BoxGeometry(kw, 0.13, kd); k.translate(kx, 0.065, kz); kerb.push(k); }
+    instance(world, mergeGeos(kerb), mat('pitKerb', { map: world.tex.granite, color: 0xa7a299, roughness: 0.8 }), pits, { surface: 'concrete', name: 'treePitKerbs', shadow: false, ray: false });
+    for (const a of pits) world.contactBlobs.push({ x: a.x, z: a.z, s: 2.1 }); }
   // one-way arrow plates: white plane with a black arrow (canvas)
   const c = document.createElement('canvas'); c.width = 256; c.height = 96; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 96); g.fillStyle = '#111'; g.fillRect(40, 40, 140, 16); g.beginPath(); g.moveTo(170, 20); g.lineTo(230, 48); g.lineTo(170, 76); g.fill(); g.font = 'bold 22px Arial'; g.fillText('ONE WAY', 44, 30);
   const arrowTex = new THREE.CanvasTexture(c); arrowTex.colorSpace = THREE.SRGBColorSpace;

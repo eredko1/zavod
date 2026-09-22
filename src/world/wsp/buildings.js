@@ -78,6 +78,7 @@ export function buildBuildings(world, T) {
     const map = styleTex(st);
     const mat = new THREE.MeshStandardMaterial({ map, roughness: st === 'glass' ? 0.25 : 0.85, metalness: st === 'glass' ? 0.4 : 0, envMapIntensity: st === 'glass' ? 1.2 : 0.4 });
     if (st === 'brick' || st === 'row') { mat.normalMap = T.brickN; mat.normalScale = new THREE.Vector2(0.4, 0.4); }
+    facadeShader(mat, st);
     solidMesh(groups[st], mat, 'bld_' + st);
   }
   const gravel = gravelTexture(R);
@@ -146,6 +147,33 @@ function dressRoof(B, out, R) {
     if (R() < 0.6) { const fan = new THREE.CylinderGeometry(bd * 0.32, bd * 0.32, 0.22, 10); fan.translate(hx, h + bh + 0.22, hz); out.hvac.push(fan); }
   }
   for (let i = 0; i < 3; i++) { const [vx, vz] = at(R(), R()); const st = new THREE.CylinderGeometry(0.13, 0.15, 1.1 + R() * 0.9, 8); st.translate(vx, h + 0.7, vz); out.vent.push(st); }
+}
+
+/** Every block of one style shares a single merged mesh and one 512 px tile, so without this they all read identically.
+ *  Hash the block's 40 m cell into a brightness/hue offset, add a macro blotch, and lay street grime over the lower
+ *  floors and a faint sky-bounce sheen over the top ones. */
+function facadeShader(mat, key) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vFPos;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvFPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vFPos;
+        float fh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float fn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+          return mix(mix(fh(i), fh(i+vec2(1,0)), f.x), mix(fh(i+vec2(0,1)), fh(i+vec2(1,1)), f.x), f.y); }`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        vec2 cell = floor(vFPos.xz / 40.0);
+        float hA = fh(cell), hB = fh(cell + 17.3), hC = fh(cell + 91.7);
+        diffuseColor.rgb *= mix(0.82, 1.14, hA);
+        diffuseColor.rgb *= vec3(1.0 + (hB - 0.5) * 0.14, 1.0 + (hC - 0.5) * 0.09, 1.0 - (hB - 0.5) * 0.12);
+        diffuseColor.rgb *= mix(0.9, 1.08, fn(vFPos.xz * 0.06 + vFPos.y * 0.02));
+        float grime = 1.0 - smoothstep(0.0, 9.0, vFPos.y);
+        diffuseColor.rgb *= 1.0 - grime * 0.22 * (0.6 + 0.4 * fn(vFPos.xz * 1.4));
+        diffuseColor.rgb *= 1.0 + smoothstep(18.0, 46.0, vFPos.y) * 0.1;`);
+  };
+  mat.customProgramCacheKey = () => 'wsp-facade-' + key;
 }
 
 function roofGeo(x0, x1, z0, z1, y) { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, y + 0.02, (z0 + z1) / 2); return g; }
@@ -276,7 +304,7 @@ function buildBackdrop(world, styleTex) {
   // distant skyline far up the avenue (scaled down for fog): a spire on the axis, a few slabs
   blk(-20, 22, -1000, -960, 130, 'stone'); blk(-10, 12, -990, -970, 175, 'stone'); blk(-3, 5, -983, -977, 205, 'stone');
   for (const [x, z, h] of [[-120, -900, 90], [90, -950, 110], [-60, -1050, 120], [160, -1000, 95], [-200, -980, 80], [40, -1100, 140]]) blk(x, x + 40, z, z + 40, h, 'glass');
-  for (const st in geos) { const m = new THREE.Mesh(mergeGeos(geos[st]), new THREE.MeshStandardMaterial({ map: styleTex(st), roughness: 0.85 })); m.name = 'backdrop_' + st; m.receiveShadow = true; scene.add(m); }
+  for (const st in geos) { const bm = new THREE.MeshStandardMaterial({ map: styleTex(st), roughness: 0.85 }); facadeShader(bm, 'bg_' + st); const m = new THREE.Mesh(mergeGeos(geos[st]), bm); m.name = 'backdrop_' + st; m.receiveShadow = true; scene.add(m); }
   const rm = new THREE.Mesh(mergeGeos(roofs), new THREE.MeshStandardMaterial({ color: 0x55514c, roughness: 0.98 })); rm.name = 'backdropRoofs'; scene.add(rm);
   const pm = new THREE.Mesh(mergeGeos(parapets), new THREE.MeshStandardMaterial({ color: 0x7c7468, roughness: 0.9 })); pm.name = 'backdropParapets'; scene.add(pm);
 }

@@ -1,7 +1,7 @@
 // SBU ground: lawns, hex-paver mall with brick bands, SAC circular plaza, roads with curbs/crosswalks, Zebra Path, Staller sunken plaza + grass terraces, fountain, pond. SBU agent.
 import * as THREE from 'three';
 import { Batch, boxGeo, circlePts } from './geo.js';
-import { GROUND, MALL, LIB, LIB_LAWN, SAC, SAC_PLAZA, PLAZA_C, BUS_LOOP, ZEBRA, PIT, FOUNTAIN, POND, STALLER, PSY, ENG_DRIVE, EAST_LAWN, BOUNDS, FREY, HARRIMAN, ESS } from './layout.js';
+import { GROUND, MALL, LIB, LIB_LAWN, SAC, SAC_PLAZA, PLAZA_C, BUS_LOOP, ZEBRA, PIT, FOUNTAIN, POND, STALLER, PSY, ENG_DRIVE, EAST_LAWN, BOUNDS, FREY, HARRIMAN, ESS, ECC } from './layout.js';
 
 const PAV_Y = 0.03;   // paving top (3 cm above the lawn plane, no z-fight)
 
@@ -158,8 +158,12 @@ export function buildGround(world, M) {
   B.box('concretePav', [T.floorX0, T.floor - 0.5, T.z0], [T.x1, T.floor, T.z1], { collide: true });
   for (let i = 0; i < T.steps; i++) {
     const x1 = T.floorX0 - i * T.tread, x0 = x1 - T.tread; const top = T.floor + T.rise * (i + 1);
-    S.box('grass', [x0, T.floor - 0.5, T.z0], [x1 - 0.14, top, T.z1], { walkable: true });
-    S.box('concreteGrey', [x1 - 0.14, T.floor - 0.5, T.z0], [x1, top + 0.02, T.z1], { collide: false }); // concrete riser face + thin lip
+    S.box('grass', [x0, T.floor - 0.5, T.z0], [x1 - 0.18, top, T.z1], { walkable: true });
+    // pale cast concrete riser (never unlit: plain material, no ARM/metalness map) + a 0.04 m nosing lip that catches the sun
+    S.box('riser', [x1 - 0.18, T.floor - 0.5, T.z0], [x1, top - 0.05, T.z1], { collide: false });
+    S.box('nosing', [x1 - 0.22, top - 0.05, T.z0], [x1 + 0.04, top + 0.02, T.z1], { collide: false });
+    // granite kerb capping the grass tread against the riser (staller_steps.jpg)
+    S.box('graniteCap', [x1 - 0.55, top - 0.06, T.z0], [x1 - 0.18, top + 0.015, T.z1], { collide: false });
     world.cover(x0 + 1.2, T.z0 + 12, 1, 0, top); world.cover(x0 + 1.2, T.z1 - 12, 1, 0, top);
   }
   S.box('grass', [T.x0, -0.5, T.z0], [T.floorX0 - T.steps * T.tread, 0, T.z1], { collide: true });          // upper lawn
@@ -167,7 +171,8 @@ export function buildGround(world, M) {
   S.box('concreteGrey', [T.floorX0 - 4, T.floor - 0.5, T.z1], [T.x1, 0, T.z1 + 0.6], { collide: true });      // south retaining wall (east part)
   S.stairs('concretePav', { x: (T.floorX0 + T.x1) / 2, z: T.z1 - 9, y0: T.floor, rise: -T.floor, run: 9, width: T.x1 - T.floorX0 - 1, axis: 'z', dir: 1, n: 10 });
   // low wall along the south rim of the terraces (mall side) with a gap for the stair
-  S.box('concreteGrey', [T.x0, 0, T.z1], [T.floorX0 - 4, 0.45, T.z1 + 0.5]);
+  S.box('graniteWall', [T.x0, 0, T.z1], [T.floorX0 - 4, 0.45, T.z1 + 0.5]);
+  S.box('graniteCap', [T.x0 - 0.06, 0.45, T.z1 - 0.06], [T.floorX0 - 4, 0.53, T.z1 + 0.56], { collide: false });
   for (let x = T.x0 + 6; x < T.floorX0 - 6; x += 12) world.cover(x, T.z1 + 1.3, 0, 1);
   // Staller entrance walk on the pit floor + terrace railing posts
   B.box('concretePav', [T.floorX0, T.floor, T.z0], [T.x1, T.floor + 0.02, T.z0 + 6], { collide: false });
@@ -220,6 +225,37 @@ export function buildGround(world, M) {
   pav('asphalt', -712, -900, -698, 900, { y: 0.02, t: 0.1 }); pav('asphalt', -690, -900, -676, 900, { y: 0.02, t: 0.1 });
   for (let z = -900; z < 900; z += 12) { pav('paint', -705.1, z, -704.9, z + 4, { y: 0.035, t: 0.015 }); pav('paint', -683.1, z, -682.9, z + 4, { y: 0.035, t: 0.015 }); }
   pav('paintY', -698.2, -900, -697.9, 900, { y: 0.035, t: 0.015 }); pav('paintY', -690.1, -900, -689.8, 900, { y: 0.035, t: 0.015 });
+
+  // ---- granite retaining walls / kerbs where lawn meets paving (no more razor grass-to-slab edges) -----------------------
+  // a 0.45 m split-face granite wall with a cap, so every lawn edge reads as a built edge (staller_steps.jpg foreground)
+  const retain = (x0, z0, x1, z1, h = 0.45) => {
+    const ax0 = Math.min(x0, x1), ax1 = Math.max(x0, x1), az0 = Math.min(z0, z1), az1 = Math.max(z0, z1);
+    S.box('graniteWall', [ax0, -0.4, az0], [ax1, h, az1], { collide: false });
+    S.box('graniteCap', [ax0 - 0.07, h, az0 - 0.07], [ax1 + 0.07, h + 0.09, az1 + 0.07], { collide: false });
+  };
+  // east lawn (fountain → Humanities): all four edges
+  retain(EAST_LAWN.x0 - 0.45, EAST_LAWN.z0 + 4, EAST_LAWN.x0, EAST_LAWN.z1);
+  retain(EAST_LAWN.x1, EAST_LAWN.z0 + 4, EAST_LAWN.x1 + 0.45, EAST_LAWN.z1);
+  retain(EAST_LAWN.x0, EAST_LAWN.z0 + 4, EAST_LAWN.x1, EAST_LAWN.z0 + 4.45);
+  retain(EAST_LAWN.x0, 110, EAST_LAWN.x1, 110.45);
+  retain(EAST_LAWN.x0, 60, EAST_LAWN.x1, 60.45, 0.35);
+  // the arts-centre lawn either side of the terraces
+  retain(T.x0, T.z0 - 0.5, T.floorX0 - 4, T.z0 - 0.05, 0.4);
+  retain(T.x0 - 0.45, T.z0 - 0.5, T.x0, T.z1 + 0.5, 0.4);
+  // library forecourt lawn
+  retain(LIB.x0 - 0.45, LIB.z1 + 2.5, LIB.x0, LIB_LAWN.z1 - 0.2, 0.35);
+  retain(LIB.x1, LIB.z1 + 2.5, LIB.x1 + 0.45, LIB_LAWN.z1 - 0.2, 0.35);
+  // bus-loop / Campus Drive walk: kerb both sides so the concrete no longer meets raw grass
+  retain(-112.45, 55, -112, 118, 0.28); retain(-104, 75, -103.55, 118, 0.28); retain(-100, 55, -99.55, 75, 0.28);
+  // south walks (lecture-hall lawn) and the Psychology forecourt
+  retain(18, 79.55, 120, 80, 0.3); retain(18, 88, 120, 88.45, 0.3);
+  retain(119.55, 12, 120, 110, 0.3); retain(169.55, 12, 170, 110, 0.3);
+  // wide mulch/plant beds at the building feet (breaks the wall-meets-grass line, reads as maintained campus)
+  const bed = (x0, z0, x1, z1) => B.box('mulchDark', [Math.min(x0, x1), 0.02, Math.min(z0, z1)], [Math.max(x0, x1), 0.09, Math.max(z0, z1)], { collide: false });
+  bed(LIB.x0 - 1.4, LIB.z1 + 2.5, LIB.x1 + 1.4, LIB.z1 + 4.2);
+  bed(PSY.x0 - 2.2, PSY.z0 - 2.2, PSY.x1 + 2.2, PSY.z0);
+  bed(FREY.x0 - 1.8, FREY.z1, FREY.x1 + 1.8, FREY.z1 + 1.8);
+  bed(ECC.x0 - 2, ECC.z0 - 2.2, ECC.x1 + 2, ECC.z0);
 
   B.flush({ shadow: false }); S.flush();
   W.groundHeight = groundHeight;

@@ -6,6 +6,7 @@ import { buildSky } from '../sbu/sky.js';
 import { buildGround, groundHeight } from '../sbu/ground.js';
 import { buildBuildings } from '../sbu/buildings.js';
 import { buildProps } from '../sbu/props.js';
+import { buildDetail } from '../sbu/detail.js';
 import { BOUNDS, MALL, SAC_PLAZA, PIT, BUS_LOOP, ENG_DRIVE, LIB, SAC, FREY, ZEBRA, PSY, STALLER, FOUNTAIN, EAST_LAWN } from '../sbu/layout.js';
 
 export const meta = {
@@ -24,6 +25,7 @@ export function build(world) {
   ctx.progress(0.15, 'university: ground'); buildGround(world, M);
   ctx.progress(0.18, 'university: buildings'); buildBuildings(world, M);
   ctx.progress(0.22, 'university: props'); buildProps(world, M);
+  ctx.progress(0.24, 'university: detail'); buildDetail(world, M);
 
   // ---- gameplay ------------------------------------------------------------------------------------------------------
   const v = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -49,9 +51,9 @@ export function build(world) {
     overview: [-165, 80, 120, -0.9, -0.42],                // high from the SW over the plaza, mall and library
     library: [27, 0, 4, 0.0, 0.12],                        // the entrance walk, "LIBRARY" over the doors
     sac: [-106, 0, 40, -1.62, 0.08],                       // the glass front from the plaza
-    staller: [88, 0, -100, -1.45, -0.12],                  // top of the lawn steps: arts-center balcony and fly tower ahead
-    steps: [138, PIT.floor, -92, 1.35, 0.12],             // from the sunken plaza floor up the grass terraces to the library's east face
-    wang: [176, 0, -66, -0.86, 0.12],                      // east of the arts wing, NE to the arts-center portal, towers and spire
+    staller: [86, 0, -98, -1.42, -0.06],                   // top of the lawn terraces: arts-centre cantilever, balcony and fly tower ahead
+    steps: [136.5, PIT.floor, -88, 1.36, 0.10],           // from the sunken plaza floor up the grass terraces to the library's east face
+    wang: [252, 0, -103, 0.63, 0.10],                      // 25 m off the arts & culture portal: red frame, stepped stucco masses, lantern tower
     frey: [-28, 0, -34, 0.35, 0.1],                        // Zebra Path mouth, Frey's ribbed concrete on the left
     zebra: [-35, 0, -104, 3.14, 0.02],                     // down the Zebra Path toward the mall
     roads: [-112, 0, 71, 2.75, -0.02],                      // the bus loop on Campus Drive

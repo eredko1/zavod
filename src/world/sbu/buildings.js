@@ -49,15 +49,30 @@ export function facade(B, o) {
       // corner piers
       for (const [cx, cz] of [[x0 - pierOut, z0 - pierOut], [x1 + pierOut - inset - pierW, z0 - pierOut], [x0 - pierOut, z1 + pierOut - inset - pierW], [x1 + pierOut - inset - pierW, z1 + pierOut - inset - pierW]]) B.box(pier, [cx, wy, cz], [cx + inset + pierW, wy + wh, cz + inset + pierW], { collide: false });
     }
-    const mp = o.mullionPitch ?? pitch / 3, mm = 0.08;
+    const mp = o.mullionPitch ?? pitch / 3, mm = o.mullionW ?? 0.14;   // ≥ 0.12 m: thin mullions shimmer into dashes at distance
     if (mp > 0) {
       for (let x = x0 + mp; x < x1 - 0.2; x += mp) { B.box('darkMullion', [x - mm / 2, wy, z0 + inset - 0.08], [x + mm / 2, wy + wh, z0 + inset + 0.02], { collide: false }); B.box('darkMullion', [x - mm / 2, wy, z1 - inset - 0.02], [x + mm / 2, wy + wh, z1 - inset + 0.08], { collide: false }); }
       for (let z = z0 + mp; z < z1 - 0.2; z += mp) { B.box('darkMullion', [x0 + inset - 0.08, wy, z - mm / 2], [x0 + inset + 0.02, wy + wh, z + mm / 2], { collide: false }); B.box('darkMullion', [x1 - inset - 0.02, wy, z - mm / 2], [x1 - inset + 0.08, wy + wh, z + mm / 2], { collide: false }); }
       B.box('darkMullion', [x0 + inset - 0.08, wy + wh * 0.5 - mm, z0 + inset - 0.08], [x1 - inset + 0.08, wy + wh * 0.5 + mm, z1 - inset + 0.08], { collide: false });
     }
+    // soot / rain staining hanging under every window sill (0.5 m, alpha 0.35) — brick never reads as one clean tile
+    if (o.sillStain !== false) {
+      const sy0 = wy - 0.62, sy1 = wy - 0.06, e = lip + 0.035;
+      if (sy0 > y0 + 0.2) {
+        B.box('sillStain', [x0 + 0.3, sy0, z0 - e - 0.02], [x1 - 0.3, sy1, z0 - e], { collide: false, uv: false });
+        B.box('sillStain', [x0 + 0.3, sy0, z1 + e], [x1 - 0.3, sy1, z1 + e + 0.02], { collide: false, uv: false });
+        B.box('sillStain', [x0 - e - 0.02, sy0, z0 + 0.3], [x0 - e, sy1, z1 - 0.3], { collide: false, uv: false });
+        B.box('sillStain', [x1 + e, sy0, z0 + 0.3], [x1 + e + 0.02, sy1, z1 - 0.3], { collide: false, uv: false });
+      }
+    }
     // spandrel band with a projecting slab lip at its base (reads as the floor slab)
     B.box(wall, [x0 - lip, wy + wh, z0 - lip], [x1 + lip, wy + wh + 0.35, z1 + lip], { collide: false });
     B.box(wall, [x0, wy + wh + 0.35, z0], [x1, wy + storey, z1], { collide: false });
+    // lighter cast-concrete band at each floor line (0.3 m) — the horizontal course that breaks up brick
+    if (o.floorBand) {
+      const fb = lip + 0.06;
+      B.box('floorBand', [x0 - fb, wy + wh + 0.05, z0 - fb], [x1 + fb, wy + wh + 0.35, z1 + fb], { collide: false });
+    }
     y += storey;
   }
   if (o.top) { B.box(o.top.key, [x0, y, z0], [x1, y + o.top.h, z1], { collide: false }); y += o.top.h; }
@@ -180,7 +195,7 @@ export function buildBuildings(world, M) {
   world.ladder(S.x0 - 2.2, V.z0 - 0.3, 0, 4.6, 0, -1);
   lettering(world, 'STUDENT  ACTIVITIES  CENTER', S.x0 - 0.62, 11.25, (S.z0 + S.hallZ1) / 2, 26, 1.0, -Math.PI / 2, '#55606a');
   // brick wings behind the hall: 3 storeys with ribbon windows + barrel-vault roofs
-  facade(B, { x0: S.hallX1, x1: S.x1, z0: S.z0, z1: 66, floors: 3, storey: 4.6, band: 2.4, inset: 0.45, pitch: 3.0, pierW: 0.9, wall: 'brickRed', glass: 'glass', parapet: 0.7 });
+  facade(B, { x0: S.hallX1, x1: S.x1, z0: S.z0, z1: 66, floors: 3, storey: 4.6, band: 2.4, inset: 0.45, pitch: 3.0, pierW: 0.9, wall: 'brickRed', glass: 'glass', parapet: 0.7, floorBand: true });
   for (const [z0, z1] of [[S.z0 + 3, S.z0 + 19], [S.z0 + 25, S.z0 + 41]]) B.hcyl('roofMetal', 'x', S.hallX1 + 1, S.x1 - 1, (z0 + z1) / 2, 14.6, 4.2, 24);
   // auditorium / ballroom block (brick, windowless, white cornice) south-west
   block(B, 'brickRed', S.x0, S.hallZ1, S.hallX1 + 8, S.z1, 12.5);
@@ -215,7 +230,7 @@ export function buildBuildings(world, M) {
   block(B, 'ribbed', F.x0 + 4, F.z1 - 14, F.x0 + 16, F.z1 + 0.5, 17.5);
   B.box('concreteGrey', [F.x1 - 12, 0, F.z1], [F.x1 - 2, 3.6, F.z1 + 3.2], { collide: true });               // entrance vestibule (south)
   B.box('glass', [F.x1 - 11.5, 0, F.z1 + 3.2], [F.x1 - 2.5, 3.2, F.z1 + 3.35], { collide: false });
-  lettering(world, 'FREY HALL', F.x1 - 7, 4.4, F.z1 + 3.4, 6, 0.7, 0, '#3a3d40');
+  lettering(world, 'HOLLIS HALL', F.x1 - 7, 4.4, F.z1 + 3.4, 6.4, 0.7, 0, '#3a3d40');
 
   // ---- Harriman Hall (west, partly outside the bounds) — ribbed concrete on a brick base ----------------------------------------
   const H = HARRIMAN;
@@ -233,8 +248,8 @@ export function buildBuildings(world, M) {
 
   // ---- Center for the Arts (Staller-style): stepped brown-brick boxes, deep ribbon windows, 24 m fly tower, cantilevered concrete balcony with lettering, recessed glass lobby, ramps + railings ----
   const T = STALLER;
-  facade(B, { x0: T.nx0, x1: T.nx1, z0: T.nz0, z1: T.nz1, y0: PIT.floor, floors: 3, storey: 4.6, band: 3.1, inset: 0.6, pitch: 12, pierW: 0, mullionPitch: 1.6, lip: 0.15, wall: 'brickStaller', pier: 'brickStaller', parapet: 0.8, hvac: 5 });
-  facade(B, { x0: T.ex0, x1: T.ex1, z0: T.nz1 - 0.5, z1: T.ez1, y0: PIT.floor, floors: 3, storey: 4.6, band: 3.1, inset: 0.6, pitch: 12, pierW: 0, mullionPitch: 1.6, lip: 0.15, wall: 'brickStaller', pier: 'brickStaller', parapet: 0.8, hvac: 3 });
+  facade(B, { x0: T.nx0, x1: T.nx1, z0: T.nz0, z1: T.nz1, y0: PIT.floor, floors: 3, storey: 4.6, band: 3.1, inset: 0.6, pitch: 12, pierW: 0, mullionPitch: 2.0, lip: 0.15, wall: 'brickStaller', pier: 'brickStaller', parapet: 0.8, hvac: 5, floorBand: true });
+  facade(B, { x0: T.ex0, x1: T.ex1, z0: T.nz1 - 0.5, z1: T.ez1, y0: PIT.floor, floors: 3, storey: 4.6, band: 3.1, inset: 0.6, pitch: 12, pierW: 0, mullionPitch: 2.0, lip: 0.15, wall: 'brickStaller', pier: 'brickStaller', parapet: 0.8, hvac: 3, floorBand: true });
   block(B, 'brickStaller', T.towerX0 - 6, T.towerZ0, T.towerX1, T.towerZ1, 24, { y0: PIT.floor, hvac: 2 });                       // fly tower
   block(B, 'brickStaller', T.nx0 + 10, T.nz0 + 6, T.nx0 + 40, T.nz1 - 20, 19, { y0: PIT.floor, hvac: 2 });                        // recital hall mass
   block(B, 'brickStaller', T.ex0 - 12, T.nz1 - 0.5, T.ex0 + 0.5, T.nz1 + 14, 12.5, { y0: PIT.floor, hvac: 1 });                    // stepped lobby box at the corner (west of the wing)
@@ -251,6 +266,25 @@ export function buildBuildings(world, M) {
   world.walkable([T.ex0 - 5.5, PIT.floor, bz0], [T.ex0 - 0.6, PIT.floor + 4.7, bz1]); world.box([T.ex0 - 5.6, PIT.floor + 4.7, bz0], [T.ex0 - 5.0, PIT.floor + 5.9, bz1]);
   for (const z of [bz0 + 0.5, bz1 - 0.5]) B.box('concreteGrey', [T.ex0 - 5.4, PIT.floor, z - 0.35], [T.ex0 - 4.6, PIT.floor + 4.2, z + 0.35], { collide: true });
   lettering(world, 'CENTER FOR THE ARTS', T.ex0 - 5.52, PIT.floor + 5.25, (bz0 + bz1) / 2, 14, 0.62, -Math.PI / 2, '#e8e2d8');
+  // cantilevered upper box: the two top storeys of the wing overhang the balcony by 6.5 m on a dark soffit (staller_steps.jpg, right)
+  {
+    const cx0 = T.ex0 - 6.6, cz0 = bz0 - 6, cz1 = bz1 + 6, cy0 = PIT.floor + 7.0, cy1 = PIT.floor + 14.0;
+    B.box('brickStaller', [cx0, cy0 + 0.55, cz0], [T.ex0 + 0.2, cy1, cz1], { collide: false });
+    B.box('steelDark', [cx0 - 0.05, cy0, cz0 - 0.05], [T.ex0 + 0.2, cy0 + 0.55, cz1 + 0.05], { collide: false });        // shadow soffit / slab edge
+    B.box('floorBand', [cx0 - 0.12, cy0 + 0.55, cz0 - 0.12], [T.ex0 + 0.2, cy0 + 0.88, cz1 + 0.12], { collide: false });
+    B.box('floorBand', [cx0 - 0.12, cy1 - 0.4, cz0 - 0.12], [T.ex0 + 0.2, cy1, cz1 + 0.12], { collide: false });
+    world.box([cx0, cy0, cz0], [T.ex0 + 0.2, cy1, cz1]);
+    // deep ribbon windows on the overhanging west face + the two returns
+    for (const [ry0, ry1] of [[cy0 + 1.5, cy0 + 3.4], [cy0 + 5.4, cy0 + 7.3]]) {
+      B.box('glassDark', [cx0 - 0.02, ry0, cz0 + 0.8], [cx0 + 0.5, ry1, cz1 - 0.8], { collide: false });
+      for (let z = cz0 + 0.8; z < cz1 - 0.8; z += 2.0) B.box('darkMullion', [cx0 - 0.08, ry0, z - 0.07], [cx0 + 0.06, ry1, z + 0.07], { collide: false });
+      for (let z = cz0 + 4; z < cz1 - 4; z += 12) B.box('glassLit', [cx0 + 0.06, ry0 + 0.2, z], [cx0 + 0.14, ry1 - 0.2, z + 3.4], { collide: false });
+      B.box('graniteCap', [cx0 - 0.28, ry0 - 0.22, cz0 + 0.7], [cx0 + 0.1, ry0, cz1 - 0.7], { collide: false });          // sill
+    }
+    // white pipe railing continuing the balcony line past the overhang
+    for (const yy of [PIT.floor + 4.75, PIT.floor + 5.35]) { B.box('white', [T.ex0 - 5.35, yy, cz0], [T.ex0 - 5.21, yy + 0.09, bz0], { collide: false }); B.box('white', [T.ex0 - 5.35, yy, bz1], [T.ex0 - 5.21, yy + 0.09, cz1], { collide: false }); }
+    for (let z = cz0; z < cz1; z += 2.4) { if (z > bz0 && z < bz1) continue; B.box('white', [T.ex0 - 5.34, PIT.floor + 4.7, z - 0.05], [T.ex0 - 5.22, PIT.floor + 5.44, z + 0.05], { collide: false }); }
+  }
   world.ladder(T.ex0 - 5.5, bz1 - 3, PIT.floor, PIT.floor + 4.7, -1, 0);                                                            // balcony ladder
   for (let z = bz0 + 6; z < bz1 - 4; z += 10) world.cover(T.ex0 - 4.6, z, -1, 0, PIT.floor + 4.7);
   // planting at the base + ramp with railing from the plaza floor up to the mall-level terrace along the south box
@@ -262,12 +296,12 @@ export function buildBuildings(world, M) {
   B.hcyl('roofMetal', 'z', VDG.z0 + 2, VDG.z1 - 2, (VDG.x0 + VDG.x1) / 2, 9, (VDG.x1 - VDG.x0) / 2 - 2, 20);
 
   // ---- south perimeter: Educational Communications Center (brick), Engineering (precast), Javits / New CS / Light Engineering backdrop ----
-  facade(B, { x0: ECC.x0, x1: ECC.x1, z0: ECC.z0, z1: ECC.z1, floors: 2, storey: 4.5, band: 1.8, inset: 0.4, pitch: 3.0, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8 });
+  facade(B, { x0: ECC.x0, x1: ECC.x1, z0: ECC.z0, z1: ECC.z1, floors: 2, storey: 4.5, band: 1.8, inset: 0.4, pitch: 3.0, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8, floorBand: true });
   facade(B, { x0: ENG.x0, x1: ENG.x1, z0: ENG.z0, z1: ENG.z1, floors: 3, storey: 4.2, band: 1.5, inset: 0.6, pitch: 3.6, pierW: 0.5, wall: 'precast', parapet: 0.9 });
   block(B, 'concrete', JAVITS.x0 + 8, JAVITS.z0 + 8, JAVITS.x1 - 8, JAVITS.z1 - 8, 6.5);
   for (const [cx, cz] of [[JAVITS.x0 + 14, JAVITS.z0 + 14], [JAVITS.x1 - 14, JAVITS.z0 + 14], [JAVITS.x0 + 14, JAVITS.z1 - 14], [JAVITS.x1 - 14, JAVITS.z1 - 14]]) { B.cyl('concrete', cx, cz, 0, 10.5, 13, 28, { collide: true }); B.cyl('roof', cx, cz, 10.5, 10.55, 12.6, 28); B.cyl('glass', cx, cz, 3.2, 5.0, 13.05, 28); }
   facade(B, { x0: NEWCS.x0, x1: NEWCS.x1, z0: NEWCS.z0, z1: NEWCS.z1, floors: 4, storey: 4.0, band: 1.2, inset: 0.4, pitch: 3.0, pierW: 0.3, wall: 'stuccoLight', glass: 'glassLight', parapet: 0.8 });
-  facade(B, { x0: LIGHTENG.x0, x1: LIGHTENG.x1, z0: LIGHTENG.z0, z1: LIGHTENG.z1, floors: 2, storey: 4.5, band: 1.8, inset: 0.4, pitch: 3.0, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8 });
+  facade(B, { x0: LIGHTENG.x0, x1: LIGHTENG.x1, z0: LIGHTENG.z0, z1: LIGHTENG.z1, floors: 2, storey: 4.5, band: 1.8, inset: 0.4, pitch: 3.4, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8, mullionPitch: 0, sillStain: false });
 
   // ---- east: Humanities (precast, partly in), Administration (4-storey concrete on the mall axis, backdrop) -------------------------
   facade(B, { x0: HUM.x0, x1: HUM.x1, z0: HUM.z0, z1: HUM.z1, floors: 3, storey: 4.0, band: 1.4, inset: 0.6, pitch: 3.6, pierW: 0.5, wall: 'precast', parapet: 0.9 });
@@ -276,44 +310,93 @@ export function buildBuildings(world, M) {
   block(B, 'concreteGrey', 277, -60, 339, 84, 13);                                                                          // Administration parking garage (backdrop)
 
   // ---- north backdrop: Stony Brook Union (brick), Campus Recreation Center (stucco + glass) --------------------------------------------
-  facade(B, { x0: UNION.x0, x1: UNION.x1, z0: UNION.z0, z1: UNION.z1, floors: 3, storey: 4.4, band: 1.8, inset: 0.4, pitch: 3.2, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8 });
+  facade(B, { x0: UNION.x0, x1: UNION.x1, z0: UNION.z0, z1: UNION.z1, floors: 3, storey: 4.4, band: 1.8, inset: 0.4, pitch: 3.4, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8, mullionPitch: 0, sillStain: false });
   facade(B, { x0: REC.x0, x1: REC.x1, z0: REC.z0, z1: REC.z1, floors: 2, storey: 6.0, band: 2.0, inset: 0.4, pitch: 3.0, pierW: 0.3, wall: 'stucco', glass: 'glassLight', parapet: 0.8 });
 
-  // ---- Arts & Culture Center (NE backdrop, Wang-style): taupe stucco stepped boxes, twin glass-strip towers, red steel portal, granite steps, lantern spire, pond ----
+  // ---- Arts & Culture Center (NE, Wang-style): taupe stucco stepped masses, a REAL 12x7x4 m red steel portal,
+  // low square window band, twin glass-strip towers, granite forecourt, stacked lantern tower, reflecting pond ----
   const Wg = WANG;
-  block(B, 'stucco', Wg.x0, Wg.z0 + 30, Wg.x0 + 60, Wg.z1, 14, { hvac: 3 });
-  block(B, 'stucco', Wg.x0 + 20, Wg.z0 + 10, Wg.x0 + 75, Wg.z0 + 40, 18, { hvac: 3 });
-  block(B, 'stucco', Wg.x0 + 60, Wg.z0 + 30, Wg.x1 - 30, Wg.z1 + 2, 12, { hvac: 4 });
-  block(B, 'stucco', Wg.x0 + 75, Wg.z0, Wg.x1, Wg.z0 + 50, 16, { hvac: 3 });
-  block(B, 'stucco', Wg.x0 + 100, Wg.z0 + 50, Wg.x1 - 10, Wg.z1 - 10, 12, { hvac: 2 });
-  block(B, 'stucco', Wg.x0 + 4, Wg.z1 - 40, Wg.x0 + 22, Wg.z1 + 4, 12, { hvac: 1 });
-  // low square window band on the long south faces
-  for (let x = Wg.x0 + 3; x < Wg.x1 - 12; x += 6) { if (x > Wg.x0 + 8 && x < Wg.x0 + 34) continue; B.box(R() < 0.3 ? 'glassLit' : 'glass', [x, 2.2, Wg.z1 + 2.02], [x + 2.4, 4.6, Wg.z1 + 2.1], { collide: false }); B.box('darkMullion', [x - 0.1, 2.1, Wg.z1 + 2.0], [x + 2.5, 2.2, Wg.z1 + 2.12], { collide: false }); }
+  const ST = 'stuccoTaupe', STD = 'stuccoTaupeDark';
+  // stepped masses: flat render-coat boxes of different heights, no brick, deep shadow planes between them (wang1.jpg)
+  const massList = [
+    [Wg.x0, Wg.z0 + 30, Wg.x0 + 26, Wg.z1 - 2, 15],
+    [Wg.x0 + 22, Wg.z0 + 16, Wg.x0 + 52, Wg.z1 - 12, 19],
+    [Wg.x0 + 12, Wg.z0 + 4, Wg.x0 + 40, Wg.z0 + 34, 16],
+    [Wg.x0 + 48, Wg.z0 + 6, Wg.x0 + 86, Wg.z0 + 52, 17],
+    [Wg.x0 + 52, Wg.z0 + 46, Wg.x1 - 46, Wg.z1 - 6, 13],
+    [Wg.x0 + 92, Wg.z0 + 12, Wg.x1 - 12, Wg.z0 + 58, 15],
+    [Wg.x0 + 108, Wg.z0 + 54, Wg.x1 - 4, Wg.z1 - 14, 11],
+    [Wg.x0 + 2, Wg.z1 - 34, Wg.x0 + 18, Wg.z1 + 2, 11],
+  ];
+  for (const [mx0, mz0, mx1, mz1, mh] of massList) {
+    block(B, ST, mx0, mz0, mx1, mz1, mh, { hvac: 2, roof: 'roof' });
+    // shadow reveal: a recessed dark band down the corner of each mass (the vertical joints in the photo)
+    B.box(STD, [mx0 - 0.02, 0, mz0 - 0.02], [mx0 + 0.35, mh, mz0 + 0.35], { collide: false });
+    B.box(STD, [mx1 - 0.35, 0, mz1 - 0.35], [mx1 + 0.02, mh, mz1 + 0.02], { collide: false });
+    // low 1 x 1 m square window band along the TOP of every mass, every 2 m (wang1/wang2.jpg)
+    for (let x = mx0 + 2; x < mx1 - 2; x += 2) {
+      B.box(R() < 0.25 ? 'glassLit' : 'glassDark', [x, mh - 2.6, mz1 + 0.01], [x + 1, mh - 1.6, mz1 + 0.09], { collide: false });
+      B.box('white', [x - 0.09, mh - 2.7, mz1 + 0.02], [x + 1.09, mh - 2.6, mz1 + 0.14], { collide: false });
+    }
+    for (let z = mz0 + 2; z < mz1 - 2; z += 2) {
+      B.box(R() < 0.25 ? 'glassLit' : 'glassDark', [mx1 + 0.01, mh - 2.6, z], [mx1 + 0.09, mh - 1.6, z + 1], { collide: false });
+      B.box('white', [mx1 + 0.02, mh - 2.7, z - 0.09], [mx1 + 0.14, mh - 2.6, z + 1.09], { collide: false });
+    }
+  }
+  // entry block: a low flat-roofed pavilion the portal stands in front of
+  const ez0 = Wg.z1 - 8, ez1 = Wg.z1 + 3;
+  block(B, ST, Wg.x0 + 26, ez0, Wg.x0 + 58, ez1, 8.4, { hvac: 0 });
+  B.box('white', [Wg.x0 + 25.7, 8.4, ez0 - 0.3], [Wg.x0 + 58.3, 8.9, ez1 + 0.3], { collide: false });
   // twin glass-strip towers flanking the entrance
-  for (const tx0 of [Wg.x0 + 26, Wg.x0 + 46]) { B.box('stucco', [tx0, 0, Wg.z1 - 6], [tx0 + 6, 22, Wg.z1 + 4]); B.box('glass', [tx0 + 1.6, 0.5, Wg.z1 + 4], [tx0 + 4.4, 21, Wg.z1 + 4.12], { collide: false }); for (let y = 3; y < 21; y += 3) B.box('darkMullion', [tx0 + 1.5, y, Wg.z1 + 4.05], [tx0 + 4.5, y + 0.1, Wg.z1 + 4.2], { collide: false }); }
-  // red steel portal frame, two bays deep, lettering on the lintel, granite entry steps
-  const fx0 = Wg.x0 + 32, fx1 = Wg.x0 + 46, fz = Wg.z1 + 4;
-  for (const x of [fx0, (fx0 + fx1) / 2, fx1]) for (const z of [fz + 0.3, fz + 5, fz + 9.7]) B.box('redSteel', [x - 0.3, 0.6, z - 0.3], [x + 0.3, 8.6, z + 0.3], { collide: true });
-  for (const y of [4.6, 8.3]) { for (const z of [fz + 0.3, fz + 5, fz + 9.7]) B.box('redSteel', [fx0 - 0.3, y - 0.3, z - 0.3], [fx1 + 0.3, y + 0.3, z + 0.3], { collide: false }); for (const x of [fx0, (fx0 + fx1) / 2, fx1]) B.box('redSteel', [x - 0.3, y - 0.3, fz], [x + 0.3, y + 0.3, fz + 10], { collide: false }); }
-  B.box('glass', [fx0 + 0.6, 0.6, Wg.z1 + 4.02], [fx1 - 0.6, 8.0, Wg.z1 + 4.3], { collide: true });
-  lettering(world, 'ARTS & CULTURE CENTER', (fx0 + fx1) / 2, 8.3, fz + 10.02, 10, 0.5, 0, '#f3ece4');
-  B.stairs('granite', { x: (fx0 + fx1) / 2, z: fz + 10, y0: 0, rise: 0.6, run: 2.4, width: fx1 - fx0 + 4, axis: 'z', dir: 1, n: 3 });
-  B.box('granite', [fx0 - 2, 0, fz], [fx1 + 2, 0.6, fz + 10], { collide: true });
-  // lantern spire: stacked hexagonal metal tiers on a stucco shaft + four white masts
-  const tx = Wg.x0 + 52, tz = Wg.z0 + 26;
-  B.cyl('stucco', tx, tz, 0, 22, 2.2, 6);
-  for (let k = 0; k < 9; k++) B.cyl('alu', tx, tz, 20 + k * 1.5, 20 + k * 1.5 + 0.7, 3.4 - k * 0.12, 6);
-  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.cyl('white', tx + dx * 1.2, tz + dz * 1.2, 33, 42, 0.12, 6);
-  // reflecting pond in front (south) of the entrance lawn
-  B.box('concreteGrey', [Wg.x0 + 24, -0.5, Wg.z1 + 16], [Wg.x0 + 60, 0.3, Wg.z1 + 34], { collide: true });
-  B.box('water', [Wg.x0 + 24.6, 0.1, Wg.z1 + 16.6], [Wg.x0 + 59.4, 0.16, Wg.z1 + 33.4], { collide: false });
+  for (const tx0 of [Wg.x0 + 18, Wg.x0 + 60]) {
+    B.box(ST, [tx0, 0, Wg.z1 - 8], [tx0 + 6.5, 23, Wg.z1 + 2]);
+    B.box('glass', [tx0 + 1.8, 0.5, Wg.z1 + 2], [tx0 + 4.7, 22, Wg.z1 + 2.12], { collide: false });
+    for (let y = 3; y < 22; y += 3) B.box('white', [tx0 + 1.6, y, Wg.z1 + 2.02], [tx0 + 4.9, y + 0.16, Wg.z1 + 2.24], { collide: false });
+    B.box('white', [tx0 - 0.25, 23, Wg.z1 - 8.25], [tx0 + 6.75, 23.6, Wg.z1 + 2.25], { collide: false });
+  }
+  // ---- the red portal: REAL box-beam frame, 12 m wide x 7 m tall x 4 m deep, 0.6 m members ----------------------------
+  const pW = 12, pH = 7, pD = 4, bm = 0.6;
+  const pcx = Wg.x0 + 42, pz1 = Wg.z1 + 3.2, pz0 = pz1 + pD;                    // pz0 = the outer (south) plane, toward the camera
+  const pxs = [pcx - pW / 2, pcx, pcx + pW / 2], pzs = [pz1, pz0];
+  const hb = bm / 2;
+  for (const x of pxs) for (const z of pzs) B.box('redSteel', [x - hb, 0, z - hb], [x + hb, pH, z + hb], { collide: true });        // 6 columns
+  for (const y of [pH * 0.55, pH]) {                                                                                                // two beam levels
+    for (const z of pzs) B.box('redSteel', [pxs[0] - hb, y - bm, z - hb], [pxs[2] + hb, y, z + hb], { collide: false });            // spanning beams
+    for (const x of pxs) B.box('redSteel', [x - hb, y - bm, pz1 - hb], [x + hb, y, pz0 + hb], { collide: false });                   // tie beams front↔back
+  }
+  for (const x of [pxs[0], pxs[2]]) for (const z of pzs) {                                                                           // knee braces (the angled struts in wang1.jpg)
+    const s = x < pcx ? 1 : -1;
+    const g = boxGeo([-hb * 0.8, -1.9, -hb * 0.8], [hb * 0.8, 1.9, hb * 0.8]); g.rotateZ(-s * 0.72); g.translate(x + s * 1.25, pH * 0.55 - 1.3, z); B.add('redSteel', g, { uv: false });
+  }
+  B.box('redSteel', [pxs[0] - hb, pH * 0.55 - bm - 0.7, pz0 - hb - 0.06], [pxs[2] + hb, pH * 0.55 - bm, pz0 + hb + 0.06], { collide: false });   // sign fascia band
+  lettering(world, 'ARTS & CULTURE CENTER', pcx, pH * 0.55 - bm - 0.35, pz0 + hb + 0.09, 8.6, 0.42, 0, '#f6efe6');
+  // glazed entrance wall behind the frame: dark glass, white mullions, four doors
+  B.box('glassDark', [pcx - pW / 2 + 0.4, 0, pz1 - 0.35], [pcx + pW / 2 - 0.4, pH - 0.4, pz1 - 0.2], { collide: true });
+  for (let x = pcx - pW / 2 + 0.4; x <= pcx + pW / 2 - 0.4 + 0.01; x += 1.45) B.box('alu', [x - 0.07, 0, pz1 - 0.42], [x + 0.07, pH - 0.4, pz1 - 0.28], { collide: false });
+  B.box('alu', [pcx - pW / 2 + 0.3, 2.45, pz1 - 0.42], [pcx + pW / 2 - 0.3, 2.6, pz1 - 0.28], { collide: false });
+  B.box('alu', [pcx - pW / 2 + 0.3, 4.4, pz1 - 0.42], [pcx + pW / 2 - 0.3, 4.52, pz1 - 0.28], { collide: false });
+  for (let x = pcx - 3.4; x < pcx + 3.4; x += 1.7) B.box('glassLit', [x + 0.1, 0.1, pz1 - 0.26], [x + 1.6, 2.4, pz1 - 0.22], { collide: false });
+  // granite entry terrace + steps down to the lawn
+  B.box('granite', [pcx - pW / 2 - 3, 0, pz1 - 1], [pcx + pW / 2 + 3, 0.6, pz0 + 3], { collide: true });
+  B.stairs('granite', { x: pcx, z: pz0 + 3, y0: 0, rise: 0.6, run: 2.4, width: pW + 6, axis: 'z', dir: 1, n: 3 });
+  B.box('graniteCap', [pcx - pW / 2 - 3.1, 0.6, pz1 - 1.1], [pcx - pW / 2 - 3, 0.68, pz0 + 3.1], { collide: false });
+  B.box('graniteCap', [pcx + pW / 2 + 3, 0.6, pz1 - 1.1], [pcx + pW / 2 + 3.1, 0.68, pz0 + 3.1], { collide: false });
+  for (let z = pz1; z < pz0 + 2; z += 3) { world.cover(pcx - pW / 2 - 3.6, z, -1, 0, 0.6); world.cover(pcx + pW / 2 + 3.6, z, 1, 0, 0.6); }
+  // lantern tower: stacked metal tiers on a stucco shaft + four white masts, close behind the entrance (wang1.jpg)
+  const tx = Wg.x0 + 52, tz = Wg.z1 - 22;
+  B.cyl(ST, tx, tz, 0, 21, 2.4, 6, { collide: true });
+  for (let k = 0; k < 9; k++) { B.cyl('alu', tx, tz, 19 + k * 1.55, 19 + k * 1.55 + 0.75, 3.5 - k * 0.1, 6); B.cyl('white', tx, tz, 19 + k * 1.55 + 0.75, 19 + k * 1.55 + 0.95, 2.1, 6); }
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.cyl('white', tx + dx * 1.25, tz + dz * 1.25, 33.5, 43, 0.13, 6);
+  // reflecting pond + lawn kerb in front (south) of the entrance
+  B.box('concreteGrey', [pcx - 18, -0.5, pz0 + 12], [pcx + 18, 0.3, pz0 + 30], { collide: true });
+  B.box('water', [pcx - 17.4, 0.1, pz0 + 12.6], [pcx + 17.4, 0.16, pz0 + 29.4], { collide: false });
 
   // ---- campus wayfinding signs (generic text, red panels on steel posts) ---------------------------------------------------------------
   const signs = [
     { x: -62, z: 6, ry: 0, text: 'ACADEMIC MALL', sub: 'LIBRARY  ·  ARTS CENTER  →' },
     { x: 60, z: 14, ry: Math.PI, text: 'STUDENT ACTIVITIES CENTER', sub: '←  BUS LOOP  ·  CAMPUS DRIVE' },
     { x: 120, z: -12, ry: 0, text: 'ADMINISTRATION  →', sub: 'ARTS CENTER  ·  THE STEPS' },
-    { x: -35, z: -30, ry: 0, text: 'ZEBRA PATH', sub: 'CHEMISTRY  ·  STUDENT UNION  ↑' },
+    { x: -35, z: -30, ry: 0, text: 'STRIPE WALK', sub: 'SCIENCES  ·  STUDENT UNION  ↑' },
     { x: -118, z: 66, ry: Math.PI / 2, text: 'CAMPUS DRIVE', sub: 'BUS LOOP' },
   ];
   for (const s of signs) {

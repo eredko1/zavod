@@ -70,8 +70,8 @@ export function buildTrees(world, T) {
   const leafMat = (tex, lit) => {
     const m = new THREE.MeshStandardMaterial({
       map: tex, alphaTest: lit ? 0.5 : 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0,
-      color: lit ? 0x6a9a3c : 0x2d4a22, emissiveMap: tex, emissive: lit ? 0x54782c : 0x1d3316,
-      emissiveIntensity: lit ? 0.3 : 0.16, transparent: false,
+      color: lit ? 0x6a9a3c : 0x38592a, emissiveMap: tex, emissive: lit ? 0x54782c : 0x2a4620,
+      emissiveIntensity: lit ? 0.3 : 0.26, transparent: false,
     });
     m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, ' + (lit ? '0.42' : '0.25') + ')); nonPerturbedNormal = normal;'); };
     m.customProgramCacheKey = () => 'wsp-leaf-' + (lit ? 'o' : 'i');

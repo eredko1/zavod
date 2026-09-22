@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch, boxGeo, circlePts } from './geo.js';
-import { leafTexture } from './mats.js';
+import { leafTexture, signTexture } from './mats.js';
+import { hedgeRow } from './detail.js';
 import { BOUNDS, MALL, LIB, LIB_LAWN, SAC, PLAZA_C, BUS_LOOP, FREY, PSY, PIT, FOUNTAIN, POND, EAST_LAWN, ENG_DRIVE, STALLER, CHEM, HARRIMAN, ESS, ECC, ENG, HUM, ZEBRA } from './layout.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Euler();
@@ -31,11 +32,13 @@ export function buildProps(world, M) {
   const { ctx, scene, R, W } = world;
   const B = new Batch(world, M, 'props');
   const j = (a) => (R() - 0.5) * a;
+  const aoSpots = []; W.sbuAOSpots = aoSpots;          // radial contact shadows, baked by detail.js
+  const ao = (x, z, r, y = 0) => aoSpots.push({ x, y, z, r });
 
   // ---- trees --------------------------------------------------------------------------------------------------------------------
   const leafDec = leafTexture(R), leafPine = leafTexture(R, { pine: true });
-  const canopyMat = new THREE.MeshStandardMaterial({ map: leafDec, color: 0x9fb26e, roughness: 1, alphaTest: 0.45, side: THREE.DoubleSide, name: 'canopy' });
-  const pineMat = new THREE.MeshStandardMaterial({ map: leafPine, color: 0x6e8a5a, roughness: 1, alphaTest: 0.45, side: THREE.DoubleSide, name: 'pine' });
+  const canopyMat = new THREE.MeshStandardMaterial({ map: leafDec.map, alphaMap: leafDec.alphaMap, color: 0xb8cc88, roughness: 1, metalness: 0, alphaTest: 0.42, side: THREE.DoubleSide, envMapIntensity: 0.5, name: 'canopy' });
+  const pineMat = new THREE.MeshStandardMaterial({ map: leafPine.map, alphaMap: leafPine.alphaMap, color: 0x84a06a, roughness: 1, metalness: 0, alphaTest: 0.42, side: THREE.DoubleSide, envMapIntensity: 0.45, name: 'pine' });
   // deciduous: trunk + 3 lumpy spheres
   // deciduous species: plane (tall, open), oak (wide, low), maple (round, dense) — trunk + 1st/2nd-order branches, lumpy canopy
   const treeGeo = (trunkH, trunkR, branches) => {
@@ -65,6 +68,7 @@ export function buildProps(world, M) {
     const p = { x, z, ry: R() * Math.PI * 2, s: s * (0.8 + R() * 0.4), color: new THREE.Color().setHSL(sp === 2 ? 0.16 + R() * 0.08 : 0.22 + R() * 0.07, 0.35 + R() * 0.2, 0.34 + R() * 0.12) };
     (sp < 0 ? pines : dec[sp]).push(p);
     ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.3, 0, z - 0.3), new THREE.Vector3(x + 0.3, 5, z + 0.3)));
+    if (Math.abs(x) < 230 && z > -250 && z < 210) ao(x, z, (sp < 0 ? 2.0 : 3.1) * p.s, W.groundHeight(x, z));
   };
   // mall rows (both sides), library lawn, plaza ring, east lawn, Staller terraces edges, perimeter belts
   for (let x = -100; x < 190; x += 12) { if (!(x > 120 && x < 152)) tree(x + j(1.5), MALL.z1 - 3.4 + j(0.6), 1.0, 'plane'); }
@@ -121,17 +125,22 @@ export function buildProps(world, M) {
   const headGeo = (() => { const h = new THREE.CylinderGeometry(0.34, 0.26, 0.5, 10); h.translate(0, 6.55, 0); const cap = new THREE.ConeGeometry(0.4, 0.22, 10); cap.translate(0, 6.9, 0); return merge([h, cap]); })();
   const bannerGeo = (() => { const g = new THREE.PlaneGeometry(0.7, 1.7); g.translate(0, 3.7, 0.65); return g; })();
   const lamps = [];
-  const lamp = (x, z, ry = 0) => { lamps.push({ x, z, ry }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.25, 0, z - 0.25), new THREE.Vector3(x + 0.25, 6, z + 0.25))); W.lampPositions.push(new THREE.Vector3(x, 6.5, z)); };
+  const lamp = (x, z, ry = 0) => { lamps.push({ x, z, ry }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.25, 0, z - 0.25), new THREE.Vector3(x + 0.25, 6, z + 0.25))); W.lampPositions.push(new THREE.Vector3(x, 6.5, z)); ao(x, z, 0.85, W.groundHeight(x, z)); };
   for (let x = -94; x < 192; x += 24) { if (!(x > 124 && x < 148)) lamp(x, MALL.z1 - 1.0, Math.PI); lamp(x + 12, MALL.z0 + 1.0, 0); }
   for (let k = 0; k < 10; k++) { const a = k * Math.PI * 2 / 10; if (a > 0.5 && a < 2.7) continue; lamp(PLAZA_C.x + Math.cos(a) * 19, PLAZA_C.z + Math.sin(a) * 19, -a + Math.PI / 2); }
   for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; lamp(BUS_LOOP.x + Math.cos(a) * (BUS_LOOP.r + 6.5), BUS_LOOP.z + Math.sin(a) * (BUS_LOOP.r + 6.5), -a - Math.PI / 2); }
   for (let z = -100; z < -40; z += 20) lamp(ZEBRA.x - 5.2, z, Math.PI / 2);
-  for (let z = -130; z < -62; z += 17) lamp(PIT.floorX0 + 1.2, z, -Math.PI / 2, PIT.floor);
+  for (let z = -134; z < -64; z += 17) lamp(144.2, z, Math.PI / 2);      // pit floor: against the arts-centre face, clear of the `steps` sight line
   for (let z = 20; z < 110; z += 18) lamp(118.2, z, -Math.PI / 2);
   for (let z = 20; z < 110; z += 18) lamp(171.5, z, Math.PI / 2);
   for (let z = -40; z < 8; z += 16) lamp(LIB.x0 - 7.5, z, Math.PI / 2);
   for (let x = 24; x < 118; x += 24) lamp(x, 86.5, 0);
   for (let z = 118; z < 140; z += 12) { lamp(ENG_DRIVE.x0 - 2, z, Math.PI / 2); }
+  // lawn-edge lamps: the arts-centre terraces, the south lecture-hall lawn and the arts & culture forecourt
+  for (let z = -134; z < -60; z += 18) lamp(PIT.x0 - 3.2, z, -Math.PI / 2);                       // top of the terraces
+  for (let x = 124; x < 178; x += 18) lamp(x, 137, 0);                                             // south lawn walk
+  for (let x = 126; x < 176; x += 22) lamp(x, 113.5, Math.PI);
+  for (const [lx, lz] of [[219, -104], [253, -104], [219, -128], [253, -128]]) lamp(lx, lz, Math.PI);   // arts & culture forecourt
   for (const l of lamps) l.y = W.groundHeight(l.x, l.z);
   inst(world, lampGeo, M.alu, lamps, 'metal', { name: 'lamps' });
   inst(world, headGeo, M.lampHead, lamps, 'metal', { name: 'lampHeads' });
@@ -146,7 +155,7 @@ export function buildProps(world, M) {
     return merge(parts);
   })();
   const benches = [];
-  const bench = (x, z, ry = 0) => { benches.push({ x, z, ry, y: W.groundHeight(x, z) }); const b = new THREE.Box3(new THREE.Vector3(x - 1, 0, z - 0.5), new THREE.Vector3(x + 1, 0.9, z + 0.5)); ctx.colliders.push(b); world.cover(x + Math.sin(ry) * 0.9, z + Math.cos(ry) * 0.9, Math.sin(ry), Math.cos(ry)); };
+  const bench = (x, z, ry = 0) => { benches.push({ x, z, ry, y: W.groundHeight(x, z) }); const b = new THREE.Box3(new THREE.Vector3(x - 1, 0, z - 0.5), new THREE.Vector3(x + 1, 0.9, z + 0.5)); ctx.colliders.push(b); ao(x, z, 1.35, W.groundHeight(x, z)); world.cover(x + Math.sin(ry) * 0.9, z + Math.cos(ry) * 0.9, Math.sin(ry), Math.cos(ry)); };
   for (let x = -94; x < 190; x += 12) { if (x > 118 && x < 154) continue; bench(x + 6, MALL.z1 - 1.1, Math.PI); if (x < 10 || x > 76) bench(x + 3, MALL.z0 + 1.4, 0); }
   for (let x = LIB.x0 + 10; x < LIB.x1 - 6; x += 16) bench(x, LIB_LAWN.z1 - 0.9, 0);
   for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + 0.4; if (a > 0.5 && a < 2.7) continue; bench(PLAZA_C.x + Math.cos(a) * 20.5, PLAZA_C.z + Math.sin(a) * 20.5, -a - Math.PI / 2); }
@@ -155,13 +164,19 @@ export function buildProps(world, M) {
   for (let z = -95; z < -45; z += 18) bench(ZEBRA.x - 5.6, z, Math.PI / 2);
   for (let x = 30; x < 116; x += 22) bench(x, 85.5, Math.PI);
   bench(FOUNTAIN.x - 12, FOUNTAIN.z - 8, 0.8); bench(FOUNTAIN.x + 12, FOUNTAIN.z - 8, -0.8);
+  for (let z = -130; z < -66; z += 14) bench(PIT.x0 - 4.6, z, -Math.PI / 2);                       // above the terraces
+  for (let x = 92; x < 130; x += 13) bench(x, PIT.z1 + 2.6, 0);                                     // terrace south rim
+  for (let x = 124; x < 176; x += 13) bench(x, 135.4, Math.PI);                                     // south lawn
+  for (let x = 128; x < 172; x += 15) bench(x, 114.6, 0);
+  for (const [bx, bz, br] of [[216, -100, 0], [228, -100, 0], [248, -100, 0], [260, -100, 0], [212, -118, Math.PI / 2], [262, -118, -Math.PI / 2]]) bench(bx, bz, br);
   inst(world, benchGeo, M.bench, benches, 'wood', { name: 'benches' });
 
   const binGeo = (() => { const g = new THREE.CylinderGeometry(0.34, 0.3, 1.0, 12, 1, true); g.translate(0, 0.5, 0); const lid = new THREE.CylinderGeometry(0.37, 0.37, 0.08, 12); lid.translate(0, 1.02, 0); return merge([g, lid]); })();
   const bins = [], binsB = [];
-  const bin = (x, z, blue = false) => { (blue ? binsB : bins).push({ x, z, y: W.groundHeight(x, z), ry: R() * 6 }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.36, 0, z - 0.36), new THREE.Vector3(x + 0.36, 1.05, z + 0.36))); };
+  const bin = (x, z, blue = false) => { (blue ? binsB : bins).push({ x, z, y: W.groundHeight(x, z), ry: R() * 6 }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 0.36, 0, z - 0.36), new THREE.Vector3(x + 0.36, 1.05, z + 0.36))); ao(x, z, 0.72, W.groundHeight(x, z)); };
   for (let x = -90; x < 190; x += 24) { if (x > 118 && x < 154) continue; bin(x + 1.5, MALL.z1 - 1.6); bin(x + 2.3, MALL.z1 - 1.6, true); }
   bin(LIB.entX1 + 3, LIB.z1 + 1.2); bin(LIB.entX1 + 3.8, LIB.z1 + 1.2, true); bin(SAC.x0 - 5.5, SAC.z0 + 22, true); bin(SAC.x0 - 5.5, SAC.z0 + 7); bin(PIT.floorX0 + 2, PIT.z0 + 34, true); bin(121.5, 40); bin(121.5, 40.9, true);
+  for (const [bx, bz] of [[PIT.x0 - 4.6, -120], [PIT.x0 - 4.6, -86], [100, PIT.z1 + 2.6], [126, PIT.z1 + 2.6], [130, 135.4], [156, 135.4], [134, 114.6], [222, -100], [254, -100], [BUS_LOOP.x + 3.2, BUS_LOOP.z - 9.4]]) { bin(bx, bz); bin(bx + 0.85, bz, true); }
   inst(world, binGeo, M.binGreen, bins, 'metal', { name: 'bins' }); inst(world, binGeo, M.binBlue, binsB, 'metal', { name: 'binsBlue' });
   // blue-light emergency phones
   const phoneGeo = (() => { const p = new THREE.CylinderGeometry(0.09, 0.11, 2.6, 8); p.translate(0, 1.3, 0); const bx = new THREE.BoxGeometry(0.34, 0.5, 0.22); bx.translate(0, 1.25, 0.12); const cap = new THREE.CylinderGeometry(0.12, 0.12, 0.3, 8); cap.translate(0, 2.75, 0); return merge([p, bx, cap]); })();
@@ -178,6 +193,9 @@ export function buildProps(world, M) {
   for (let z = SAC.z0 - 2; z < SAC.z1 + 2; z += 1.6) bol(SAC.x0 - 6.2, z);
   for (let k = 0; k < 40; k++) { const a = k * Math.PI * 2 / 40; bol(BUS_LOOP.x + Math.cos(a) * (BUS_LOOP.r + BUS_LOOP.w / 2 + 0.6), BUS_LOOP.z + Math.sin(a) * (BUS_LOOP.r + BUS_LOOP.w / 2 + 0.6)); }
   for (let x = MALL.x0 + 1; x < MALL.x0 + 3; x += 1.6) for (let z = MALL.z0 + 1; z < MALL.z1; z += 1.8) bol(x, z);
+  for (let x = 122; x < 178; x += 2.2) bol(x, 139.2);                                               // south lawn edge
+  for (let z = -124; z < -70; z += 2.4) bol(PIT.x0 - 6.4, z);                                        // terrace top walk
+  for (let x = 208; x < 268; x += 2.4) bol(x, -95.5);                                                // arts & culture forecourt edge
   inst(world, bolGeo, M.steelDark, bols, 'metal', { name: 'bollards' });
 
   // bike racks (inverted-U hoops) near the SAC and library entrance
@@ -185,6 +203,7 @@ export function buildProps(world, M) {
   const racks = [];
   const rackRow = (x, z, n, ry) => { for (let i = 0; i < n; i++) racks.push({ x: x + Math.cos(ry) * i * 0.9, z: z - Math.sin(ry) * i * 0.9, ry, y: W.groundHeight(x, z) }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(Math.min(x, x + Math.cos(ry) * n * 0.9) - 0.5, 0, Math.min(z, z - Math.sin(ry) * n * 0.9) - 0.5), new THREE.Vector3(Math.max(x, x + Math.cos(ry) * n * 0.9) + 0.5, 0.9, Math.max(z, z - Math.sin(ry) * n * 0.9) + 0.5))); world.cover(x + Math.cos(ry) * n * 0.45, z - Math.sin(ry) * n * 0.45 + 1.0, 0, 1); };
   rackRow(SAC.x0 - 8, SAC.z0 + 40, 8, Math.PI / 2); rackRow(LIB.entX1 + 8, LIB.z1 + 1.5, 7, 0); rackRow(LIB.entX0 - 14, LIB.z1 + 1.5, 7, 0); rackRow(FREY.x1 - 20, FREY.z1 + 8, 6, 0); rackRow(PSY.x0 + 6, PSY.z0 - 2.4, 6, 0);
+  rackRow(126, 133.5, 7, 0); rackRow(160, 133.5, 6, 0); rackRow(PIT.x0 - 8.5, -112, 6, Math.PI / 2); rackRow(214, -98.5, 6, 0);
   inst(world, rackGeo, M.steel, racks, 'metal', { name: 'racks' });
 
   // low hoop fence around the library lawn and the mall tree strips (steel, thin)
@@ -197,7 +216,16 @@ export function buildProps(world, M) {
   inst(world, hoopGeo, M.steelDark, hoops, 'metal', { name: 'hoops', shadow: false });
 
   // ---- hedges + perimeter fences (closing gaps between buildings at the bounds) ------------------------------------------------------
-  const hedge = (x0, z0, x1, z1, h = 1.3) => B.box('hedge', [Math.min(x0, x1), 0, Math.min(z0, z1)], [Math.max(x0, x1), h, Math.max(z0, z1)]);
+  // real hedge rows: 1 m tall x 0.8 m deep foliage mesh with a noise-displaced top and gaps at the paths
+  const hedge = (x0, z0, x1, z1, h = 1.05, gaps = []) => {
+    const horiz = Math.abs(x1 - x0) >= Math.abs(z1 - z0);
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    const ax0 = horiz ? Math.min(x0, x1) : cx, az0 = horiz ? cz : Math.min(z0, z1);
+    const ax1 = horiz ? Math.max(x0, x1) : cx, az1 = horiz ? cz : Math.max(z0, z1);
+    hedgeRow(B, world, ax0, az0, ax1, az1, { h, d: 0.8, gaps });
+    const L = Math.hypot(ax1 - ax0, az1 - az0);
+    for (let t = 6; t < L - 4; t += 14) ao(ax0 + (ax1 - ax0) * t / L, az0 + (az1 - az0) * t / L, 1.1);
+  };
   const fence = (x0, z0, x1, z1, h = 2.2) => { // chain-link style: posts + thin dark panel
     const n = Math.max(1, Math.round(Math.hypot(x1 - x0, z1 - z0) / 3));
     for (let i = 0; i <= n; i++) B.cyl('steelDark', x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n, 0, h, 0.04, 6);
@@ -212,7 +240,7 @@ export function buildProps(world, M) {
   hedge(-165, BOUNDS.z1 - 1, ENG.x0 - 1, BOUNDS.z1); fence(-160, BOUNDS.z1 - 2, ENG.x0 - 1, BOUNDS.z1 - 2);   // south-west edge
   hedge(ENG.x1 + 1, BOUNDS.z1 - 1, ENG_DRIVE.x0 - 3.5, BOUNDS.z1); fence(ENG.x1 + 1, BOUNDS.z1 - 2, ENG_DRIVE.x0 - 3.5, BOUNDS.z1 - 2);
   hedge(ENG_DRIVE.x1 + 3.5, BOUNDS.z1 - 1, ECC.x0 - 1, BOUNDS.z1); fence(ENG_DRIVE.x1 + 3.5, BOUNDS.z1 - 2, ECC.x0 - 1, BOUNDS.z1 - 2);
-  hedge(ECC.x1 + 1, BOUNDS.z1 - 1, BOUNDS.x1, BOUNDS.z1); fence(ECC.x1 + 1, BOUNDS.z1 - 2, BOUNDS.x1, BOUNDS.z1 - 2);  // south-east
+  hedge(ECC.x1 + 1, BOUNDS.z1 - 1.2, BOUNDS.x1, BOUNDS.z1 - 1.2, 1.05, [[16, 20], [38, 42], [54, 57]]); fence(ECC.x1 + 1, BOUNDS.z1 - 2, BOUNDS.x1, BOUNDS.z1 - 2);  // south-east
   hedge(BOUNDS.x1 - 1, HUM.z1 + 1, BOUNDS.x1, BOUNDS.z1); fence(BOUNDS.x1 - 2, HUM.z1 + 1, BOUNDS.x1 - 2, BOUNDS.z1);  // east edge south of Humanities
   hedge(BOUNDS.x1 - 1, MALL.z1 + 2, BOUNDS.x1, HUM.z0 - 1); fence(BOUNDS.x1 - 2, MALL.z1 + 2, BOUNDS.x1 - 2, HUM.z0 - 1);
   hedge(BOUNDS.x1 - 1, STALLER.ez1 + 1, BOUNDS.x1, MALL.z0 - 2); fence(BOUNDS.x1 - 2, STALLER.ez1 + 1, BOUNDS.x1 - 2, MALL.z0 - 2);   // east edge north of the mall
@@ -248,22 +276,105 @@ export function buildProps(world, M) {
   inst(world, carBody, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.6, envMapIntensity: 1.0, name: 'car' }), cars, 'metal', { name: 'cars' });
   inst(world, carGlass, M.glassDark, cars, 'metal', { name: 'carGlass', shadow: false });
   inst(world, carWheels, M.rubber, cars, 'metal', { name: 'carWheels', shadow: false });
-  // buses: white body with blue band + dark window strip, at the loop stops
-  const busBody = (() => { const b = new THREE.BoxGeometry(12, 3.0, 2.55); b.translate(0, 1.9, 0); const h = new THREE.BoxGeometry(3.2, 0.5, 1.9); h.translate(-1.5, 3.65, 0); const h2 = new THREE.BoxGeometry(2.0, 0.4, 1.6); h2.translate(3.5, 3.6, 0); const bump = new THREE.BoxGeometry(0.3, 0.9, 2.2); bump.translate(6.0, 1.0, 0); return merge([b, h, h2, bump]); })();
-  const busDoors = (() => { const d1 = new THREE.BoxGeometry(1.2, 2.2, 0.06); d1.translate(4.6, 1.5, 1.28); const d2 = new THREE.BoxGeometry(1.6, 2.2, 0.06); d2.translate(-1.2, 1.5, 1.28); const fr = new THREE.BoxGeometry(0.08, 2.2, 0.08); const f1 = fr.clone(); f1.translate(4.0, 1.5, 1.3); const f2 = fr.clone(); f2.translate(5.2, 1.5, 1.3); const f3 = fr.clone(); f3.translate(-2.0, 1.5, 1.3); const f4 = fr.clone(); f4.translate(-0.4, 1.5, 1.3); return merge([d1, d2, f1, f2, f3, f4]); })();
-  const busWin = (() => { const b = new THREE.BoxGeometry(12.04, 1.1, 2.59); b.translate(0, 2.55, 0); return b; })();
-  const busBand = (() => { const b = new THREE.BoxGeometry(12.04, 0.5, 2.59); b.translate(0, 1.2, 0); return b; })();
-  const busWheels = (() => { const parts = []; for (const [x, z] of [[-4, -1.15], [-3.0, -1.15], [3.6, -1.15], [-4, 1.15], [-3.0, 1.15], [3.6, 1.15]]) { const w = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 12); w.rotateX(Math.PI / 2); w.translate(x, 0.5, z); parts.push(w); } return merge(parts); })();
+  // ---- buses: real transit coach — body with a skirt, 6 wheels, tinted window band, folding doors,
+  // roof HVAC hump, destination sign, mirrors, lights, fictional livery -------------------------------------
+  const BL = 12.0, BW = 2.55, BHW = BW / 2;
+  const busBody = (() => {
+    const parts = [];
+    const skirt = new THREE.BoxGeometry(BL - 0.5, 0.62, BW - 0.14); skirt.translate(0, 0.86, 0); parts.push(skirt);          // lower skirt (narrower)
+    const lower = new THREE.BoxGeometry(BL, 0.74, BW); lower.translate(0, 1.54, 0); parts.push(lower);                        // belt below the glass
+    const upper = new THREE.BoxGeometry(BL, 0.52, BW); upper.translate(0, 3.06, 0); parts.push(upper);                        // header above the glass
+    const roof = new THREE.BoxGeometry(BL - 0.22, 0.30, BW - 0.22); roof.translate(0, 3.44, 0); parts.push(roof);
+    const roofC = new THREE.BoxGeometry(BL - 0.9, 0.12, BW - 0.05); roofC.translate(0, 3.34, 0); parts.push(roofC);           // roof chamfer
+    const front = new THREE.BoxGeometry(0.34, 1.9, BW); front.translate(BL / 2 - 0.17, 2.3, 0); parts.push(front);            // A-pillar face
+    const rear = new THREE.BoxGeometry(0.34, 1.9, BW); rear.translate(-BL / 2 + 0.17, 2.3, 0); parts.push(rear);
+    const hvac = new THREE.BoxGeometry(3.1, 0.42, 1.85); hvac.translate(-2.2, 3.80, 0); parts.push(hvac);                     // roof HVAC hump
+    const hvac2 = new THREE.BoxGeometry(1.5, 0.30, 1.4); hvac2.translate(3.1, 3.74, 0); parts.push(hvac2);
+    const bump = new THREE.BoxGeometry(0.32, 0.55, BW + 0.08); bump.translate(BL / 2 + 0.08, 0.82, 0); parts.push(bump);      // bumpers
+    const bumpR = new THREE.BoxGeometry(0.32, 0.55, BW + 0.08); bumpR.translate(-BL / 2 - 0.08, 0.82, 0); parts.push(bumpR);
+    for (const zz of [-BHW - 0.16, BHW + 0.16]) {                                                                             // mirrors
+      const arm = new THREE.BoxGeometry(0.1, 0.1, 0.34); arm.translate(BL / 2 - 0.5, 3.0, zz); parts.push(arm);
+      const gl = new THREE.BoxGeometry(0.08, 0.62, 0.3); gl.translate(BL / 2 - 0.5, 2.72, zz + (zz > 0 ? 0.1 : -0.1)); parts.push(gl);
+    }
+    const dest = new THREE.BoxGeometry(0.06, 0.42, 1.9); dest.translate(BL / 2 + 0.2, 3.02, 0); parts.push(dest);             // destination sign box
+    return merge(parts);
+  })();
+  const busGlassGeo = (() => {
+    const parts = [];
+    const side = new THREE.BoxGeometry(BL - 1.0, 1.26, BW + 0.04); side.translate(-0.2, 2.42, 0); parts.push(side);           // side window band
+    const wind = new THREE.BoxGeometry(0.3, 1.9, BW - 0.24); wind.translate(BL / 2 - 0.02, 2.36, 0); parts.push(wind);        // windscreen
+    const back = new THREE.BoxGeometry(0.3, 1.3, BW - 0.3); back.translate(-BL / 2 + 0.02, 2.42, 0); parts.push(back);
+    return merge(parts);
+  })();
+  const busSkinGeo = (() => {                                                                                                 // livery panel (fictional text)
+    const g = new THREE.PlaneGeometry(7.6, 0.62); g.rotateY(-Math.PI / 2); g.translate(-BHW - 0.03, 1.52, 0.6);
+    const g2 = new THREE.PlaneGeometry(7.6, 0.62); g2.rotateY(Math.PI / 2); g2.translate(BHW + 0.03, 1.52, -0.6);
+    return merge([g, g2]);
+  })();
+  const busDoors = (() => {                                                                                                   // two folding doors, each a pair of leaves
+    const parts = [];
+    for (const [cx, w] of [[4.3, 1.15], [-1.1, 1.6]]) {
+      for (const s2 of [-1, 1]) {
+        const leaf = new THREE.BoxGeometry(w / 2 - 0.04, 2.1, 0.07); leaf.translate(cx + s2 * w / 4, 1.62, BHW + 0.02); parts.push(leaf);
+      }
+      for (const fx of [cx - w / 2, cx + w / 2, cx]) { const fr = new THREE.BoxGeometry(0.07, 2.16, 0.1); fr.translate(fx, 1.62, BHW + 0.05); parts.push(fr); }
+      const hd = new THREE.BoxGeometry(w + 0.14, 0.09, 0.1); hd.translate(cx, 2.72, BHW + 0.05); parts.push(hd);
+      const st = new THREE.BoxGeometry(w, 0.1, 0.5); st.translate(cx, 0.6, BHW + 0.2); parts.push(st);                         // step
+    }
+    return merge(parts);
+  })();
+  const busWheels = (() => {
+    const parts = [];
+    for (const [x, z] of [[-4.3, -1.16], [-3.05, -1.16], [3.55, -1.16], [-4.3, 1.16], [-3.05, 1.16], [3.55, 1.16]]) {
+      const w = new THREE.CylinderGeometry(0.5, 0.5, 0.32, 14); w.rotateX(Math.PI / 2); w.translate(x, 0.5, z); parts.push(w);
+      const arch = new THREE.BoxGeometry(1.25, 0.16, 0.12); arch.translate(x, 1.02, z + (z > 0 ? 0.08 : -0.08)); parts.push(arch);
+    }
+    return merge(parts);
+  })();
+  const busHubs = (() => { const parts = []; for (const [x, z] of [[-4.3, -1.3], [-3.05, -1.3], [3.55, -1.3], [-4.3, 1.3], [-3.05, 1.3], [3.55, 1.3]]) { const h = new THREE.CylinderGeometry(0.24, 0.24, 0.05, 12); h.rotateX(Math.PI / 2); h.translate(x, 0.5, z); parts.push(h); } return merge(parts); })();
+  const busLights = (() => {
+    const parts = [];
+    for (const z of [-0.85, 0.85]) { const hl = new THREE.BoxGeometry(0.08, 0.3, 0.42); hl.translate(BL / 2 + 0.12, 1.15, z); parts.push(hl); }
+    return merge(parts);
+  })();
+  const busTail = (() => { const parts = []; for (const z of [-0.85, 0.85]) { const tl = new THREE.BoxGeometry(0.08, 0.5, 0.34); tl.translate(-BL / 2 - 0.12, 1.7, z); parts.push(tl); } return merge(parts); })();
   const buses = [];
-  const bus = (a) => { const x = BUS_LOOP.x + Math.cos(a) * BUS_LOOP.r, z = BUS_LOOP.z + Math.sin(a) * BUS_LOOP.r; const ry = -a - Math.PI / 2; buses.push({ x, z, ry }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 6.5, 0, z - 6.5), new THREE.Vector3(x + 6.5, 3.5, z + 6.5))); world.cover(x + Math.cos(a) * 2.6, z + Math.sin(a) * 2.6, Math.cos(a), Math.sin(a)); };
+  const bus = (a) => { const x = BUS_LOOP.x + Math.cos(a) * BUS_LOOP.r, z = BUS_LOOP.z + Math.sin(a) * BUS_LOOP.r; const ry = -a - Math.PI / 2; buses.push({ x, z, ry }); ctx.colliders.push(new THREE.Box3(new THREE.Vector3(x - 6.2, 0, z - 6.2), new THREE.Vector3(x + 6.2, 3.6, z + 6.2))); world.cover(x + Math.cos(a) * 2.6, z + Math.sin(a) * 2.6, Math.cos(a), Math.sin(a)); ao(x, z, 7.5); };
   bus(0.25); bus(2.1); bus(4.2);
-  inst(world, busBody, M.bus, buses, 'metal', { name: 'buses' }); inst(world, busWin, M.glassDark, buses, 'metal', { name: 'busWin', shadow: false }); inst(world, busDoors, M.glassDark, buses, 'metal', { name: 'busDoors', shadow: false }); inst(world, busBand, M.busBlue, buses, 'metal', { name: 'busBand', shadow: false }); inst(world, busWheels, M.rubber, buses, 'metal', { name: 'busWheels', shadow: false });
-  // bus shelter on the island
+  inst(world, busBody, M.bus, buses, 'metal', { name: 'buses' });
+  inst(world, busGlassGeo, M.busGlass, buses, 'metal', { name: 'busWin', shadow: false });
+  inst(world, busSkinGeo, M.busSkin, buses, 'metal', { name: 'busSkin', shadow: false });
+  inst(world, busDoors, M.busGlass, buses, 'metal', { name: 'busDoors', shadow: false });
+  inst(world, busWheels, M.rubber, buses, 'metal', { name: 'busWheels', shadow: false });
+  inst(world, busHubs, M.alu, buses, 'metal', { name: 'busHubs', shadow: false });
+  inst(world, busLights, M.lampHead, buses, 'metal', { name: 'busLights', shadow: false });
+  inst(world, busTail, M.tailLight, buses, 'metal', { name: 'busTail', shadow: false });
+  // ---- bus shelter on the island: glazed back + side, steel roof, bench, route sign, litter bin --------------
   const sx = BUS_LOOP.x, sz = BUS_LOOP.z - 8;
-  for (const [dx, dz] of [[-3, -1.2], [3, -1.2], [-3, 1.2], [3, 1.2]]) B.cyl('steelDark', sx + dx, sz + dz, 0, 2.8, 0.06, 8);
-  B.box('glass', [sx - 3.3, 0.1, sz - 1.35], [sx + 3.3, 2.6, sz - 1.2], { collide: true });
-  B.box('steelDark', [sx - 3.6, 2.8, sz - 1.6], [sx + 3.6, 3.0, sz + 1.6]);
-  B.box('bench', [sx - 2.6, 0.45, sz - 0.9], [sx + 2.6, 0.5, sz - 0.4]); world.cover(sx, sz + 1.2, 0, 1);
+  for (const [dx, dz] of [[-3, -1.2], [3, -1.2], [-3, 1.2], [3, 1.2]]) B.cyl('steelDark', sx + dx, sz + dz, 0, 2.85, 0.07, 8);
+  B.box('glass', [sx - 3.2, 0.35, sz - 1.32], [sx + 3.2, 2.55, sz - 1.22], { collide: true });                 // back glazing
+  B.box('glass', [sx - 3.3, 0.35, sz - 1.32], [sx - 3.2, 2.55, sz + 1.2], { collide: false });                  // end glazing
+  B.box('steelDark', [sx - 3.3, 0.2, sz - 1.36], [sx + 3.3, 0.36, sz + 1.3], { collide: false });
+  B.box('steelDark', [sx - 3.7, 2.85, sz - 1.7], [sx + 3.7, 3.05, sz + 1.7]);                                   // roof slab
+  B.box('alu', [sx - 3.75, 3.05, sz - 1.75], [sx + 3.75, 3.14, sz + 1.75], { collide: false });
+  B.box('bench', [sx - 2.6, 0.46, sz - 0.95], [sx + 2.6, 0.52, sz - 0.35]);                                     // bench slats
+  for (const bxp of [sx - 2.4, sx, sx + 2.4]) B.box('steelDark', [bxp - 0.05, 0, sz - 0.9], [bxp + 0.05, 0.46, sz - 0.4], { collide: false });
+  B.cyl('steelDark', sx + 4.6, sz + 0.4, 0, 2.9, 0.06, 8);                                                       // route sign post
+  ao(sx, sz, 5.2); ao(sx + 4.6, sz + 0.4, 0.8);
+  {
+    const t = signTexture({ text: 'ROUTE 5', sub: 'INNER LOOP  ·  EVERY 10 MIN', w: 512, h: 256, bg: '#1e3f7a', font: 'bold 78px Helvetica, Arial, sans-serif' });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.72, 0.07), [M.steelDark, M.steelDark, M.steelDark, M.steelDark, new THREE.MeshStandardMaterial({ map: t, roughness: 0.65 }), new THREE.MeshStandardMaterial({ map: t, roughness: 0.65 })]);
+    m.position.set(sx + 4.6, 2.45, sz + 0.4); m.rotation.y = -0.5; m.castShadow = true; m.name = 'sbu:routeSign'; scene.add(m); world.solid(m, 'metal', { collide: false });
+  }
+  world.cover(sx, sz + 1.9, 0, 1);
+  // the motorcycles belong on the road, not on the brick plaza
+  W.vehicleSpots = [
+    { x: BUS_LOOP.x + Math.cos(5.2) * (BUS_LOOP.r - 1.5), z: BUS_LOOP.z + Math.sin(5.2) * (BUS_LOOP.r - 1.5), yaw: -5.2 - Math.PI / 2 },
+    { x: BUS_LOOP.x + Math.cos(3.4) * (BUS_LOOP.r + 1.5), z: BUS_LOOP.z + Math.sin(3.4) * (BUS_LOOP.r + 1.5), yaw: -3.4 - Math.PI / 2 },
+    { x: BUS_LOOP.x - BUS_LOOP.r - 16, z: BUS_LOOP.z + 2.6, yaw: Math.PI / 2 },
+    { x: BUS_LOOP.x - BUS_LOOP.r - 26, z: BUS_LOOP.z - 2.6, yaw: -Math.PI / 2 },
+    { x: ENG_DRIVE.x0 + 4, z: ENG_DRIVE.z0 + 18, yaw: 0 },
+  ];
 
   // ---- fountain jet + Glaser-style steel sculpture on the library forecourt --------------------------------------------------------
   { // jets: central 8 m spire (tapered, soft-alpha) + 6 arcs from the rim inward (tube along a parabola), gently pulsing
@@ -294,7 +405,56 @@ export function buildProps(world, M) {
     B.cyl('steelDark', x, z, 0, 2.4, 0.04, 6); B.cyl('binGreen', x, z, 2.2, 2.6, 1.5, 10, { r0: 0.05 }); B.cyl('steelDark', x, z, 0.72, 0.76, 0.6, 12);
     world.box([x - 0.6, 0, z - 0.6], [x + 0.6, 0.8, z + 0.6]); world.cover(x + 1.1, z, 1, 0);
   }
-  for (const [x, z] of [[-14, 8], [-52, 8], [-33, 26], [-108, 20], [-108, 30], [122, 18], [122, 26]]) { B.box('concreteGrey', [x - 1.4, 0, z - 0.7], [x + 1.4, 0.75, z + 0.7]); B.box('hedge', [x - 1.3, 0.75, z - 0.6], [x + 1.3, 1.25, z + 0.6], { collide: false }); world.cover(x, z + 1.4, 0, 1); world.cover(x, z - 1.4, 0, -1); }
+  for (const [x, z] of [[-14, 8], [-52, 8], [-33, 26], [-108, 20], [-108, 30], [122, 18], [122, 26]]) { B.box('concreteGrey', [x - 1.4, 0, z - 0.7], [x + 1.4, 0.75, z + 0.7]); B.box('hedgeLeaf', [x - 1.3, 0.75, z - 0.6], [x + 1.3, 1.3, z + 0.6], { collide: false }); ao(x, z, 1.9); world.cover(x, z + 1.4, 0, 1); world.cover(x, z - 1.4, 0, -1); }
+
+  // ---- lawn clutter: planters, notice kiosks, banner poles, picnic tables on the formerly empty lawns --------
+  const planter = (x, z, w = 1.6, d = 1.0) => {
+    const y = W.groundHeight(x, z);
+    B.box('graniteWall', [x - w, y, z - d], [x + w, y + 0.62, z + d]);
+    B.box('graniteCap', [x - w - 0.08, y + 0.62, z - d - 0.08], [x + w + 0.08, y + 0.72, z + d + 0.08], { collide: false });
+    B.box('mulchDark', [x - w + 0.15, y + 0.6, z - d + 0.15], [x + w - 0.15, y + 0.68, z + d - 0.15], { collide: false });
+    B.box('hedgeLeaf', [x - w + 0.2, y + 0.66, z - d + 0.2], [x + w - 0.2, y + 1.32, z + d - 0.2], { collide: false });
+    ao(x, z, Math.max(w, d) + 1.1, y); world.cover(x, z + d + 0.8, 0, 1); world.cover(x, z - d - 0.8, 0, -1);
+  };
+  for (const [x, z] of [[92, PIT.z1 + 3.4], [118, PIT.z1 + 3.4], [PIT.x0 - 5.4, -140], [PIT.x0 - 5.4, -64],
+                        [123, 136], [149, 136], [175, 136], [123, 113], [151, 113],
+                        [206, -99], [270, -99], [232, -97], [244, -97],
+                        [LIB.entX0 - 8, LIB.z1 + 5.5], [LIB.entX1 + 8, LIB.z1 + 5.5]]) planter(x, z);
+  // notice kiosks (triangular pin-boards) on the mall and the lawn walks
+  const kiosk = (x, z, ry = 0) => {
+    const y = W.groundHeight(x, z);
+    for (let k = 0; k < 3; k++) {
+      const a = ry + k * Math.PI * 2 / 3;
+      const g = boxGeo([-0.62, 0.9, -0.05], [0.62, 2.55, 0.05]); g.rotateY(a); g.translate(x + Math.sin(a) * 0.36, y, z + Math.cos(a) * 0.36); B.add('cream', g, { uv: false });
+      const f = boxGeo([-0.68, 0.84, -0.09], [0.68, 2.62, -0.02]); f.rotateY(a); f.translate(x + Math.sin(a) * 0.36, y, z + Math.cos(a) * 0.36); B.add('steelDark', f, { uv: false });
+    }
+    B.cyl('steelDark', x, z, y, y + 2.8, 0.12, 8);
+    B.cyl('steelDark', x, z, y + 2.62, y + 2.78, 0.9, 3);
+    world.box([x - 0.9, y, z - 0.9], [x + 0.9, y + 2.8, z + 0.9]); ao(x, z, 1.5, y);
+    world.cover(x, z + 1.3, 0, 1);
+  };
+  kiosk(-46, MALL.z1 - 2.2, 0.4); kiosk(70, MALL.z1 - 2.2, 1.1); kiosk(PIT.x0 - 6, -96, 0.7); kiosk(140, 134, 2.2); kiosk(236, -97, 0.2);
+  // banner poles (pairs of tall masts with fabric banners) marking the lawn entrances
+  const bannerMat = new THREE.MeshStandardMaterial({ color: 0x9b1b2a, roughness: 0.85, side: THREE.DoubleSide, name: 'bannerTall' });
+  const bannerGeos = [];
+  const bannerPole = (x, z, ry = 0) => {
+    const y = W.groundHeight(x, z);
+    B.cyl('alu', x, z, y, y + 7.2, 0.09, 10); B.cyl('alu', x, z, y + 7.2, y + 7.45, 0.14, 10);
+    const g = new THREE.PlaneGeometry(0.85, 3.0); g.translate(0.5, y + 5.2, 0); g.rotateY(ry); g.translate(x, 0, z);
+    bannerGeos.push(g);
+    world.box([x - 0.2, y, z - 0.2], [x + 0.2, y + 7.2, z + 0.2]); ao(x, z, 0.9, y);
+  };
+  for (const [x, z, ry] of [[PIT.x0 - 7.6, -122, 0], [PIT.x0 - 7.6, -80, 0], [120.5, 131, Math.PI / 2], [178.5, 131, -Math.PI / 2],
+                            [204, -101, 0], [272, -101, 0], [LIB.entX0 - 12, LIB_LAWN.z1 - 2, 0], [LIB.entX1 + 12, LIB_LAWN.z1 - 2, 0]]) bannerPole(x, z, ry);
+  if (bannerGeos.length) { const bg = BGU.mergeGeometries(bannerGeos.map(g => g.toNonIndexed()), false); const bm = new THREE.Mesh(bg, bannerMat); bm.castShadow = true; bm.name = 'sbu:banners'; bm.userData.surface = 'wood'; scene.add(bm); ctx.raycastTargets.push(bm); }
+  // picnic tables on the lawns
+  for (const [x, z, ry] of [[132, 126, 0.4], [152, 122, -0.6], [166, 129, 0.2], [PIT.x0 - 12, -104, 0.3], [PIT.x0 - 12, -88, -0.4], [224, -110, 0.5], [250, -112, -0.3]]) {
+    const y = W.groundHeight(x, z);
+    const top = boxGeo([-0.85, 0.72, -0.38], [0.85, 0.78, 0.38]); top.rotateY(ry); top.translate(x, y, z); B.add('bench', top, { uv: false });
+    for (const s2 of [-1, 1]) { const bn = boxGeo([-0.85, 0.44, s2 * 0.72 - 0.16], [0.85, 0.5, s2 * 0.72 + 0.16]); bn.rotateY(ry); bn.translate(x, y, z); B.add('bench', bn, { uv: false }); }
+    for (const s2 of [-1, 1]) { const lg = boxGeo([s2 * 0.62 - 0.05, 0, -0.78], [s2 * 0.62 + 0.05, 0.74, 0.78]); lg.rotateY(ry); lg.translate(x, y, z); B.add('steelDark', lg, { uv: false }); }
+    world.box([x - 1, y, z - 1], [x + 1, y + 0.8, z + 1]); ao(x, z, 1.7, y); world.cover(x, z + 1.4, 0, 1);
+  }
 
   B.flush();
 }
