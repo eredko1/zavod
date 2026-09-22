@@ -2,6 +2,7 @@
 // interior HDRI environment (PMREM), light shafts (additive prisms) + dust motes, light haze. TERMINAL agent.
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { P } from './plan.js';
 
 export const SUN_DIR = new THREE.Vector3(0.80, 0.55, 0.27).normalize();   // from the scene toward the sun (E-SE, 33° up)
@@ -50,10 +51,17 @@ export function buildLighting(world, M) {
   const pt = (x, y, z, color, intensity, dist, decay = 2) => { const l = new THREE.PointLight(color, intensity, dist, decay); l.position.set(x, y, z); scene.add(l); return l; };
   // ---- cove wash: a few very broad, low-intensity warm lights backing the cornice/arch strips ------------
   // (the strips themselves are emissive geometry in concourse.js — these make the stone actually receive the wash)
-  // physical falloff (decay 2) keeps the wash tight to the stone near the strip instead of flat-filling the room
-  for (const x of [-30, -10, 10, 30]) for (const z of [P.Z1 - 2.1, P.Z0 + 2.1]) pt(x, P.CORNICE - 2.4, z, 0xffd6a0, 540, 24);
-  pt(P.X0 + 4.5, 22.0, 0, 0xffdcaa, 900, 30); pt(P.X1 - 4.5, 22.0, 0, 0xffdcaa, 900, 30);   // end lunettes
-  for (const x of [-34, 34]) pt(x, P.BAL_Y - 1.3, 0, 0xffd2a0, 120, 16);                    // balcony soffit / arcade
+  // four long RectAreaLights (one per wall) give a perfectly even grazing wash for the price of ~4 lights,
+  // where a row of point lights would scallop and cost three times as much.
+  RectAreaLightUniformsLib.init();
+  const cove = (w, h, x, y, z, lx, ly, lz, intensity) => {
+    const l = new THREE.RectAreaLight(0xffd9a0, intensity, w, h); l.position.set(x, y, z); l.lookAt(lx, ly, lz); scene.add(l); return l;
+  };
+  cove(82, 3.6, 0, P.CORNICE - 3.0, P.Z1 - 1.7, 0, P.CORNICE - 13, P.Z1 - 0.4, 13);   // south cornice, raking down its own wall
+  cove(82, 3.6, 0, P.CORNICE - 3.0, P.Z0 + 1.7, 0, P.CORNICE - 13, P.Z0 + 0.4, 13);   // north cornice
+  cove(34, 4.0, P.X0 + 2.6, 24.0, 0, P.X0 + 0.6, 14, 0, 14);                          // west lunette
+  cove(34, 4.0, P.X1 - 2.6, 24.0, 0, P.X1 - 0.6, 14, 0, 14);                          // east lunette
+  for (const x of [-34, 34]) pt(x, P.BAL_Y - 1.3, 0, 0xffd2a0, 120, 16);              // balcony soffit / arcade
   pt(0, 4.6, 0, 0xffd9a0, 60, 22);                                  // info booth / clock
   pt(-12, 8.2, 40, 0xffd2a0, 140, 34); pt(12, 8.2, 40, 0xffd2a0, 140, 34);   // Vanderbilt Hall chandeliers
   pt(0, -1.6, 24.5, 0xffd0a0, 70, 24);                              // Whispering Gallery
