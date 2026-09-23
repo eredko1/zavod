@@ -4,6 +4,7 @@ import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch, slopedBox, worldUV } from './geo.js';
 import { TRACK_X, TRACK_Z0, TRACK_Z1, DEPOT, FENCE, OFFICE, ROAD_E, ROAD_W, SLEEPER_TOP, RAIL_TOP } from './layout.js';
 import { chainlinkTexture, barbedTexture } from '../mats.js';
+import { leafTexture } from '../wsp/textures.js';
 
 export function buildYard(world, M) {
   const B = new Batch(world, M, 'yard');
@@ -16,6 +17,7 @@ export function buildYard(world, M) {
   B.flush();
   buildFenceMesh(world, M);
   buildDistant(world, M);
+  buildScrub(world);
 }
 
 // ---- fuel depot (SW) ------------------------------------------------------------------------------------------------
@@ -373,15 +375,52 @@ function buildDistant(world, M) {
   for (let i = 0; i < 70; i++) { const west = i < 40; const x = west ? -150 + R() * 30 : 70 + R() * 90, z = west ? -120 + R() * 240 : -150 - R() * 25; const h = 9 + R() * 8; const g = new THREE.CylinderGeometry(0.4, 2.6 + R() * 1.5, h, 6); g.translate(x, h / 2 + 0.5, z); dark.push(g); }
   // windows pattern for the skyline blocks (unlit daytime glazing on precast panels)
   const wc = document.createElement('canvas'); wc.width = 128; wc.height = 128; const wg = wc.getContext('2d');
-  wg.fillStyle = '#7a838b'; wg.fillRect(0, 0, 128, 128); wg.fillStyle = '#6a737b'; wg.fillRect(0, 60, 128, 8);
-  for (let yy = 8; yy < 128; yy += 32) for (let xx = 6; xx < 128; xx += 21) { wg.fillStyle = R() < 0.85 ? '#3a4650' : '#9aa4ab'; wg.fillRect(xx, yy, 12, 16); }
+  wg.fillStyle = '#d8d4cc'; wg.fillRect(0, 0, 128, 128); wg.fillStyle = '#b8b2a8'; wg.fillRect(0, 60, 128, 8);
+  for (let yy = 8; yy < 128; yy += 32) for (let xx = 6; xx < 128; xx += 21) { wg.fillStyle = R() < 0.85 ? '#28323a' : '#7c8890'; wg.fillRect(xx, yy, 12, 16); wg.fillStyle = 'rgba(40,36,30,0.25)'; wg.fillRect(xx - 1, yy + 16, 14, 3); }
   const winTex = new THREE.CanvasTexture(wc); winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping; winTex.colorSpace = THREE.SRGBColorSpace;
-  const skyMat = new THREE.MeshStandardMaterial({ map: winTex, color: 0xa8aeb4, roughness: 0.95, metalness: 0, name: 'skyline' });
+  const skyMat = new THREE.MeshStandardMaterial({ map: winTex, color: 0xffffff, vertexColors: true, roughness: 0.95, metalness: 0, name: 'skyline' });
+  { const tints = [0xa39a8c, 0x8e8478, 0xb3aca0, 0x9a8272, 0x7f8a8f, 0xbdb4a2, 0x8a6f5e]; for (const g of geos) { const c = new THREE.Color(tints[(R() * tints.length) | 0]); const n = g.attributes.position.count, col = new Float32Array(n * 3); for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(col, 3)); } }
   const skyGeo = BGU.mergeGeometries(geos.map(g => g.index ? g.toNonIndexed() : g), false);
   // uv: 1 window column per 3.5 m, one storey per 4 m (world-space by dominant axis)
   { const pos = skyGeo.attributes.position, nor = skyGeo.attributes.normal, uv = skyGeo.attributes.uv; for (let i = 0; i < pos.count; i++) { const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i)); if (ny > nx && ny > nz) uv.setXY(i, 0.02, 0.02); else if (nx > nz) uv.setXY(i, pos.getZ(i) / 3.5, pos.getY(i) / 4.0); else uv.setXY(i, pos.getX(i) / 3.5, pos.getY(i) / 4.0); } uv.needsUpdate = true; }
   const m1 = new THREE.Mesh(skyGeo, skyMat); m1.frustumCulled = false; m1.name = 'distant'; m1.castShadow = false; m1.receiveShadow = false; scene.add(m1);
-  const m3 = new THREE.Mesh(BGU.mergeGeometries(plain.map(g => g.index ? g.toNonIndexed() : g), false), M.distant); m3.frustumCulled = false; m3.name = 'distant-plain'; m3.castShadow = false; m3.receiveShadow = false; scene.add(m3); m3.userData.surface = 'concrete'; ctx.raycastTargets.push(m3);
+  // silos / elevator / chimneys: slip-formed concrete — horizontal lift lines, rain streaks and rust runs from the top
+  const sc = document.createElement('canvas'); sc.width = 256; sc.height = 512; const sg = sc.getContext('2d');
+  sg.fillStyle = '#8f8a80'; sg.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 2600; i++) { sg.fillStyle = `rgba(${R() < 0.5 ? '60,56,50' : '170,165,155'},${R() * 0.08})`; sg.fillRect(R() * 256, R() * 512, 2 + R() * 6, 2 + R() * 6); }
+  for (let y = 0; y < 512; y += 24) { sg.fillStyle = 'rgba(55,50,45,0.18)'; sg.fillRect(0, y, 256, 2); }
+  for (let i = 0; i < 70; i++) { const x = R() * 256, L = 60 + R() * 320; const gr = sg.createLinearGradient(0, 0, 0, L); const rust = R() < 0.3; gr.addColorStop(0, rust ? 'rgba(110,62,32,0.45)' : 'rgba(40,38,34,0.35)'); gr.addColorStop(1, 'rgba(40,38,34,0)'); sg.fillStyle = gr; sg.fillRect(x, 0, 2 + R() * 7, L); }
+  const siloTex = new THREE.CanvasTexture(sc); siloTex.colorSpace = THREE.SRGBColorSpace; siloTex.wrapS = siloTex.wrapT = THREE.RepeatWrapping; siloTex.repeat.set(2, 1); siloTex.anisotropy = 8;
+  const siloMat = new THREE.MeshStandardMaterial({ map: siloTex, color: 0xcfc9bd, roughness: 0.95, metalness: 0, name: 'distantSilo' });
+  const m3 = new THREE.Mesh(BGU.mergeGeometries(plain.map(g => g.index ? g.toNonIndexed() : g), false), siloMat); m3.frustumCulled = false; m3.name = 'distant-plain'; m3.castShadow = false; m3.receiveShadow = false; scene.add(m3); m3.userData.surface = 'concrete'; ctx.raycastTargets.push(m3);
   const m2 = new THREE.Mesh(BGU.mergeGeometries(dark.map(g => g.index ? g.toNonIndexed() : g), false), M.distantDark); m2.frustumCulled = false; m2.name = 'distant-dark'; m2.castShadow = false; m2.receiveShadow = false; scene.add(m2);
   for (const m of [m1, m2]) { m.userData.surface = 'concrete'; ctx.raycastTargets.push(m); }
+}
+
+// ---- scrubland beyond the fence: the 360 m ground plane is yard dirt all the way out, which read as a bare brown desert
+// from every elevated pose. A dry-grass layer fades in just past the fence, broken by bushes and a few young trees. ----
+function buildScrub(world) {
+  const { scene, R } = world; const S = 360, E = FENCE + 6;
+  const tc = document.createElement('canvas'); tc.width = tc.height = 512; const tg = tc.getContext('2d');
+  tg.fillStyle = '#7d7a4c'; tg.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 90; i++) { const x = R() * 512, y = R() * 512, r = 20 + R() * 70; const gr = tg.createRadialGradient(x, y, 0, x, y, r); const c = R() < 0.4 ? '104,98,62' : R() < 0.6 ? '86,96,54' : '128,116,76'; gr.addColorStop(0, `rgba(${c},0.6)`); gr.addColorStop(1, `rgba(${c},0)`); tg.fillStyle = gr; tg.fillRect(x - r, y - r, r * 2, r * 2); }
+  for (let i = 0; i < 9000; i++) { const x = R() * 512, y = R() * 512; tg.strokeStyle = `hsla(${50 + R() * 30},${25 + R() * 20}%,${25 + R() * 30}%,0.55)`; tg.lineWidth = 1; tg.beginPath(); tg.moveTo(x, y); tg.lineTo(x + (R() - 0.5) * 4, y - 3 - R() * 5); tg.stroke(); }
+  const grass = new THREE.CanvasTexture(tc); grass.colorSpace = THREE.SRGBColorSpace; grass.wrapS = grass.wrapT = THREE.RepeatWrapping; grass.repeat.set(S / 9, S / 9); grass.anisotropy = 8;
+  const mc = document.createElement('canvas'); mc.width = mc.height = 256; const mg = mc.getContext('2d');
+  mg.fillStyle = '#fff'; mg.fillRect(0, 0, 256, 256);
+  const px = (v) => (v / S + 0.5) * 256; mg.filter = 'blur(3px)'; mg.fillStyle = '#000'; mg.fillRect(px(-E), px(-E), px(E) - px(-E), px(E) - px(-E)); mg.filter = 'none';
+  for (let i = 0; i < 260; i++) { mg.fillStyle = `rgba(0,0,0,${0.25 + R() * 0.5})`; mg.beginPath(); mg.arc(R() * 256, R() * 256, 1 + R() * 5, 0, 7); mg.fill(); }   // worn dirt patches
+  const mask = new THREE.CanvasTexture(mc);
+  const mat = new THREE.MeshLambertMaterial({ map: grass, color: 0x9c9a82, alphaMap: mask, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, name: 'scrub' });
+  const g = new THREE.PlaneGeometry(S, S); g.rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, mat); m.position.y = 0.02; m.receiveShadow = true; m.renderOrder = 1; m.name = 'scrub'; scene.add(m);
+  // bushes: crossed leaf cards, instanced, only outside the fence
+  const leaf = leafTexture(R, { hue: 78 });
+  const cards = []; for (let k = 0; k < 3; k++) { const q = new THREE.PlaneGeometry(2.6, 1.9); q.translate(0, 0.85, 0); q.rotateY(k * Math.PI / 3); cards.push(q); }
+  const bush = BGU.mergeGeometries(cards, false);
+  const bm = new THREE.MeshLambertMaterial({ map: leaf, color: 0x9aa282, alphaTest: 0.5, side: THREE.DoubleSide, name: 'bush' });
+  bm.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, 0.4));'); }; bm.customProgramCacheKey = () => 'ry-bush';
+  const pl = []; for (let i = 0; i < 2200 && pl.length < 900; i++) { const x = (R() - 0.5) * S * 0.95, z = (R() - 0.5) * S * 0.95; if (Math.abs(x) < E + 3 && Math.abs(z) < E + 3) continue; if (Math.abs(x) < 12) continue; const big = R() < 0.18; pl.push([x, z, big ? 3.2 + R() * 2.5 : 1.3 + R() * 1.6, R() * 6.3]); if (R() < 0.5) { const a = R() * 6.3; pl.push([x + Math.cos(a) * 2.5, z + Math.sin(a) * 2.5, 1 + R() * 1.4, R() * 6.3]); } }
+  const im = new THREE.InstancedMesh(bush, bm, pl.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  pl.forEach(([x, z, sc, ry], i) => { q.setFromAxisAngle(up, ry); im.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc, sc * (0.8 + R() * 0.5), sc))); });
+  im.instanceMatrix.needsUpdate = true; im.castShadow = false; im.receiveShadow = true; im.name = 'bushes'; scene.add(im);
 }

@@ -140,6 +140,7 @@ function buildShed(B, world, M) {
   for (const y of [S.floor + 0.05, S.floor + 1.3, S.floor + 2.5]) B.box('plank', [S.x1 - t - 1.2, y, -9], [S.x1 - t, y + 0.08, 4.5], { collide: false, uvScale: 1 });
   world.box([S.x1 - t - 1.2, S.floor, -9], [S.x1 - t, S.floor + 3.6, 4.5]);
   B.box('plank', [S.x0 + t + 0.4, S.floor + 0.85, -10.5], [S.x0 + t + 2.4, S.floor + 0.92, -8.0], { uvScale: 1 }); B.box('steelDark', [S.x0 + t + 0.5, S.floor, -10.4], [S.x0 + t + 2.3, S.floor + 0.85, -8.1], { collide: false });
+  stockShed(B, world, S, t, M);
   world.cover(S.x1 - t - 2.2, -6, 1, 0, S.floor); world.cover(S.x1 - t - 2.2, 2, 1, 0, S.floor); world.cover(S.x0 + t + 3.2, -9.2, -1, 0, S.floor);
   world.cover(S.x1 + 2.6, 7, 1, 0, 0); world.cover(S.x0 - 1.4, -4, 1, 0, PLATFORM.h); world.cover(S.x0 - 1.4, 4, 1, 0, PLATFORM.h);
 }
@@ -187,6 +188,7 @@ function buildOffice(B, world, M) {
   B.box('plank', [O.x1 - t - 0.9, f1 + 0.78, O.z0 + 1.0], [O.x1 - t - 0.05, f1 + 0.84, O.z1 - 1.0], { uvScale: 1 }); B.box('paintedConcrete', [O.x1 - t - 0.85, f1, O.z0 + 1.0], [O.x1 - t - 0.1, f1 + 0.78, O.z1 - 1.0], { uvScale: 0.5 });
   B.box('shutter', [O.x0 + t, f1, O.z0 + t + 3.0], [O.x0 + t + 0.5, f1 + 2.0, O.z0 + t + 6.0], { uvScale: 0.6 });
   world.cover(O.x1 - t - 1.7, 9, 1, 0, f1); world.cover(O.x1 - t - 1.7, 13, 1, 0, f1); world.cover(O.x0 + t + 1.2, 10.5, -1, 0, f1);
+  furnishSignalBox(B, world, O, t, f1, roof);
   // roof slab + parapet (gap on the south edge where the stair lands, x -43.8..-42.2), plant box, antenna mast
   B.box('concreteCracked', [O.x0 - 0.2, roof - 0.25, O.z0 - 0.2], [O.x1 + 0.2, roof, O.z1 + 0.2], { walkable: true, uvScale: 0.5 });
   const pp = 0.3, ph = O.parapet;
@@ -279,4 +281,67 @@ function buildSigns(world, M) {
   add(signTexture({ text: 'ОПАСНО', sub: 'ВЫСОКОЕ НАПРЯЖЕНИЕ', bg: '#c9a227', fg: '#111111', border: '#111111', stripes: false, R }), 1.2, 0.5, -30.7, 2.0, -12, Math.PI / 2);
   add(signTexture({ text: 'ТОПЛИВО', sub: 'NO SMOKING · НЕ КУРИТЬ', bg: '#8a1a12', fg: '#ffffff', border: '#ffffff', R }), 3.0, 0.75, -40, 1.9, 31.05, Math.PI);
   add(signTexture({ text: 'СТОП', bg: '#b3261e', fg: '#ffffff', border: '#ffffff', w: 256, h: 128, R }), 1.0, 0.5, 48.5, 2.2, 61.5, Math.PI);
+}
+
+// ---- signal-box interior (critic: "empty brick box") -----------------------------------------------------------------
+function furnishSignalBox(B, world, O, t, f1, roof) {
+  const R = world.R; const ix0 = O.x0 + t, ix1 = O.x1 - t, iz0 = O.z0 + t, iz1 = O.z1 - t;
+  // painted wainscot (institutional green to 1.3 m) + plaster ceiling hung under the roof slab
+  const wain = new THREE.MeshStandardMaterial({ color: 0x4f6a58, roughness: 0.7, name: 'wainscot' });
+  const plaster = new THREE.MeshStandardMaterial({ color: 0xc9c4b6, roughness: 0.95, name: 'plaster' });
+  const add = (mat, geo, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.receiveShadow = true; world.scene.add(m); return m; };
+  for (const y0 of [0.06, f1]) {
+    add(wain, new THREE.BoxGeometry(0.02, 1.3, iz1 - iz0), ix0 + 0.011, y0 + 0.65, (iz0 + iz1) / 2);
+    add(wain, new THREE.BoxGeometry(ix1 - ix0, 1.3, 0.02), (ix0 + ix1) / 2, y0 + 0.65, iz1 - 0.011);
+  }
+  add(plaster, new THREE.BoxGeometry(ix1 - ix0, 0.03, iz1 - iz0), (ix0 + ix1) / 2, roof - 0.27, (iz0 + iz1) / 2);
+  add(plaster, new THREE.BoxGeometry(ix1 - ix0, 0.03, iz1 - iz0), (ix0 + ix1) / 2, f1 - 0.3, (iz0 + iz1) / 2);
+  // fluorescent fittings (emissive tubes) on both floors
+  const tube = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f7ff, emissiveIntensity: 2.2, name: 'tube' });
+  for (const y of [roof - 0.33, f1 - 0.36]) for (const z of [8.6, 13.2]) { B.box('steelDark', [-40.8, y - 0.02, z - 0.12], [-35.2, y + 0.05, z + 0.12], { collide: false }); add(tube, new THREE.BoxGeometry(5.4, 0.04, 0.08), -38, y - 0.04, z); }
+  // lever frame down the middle of the signal box: cast base + 18 levers (red home, yellow distant, black points, blue locks)
+  const fz0 = 8.0, fz1 = 14.2, fx = -38.6;
+  B.box('black', [fx - 0.35, f1, fz0 - 0.2], [fx + 0.35, f1 + 0.45, fz1 + 0.2], { uvScale: 1 });
+  B.box('steelDark', [fx - 0.4, f1 + 0.45, fz0 - 0.25], [fx + 0.4, f1 + 0.52, fz1 + 0.25], { collide: false });
+  const lever = ['drumRed', 'drumRed', 'yellow', 'black', 'black', 'drumBlue', 'drumRed', 'black', 'white', 'drumRed', 'yellow', 'black', 'drumBlue', 'black', 'drumRed', 'black', 'yellow', 'drumRed'];
+  const LG = []; lever.forEach((k, i) => { const z = fz0 + i * (fz1 - fz0) / (lever.length - 1); const pulled = R() < 0.3; const g = new THREE.BoxGeometry(0.04, 1.15, 0.05); g.translate(0, 0.575, 0); g.rotateZ(pulled ? -0.35 : 0.3); g.translate(fx, f1 + 0.5, z); B.add(k, g, { collide: false }); const hnd = new THREE.BoxGeometry(0.06, 0.12, 0.06); hnd.translate(0, 1.2, 0); hnd.rotateZ(pulled ? -0.35 : 0.3); hnd.translate(fx, f1 + 0.5, z); B.add('steel', hnd, { collide: false }); });
+  world.box([fx - 0.4, f1, fz0 - 0.25], [fx + 0.4, f1 + 1.2, fz1 + 0.25]); world.cover(fx - 0.9, 11, -1, 0, f1); world.cover(fx + 0.9, 11, 1, 0, f1);
+  // illuminated track diagram on the west wall
+  { const c = document.createElement('canvas'); c.width = 1024; c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#1b2226'; g.fillRect(0, 0, 1024, 256);
+    g.strokeStyle = '#d9d4c3'; g.lineWidth = 5; for (let k = 0; k < 5; k++) { const y = 40 + k * 44; g.beginPath(); g.moveTo(20, y); g.lineTo(1004, y); g.stroke(); if (k < 4) { const x = 150 + R() * 700; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 80, y + 44); g.stroke(); } }
+    for (let k = 0; k < 26; k++) { g.fillStyle = R() < 0.3 ? '#ff4020' : R() < 0.6 ? '#40ff70' : '#ffd040'; g.beginPath(); g.arc(40 + R() * 944, 40 + ((R() * 5) | 0) * 44, 6, 0, 7); g.fill(); }
+    for (let k = 0; k < 8; k++) { g.fillStyle = '#e8e2d0'; g.font = 'bold 18px monospace'; g.fillText(String(100 + ((R() * 900) | 0)), 60 + k * 120, 250); }
+    const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+    const m = add(new THREE.MeshStandardMaterial({ map: tx, emissiveMap: tx, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.6, name: 'diagram' }), new THREE.PlaneGeometry(5.6, 1.4), ix0 + 0.03, f1 + 2.1, 11); m.rotation.y = Math.PI / 2; }
+  // control desk top: CRT monitors, phone, ledgers, desk lamp
+  const scr = new THREE.MeshStandardMaterial({ color: 0x0a120c, emissive: 0x3cff78, emissiveIntensity: 0.5, roughness: 0.2, name: 'crt' });
+  for (const z of [8.3, 11.0, 13.7]) { B.box('cabinet', [ix1 - 0.85, f1 + 0.84, z - 0.3], [ix1 - 0.3, f1 + 1.34, z + 0.3], { collide: false }); const sm = add(scr, new THREE.PlaneGeometry(0.46, 0.36), ix1 - 0.86, f1 + 1.1, z); sm.rotation.y = -Math.PI / 2; }
+  B.box('black', [ix1 - 0.7, f1 + 0.84, 9.5], [ix1 - 0.45, f1 + 0.94, 9.75], { collide: false });
+  for (let i = 0; i < 5; i++) { const z = 12.1 + R() * 0.8; B.box(R() < 0.5 ? 'white' : 'drumRed', [ix1 - 0.8 + R() * 0.2, f1 + 0.84 + i * 0.03, z], [ix1 - 0.5 + R() * 0.1, f1 + 0.87 + i * 0.03, z + 0.28], { collide: false }); }
+  // office chairs (x2) and filing cabinets along the west wall; lockers + desk downstairs
+  for (const [cx, cz, y] of [[ix1 - 1.4, 9.6, f1], [ix1 - 1.5, 12.8, f1], [-39.5, 9.0, 0.06]]) { B.cyl('steelDark', cx, cz, y, y + 0.42, 0.03, 6); B.box('black', [cx - 0.24, y + 0.42, cz - 0.24], [cx + 0.24, y + 0.5, cz + 0.24], { collide: false }); B.box('black', [cx + 0.18, y + 0.5, cz - 0.22], [cx + 0.24, y + 1.05, cz + 0.22], { collide: false }); }
+  for (let i = 0; i < 3; i++) B.box('cabinet', [ix0 + 0.05, f1, 6.8 + i * 0.52], [ix0 + 0.65, f1 + 1.35, 7.28 + i * 0.52], { uvScale: 1 });
+  for (let i = 0; i < 4; i++) B.box('drumGrey', [ix0 + 0.05, 0.06, 13.0 + i * 0.55], [ix0 + 0.55, 1.9, 13.5 + i * 0.55], { uvScale: 1 });
+  B.box('plank', [-40.2, 0.78, 8.2], [-38.2, 0.84, 9.4], { uvScale: 1 }); for (const [a, b] of [[-40.15, 8.25], [-38.3, 8.25], [-40.15, 9.3], [-38.3, 9.3]]) B.box('steelDark', [a, 0.06, b], [a + 0.05, 0.78, b + 0.05], { collide: false });
+  world.box([-40.2, 0, 8.2], [-38.2, 0.84, 9.4]);
+}
+
+// ---- goods shed: stock in the open bay (critic: "empty brick box") ------------------------------------------------------
+function stockShed(B, world, S, t, M) {
+  const R = world.R; const y = S.floor;
+  if (!M.sack) { M.sack = new THREE.MeshStandardMaterial({ color: 0x9a8864, roughness: 1, name: 'sack' }); M.sackPaper = new THREE.MeshStandardMaterial({ color: 0xb8ab90, roughness: 0.95, name: 'sackPaper' }); M.surface.sack = 'wood'; M.surface.sackPaper = 'wood'; }
+  const pallet = (x, z, ry = 0) => { B.box('plank', [x - 0.6, y, z - 0.5], [x + 0.6, y + 0.14, z + 0.5], { uvScale: 1, collide: false }); };
+  // pallets of sacks (grain/cement), crates, drums; aisle kept clear from the west shutter to the back door
+  const spots = [[S.x0 + t + 1.2, 6.2], [S.x0 + t + 1.2, 7.6], [S.x0 + t + 2.6, 6.2], [S.x0 + t + 1.2, 10.4], [S.x0 + t + 2.6, 10.4], [S.x1 - t - 1.6, 9.6], [S.x1 - t - 1.6, 11.0], [S.x0 + t + 1.2, -6.5], [S.x0 + t + 2.6, -6.5]];
+  for (const [x, z] of spots) {
+    pallet(x, z); const kind = R();
+    if (kind < 0.5) { const layers = 2 + ((R() * 3) | 0); for (let l = 0; l < layers; l++) for (let k = 0; k < 2; k++) { const g = new THREE.CapsuleGeometry(0.2, 0.55, 3, 8); g.rotateZ(Math.PI / 2); g.scale(1, 0.55, 1); g.rotateY((l % 2) * Math.PI / 2); g.translate(x + (l % 2 ? (k - 0.5) * 0.45 : 0), y + 0.26 + l * 0.22, z + (l % 2 ? 0 : (k - 0.5) * 0.45)); B.add(R() < 0.5 ? 'sack' : 'sackPaper', g, { collide: false }); } world.box([x - 0.6, y, z - 0.5], [x + 0.6, y + 0.3 + layers * 0.22, z + 0.5]); }
+    else { const h = 0.6 + R() * 0.5; B.box('plank', [x - 0.55, y + 0.14, z - 0.45], [x + 0.55, y + 0.14 + h, z + 0.45], { uvScale: 1 }); if (R() < 0.6) B.box('plank', [x - 0.4, y + 0.14 + h, z - 0.35], [x + 0.35, y + 0.64 + h, z + 0.3], { uvScale: 1 }); }
+    world.cover(x + 1.0, z, 1, 0, y);
+  }
+  for (let i = 0; i < 6; i++) { const x = S.x1 - t - 0.6 - (i % 3) * 0.62, z = -10.8 + ((i / 3) | 0) * 0.62; B.cyl(i % 2 ? 'drumBlue' : 'drumRed', x, z, y, y + 0.88, 0.29, 12); }
+  world.box([S.x1 - t - 2.1, y, -11.2], [S.x1 - t - 0.2, y + 0.9, -9.8]);
+  // hanging enamel lamps over the aisle (emissive bulbs; the fill lights already exist)
+  const bulb = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd6a0, emissiveIntensity: 3, name: 'bulb' });
+  for (const z of [-6, 0, 6]) { B.cyl('steelDark', 30, z, S.roof - 1.6, S.roof - 0.3, 0.01, 4); const shade = new THREE.ConeGeometry(0.32, 0.22, 14, 1, true); shade.translate(30, S.roof - 1.7, z); B.add('steelDark', shade, { collide: false }); const b = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), bulb); b.position.set(30, S.roof - 1.8, z); world.scene.add(b); }
 }
