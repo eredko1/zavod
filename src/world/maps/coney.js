@@ -7,6 +7,7 @@ import { buildSky } from '../sbu/sky.js';
 import { buildCity } from '../coney/city.js';
 import { buildHousing } from '../coney/housing.js';
 import { buildShore, BW, sandHeight, waterZ, SAND_TOP } from '../coney/shore.js';
+import { buildHorizon } from '../coney/horizon.js';
 import { buildLandmarks, LM } from '../coney/landmarks.js';
 import { buildBeachLife } from '../coney/life.js';
 import { buildPark } from '../coney/park.js';
@@ -38,6 +39,7 @@ export function build(world) {
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
   try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level: cops + Luna Park crews (coney/chase.js)
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
+  try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);
 
