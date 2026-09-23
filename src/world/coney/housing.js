@@ -356,6 +356,7 @@ function buildAll(world, M) {
   }
   B.flush({ shadow: true }); G.flush({ shadow: false });
   plantTrees(world, trees);
+  world.W.luna = world.lunaTowers;   // QA: window.__ctx.world.luna[i].top[s].view / cars
   return { towers: towers.length, ac: list.length, trees: trees.length };
 }
 
@@ -426,7 +427,15 @@ function buildTower(L, parts, R, acs, m) {
         if (isGallery) {
           const yg = Math.max(yb, 0);
           if (yg < Hw) {
-            rect('hGalleryBack', f, a, bnd, Math.max(yg, ST), Hw, -GALV, bw, 'gal');
+            { // gallery back wall — cut open on the 19th floor between the walkway gates (the elevator lobby's walls stand there)
+              const y0 = Math.max(yg, ST), yF = (Math.min(19, p.floors) - 1) * ST, gm = (f.a0 + f.a1) / 2, lo = Math.min(a, bnd), hi = Math.max(a, bnd);
+              const w0 = Math.max(lo, gm - WALK_HALF), w1 = Math.min(hi, gm + WALK_HALF);
+              if (w1 - w0 > 0.01 && y0 < yF && Hw > yF + ST) {
+                rect('hGalleryBack', f, a, bnd, y0, yF, -GALV, bw, 'gal'); rect('hGalleryBack', f, a, bnd, yF + ST, Hw, -GALV, bw, 'gal');
+                if (w0 > lo) rect('hGalleryBack', f, lo, w0, yF, yF + ST, -GALV, bw, 'gal');
+                if (hi > w1) rect('hGalleryBack', f, w1, hi, yF, yF + ST, -GALV, bw, 'gal');
+              } else rect('hGalleryBack', f, a, bnd, y0, Hw, -GALV, bw, 'gal');
+            }
             if (yg < ST) { // ground floor at the lobby line: lit lobby glass (hangout lobby, see coreInterior) with the entrance gap, brick beyond
               const mid = f.axis === 'z' ? (p.z0 + p.z1) / 2 : (p.x0 + p.x1) / 2, lo = Math.min(a, bnd), hi = Math.max(a, bnd);
               const cutsG = [lo, hi, mid - LOBBY_HALF, mid - DOOR_HALF, mid + DOOR_HALF, mid + LOBBY_HALF].filter((v) => v >= lo && v <= hi).sort((u, v) => u - v);
@@ -647,12 +656,13 @@ function coreInterior(L, p, Ht) {
   const col = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx); };
   const vis = (key, ...v) => { const [mn, mx] = bx(...v); L.box(key, mn, mx, { collide: false }); };
   const mid = (A[0] + A[1]) / 2, i0 = C[0] + GAL, i1 = C[1] - GAL;
-  // solids: everything above the ground floor, and the ground floor beyond the lobby
-  col(A[0], ST, i0, A[1], Ht, i1);
+  const yF = (Math.min(19, p.floors) - 1) * ST, CEIL = 2.55;
+  // solids: everything above the ground floor except the 19th-floor elevator lobby, and the ground floor beyond the lobby
+  col(A[0], ST, i0, A[1], yF, i1); col(A[0], yF + CEIL, i0, A[1], Ht, i1);
+  col(A[0], yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); col(mid + LOBBY_HALF, yF, i0, A[1], yF + CEIL, i1);
   col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1); col(mid + LOBBY_HALF, 0, i0, A[1], ST, i1);
   // lobby glass walls (colliders) with the entrance gaps
   for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + LOBBY_HALF, ST, c + 0.06); }
-  // lobby dressing
   // lobby dressing: 12" VCT checker floor, glazed-tile wainscot walls, a dropped ceiling with light panels, three steel cars
   // with call-button plates and lit floor indicators, a bank of aluminium mailboxes, a directory board, a bench
   vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + LOBBY_HALF, 0.03, i1);
@@ -660,43 +670,64 @@ function coreInterior(L, p, Ht) {
   for (let a = mid - LOBBY_HALF + 1.5; a < mid + LOBBY_HALF - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.05, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.02, (i0 + i1) / 2 + 0.3);
   vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); vis('hLobbyWall', mid + LOBBY_HALF, 0, i0, mid + LOBBY_HALF + 0.05, ST, i1);
   const cars = [0, 1, 2].map((k) => i0 + (i1 - i0) * (k + 0.5) / 3);
-  for (const cc of cars) {
-    vis('hElev', mid - LOBBY_HALF, 0.03, cc - 0.52, mid - LOBBY_HALF + 0.05, 2.12, cc + 0.52);
-    vis('hRail', mid - LOBBY_HALF, 2.12, cc - 0.62, mid - LOBBY_HALF + 0.07, 2.22, cc + 0.62);
-    for (const s of [-1, 1]) vis('hRail', mid - LOBBY_HALF, 0.03, cc + s * 0.52 - 0.05, mid - LOBBY_HALF + 0.07, 2.12, cc + s * 0.52 + 0.05);   // jambs
-    vis('hPanel', mid - LOBBY_HALF, 0.95, cc + 0.6, mid - LOBBY_HALF + 0.06, 1.3, cc + 0.72);                                                  // call plate
-    vis('hButton', mid - LOBBY_HALF, 1.16, cc + 0.63, mid - LOBBY_HALF + 0.08, 1.22, cc + 0.69); vis('hButton', mid - LOBBY_HALF, 1.03, cc + 0.63, mid - LOBBY_HALF + 0.08, 1.09, cc + 0.69);
-    vis('hIndicator', mid - LOBBY_HALF, 2.26, cc - 0.25, mid - LOBBY_HALF + 0.06, 2.4, cc + 0.25);    // floor indicator
-  }
+  // the bank of 3 steel cars on the lobby end wall (a = mid - LOBBY_HALF, facing +a): ground floor and the same shafts on 19
+  const bank = (y) => { const e = mid - LOBBY_HALF; for (const cc of cars) {
+    vis('hElev', e, y + 0.03, cc - 0.52, e + 0.05, y + 2.12, cc + 0.52);
+    vis('hRail', e, y + 2.12, cc - 0.62, e + 0.07, y + 2.22, cc + 0.62);
+    for (const s of [-1, 1]) vis('hRail', e, y + 0.03, cc + s * 0.52 - 0.05, e + 0.07, y + 2.12, cc + s * 0.52 + 0.05);   // jambs
+    vis('hPanel', e, y + 0.95, cc + 0.6, e + 0.06, y + 1.3, cc + 0.72);                                                  // call plate
+    vis('hButton', e, y + 1.16, cc + 0.63, e + 0.08, y + 1.22, cc + 0.69); vis('hButton', e, y + 1.03, cc + 0.63, e + 0.08, y + 1.09, cc + 0.69);
+    vis('hIndicator', e, y + 2.26, cc - 0.25, e + 0.06, y + 2.4, cc + 0.25);    // floor indicator
+  } };
+  bank(0);
   vis('hMail', mid + LOBBY_HALF - 0.3, 0.85, i0 + 0.45, mid + LOBBY_HALF, 1.95, i1 - 0.45);          // mailboxes
   vis('hRail', mid + LOBBY_HALF - 0.33, 0.8, i0 + 0.4, mid + LOBBY_HALF, 0.85, i1 - 0.4);
   const nrm = (dc) => { const q = P3(0, 0, dc); return [q[0], q[2]]; };   // local normal pointing along +/-c
-  { const q = P3(1, 0, 0); L.sign('hDirectory', P3(mid + LOBBY_HALF - 0.02, 2.25, (i0 + i1) / 2), [-q[0], -q[2]], 1.6, 0.5); }   // "MAIL ROOM · BLDG" plaque over the boxes
-  // the 19th floor: walkable gallery walkway on both faces, railing, end caps, elevator doors on the back wall
-  const yF = (Math.min(19, p.floors) - 1) * ST;
+  const nrmA = (da) => { const q = P3(da, 0, 0); return [q[0], q[2]]; };  // local normal pointing along +/-a
+  L.sign('hDirectory', P3(mid + LOBBY_HALF - 0.02, 2.25, (i0 + i1) / 2), nrmA(-1), 1.6, 0.5);   // plaque over the boxes
+
+  // ---- the 19th floor: a walkable loop. Two railed gallery walkways (one per long face: one looks north over Brooklyn to the
+  // Manhattan skyline, the other south over the rides to the ocean) joined THROUGH the core by an enclosed elevator lobby
+  // (the same 3 shafts as the ground floor, VCT floor, tile walls, lit ceiling panels) with two open doorways on each side.
+  const OPEN = [[mid - 6.3, mid - 3.5], [mid + 2.6, mid + 5.4]], WT = 0.2, HEAD = 2.25;
+  vis('hLobbyFloor', mid - LOBBY_HALF, yF, i0, mid + LOBBY_HALF, yF + 0.03, i1);
+  vis('hLobbyCeiling', mid - LOBBY_HALF, yF + CEIL - 0.02, i0, mid + LOBBY_HALF, yF + CEIL, i1);
+  for (let a = mid - LOBBY_HALF + 1.6; a < mid + LOBBY_HALF - 1; a += 2.8) vis('hLobbyCeil', a - 0.6, yF + CEIL - 0.05, (i0 + i1) / 2 - 0.3, a + 0.6, yF + CEIL - 0.02, (i0 + i1) / 2 + 0.3);
+  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
+  bank(yF);
+  L.sign('hFloor19', P3(mid + LOBBY_HALF - 0.02, yF + 1.55, (i0 + i1) / 2), nrmA(-1), 1.1, 1.1);                  // "19" on the far end wall
+  vis('hDoor', mid + LOBBY_HALF - 0.04, yF + 0.03, i0 + 0.35, mid + LOBBY_HALF, yF + 1.3, i0 + 0.95);             // compactor-chute hatch
   const walks = [];
   for (const [cOut, cIn, sg] of [[C[0], i0, 1], [C[1], i1, -1]]) {
     col(mid - WALK_HALF, yF - 0.25, cOut, mid + WALK_HALF, yF, cIn);
-    col(mid - WALK_HALF, yF, cOut, mid + WALK_HALF, yF + 1.1, cOut + sg * 0.12);
+    // railing: 1.1 m steel rail + an invisible 2 m guard so nobody vaults or mantles off the 19th floor
+    col(mid - WALK_HALF, yF, cOut, mid + WALK_HALF, yF + 2.0, cOut + sg * 0.12);
     col(mid - WALK_HALF - 0.3, yF, cOut, mid - WALK_HALF, yF + 2.6, cIn); col(mid + WALK_HALF, yF, cOut, mid + WALK_HALF + 0.3, yF + 2.6, cIn);
     vis('hSlab', mid - WALK_HALF, yF - 0.02, cOut, mid + WALK_HALF, yF + 0.01, cIn);
     vis('hRail', mid - WALK_HALF, yF + 1.05, cOut, mid + WALK_HALF, yF + 1.12, cOut + sg * 0.08);
-    // elevator vestibule: the wall that carries the doors stands at the lobby line, proud of the deeper gallery back wall
-    vis('hVestibule', mid - WALK_HALF, yF + 0.01, cIn, mid + WALK_HALF, yF + ST - 0.02, cIn + sg * (GALV - GAL));
     for (const e of [mid - WALK_HALF - 0.05, mid + WALK_HALF + 0.05]) {   // steel gates closing the walkway ends
       vis('hRail', e - 0.04, yF, cOut, e + 0.04, yF + 2.2, cIn); for (const y of [0.1, 1.1, 2.15]) vis('hRail', e - 0.03, yF + y, cOut, e + 0.03, yF + y + 0.05, cIn);
       for (let c = 0.15; c < GAL - 0.05; c += 0.14) vis('hRail', e - 0.012, yF + 0.1, cOut + sg * c - 0.012, e + 0.012, yF + 2.15, cOut + sg * c + 0.012);
     }
-    const doors = [-2.4, 0, 2.4].map((d) => mid + d);
-    for (const a of doors) {
-      vis('hElev', a - 0.52, yF + 0.02, cIn - sg * 0.05, a + 0.52, yF + 2.1, cIn);
-      vis('hRail', a - 0.62, yF + 2.1, cIn - sg * 0.07, a + 0.62, yF + 2.2, cIn); for (const s of [-1, 1]) vis('hRail', a + s * 0.57 - 0.05, yF + 0.02, cIn - sg * 0.07, a + s * 0.57 + 0.05, yF + 2.1, cIn);
-      vis('hPanel', a + 0.6, yF + 0.95, cIn - sg * 0.05, a + 0.74, yF + 1.3, cIn); vis('hButton', a + 0.63, yF + 1.1, cIn - sg * 0.08, a + 0.71, yF + 1.18, cIn);
+    // lobby side wall on the lobby line (dark painted block outside, tile inside) with two open steel-framed doorways
+    const cW = cIn + sg * WT, segs = []; let a0 = mid - WALK_HALF;
+    for (const [o0, o1] of OPEN) { segs.push([a0, o0]); a0 = o1; } segs.push([a0, mid + WALK_HALF]);
+    for (const [s0, s1] of segs) {
+      col(s0, yF, cIn, s1, yF + CEIL, cW); vis('hVestibule', s0, yF + 0.01, cIn, s1, yF + ST - 0.02, cW);
+      const q0 = Math.max(s0, mid - LOBBY_HALF), q1 = Math.min(s1, mid + LOBBY_HALF); if (q1 > q0) vis('hLobbyWall', q0, yF + 0.01, cW, q1, yF + CEIL - 0.02, cW + sg * 0.02);
     }
-    for (const d of [-4, 4]) L.sign('hFloor19', P3(mid + d, yF + 1.6, cIn - sg * 0.015), nrm(-sg), 1.2, 1.2);   // painted floor number beside the cars
-    walks.push({ cOut, cIn, sg, doors });
+    for (const [o0, o1] of OPEN) {
+      vis('hVestibule', o0, yF + HEAD, cIn, o1, yF + ST - 0.02, cW); col(o0, yF + HEAD, cIn, o1, yF + CEIL, cW);   // header
+      for (const e of [o0, o1]) vis('hRail', e - 0.06, yF + 0.01, cIn - sg * 0.03, e + 0.06, yF + HEAD, cW + sg * 0.03);   // jambs
+      vis('hRail', o0 - 0.06, yF + HEAD - 0.08, cIn - sg * 0.03, o1 + 0.06, yF + HEAD, cW + sg * 0.03);                   // head
+      vis('hSlab', o0, yF, cIn, o1, yF + 0.035, cW);                                                                         // threshold
+    }
+    L.sign('hFloor19', P3(mid - 1.0, yF + 1.6, cIn - sg * 0.015), nrm(-sg), 1.1, 1.1);   // painted floor number beside the doorways
+    for (let a = mid - WALK_HALF + 1.4; a < mid + WALK_HALF - 1; a += 3.6) { const cm = cOut + sg * 0.95; vis('hRail', a - 0.3, yF + ST - 0.1, cm - 0.14, a + 0.3, yF + ST - 0.02, cm + 0.14); vis('hLobbyCeil', a - 0.27, yF + ST - 0.12, cm - 0.11, a + 0.27, yF + ST - 0.1, cm + 0.11); }   // gallery ceiling fixtures
+    walks.push({ cOut, cIn, sg });
   }
-  return { ax, A, C, mid, i0, i1, cars, yF, walks, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF };
+  const topCars = cars.map((cc) => ({ a: mid - LOBBY_HALF + 1.1, c: cc }));
+  return { ax, A, C, mid, i0, i1, cars, topCars, yF, walks, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF, open: OPEN };
 }
 
 /** World-space registry entry for one complex (used by coney/hangout.js). */
@@ -710,9 +741,13 @@ function towerInfo(core, m, centre) {
     cars: core.cars.map((cc) => ({ pos: toWorld(core.mid - core.lobbyHalf + 1.1, 0, cc), yaw: yawOf(ea.clone().negate()) })),
     doors: [core.i0, core.i1].map((c, k) => ({ inside: toWorld(core.mid, 0, c + (k ? -1.2 : 1.2)), outside: toWorld(core.mid, 0, c + (k ? 1 : -1) * (GAL + 5)), yawIn: yawOf(ec.clone().multiplyScalar(k ? -1 : 1)), plane: toWorld(core.mid, 0, c), along: ea.clone().normalize(), half: core.doorHalf })),
   };
+  // 19th floor: both walkways share the one elevator lobby — cars[k] stands in front of lobby car k (facing its door, -a);
+  // view = the railing on that walkway, looking straight out
+  const topCars = core.topCars.map((q) => ({ pos: toWorld(q.a, core.yF, q.c), yaw: yawOf(ea.clone().negate()) }));
   const top = core.walks.map((w) => ({
-    cars: w.doors.map((a) => ({ pos: toWorld(a, core.yF, w.cIn - w.sg * 0.85), yaw: yawOf(ec.clone().multiplyScalar(w.sg)) })),
+    cars: topCars,
     view: { pos: toWorld(core.mid, core.yF, w.cOut + w.sg * 0.6), yaw: yawOf(ec.clone().multiplyScalar(-w.sg)) },
+    walk: { a0: toWorld(core.mid - core.walkHalf + 0.6, core.yF, w.cOut + w.sg * 0.85), a1: toWorld(core.mid + core.walkHalf - 0.6, core.yF, w.cOut + w.sg * 0.85) },
   }));
   return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, toWorld };
 }
