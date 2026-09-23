@@ -21,7 +21,7 @@ export function buildBeachLife(world, M) {
     const y = sandHeight(x, z);
     if (R() < 0.75) umbrellas.push({ x, y, z, ry: R() * 6.3, tilt: (R() - 0.5) * 0.3, c: umbrellaCols[(R() * umbrellaCols.length) | 0] });
     const n = 1 + ((R() * 4) | 0);
-    for (let k = 0; k < n; k++) { const tx = x + (R() - 0.5) * 4, tz = z + (R() - 0.5) * 3; towels.push({ x: tx, y: sandHeight(tx, tz) + 0.02, z: tz, ry: R() * 6.3, c: towelCols[(R() * towelCols.length) | 0] }); if (R() < 0.75) { const lie = R() < 0.65; crowd.push({ x: tx, y: sandHeight(tx, tz) + (lie ? 0.02 : 0), z: tz, ry: R() * 6.3, pose: lie ? 'lie' : R() < 0.7 ? 'stand' : 'phone', bag: 0 }); } }
+    for (let k = 0; k < n; k++) { const tx = x + (R() - 0.5) * 4, tz = z + (R() - 0.5) * 3; towels.push({ x: tx, y: sandHeight(tx, tz) + 0.02, z: tz, ry: R() * 6.3, c: towelCols[(R() * towelCols.length) | 0] }); if (R() < 0.5) { const lie = R() < 0.65; crowd.push({ x: tx, y: sandHeight(tx, tz) + (lie ? 0.02 : 0), z: tz, ry: R() * 6.3, pose: lie ? 'lie' : R() < 0.7 ? 'stand' : 'phone', bag: 0 }); } }
   }
   inst(scene, umbrellaGeo(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide, name: 'umbrella' }), umbrellas, true);
   inst(scene, new THREE.CylinderGeometry(0.025, 0.025, 2.3, 6).translate(0, 1.15, 0), M.alu, umbrellas.map((u) => ({ ...u, c: null })), true);
