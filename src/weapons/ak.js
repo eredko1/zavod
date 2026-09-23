@@ -10,8 +10,10 @@ export const AK_SPEC = {
   mag: 30, reserve: 150, rpm: 600, auto: true, damage: 40, headMul: 2.0, range: 220, falloff: [45, 180, 0.6],
   reloadStyle: 'mag', reloadKeys: { magGrab: [-0.02, -0.17, -0.03], down: [-0.1, -0.42, 0.06], rack: [0.02, 0.03, 0.0], tiltK: 1.1 },
   hipSpread: 1.9, adsSpread: 0.16, spreadPerShot: 0.6, spreadMax: 7, moveSpread: 2.0,
-  recoilPitch: 0.52, recoilYaw: 0.3, kickBack: 0.04, kickUp: 0.08, kickRoll: 0.045,
-  reloadTime: 2.4, reloadTimeTac: 2.0, swapTime: 0.45, adsTime: 0.24, adsDist: 0.24,
+  recoilPitch: 0.5, recoilYaw: 0.2, recoilRecover: 1.0, kickBack: 0.04, kickUp: 0.08, kickRoll: 0.045,
+  reloadTime: 2.4, reloadTimeTac: 2.0, swapTime: 0.45,
+  // ADS: cheek on the stock comb (~0.28 m behind the rear leaf), world fov 55 at the default 75, viewmodel drawn at a steady ~40° so the irons don't balloon
+  adsTime: 0.18, adsDist: 0.28, adsFovMul: 55 / 75, adsVmFov: 36,
   flashSize: 0.17, flashStrength: 1.15, brassScale: 1,
   hip: { pos: [0.088, -0.105, -0.27], rot: [0.0, 0.05, 0.01] },
   sprint: { pos: [0.16, -0.16, -0.30], rot: [-0.25, 0.75, 0.35] },
@@ -44,9 +46,11 @@ export function buildAk(mats) {
   b.add(cylX(0.006, 0.006, 0.006, 10), 'steel', { pos: [0.023, 0.012, 0.075], wear: 'rim' });
   // rear sight block + leaf
   b.add(rbox(0.03, 0.02, 0.03, 0.003, 1), 'steel', { pos: [0, 0.035, -0.095], wearAmt: 1.3 });
-  b.add(rbox(0.018, 0.012, 0.004, 0.001, 1), 'steel', { pos: [0, sightY - 0.002, -0.10], wearAmt: 1.4 }); // leaf
-  b.add(box(0.003, 0.005, 0.005), 'blackout', { pos: [0, sightY + 0.0025, -0.10], wear: 'none' }); // notch
-  b.add(rbox(0.006, 0.006, 0.022, 0.001, 1), 'steel', { pos: [0, 0.048, -0.082], wearAmt: 1.3 }); // range slider
+  // leaf with a real U-notch. Sight picture = post tip level with the TOP of the notch ears, centred in the gap, so the sight line
+  // (sightY) runs across the ear tops; notch bottom is 4 mm lower so ~9 mm of the post shows inside the 4.6 mm gap.
+  b.add(rbox(0.02, 0.008, 0.004, 0.0008, 1), 'steel', { pos: [0, sightY - 0.008, -0.10], wearAmt: 1.4 }); // leaf bar (top = notch bottom)
+  for (const x of [-0.0061, 0.0061]) b.add(rbox(0.0076, 0.0042, 0.004, 0.0006, 1), 'steel', { pos: [x, sightY - 0.0021, -0.10], wearAmt: 1.4 }); // notch ears (tops at sightY)
+  b.add(rbox(0.006, 0.006, 0.022, 0.001, 1), 'steel', { pos: [0, 0.041, -0.082], wearAmt: 1.3 }); // range slider
   // trunnion / pins
   for (const z of [0.09, -0.06]) b.add(cylX(0.0045, 0.0045, 0.044, 8), 'steel', { pos: [0, -0.012, z], wear: 'rim', wearAmt: 1.5 });
 
@@ -63,7 +67,7 @@ export function buildAk(mats) {
   b.add(cylZ(0.0095, 0.0105, 0.44, 16), 'steel', { pos: [0, 0, -0.32], wear: 'rim', wearAmt: 0.7 }); // barrel
   b.add(cylZ(0.0032, 0.0032, 0.36, 8), 'steel', { pos: [0, -0.016, -0.30], wear: 'rim', wearAmt: 1.5 }); // cleaning rod
   b.add(rbox(0.022, 0.03, 0.026, 0.003, 1), 'steel', { pos: [0, 0.012, -0.45], wearAmt: 1.3 }); // front sight base
-  b.add(rbox(0.003, 0.03, 0.003, 0.0006, 1), 'steel', { pos: [0, sightY - 0.013, -0.45], wearAmt: 1.2 }); // post (tip at sightY)
+  b.add(rbox(0.004, 0.03, 0.0035, 0.0005, 1), 'steel', { pos: [0, sightY - 0.015, -0.45], wearAmt: 1.2 }); // post (tip exactly at sightY: sits in the notch bottom)
   for (const x of [-0.011, 0.011]) b.add(cylZ(0.003, 0.003, 0.02, 8), 'steel', { pos: [x, sightY - 0.002, -0.45], rot: [0, 0, 0], wear: 'rim', wearAmt: 1.3 }); // ears (uprights)
   for (const x of [-0.011, 0.011]) b.add(rbox(0.006, 0.026, 0.008, 0.002, 1), 'steel', { pos: [x, 0.04, -0.45], wearAmt: 1.3 });
   b.add(torus(0.011, 0.0025, 6, 16, Math.PI), 'steel', { pos: [0, sightY - 0.004, -0.45], wear: 'all', wearAmt: 0.4 }); // hood arc
@@ -110,6 +114,7 @@ export function buildAk(mats) {
   b.add(torus(0.007, 0.0016, 6, 14), 'steel', { pos: [-0.017, -0.045, 0.38], rot: [0, Math.PI / 2, 0], wear: 'all', wearAmt: 0.5 }); // rear sling loop
 
   parts.sight = new THREE.Object3D(); parts.sight.position.set(0, sightY, -0.10); group.add(parts.sight);
+  parts.sightFront = new THREE.Object3D(); parts.sightFront.position.set(0, sightY, -0.45); group.add(parts.sightFront); // front post tip (QA: sight-line check)
   parts.muzzle = new THREE.Object3D(); parts.muzzle.position.set(0, 0, -0.551); group.add(parts.muzzle);
   parts.eject = new THREE.Object3D(); parts.eject.position.set(0.024, 0.014, -0.03); group.add(parts.eject);
 

@@ -163,6 +163,7 @@ export function placeCars(world, list, { raycast = true } = {}) {
   const { scene, ctx, R } = world; const CM = carMaterials();
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
   const reg = world.parkedCars || (world.parkedCars = []);
+  if (world.W && !world.W.parkedCars) world.W.parkedCars = reg;   // vehicles.js reads ctx.world.parkedCars (touch STEAL button)
   for (const c of list) { c.refs = []; if (c.color == null) c.color = null; reg.push(c); }
   for (const kind of CAR_KINDS) {
     const P = list.filter((c) => c.kind === kind); if (!P.length) continue;
@@ -180,3 +181,71 @@ export function placeCars(world, list, { raycast = true } = {}) {
 
 /** Remove one parked car from its instanced meshes (hangout: stolen). */
 export function hideParkedCar(c) { const z = new THREE.Matrix4().makeScale(0, 0, 0); for (const { im, i } of c.refs || []) { im.setMatrixAt(i, z); im.instanceMatrix.needsUpdate = true; } c.gone = true; }
+
+/**
+ * Driver's-eye point for a kind, in the kit frame (+x front, y up, z right-hand = passenger side): the eye sits ~0.42 m behind
+ * the top edge of the windshield, ~0.28 m under the roof, on the left (US driver) seat. vehicles.js places its camera here.
+ */
+export function carEye(kind = 'sedan') {
+  const K = KINDS[kind] || KINDS.sedan;
+  return { x: K.ws[1] - 0.42, y: K.roof - 0.28, z: -K.w / 2 * 0.4 };
+}
+
+/**
+ * Cabin for a drivable car (kit frame, same as carGeometries): the inside of the body shell (paint geometry rendered BackSide
+ * in a dark trim colour → roof liner, pillars, door cards), a faint tint on the inside of the glass, dashboard with an
+ * instrument binnacle (lit gauges), steering wheel on a column (returns `wheel`: rotate wheel.rotation.x to steer), seats,
+ * centre console and a rear-view mirror. Opaque exterior glass hides all of it from outside. No colliders / raycast.
+ */
+export function carInterior(kind = 'sedan', geos = null) {
+  const K = KINDS[kind] || KINDS.sedan; const G = geos || carGeometries(kind).geos; const HW = K.w / 2;
+  const I = interiorMats();
+  const g = new THREE.Group(); g.name = 'carInterior';
+  const add = (geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = false; m.receiveShadow = true; parent.add(m); return m; };
+  add(G.paint, I.shell); add(G.glass, I.glassIn);
+  const eye = carEye(kind), [wsBase, wsTop] = K.ws;
+  // dashboard: from under the windshield base back to ~0.5 m ahead of the eye, top just above the belt line
+  const dx0 = eye.x + 0.5, dx1 = wsBase + 0.05, dTop = K.belt + 0.04;
+  add(new THREE.BoxGeometry(dx1 - dx0, 0.36, K.w * 0.9), I.dash, (dx0 + dx1) / 2, dTop - 0.18, 0);
+  add(new THREE.BoxGeometry(0.2, 0.05, K.w * 0.88), I.dash, dx0 + 0.02, dTop - 0.21, 0, 0, 0, 0.5);          // lower lip, rounded read
+  // binnacle hood + gauges in front of the driver
+  add(new THREE.BoxGeometry(0.2, 0.09, 0.42), I.dash, dx0 + 0.04, dTop + 0.03, eye.z);
+  add(new THREE.PlaneGeometry(0.34, 0.08), I.gauge, dx0 - 0.004, dTop - 0.05, eye.z, 0, -Math.PI / 2, 0);
+  // centre stack + console
+  add(new THREE.BoxGeometry(0.16, 0.3, 0.3), I.trim, dx0 - 0.05, dTop - 0.25, 0);
+  add(new THREE.PlaneGeometry(0.18, 0.1), I.screen, dx0 - 0.135, dTop - 0.12, 0, 0, -Math.PI / 2, 0);
+  add(new THREE.BoxGeometry(0.9, 0.22, 0.24), I.trim, eye.x - 0.1, K.clr + 0.35, 0);
+  // seats (base + back), both fronts
+  for (const sz of [eye.z, -eye.z]) {
+    add(new THREE.BoxGeometry(0.52, 0.14, 0.5), I.seat, eye.x - 0.02, K.clr + 0.32, sz);
+    add(new THREE.BoxGeometry(0.13, 0.7, 0.5), I.seat, eye.x - 0.36, K.clr + 0.72, sz, 0, 0, 0.2);
+    add(new THREE.BoxGeometry(0.1, 0.18, 0.26), I.seat, eye.x - 0.44, K.clr + 1.14, sz, 0, 0, 0.2);
+  }
+  // steering wheel on a raked column
+  const col = new THREE.Group(); col.position.set(eye.x + 0.4, eye.y - 0.33, eye.z); col.rotation.z = -0.42; g.add(col);   // tilt: top leans toward the driver
+  const wheel = new THREE.Group(); col.add(wheel);
+  const rim = new THREE.TorusGeometry(0.18, 0.02, 8, 28); rim.rotateY(Math.PI / 2); add(rim, I.wheel, 0, 0, 0, 0, 0, 0, wheel);
+  for (const a of [0, Math.PI * 0.62, -Math.PI * 0.62]) { const sp = new THREE.BoxGeometry(0.02, 0.17, 0.03); sp.translate(0, -0.085, 0); add(sp, I.wheel, 0, 0, 0, a, 0, 0, wheel); }
+  add(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12), I.wheel, 0.01, 0, 0, 0, 0, Math.PI / 2, wheel);
+  add(new THREE.CylinderGeometry(0.035, 0.045, 0.34, 8), I.trim, 0.18, 0, 0, 0, 0, Math.PI / 2, col);
+  // rear-view mirror
+  add(new THREE.BoxGeometry(0.03, 0.07, 0.24), I.trim, wsTop - 0.04, K.roof - 0.12, 0);
+  add(new THREE.BoxGeometry(0.004, 0.055, 0.22), I.mirror, wsTop - 0.058, K.roof - 0.12, 0);
+  return { group: g, wheel };
+}
+let IMATS = null;
+function interiorMats() {
+  if (IMATS) return IMATS;
+  IMATS = {
+    shell: new THREE.MeshStandardMaterial({ color: 0x3a3a3c, roughness: 0.9, side: THREE.BackSide }),
+    glassIn: new THREE.MeshPhysicalMaterial({ color: 0x8fa3ad, roughness: 0.05, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.BackSide, envMapIntensity: 0.6 }),
+    dash: new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.8 }),
+    trim: new THREE.MeshStandardMaterial({ color: 0x151618, roughness: 0.55, metalness: 0.2 }),
+    seat: new THREE.MeshStandardMaterial({ color: 0x2b2926, roughness: 0.95 }),
+    wheel: new THREE.MeshStandardMaterial({ color: 0x101112, roughness: 0.5 }),
+    gauge: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0xffa040, emissiveIntensity: 0.55, roughness: 0.4 }),
+    screen: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x3a7fd0, emissiveIntensity: 0.5, roughness: 0.3 }),
+    mirror: new THREE.MeshStandardMaterial({ color: 0xaab4bc, roughness: 0.05, metalness: 1 }),
+  };
+  return IMATS;
+}

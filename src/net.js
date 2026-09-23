@@ -1,195 +1,480 @@
 // Online free-for-all over free public MQTT brokers (WebSockets) — no server of our own. Owned by: main.
 //
-// Join: menu "Play online" (reloads into ?room=public on the current map) or any URL with ?room=<name>. ?name=<callsign>.
-// Topics (per map + room):  zv2/<map>/<room>/s/<id>  player state, 15 Hz  ·  zv2/<map>/<room>/ev  events (hello/shot/hit/kill/bye)
-// Model: each client owns its own player. Shooters raycast locally against interpolated remote hitboxes and send `hit`;
-// the victim's client applies damage (so health is never disputed) and announces `kill`. Remote players are the AI soldier
-// model driven by snapshots rendered 100 ms in the past (smooth under jitter). AI waves are off online (?ai=1 keeps them).
+// Join: main menu "Play online" (netui.js: room + name + share link) or any URL with ?room=<name>[&name=<callsign>].
+// Topics (per map + room):  zv3/<map>/<room>/s/<id>  player state, 15 Hz (2 Hz heartbeat while the tab is hidden)
+//                           zv3/<map>/<room>/ev      events (hello/sync?/sync/shot/hit/boom/kill/steal/bye + game-mode `net:<t>`)
+//
+// CONNECTION. Every client keeps a link to EVERY broker at once (HiveMQ, EMQX, Mosquitto) and publishes on all live links;
+// receivers dedupe by per-sender sequence numbers (state: newest-wins by `q`; events: seen-set of (sender, instance, q)).
+// So one broker dying never splits the room (with sequential failover, A on HiveMQ and B on EMQX would never meet). Each
+// link reconnects on its own with jittered exponential backoff (1 s → 20 s), resubscribes, re-announces `hello` and asks
+// the room for `sync?`. A link watchdog recycles half-dead sockets: we subscribe to s/+ so our own state echoes back —
+// no echo for 6 s = dead link. The echo also gives the ping shown on the badge. `online` / tab-return force reconnects.
+// Critical events (kill, steal) are sent twice with the same seq (lossy QoS 0) and queued while every link is down.
+//
+// JOIN MID-GAME. A new/returning client sends `sync?`; every peer answers (random 50-400 ms spread) with its scoreboard
+// view and the parked-car indices it knows were stolen. Scores merge with max() per field (K/D only grow within a
+// session, so max is order-independent and duplicate-proof); each client also reports its own K/D in every state packet,
+// so boards converge even if a kill event is lost. Stolen cars are replayed through the bus as `net:steal` — exactly what
+// hangout.js already handles (idempotent: hideParkedCar + collider removal). The id survives a reload (sessionStorage,
+// released on pagehide, so a duplicated tab gets a fresh one) and scores of peers who left are kept as ghosts, so a
+// friend who refreshes comes back with the same score.
+//
+// ROBUSTNESS. Messages > 4 KB, non-JSON, non-objects, bad ids, non-finite numbers are dropped; positions/damage/radii are
+// clamped; per-peer token buckets (state 40/s, events 45/s); `kill` only accepted from the victim itself; hangout event
+// payloads (elev/steal/smoke) are shape-checked before they reach the bus. Duplicate names get a stable ·XY suffix (the
+// lexicographically smallest id keeps the plain name, so every client shows the same labels). A `bye` (also the broker
+// will, which fires when only ONE of our links drops) removes a peer only if no state follows within 1.5 s.
+// Hidden tabs: rAF stops, so a Web Worker tick (not throttled like page timers) keeps a 2 Hz AFK heartbeat; hidden / menu /
+// paused players are flagged AFK (tag shows it, they can't be hit — no farming a friend who is answering a text). On
+// return: reconnect dead links, hello + sync?, and peer timeouts get a grace period (mobile Safari freezes sockets).
+// Hidden tabs also skip cosmetic FX (tracers/smoke would otherwise pile up without update() to age them).
+//
+// SMOOTHNESS / CLOCKS. Snapshots are timed by the SENDER's performance.now (`ts`) mapped onto our clock with a running
+// minimum of (arrival − ts) that relaxes 0.5 ms/s — only differences of one peer's own clock are used, so wall-clock skew
+// between devices is irrelevant and network jitter is removed from the timeline. Render delay per peer adapts to measured
+// jitter and send interval: max(1.5·interval, interval + 2.5·jitter + 15 ms) clamped 90-400 ms (≈100 ms on good links).
+// Past the newest snapshot we extrapolate ≤ 150 ms then hold. Jumps > 15 m between snapshots (elevators, respawn,
+// passenger seat) snap instead of sliding across the map. Yaw / vehicle heading interpolate on the shortest arc.
+//
+// HIT REGISTRATION / LAG COMPENSATION. Shooter-authoritative detection, victim-authoritative damage: weapons.js raycasts
+// in its update against the remote hitboxes (bone-attached, userData.remote) — UPDATE_ORDER runs weapons BEFORE net, so
+// the hitbox matrixWorld is still the one computed for the previous rendered frame, i.e. each remote player exactly
+// where the shooter SAW them (interpolated ~100 ms in the past). That is the "rewind to the shooter's render time" of
+// classic lag compensation, done on the shooter's machine with no position-history replay needed. The shooter sends
+// `hit` {to, dmg, hs}; the victim clamps and applies it (health is never disputed) and announces `kill`. Trade-off
+// (as in any favour-the-shooter model): a victim can die ~RTT/2 + render delay after reaching cover.
 // Public brokers are shared and unauthenticated: rooms are not private and a modified client could lie. Fine for casual play.
 import * as THREE from 'three';
 import { createInstance } from './ai/model.js';
-import { carGeometries, carMaterials } from './world/carkit.js';
+import { carGeometries, carMaterials, CAR_KINDS } from './world/carkit.js';
 import { buildBike } from './vehicles/bike.js';
+import * as UI from './netui.js';
 
-const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
-const RATE = 1 / 15, INTERP = 0.1, TIMEOUT = 6000, RESPAWN = 4, PROTECT = 2.5;
+const ALL_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
+const MQTT_LIBS = ['https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.esm.js', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.esm.js'];
+const PROTO = 'zv3';
+const SEND_HZ = 15, HEARTBEAT_MS = 480, TIMEOUT = 10000, BYE_GRACE = 1500, RESPAWN = 4, PROTECT = 2.5;
+const MAX_MSG = 4096, TELEPORT = 15, EXTRAP_MS = 150, DELAY_MIN = 90, DELAY_MAX = 400, WATCHDOG = 6000;
+const F_DEAD = 1, F_CROUCH = 2, F_ADS = 4, F_AFK = 8;
+const ID_RE = /^[a-z0-9]{8}$/;
 let S = null;
 
+const rid = () => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+const num = (v, lim) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-lim, Math.min(lim, v)) : NaN);
+const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null);
+const vec = (a, lim = 20000) => { if (!Array.isArray(a) || a.length < 3) return null; const r = [num(a[0], lim), num(a[1], lim), num(a[2], lim)]; return r.some(Number.isNaN) ? null : r; };
+export const cleanName = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>&"'\\`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+export const cleanRoom = (s) => String(s ?? '').toLowerCase().replace(/[^\w-]/g, '').slice(0, 24);
+
 export async function init(ctx) {
-  const qs = ctx.qs; const online = qs.has('room') || qs.get('mp') === '1';
-  // menu entry works even when offline: reload into the public room on this map
-  ctx.bus.on('ui', (e) => { if (e?.action !== 'online') return; const u = new URL(location.href); u.searchParams.set('room', u.searchParams.get('room') || 'public'); u.searchParams.set('map', ctx.world?.mapId || 'zavod'); location.href = u.toString(); });
-  if (!online || qs.get('mp') === '0') return null;
-  let mqtt; try { mqtt = (await import('https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.esm.js')).default; } catch (e) { console.warn('[net] mqtt lib unavailable', e); return null; }
-  const id = Math.random().toString(36).slice(2, 10);
-  const room = (qs.get('room') || 'public').replace(/[^\w-]/g, '').slice(0, 24) || 'public';
-  let name = qs.get('name'); try { if (!name) name = localStorage.getItem('zavod.name'); if (qs.get('name')) localStorage.setItem('zavod.name', qs.get('name')); } catch {}
-  name = String(name || 'OP-' + id.slice(0, 4).toUpperCase()).replace(/[<>&"]/g, '').slice(0, 16);
-  const base = `zv2/${ctx.world?.mapId || 'zavod'}/${room}/`;
-  S = { ctx, mqtt, id, room, name, base, peers: new Map(), score: new Map(), t: 0, seq: 0, lastAttacker: null, protectT: PROTECT, respawnT: -1, brokerI: 0, client: null, ui: null };
-  S.score.set(id, { name, k: 0, d: 0 });
-  connect();
+  const qs = ctx.qs; const online = (qs.has('room') || qs.get('mp') === '1') && qs.get('mp') !== '0';
+  const map = ctx.world?.mapId || 'zavod';
+  UI.install(ctx, { online, map, state: () => S });          // "Play online" menu overlay + phone action button work offline too
+  if (!online) return null;
+  const room = cleanRoom(qs.get('room')) || 'public';
+  let name = cleanName(qs.get('name')); try { if (!name) name = cleanName(localStorage.getItem('zavod.name')); else localStorage.setItem('zavod.name', name); localStorage.setItem('zavod.room', room); } catch {}
+  const id = identity(map, room);
+  name = name || 'OP-' + id.slice(0, 4).toUpperCase();
+  const base = `${PROTO}/${map}/${room}/`;
+  const pick = (qs.get('brokers') || '').split(',').map((v) => parseInt(v, 10)).filter((v) => v >= 0 && v < ALL_BROKERS.length);
+  S = { ctx, mqtt: null, id, inst: rid(), room, name, map, base, brokers: pick.length ? pick.map((i) => ALL_BROKERS[i]) : ALL_BROKERS,
+    links: [], peers: new Map(), score: new Map(), stolen: new Set(), buckets: new Map(), dedupe: new Map(), disp: new Map(), outbox: [],
+    seq: 0, sseq: 0, lastSend: 0, lastSync: 0, everUp: false, hiddenAt: 0, lastAttacker: null, protectT: PROTECT, respawnT: -1, tab: false, board: false };
+  S.score.set(id, { name, k: 0, d: 0, gone: false });
+  recomputeNames();
+  UI.online(ctx);
+  S.mqtt = await loadMqtt();
+  if (!S.mqtt) { UI.setStatus('ONLINE UNAVAILABLE · mqtt lib blocked', 'bad'); return api(); }
+  S.brokers.forEach((_, i) => openLink(i));
   // online = free-for-all: no AI waves, and every spawn point on the map is fair game
   if (qs.get('ai') !== '1') { try { ctx.ai?.qaSetEnabled?.(false); ctx.ai?.qaKillAll?.(); } catch {} }
   const W = ctx.world; if (W?.enemySpawns?.length) W.playerSpawns = [...(W.playerSpawns || []), ...W.enemySpawns];
   // maps may define where an online session starts (coney: outside Luna Park building 2) — jittered so friends don't stack
   if (W?.onlineStart) { const [x, y, z, yaw] = W.onlineStart; const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.2; try { ctx.player.teleport(x + Math.cos(a) * r, y, z + Math.sin(a) * r, yaw, 0); } catch {} }
-  ctx.bus.on('shot', (e) => { if (!e || e.who !== 'player' || !S.client?.connected) return; const o = e.muzzle || e.origin; send({ t: 'shot', o: v3(o), d: v3(e.dir), w: e.id || '' }); });
-  ctx.bus.on('playerDied', () => { const a = S.lastAttacker && performance.now() - S.lastAttacker.at < 8000 ? S.lastAttacker : null; send({ t: 'kill', k: a?.id || null, v: id, hs: !!a?.hs }); onKill(a?.id || null, id, !!a?.hs); S.respawnT = RESPAWN; });
-  ctx.bus.on('explosion', (e) => { if (e && !e.remote && e.position) send({ t: 'boom', p: v3(e.position), r: e.radius || 6 }); });
+  ctx.bus.on('shot', (e) => { if (!e || e.who !== 'player') return; const o = e.muzzle || e.origin; if (!o || !e.dir) return; send({ t: 'shot', o: v3(o), d: v3(e.dir), w: String(e.id || '').slice(0, 12) }); });
+  ctx.bus.on('playerDied', () => { const a = S.lastAttacker && performance.now() - S.lastAttacker.at < 8000 ? S.lastAttacker : null; send({ t: 'kill', k: a?.id || null, v: S.id, hs: !!a?.hs }, true); onKill(a?.id || null, S.id, !!a?.hs); S.respawnT = RESPAWN; });
+  ctx.bus.on('explosion', (e) => { if (e && !e.remote && e.position) send({ t: 'boom', p: v3(e.position), r: Math.min(12, e.radius || 6) }); });
   ctx.bus.on('playerRespawn', () => { S.protectT = PROTECT; S.lastAttacker = null; });
-  buildUI();
-  addEventListener('beforeunload', () => { try { send({ t: 'bye' }); S.client?.end(true); } catch {} });
+  // keyboard scoreboard (phones: tap the status badge — netui)
+  addEventListener('keydown', (e) => { if (e.code === 'Tab') { e.preventDefault(); S.tab = true; UI.renderBoard(); } });
+  addEventListener('keyup', (e) => { if (e.code === 'Tab') S.tab = false; });
+  addEventListener('blur', () => { S.tab = false; });
+  // background tabs: a worker tick (not throttled like page timers) keeps the heartbeat + link watchdog alive
+  startWorkerTick();
+  document.addEventListener('visibilitychange', onVisibility);
+  addEventListener('online', () => kickLinks());
+  addEventListener('pagehide', leave); addEventListener('beforeunload', leave);
+  setInterval(() => UI.refresh(), 1000);
+  return api();
+}
+
+function api() {
   return {
-    get peers() { return S.peers.size; }, get connected() { return !!S.client?.connected; }, room, name, id,
-    hit: (peer, dmg, hs, point) => { const p = S.peers.get(peer); if (!p || p.dead) return; send({ t: 'hit', to: peer, dmg: Math.min(250, dmg | 0), hs: !!hs }); },
-    scores: () => [...S.score.entries()].map(([k, v]) => ({ id: k, ...v })),
-    send: (t, data = {}) => send({ ...data, t }),
-    peer: (id) => { const p = S.peers.get(id); return p ? { id, name: p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead } : null; },
+    get peers() { return S.peers.size; }, get connected() { return anyUp(); }, get room() { return S.room; }, get name() { return S.name; }, get id() { return S.id; },
+    hit: (peer, dmg, hs) => { const p = S.peers.get(peer); if (!p || p.dead || p.afk) return; send({ t: 'hit', to: peer, dmg: Math.max(0, Math.min(250, dmg | 0)), hs: !!hs }); },
+    scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
+    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, t === 'steal'); },
+    peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk } : null; },
     list: () => [...S.peers.keys()],
+    stolen: () => [...S.stolen].sort((a, b) => a - b),
+    links: () => S.links.map((L) => ({ url: L.url, up: L.up, rtt: Math.round(L.rtt || 0), tries: L.tries })),
+    info: () => [...S.peers.values()].map((p) => ({ id: p.id, name: S.disp.get(p.id) || p.name, afk: p.afk, dead: p.dead, delay: Math.round(p.delay), jitter: +p.jit.toFixed(1), iv: Math.round(p.iv), snaps: p.snaps.length })),
+    status: () => statusInfo(),
   };
 }
 
-function connect() {
-  const url = BROKERS[S.brokerI % BROKERS.length];
-  const c = S.mqtt.connect(url, { clientId: 'zv_' + S.id + '_' + S.brokerI, clean: true, connectTimeout: 6000, reconnectPeriod: 0, keepalive: 20,
-    will: { topic: S.base + 'ev', payload: JSON.stringify({ f: S.id, t: 'bye' }), qos: 0, retain: false } });
-  S.client = c;
-  c.on('connect', () => { c.subscribe([S.base + 's/+', S.base + 'ev']); send({ t: 'hello', n: S.name }); status(`ONLINE · ${S.room}`); console.log('[net] connected', url, S.room, S.name); });
-  const fail = () => { if (S.client !== c) return; try { c.end(true); } catch {} S.brokerI++; status('RECONNECTING…'); setTimeout(connect, 1500); };
-  c.on('error', fail); c.on('close', fail);
-  c.on('message', (topic, buf) => { let m; try { m = JSON.parse(buf.toString()); } catch { return; } if (topic.startsWith(S.base + 's/')) onState(topic.slice(S.base.length + 2), m); else onEvent(m); });
+// ---------- identity: same id across a reload of this tab (score comes back via sync), fresh id for a duplicated tab ----------
+function identity(map, room) {
+  const key = 'zavod.net';
+  let id = null;
+  try { const s = JSON.parse(sessionStorage.getItem(key) || 'null'); if (s && s.map === map && s.room === room && !s.live && ID_RE.test(s.id)) id = s.id; } catch {}
+  id = id || rid();
+  const mark = (live) => { try { sessionStorage.setItem(key, JSON.stringify({ id, map, room, live })); } catch {} };
+  mark(true); addEventListener('pagehide', () => mark(false)); addEventListener('pageshow', () => mark(true));
+  return id;
 }
-const send = (m) => { if (!S?.client?.connected) return; m.f = S.id; try { S.client.publish(S.base + 'ev', JSON.stringify(m)); } catch {} };
-const v3 = (v) => v ? [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)] : [0, 0, 0];
+async function loadMqtt() {
+  for (const url of MQTT_LIBS) { try { const m = await import(/* @vite-ignore */ url); if (m?.default?.connect) return m.default; } catch (e) { console.warn('[net] mqtt lib failed', url, e?.message); } }
+  return null;
+}
+
+// ---------- links (one per broker, all live at once) ----------
+function openLink(i) {
+  const L = S.links[i] || (S.links[i] = { i, url: S.brokers[i], client: null, up: false, tries: 0, timer: 0, upAt: 0, lastRx: 0, rtt: 0 });
+  clearTimeout(L.timer); L.timer = 0;
+  if (L.client) { const old = L.client; L.client = null; try { old.end(true); } catch {} }
+  let c;
+  try {
+    c = S.mqtt.connect(L.url, { clientId: `zv_${S.id}_${i}_${rid().slice(0, 4)}`, clean: true, connectTimeout: 8000, reconnectPeriod: 0, keepalive: 15, resubscribe: false,
+      will: { topic: S.base + 'ev', payload: JSON.stringify({ f: S.id, z: S.inst, t: 'bye', w: 1 }), qos: 0, retain: false } });
+  } catch (e) { console.warn('[net] connect threw', L.url, e?.message); return retry(L); }
+  L.client = c;
+  c.on('connect', () => {
+    if (L.client !== c) return;
+    c.subscribe([S.base + 's/+', S.base + 'ev'], (err) => {
+      if (L.client !== c) return;
+      if (err) { console.warn('[net] subscribe failed', L.url, err?.message); return down(); }
+      const first = !anyUp(); L.up = true; L.tries = 0; L.upAt = L.lastRx = performance.now();
+      console.log('[net] link up', L.url, S.room, S.name);
+      onLinkUp(first);
+    });
+  });
+  const down = () => {
+    if (L.client !== c) return; const was = L.up; L.up = false; L.client = null; try { c.end(true); } catch {}
+    if (was) console.log('[net] link down', L.url);
+    retry(L); UI.refresh();
+  };
+  c.on('error', down); c.on('close', down); c.on('offline', down);
+  c.on('message', (topic, buf) => onRaw(L, topic, buf));
+}
+function retry(L) {
+  clearTimeout(L.timer);
+  const d = Math.min(20000, 1000 * 2 ** Math.min(L.tries++, 5)) * (0.75 + Math.random() * 0.5);
+  L.timer = setTimeout(() => openLink(L.i), d);
+}
+function kickLinks() { for (const L of S.links) if (L && !L.up) { L.tries = 0; openLink(L.i); } }
+const anyUp = () => !!S?.links.some((L) => L?.up);
+function onLinkUp(first) {
+  S.everUp = true;
+  sendState(performance.now(), true);
+  send({ t: 'hello', n: S.name });
+  requestSync(first);
+  if (S.outbox.length) { const now = performance.now(); const q = S.outbox.splice(0); for (const m of q) if (now - m.at < 30000) pub(S.base + 'ev', m.m); }
+  UI.refresh();
+}
+function pub(topic, obj) {
+  const s = JSON.stringify(obj); let ok = false;
+  for (const L of S.links) if (L?.up && L.client) { try { L.client.publish(topic, s, { qos: 0 }); ok = true; } catch {} }
+  return ok;
+}
+function send(m, critical = false) {
+  if (!S) return; m.f = S.id; m.z = S.inst; m.q = ++S.seq;
+  const ok = pub(S.base + 'ev', m);
+  if (critical) { if (!ok) { S.outbox.push({ m, at: performance.now() }); if (S.outbox.length > 20) S.outbox.shift(); } else setTimeout(() => pub(S.base + 'ev', m), 350); }
+}
+function requestSync(force) { const now = performance.now(); if (!force && now - S.lastSync < 2000) return; S.lastSync = now; send({ t: 'sync?' }); }
+function leave() { if (!S || S.left) return; S.left = true; try { send({ t: 'bye' }); } catch {} for (const L of S.links) { try { L?.client?.end(true); } catch {} } }
+const v3 = (v) => v ? [+(+v.x).toFixed(2), +(+v.y).toFixed(2), +(+v.z).toFixed(2)] : [0, 0, 0];
+
+// ---------- background: worker tick, visibility ----------
+function startWorkerTick() {
+  const tick = () => {
+    if (!S) return; const now = performance.now();
+    if (now - S.lastSend > HEARTBEAT_MS) sendState(now);            // rAF stalled (hidden tab / frozen frame): 2 Hz AFK heartbeat
+    for (const L of S.links) if (L?.up && now - L.lastRx > WATCHDOG && now - L.upAt > WATCHDOG) { console.log('[net] watchdog: no echo on', L.url); L.up = false; openLink(L.i); UI.refresh(); }
+  };
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 250);'], { type: 'text/javascript' })));
+    w.onmessage = tick; S.worker = w;
+  } catch { setInterval(tick, 250); }
+}
+function onVisibility() {
+  const now = performance.now();
+  if (document.hidden) { S.hiddenAt = now; sendState(now, true); return; }
+  const away = S.hiddenAt ? now - S.hiddenAt : 0; S.hiddenAt = 0;
+  if (away > 3000) for (const p of S.peers.values()) p.seen = Math.max(p.seen, now - TIMEOUT / 2);   // sockets may have been frozen: grace before timeouts
+  kickLinks();
+  sendState(now, true); send({ t: 'hello', n: S.name }); requestSync(true);
+  UI.refresh();
+}
+
+// ---------- inbound: validate → dedupe → rate-limit → dispatch ----------
+function allow(pid, kind, rate, burst) {
+  const k = pid + kind, now = performance.now(); let b = S.buckets.get(k);
+  if (!b) { if (S.buckets.size > 600) S.buckets.clear(); S.buckets.set(k, b = { tok: burst, at: now }); }
+  b.tok = Math.min(burst, b.tok + (now - b.at) / 1000 * rate); b.at = now;
+  if (b.tok < 1) return false; b.tok--; return true;
+}
+function fresh(key, q) {
+  let d = S.dedupe.get(key); if (!d) { if (S.dedupe.size > 200) S.dedupe.clear(); S.dedupe.set(key, d = { set: new Set(), max: 0 }); }
+  if (d.set.has(q) || q < d.max - 400) return false;
+  d.set.add(q); if (q > d.max) d.max = q;
+  if (d.set.size > 500) for (const v of d.set) if (v < d.max - 400) d.set.delete(v);
+  return true;
+}
+function onRaw(L, topic, buf) {
+  const now = performance.now(); L.lastRx = now;
+  if (!S || !buf || buf.length > MAX_MSG) return;
+  let m; try { m = JSON.parse(buf.toString()); } catch { return; }
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return;
+  try {
+    if (topic.startsWith(S.base + 's/')) {
+      const pid = topic.slice(S.base.length + 2);
+      if (pid === S.id) { if (m.z === S.inst && Number.isFinite(m.ts)) { const r = now - m.ts; if (r >= 0 && r < 10000) L.rtt = L.rtt ? L.rtt * 0.8 + r * 0.2 : r; } return; }   // our own echo: link liveness + ping
+      if (ID_RE.test(pid)) onState(pid, m, now);
+    } else if (topic === S.base + 'ev') {
+      if (!ID_RE.test(m.f) || m.f === S.id || typeof m.t !== 'string' || !/^[a-z?]{1,12}$/i.test(m.t)) return;
+      if (m.t === 'bye') return onBye(m.f, now);
+      if (!Number.isInteger(m.q) || !fresh(m.f + ':' + String(m.z || '').slice(0, 8), m.q)) return;
+      if (!allow(m.f, 'e', 45, 90)) return;
+      onEvent(m);
+    }
+  } catch (e) { console.warn('[net] bad message', m?.t, e?.message); }
+}
 
 // ---------- remote players ----------
 function peerFor(pid, name) {
-  let p = S.peers.get(pid); if (p) { if (name && name !== p.name) p.name = name; return p; }
+  let p = S.peers.get(pid);
+  if (p) { if (name && name !== p.name) { p.name = name; const sc = S.score.get(pid); if (sc) sc.name = name; recomputeNames(); } return p; }
   const ctx = S.ctx; const asset = ctx.ai?.asset; if (!asset) return null;
   const inst = createInstance(asset, [...pid].reduce((a, c) => a + c.charCodeAt(0), 0) % 3);
   ctx.scene.add(inst.group);
   for (const h of inst.hitboxes) { h.userData.remote = pid; delete h.userData.soldier; ctx.raycastTargets.push(h); }
-  const tag = nameTag(name || '?'); tag.position.y = 2.25; inst.group.add(tag);
-  p = { id: pid, name: name || '?', inst, tag, snaps: [], dead: false, seen: performance.now(), fall: 0 };
-  S.peers.set(pid, p); if (!S.score.has(pid)) S.score.set(pid, { name: p.name, k: 0, d: 0 });
-  ctx.hud?.toast?.(`${p.name} joined`, 1800); return p;
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: true })); tag.scale.set(1.3, 0.33, 1); tag.renderOrder = 5; ctx.scene.add(tag);
+  const now = performance.now();
+  p = { id: pid, name: name || '?', inst, tag, tagText: '', snaps: [], dead: false, deadAt: 0, afk: false, seen: now, byeAt: 0, fall: 0,
+    lastQ: -1, z: null, off: null, offAt: now, jit: 0, iv: 1000 / SEND_HZ, lastTs: null, delay: 100, delayT: 100, vehKey: null, vehObj: null, veh: null, heading: 0 };
+  S.peers.set(pid, p);
+  const sc = S.score.get(pid); if (sc) { sc.gone = false; if (name) sc.name = name; } else S.score.set(pid, { name: p.name, k: 0, d: 0, gone: false });
+  recomputeNames();
+  ctx.hud?.toast?.(`${S.disp.get(pid) || p.name} joined`, 1800);
+  UI.refresh(); return p;
 }
-function dropPeer(pid) {
+function dropPeer(pid, why = 'left') {
   const p = S.peers.get(pid); if (!p) return; const ctx = S.ctx;
-  ctx.scene.remove(p.inst.group); for (const h of p.inst.hitboxes) { const i = ctx.raycastTargets.indexOf(h); if (i > -1) ctx.raycastTargets.splice(i, 1); }
-  S.peers.delete(pid); S.score.delete(pid); ctx.hud?.toast?.(`${p.name} left`, 1500);
+  ctx.scene.remove(p.inst.group); ctx.scene.remove(p.tag); p.tag.material.map?.dispose(); p.tag.material.dispose();
+  if (p.vehObj) ctx.scene.remove(p.vehObj);
+  for (const h of p.inst.hitboxes) { const i = ctx.raycastTargets.indexOf(h); if (i > -1) ctx.raycastTargets.splice(i, 1); }
+  S.peers.delete(pid); const sc = S.score.get(pid); if (sc) sc.gone = true;   // ghost: comes back if they rejoin with the same id
+  for (const k of ['s', 'e']) S.buckets.delete(pid + k);
+  ctx.hud?.toast?.(`${S.disp.get(pid) || p.name} ${why}`, 1500);
+  recomputeNames(); UI.refresh(); UI.renderBoard();
 }
-function nameTag(text) {
+function onBye(pid, now) { const p = S.peers.get(pid); if (p) p.byeAt = now; }
+
+// duplicate names: the smallest id keeps the plain name, the others get ·XY — the same labels on every client
+function recomputeNames() {
+  const all = [[S.id, S.name], ...[...S.peers.values()].map((p) => [p.id, p.name])];
+  const groups = new Map(); for (const [id, n] of all) { const k = n.toLowerCase(); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(id); }
+  for (const [id, n] of all) { const g = groups.get(n.toLowerCase()).sort(); S.disp.set(id, g.length > 1 && g[0] !== id ? `${n}·${id.slice(0, 2).toUpperCase()}` : n); }
+  for (const [id, sc] of S.score) if (!S.disp.has(id)) S.disp.set(id, sc.name);
+}
+function setTag(p) {
+  const text = (S.disp.get(p.id) || p.name) + (p.afk ? ' · AFK' : '');
+  if (text === p.tagText) return; p.tagText = text;
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
-  g.font = '600 30px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(8, 12, 240, 40); g.fillStyle = '#ff7a5c'; g.fillText(text, 128, 43);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: true, transparent: true })); s.scale.set(1.3, 0.33, 1); return s;
+  g.font = '600 28px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(4, 12, 248, 40);
+  g.fillStyle = p.afk ? '#9aa4ae' : '#ff7a5c'; g.fillText(text, 128, 42, 240);
+  p.tag.material.map?.dispose(); p.tag.material.map = new THREE.CanvasTexture(c); p.tag.material.needsUpdate = true;
 }
-function onState(pid, m) {
-  if (pid === S.id || !Array.isArray(m.p)) return;
-  const p = peerFor(pid, m.n); if (!p) return;
-  p.seen = performance.now();
-  const v = m.v && m.v.k !== 'pass' ? m.v : null;
-  p.snaps.push({ t: p.seen / 1000, x: v ? v.x : m.p[0], y: v ? v.y : m.p[1], z: v ? v.z : m.p[2], yaw: v ? v.h : (m.p[3] || 0), sp: m.p[4] || 0, f: m.p[5] | 0, v });
-  if (p.snaps.length > 20) p.snaps.shift();
+
+function onState(pid, m, now) {
+  const q = m.q, P = m.p; if (!Number.isInteger(q) || !Array.isArray(P) || P.length < 6) return;
+  let p = S.peers.get(pid);
+  const z = typeof m.z === 'string' ? m.z.slice(0, 8) : '';
+  if (p && z === p.z && q <= p.lastQ) return;                      // same packet via another broker, or out of order
+  if (!allow(pid, 's', 40, 60)) return;
+  const x = num(P[0], 20000), y = num(P[1], 5000), zz = num(P[2], 20000), yaw = num(P[3], 1000), sp = num(P[4], 200), fl = int(P[5], 0, 255) ?? 0;
+  if ([x, y, zz, yaw, sp].some(Number.isNaN)) return;
+  let v = null;
+  if (m.v && typeof m.v === 'object' && m.v.k !== 'pass') {
+    const k = String(m.v.k || ''); const vp = vec([m.v.x, m.v.y, m.v.z]); const h = num(m.v.h, 1000);
+    if (vp && !Number.isNaN(h) && (k === 'bike' || CAR_KINDS.includes(k))) v = { k, c: int(m.v.c, 0, 0xffffff) ?? 0x22305c, h, x: vp[0], y: vp[1], z: vp[2] };
+  }
+  p = p || peerFor(pid, cleanName(m.n)); if (!p) return;
+  if (z !== p.z) { p.z = z; p.lastQ = -1; p.off = null; p.lastTs = null; }   // they reloaded (same id, new instance): reset sequence + clock
+  p.lastQ = q; p.seen = now;
+  const n = cleanName(m.n); if (n && n !== p.name) peerFor(pid, n);
+  if (Array.isArray(m.sc)) mergeScore(pid, n || p.name, int(m.sc[0], 0, 99999) ?? 0, int(m.sc[1], 0, 99999) ?? 0);
+  // sender-clock timeline (skew-free: only differences of their own clock are used)
+  const ts = Number.isFinite(m.ts) ? m.ts : now; const off = now - ts;
+  if (p.off === null || off < p.off) p.off = off; else p.off += (now - p.offAt) * 0.0005; p.offAt = now;
+  const late = Math.max(0, off - p.off); p.jit = p.jit * 0.9 + Math.min(late, 1000) * 0.1;
+  if (p.lastTs !== null) { const iv = ts - p.lastTs; if (iv > 0 && iv < 3000) p.iv = p.iv * 0.85 + iv * 0.15; } p.lastTs = ts;
+  p.delayT = Math.min(DELAY_MAX, Math.max(DELAY_MIN, 1.5 * p.iv, p.iv + 2.5 * p.jit + 15));
+  const last = p.snaps[p.snaps.length - 1];
+  let t = ts + p.off; if (last && t <= last.t) t = last.t + 1;
+  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tp: false };
+  if (last && Math.hypot(s.x - last.x, s.y - last.y, s.z - last.z) > TELEPORT) s.tp = true;
+  p.snaps.push(s); if (p.snaps.length > 40) p.snaps.shift();
+  const afk = !!(fl & F_AFK); if (afk !== p.afk) { p.afk = afk; UI.refresh(); }
 }
+function mergeScore(pid, name, k, d) {
+  let e = S.score.get(pid); if (!e) S.score.set(pid, e = { name: name || '?', k: 0, d: 0, gone: pid !== S.id && !S.peers.has(pid) });
+  const changed = k > e.k || d > e.d; e.k = Math.max(e.k, k); e.d = Math.max(e.d, d); if (name && pid !== S.id) e.name = name;
+  if (changed) UI.renderBoard();
+}
+
 function onEvent(m) {
-  if (!m || m.f === S.id) return; const ctx = S.ctx;
-  if (m.t === 'bye') return dropPeer(m.f);
-  if (m.t === 'hello') { peerFor(m.f, String(m.n || '').slice(0, 16)); return; }
-  if (m.t === 'shot') {
-    const p = S.peers.get(m.f); const o = new THREE.Vector3(...m.o), d = new THREE.Vector3(...m.d).normalize();
-    if (p?.inst.muzzle) p.inst.muzzle.getWorldPosition(o);
-    try { ctx.weapons?.fx?.enemyShot?.(o, d); } catch {}
-    try { ctx.audio?.play?.('enemy_rifle', { position: { x: o.x, y: o.y, z: o.z } }); } catch {}
-    return;
+  const ctx = S.ctx, f = m.f;
+  switch (m.t) {
+    case 'hello': { const n = cleanName(m.n); if (n) { const sc = S.score.get(f); if (sc) sc.name = n; } peerFor(f, n); return; }
+    case 'sync?': { setTimeout(() => { if (!S) return; send({ t: 'sync', to: f, sb: [...S.score.entries()].slice(0, 40).map(([id, v]) => [id, v.name, v.k, v.d]), st: [...S.stolen].slice(0, 200) }); }, 50 + Math.random() * 350); return; }
+    case 'sync': {
+      if (m.to !== S.id) return;
+      if (Array.isArray(m.sb)) for (const r of m.sb.slice(0, 40)) { if (!Array.isArray(r) || !ID_RE.test(r[0])) continue; mergeScore(r[0], r[0] === S.id ? null : cleanName(r[1]), int(r[2], 0, 99999) ?? 0, int(r[3], 0, 99999) ?? 0); }
+      if (Array.isArray(m.st)) for (const i of m.st.slice(0, 200)) if (int(i, 0, 100000) !== null && !S.stolen.has(i)) { S.stolen.add(i); ctx.bus.emit('net:steal', { t: 'steal', i, f, sync: true }); }
+      recomputeNames(); UI.renderBoard(); return;
+    }
+    case 'shot': {
+      if (document.hidden) return;
+      const o0 = vec(m.o), d0 = vec(m.d, 2); if (!o0 || !d0) return;
+      const p = S.peers.get(f); const o = new THREE.Vector3(...o0), d = new THREE.Vector3(...d0); if (d.lengthSq() < 1e-6) return; d.normalize();
+      if (p?.inst.muzzle && p.inst.group.visible) p.inst.muzzle.getWorldPosition(o);
+      try { ctx.weapons?.fx?.enemyShot?.(o, d); } catch {}
+      try { ctx.audio?.play?.('enemy_rifle', { position: { x: o.x, y: o.y, z: o.z } }); } catch {}
+      return;
+    }
+    case 'hit': {
+      if (m.to !== S.id) return;
+      const me = ctx.player; if (!me || me.dead || S.protectT > 0 || isAfk()) return;
+      const dmg = Math.max(0, Math.min(250, +m.dmg || 0)); if (!dmg) return;
+      const p = S.peers.get(f); S.lastAttacker = { id: f, hs: !!m.hs, at: performance.now() };
+      me.damage(dmg, p ? (p.vehObj || p.inst.group).position.clone() : null);
+      return;
+    }
+    case 'boom': {   // someone's frag: replay the blast, and hurt ourselves if we are in range
+      const pp = vec(m.p); if (!pp) return; const pos = new THREE.Vector3(...pp), R = Math.max(0, Math.min(12, +m.r || 6));
+      if (!document.hidden) { try { ctx.weapons?.fx?.explosion?.(pos); } catch {} try { ctx.audio?.play?.('explosion', { position: { x: pos.x, y: pos.y, z: pos.z } }); } catch {} }
+      const me = ctx.player;
+      if (me && !me.dead && S.protectT <= 0 && !isAfk()) { const d = Math.hypot(me.position.x - pos.x, me.position.y + 0.9 - pos.y, me.position.z - pos.z); if (d < R) { const dmg = Math.round(100 * (1 - d / R) ** 1.3); if (dmg > 0) { S.lastAttacker = { id: f, hs: false, at: performance.now() }; me.damage(dmg, pos); } } }
+      return;
+    }
+    case 'kill': { if (m.v !== f) return; const k = ID_RE.test(m.k) ? m.k : null; return onKill(k, f, !!m.hs); }   // only the victim may announce its own death
+    case 'steal': { const i = int(m.i, 0, 100000); if (i === null) return; S.stolen.add(i); ctx.bus.emit('net:steal', { t: 'steal', i, f }); return; }
+    case 'elev': {
+      const i = int(m.i, 0, 255), k = int(m.k, 0, 15), s = int(m.s ?? 0, 0, 7), p = vec(m.p); if (i === null || k === null || s === null || !p || (m.d !== 'up' && m.d !== 'down')) return;
+      ctx.bus.emit('net:elev', { t: 'elev', f, i, k, s, d: m.d, p }); return;
+    }
+    case 'smoke': { if (document.hidden) return; const p = vec(m.p); if (p) ctx.bus.emit('net:smoke', { t: 'smoke', f, p }); return; }
   }
-  if (m.t === 'hit' && m.to === S.id) {
-    const me = ctx.player; if (!me || me.dead || S.protectT > 0) return;
-    const p = S.peers.get(m.f); S.lastAttacker = { id: m.f, hs: !!m.hs, at: performance.now() };
-    me.damage(Math.max(0, Math.min(250, +m.dmg || 0)), p ? p.inst.group.position.clone() : null);
-    return;
-  }
-  if (m.t === 'boom' && Array.isArray(m.p)) {   // someone's frag: replay the blast, and hurt ourselves if we are in range
-    const pos = new THREE.Vector3(...m.p), R = Math.min(12, +m.r || 6);
-    try { ctx.weapons?.fx?.explosion?.(pos); } catch {} try { ctx.audio?.play?.('explosion', { position: { x: pos.x, y: pos.y, z: pos.z } }); } catch {}
-    const me = ctx.player; if (me && !me.dead && S.protectT <= 0) { const d = Math.hypot(me.position.x - pos.x, me.position.y + 0.9 - pos.y, me.position.z - pos.z); if (d < R) { const dmg = Math.round(100 * (1 - d / R) ** 1.3); if (dmg > 0) { S.lastAttacker = { id: m.f, hs: false, at: performance.now() }; me.damage(dmg, pos); } } }
-    return;
-  }
-  if (m.t === 'kill') return onKill(m.k, m.v, !!m.hs);
-  ctx.bus.emit('net:' + m.t, m);   // game-mode events (coney hangout: igor, elev, steal, smoke …)
+  ctx.bus.emit('net:' + m.t, m);   // other game-mode events (coney hangout: igor …)
 }
 function onKill(killer, victim, hs) {
-  const ctx = S.ctx; const nm = (id) => id === S.id ? S.name : (S.peers.get(id)?.name || S.score.get(id)?.name || '?');
-  const kv = S.score.get(victim) || { name: nm(victim), k: 0, d: 0 }; kv.d++; S.score.set(victim, kv);
-  if (killer && killer !== victim) { const kk = S.score.get(killer) || { name: nm(killer), k: 0, d: 0 }; kk.k++; S.score.set(killer, kk); }
-  const vp = S.peers.get(victim); if (vp) { vp.dead = true; vp.fall = 0; }
+  const ctx = S.ctx; const nm = (id) => S.disp.get(id) || S.score.get(id)?.name || '?';
+  const kv = S.score.get(victim) || { name: nm(victim), k: 0, d: 0, gone: false }; kv.d++; S.score.set(victim, kv);
+  if (killer && killer !== victim) { const kk = S.score.get(killer) || { name: nm(killer), k: 0, d: 0, gone: !S.peers.has(killer) && killer !== S.id }; kk.k++; S.score.set(killer, kk); }
+  const vp = S.peers.get(victim); if (vp) { vp.dead = true; vp.deadAt = performance.now(); vp.fall = 0; }
   ctx.hud?.killfeed?.(`${killer ? nm(killer) : 'WORLD'}  ${hs ? '⊕ ' : ''}▸  ${nm(victim)}`);
   if (killer === S.id && victim !== S.id) { ctx.hud?.hitmarker?.(hs, true); ctx.hud?.scorePopup?.(hs ? 'HEADSHOT KILL' : 'KILL', hs); }
-  renderBoard();
+  UI.renderBoard();
+}
+const isAfk = () => document.hidden || S.ctx.state === 'menu' || S.ctx.state === 'paused';
+
+// ---------- outbound state ----------
+function sendState(now, force = false) {
+  if (!S || (!force && !anyUp())) return; const ctx = S.ctx, me = ctx.player; if (!me?.position) return;
+  S.lastSend = now; const p = me.position;
+  const flags = (me.dead ? F_DEAD : 0) | (me.crouching ? F_CROUCH : 0) | (me.ads ? F_ADS : 0) | (isAfk() ? F_AFK : 0);
+  let vi = null;
+  try { const mv = ctx.vehicles?.mounted; vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null); } catch {}
+  const sc = S.score.get(S.id);
+  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, sc: [sc.k, sc.d] });
 }
 
 // ---------- per frame ----------
+const _lerpAngle = (a, b, k) => { let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d * k; };
 export function update(dt, ctx) {
   if (!S) return;
-  const me = ctx.player; S.t += dt; if (S.protectT > 0) S.protectT -= dt;
-  if (S.respawnT > 0) status(`RESPAWN IN ${Math.ceil(S.respawnT)}`);
-  if (S.respawnT > 0 && (S.respawnT -= dt) <= 0) { S.respawnT = -1; try { me.respawn(); } catch (e) { console.warn('[net] respawn', e); } }
-  if (me?.position && S.t >= RATE && S.client?.connected) {
-    S.t = 0; const p = me.position; const flags = (me.dead ? 1 : 0) | (me.crouching ? 2 : 0) | (me.ads ? 4 : 0);
-    try { const mv = ctx.vehicles?.mounted; const vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null);
-    S.client.publish(S.base + 's/' + S.id, JSON.stringify({ n: S.name, p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi })); } catch {}
-  }
-  const now = performance.now(), rt = now / 1000 - INTERP;
+  const now = performance.now(), rdt = Math.min(0.1, ctx.time?.realDt ?? dt), me = ctx.player;
+  if (S.protectT > 0) S.protectT -= dt;
+  if (S.respawnT > 0) UI.setRespawn(Math.ceil(S.respawnT));
+  if (S.respawnT > 0 && (S.respawnT -= dt) <= 0) { S.respawnT = -1; UI.setRespawn(0); try { me.respawn(); } catch (e) { console.warn('[net] respawn', e); } }
+  // state goes out on real time — menu / pause (simDt = 0) must not silence us, or friends time us out
+  if (me?.position && now - S.lastSend >= 1000 / SEND_HZ - 3) sendState(now);
   for (const [pid, p] of S.peers) {
-    if (now - p.seen > TIMEOUT) { dropPeer(pid); continue; }
-    const sn = p.snaps; if (!sn.length) continue;
-    let a = sn[0], b = sn[sn.length - 1];
-    for (let i = 0; i + 1 < sn.length; i++) if (sn[i].t <= rt && sn[i + 1].t >= rt) { a = sn[i]; b = sn[i + 1]; break; }
-    const k = b.t > a.t ? Math.min(1, Math.max(0, (rt - a.t) / (b.t - a.t))) : 1;
-    const g = p.inst.group; g.position.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);
-    let dy = b.yaw - a.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); g.rotation.y = a.yaw + dy * k + Math.PI;
-    const dead = !!(b.f & 1); if (!dead && p.dead) { p.dead = false; p.fall = 0; }
-    p.dead = p.dead || dead;
-    p.fall = p.dead ? Math.min(1, p.fall + dt * 2.5) : 0; g.rotation.x = -p.fall * Math.PI / 2; g.position.y += p.fall * 0.25;
-    p.tag.visible = !p.dead;
-    const crouch = !!(b.f & 2); p.inst.inner && (p.inst.inner.scale.y = crouch ? 0.72 : 1);
-    const sp = b.sp; const A = p.inst.actions;
-    if (A) { const w = sp > 4.5 ? [0, 0, 1] : sp > 0.4 ? [0, 1, 0] : [1, 0, 0]; ['Idle', 'Walk', 'Run'].forEach((n, i) => { const act = A[n]; if (act) act.setEffectiveWeight(THREE.MathUtils.lerp(act.getEffectiveWeight(), p.dead ? (n === 'Idle' ? 1 : 0) : w[i], Math.min(1, dt * 8))); }); }
-    p.inst.mixer?.update(dt);
-    // driving: show their vehicle instead of the soldier (interpolated with the same snapshots)
-    const vk = b.v ? b.v.k + ':' + b.v.c : null;
-    if (vk !== p.vehKey) { if (p.vehObj) { ctx.scene.remove(p.vehObj); p.vehObj = null; } p.vehKey = vk; p.veh = b.v ? { ...b.v } : null; if (b.v) { p.vehObj = remoteVehicle(ctx, b.v); ctx.scene.add(p.vehObj); } }
-    if (p.vehObj) { p.vehObj.position.copy(g.position); p.vehObj.rotation.set(0, g.rotation.y - Math.PI, 0); g.visible = false; p.heading = g.rotation.y - Math.PI; } else { g.visible = true; p.heading = g.rotation.y - Math.PI; }
-    p.tag.visible = !p.dead; if (p.vehObj) { p.tag.position.y = 2.25; }
+    if (now - p.seen > TIMEOUT) { dropPeer(pid, 'timed out'); continue; }
+    if (p.byeAt && p.seen < p.byeAt && now - p.byeAt > BYE_GRACE) { dropPeer(pid, 'left'); continue; }
+    renderPeer(p, now, rdt, ctx);
   }
-  if (S.ui) S.ui.board.style.display = (ctx.input?.keys?.has?.('Tab') || S.tab) ? 'block' : 'none';
+  UI.frame(S.tab || S.board);
+}
+function renderPeer(p, now, rdt, ctx) {
+  const sn = p.snaps; if (!sn.length) return;
+  p.delay += (p.delayT - p.delay) * Math.min(1, rdt * 2);
+  const rt = now - p.delay;
+  while (sn.length > 2 && sn[1].t <= rt) sn.shift();
+  const A = sn[0], B = sn[1] || sn[0]; let x, y, z, yaw, cur;
+  if (sn.length === 1 || rt <= A.t) { cur = A; x = A.x; y = A.y; z = A.z; yaw = A.yaw; }
+  else if (rt <= B.t) {
+    const k = (rt - A.t) / Math.max(1, B.t - A.t);
+    if (B.tp) { cur = k < 0.5 ? A : B; x = cur.x; y = cur.y; z = cur.z; yaw = cur.yaw; }        // elevator / respawn / seat: snap, don't slide
+    else { cur = k < 0.5 ? A : B; x = A.x + (B.x - A.x) * k; y = A.y + (B.y - A.y) * k; z = A.z + (B.z - A.z) * k; yaw = _lerpAngle(A.yaw, B.yaw, k); }
+  } else {
+    cur = B; x = B.x; y = B.y; z = B.z; yaw = B.yaw;
+    const span = B.t - A.t, e = Math.min(rt - B.t, EXTRAP_MS);
+    if (!B.tp && !(B.f & F_DEAD) && span > 0 && span < 400 && sn.length > 1) { const k = e / span; x += (B.x - A.x) * k; y += (B.y - A.y) * k; z += (B.z - A.z) * k; yaw = _lerpAngle(A.yaw, B.yaw, 1 + k); }
+  }
+  const g = p.inst.group; g.position.set(x, y, z); g.rotation.y = yaw + Math.PI; p.heading = yaw;
+  const dead = !!(cur.f & F_DEAD);
+  if (!dead && p.dead && cur.t > p.deadAt + 500) { p.dead = false; p.fall = 0; }   // revive only on a snapshot newer than the kill
+  if (dead && !p.dead) { p.dead = true; p.deadAt = now; }
+  p.fall = p.dead ? Math.min(1, p.fall + rdt * 2.5) : 0; g.rotation.x = -p.fall * Math.PI / 2; g.position.y += p.fall * 0.25;
+  const crouch = !!(cur.f & F_CROUCH); if (p.inst.inner) p.inst.inner.scale.y = crouch ? 0.72 : 1;
+  const A_ = p.inst.actions;
+  if (A_) { const w = cur.sp > 4.5 ? [0, 0, 1] : cur.sp > 0.4 ? [0, 1, 0] : [1, 0, 0]; ['Idle', 'Walk', 'Run'].forEach((n, i) => { const act = A_[n]; if (act) act.setEffectiveWeight(THREE.MathUtils.lerp(act.getEffectiveWeight(), p.dead ? (n === 'Idle' ? 1 : 0) : w[i], Math.min(1, rdt * 8))); }); }
+  p.inst.mixer?.update(rdt);
+  // driving: show their vehicle instead of the soldier (same interpolated pose; heading on the shortest arc)
+  const vk = cur.v ? cur.v.k + ':' + cur.v.c : null;
+  if (vk !== p.vehKey) {
+    if (p.vehObj) { ctx.scene.remove(p.vehObj); p.vehObj = null; }
+    p.vehKey = vk; p.veh = cur.v ? { ...cur.v } : null;
+    if (cur.v) { try { p.vehObj = remoteVehicle(ctx, cur.v); ctx.scene.add(p.vehObj); } catch (e) { console.warn('[net] remote vehicle', e?.message); p.vehObj = null; } }
+  }
+  if (p.vehObj) { p.vehObj.position.set(x, y, z); p.vehObj.rotation.set(0, yaw, 0); g.visible = false; } else g.visible = true;
+  setTag(p);
+  p.tag.visible = !p.dead;
+  if (p.vehObj) p.tag.position.set(x, y + 2.1, z); else p.tag.position.set(g.position.x, g.position.y + (crouch ? 1.8 : 2.25), g.position.z);
 }
 
-// ---------- HUD bits: status badge + scoreboard (hold Tab) ----------
-function buildUI() {
-  const css = document.createElement('style'); css.textContent = `
-  .zvnet{position:fixed;top:12px;right:14px;z-index:40;font:600 12px Barlow,Arial,sans-serif;letter-spacing:.12em;color:#cfe3ff;background:rgba(10,14,20,.55);padding:5px 10px;border-left:2px solid #4aa3ff;pointer-events:none}
-  .zvboard{display:none;position:fixed;left:50%;top:18%;transform:translateX(-50%);min-width:420px;z-index:41;background:rgba(8,10,14,.82);border:1px solid rgba(255,255,255,.12);font:500 15px Barlow,Arial,sans-serif;color:#e8edf2;pointer-events:none}
-  .zvboard h3{margin:0;padding:10px 16px;font:700 13px 'Barlow Condensed',Arial;letter-spacing:.2em;background:rgba(74,163,255,.18)}
-  .zvboard table{width:100%;border-collapse:collapse}.zvboard td{padding:6px 16px}.zvboard tr.me td{color:#ffd27a}.zvboard td.n{text-align:right;width:60px}`;
-  document.head.appendChild(css);
-  const badge = document.createElement('div'); badge.className = 'zvnet'; badge.textContent = 'CONNECTING…'; document.body.appendChild(badge);
-  const board = document.createElement('div'); board.className = 'zvboard'; document.body.appendChild(board);
-  S.ui = { badge, board };
-  addEventListener('keydown', (e) => { if (e.code === 'Tab') { e.preventDefault(); S.tab = true; renderBoard(); } });
-  addEventListener('keyup', (e) => { if (e.code === 'Tab') S.tab = false; });
-  setInterval(() => { if (S.client?.connected) status(`ONLINE · ${S.room} · ${S.peers.size + 1} PLAYER${S.peers.size ? 'S' : ''}`); }, 1000);
-  renderBoard();
+// ---------- status (read by netui) ----------
+function statusInfo() {
+  if (!S) return { text: 'OFFLINE', level: 'bad' };
+  const up = S.links.filter((L) => L?.up), n = S.peers.size + 1;
+  if (S.respawnT > 0) return { text: `RESPAWN IN ${Math.ceil(S.respawnT)}`, level: 'warn' };
+  if (!S.mqtt) return { text: 'ONLINE UNAVAILABLE', level: 'bad' };
+  if (!up.length) return { text: typeof navigator !== 'undefined' && navigator.onLine === false ? 'NO INTERNET · RETRYING' : S.everUp ? 'RECONNECTING…' : 'CONNECTING…', level: S.everUp ? 'bad' : 'warn' };
+  const rtt = Math.min(...up.map((L) => L.rtt || 999));
+  return { text: `${S.room.toUpperCase()} · ${n} PLAYER${n > 1 ? 'S' : ''} · ${rtt < 999 ? Math.round(rtt / 2) + ' MS' : '…'}`, level: up.length < S.links.length ? 'ok2' : 'ok', links: `${up.length}/${S.links.length}` };
 }
-function status(t) { if (S?.ui) S.ui.badge.textContent = t; }
-function renderBoard() {
-  if (!S?.ui) return;
-  const rows = [...S.score.entries()].sort((a, b) => b[1].k - a[1].k || a[1].d - b[1].d)
-    .map(([pid, v]) => `<tr class="${pid === S.id ? 'me' : ''}"><td>${esc(v.name)}</td><td class="n">${v.k}</td><td class="n">${v.d}</td></tr>`).join('');
-  S.ui.board.innerHTML = `<h3>FREE FOR ALL · ${esc(S.room.toUpperCase())}</h3><table><tr><td style="opacity:.5">PLAYER</td><td class="n" style="opacity:.5">K</td><td class="n" style="opacity:.5">D</td></tr>${rows}</table>`;
+export function roster() {
+  if (!S) return [];
+  return [...S.score.entries()].filter(([, v]) => !v.gone).map(([id, v]) => ({ id, name: S.disp.get(id) || v.name, k: v.k, d: v.d, me: id === S.id, afk: id === S.id ? isAfk() : !!S.peers.get(id)?.afk }))
+    .sort((a, b) => b.k - a.k || a.d - b.d || a.name.localeCompare(b.name));
 }
-const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+export function toggleBoard(v) { if (S) S.board = v ?? !S.board; }
+export function netInfo() { return S ? { room: S.room, name: S.name, map: S.map, status: statusInfo() } : null; }
 
 // ---------- remote vehicles (cars from the car kit, bikes from the bike kit) ----------
 const _carGeo = new Map();

@@ -11,6 +11,7 @@ import { buildLandmarks, LM } from '../coney/landmarks.js';
 import { buildBeachLife } from '../coney/life.js';
 import { buildPark } from '../coney/park.js';
 import { buildHangout, hangoutQA } from '../coney/hangout.js';
+import { buildChase } from '../coney/chase.js';
 import { OSM, PLAY } from '../coney/osm.js';
 import { bbox, segDist, pip } from '../osmkit.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
@@ -35,6 +36,7 @@ export function build(world) {
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
   ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
+  try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level: cops + Luna Park crews (coney/chase.js)
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);

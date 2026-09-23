@@ -125,7 +125,7 @@ export class Soldier {
         else {
           desired.subVectors(wp, this.position); desired.y = 0; const d = desired.length();
           if (d > 1e-4) desired.multiplyScalar(1 / d);
-          let sp = this.gait === 'walk' ? SPEED.walk : SPEED.run;
+          let sp = this.gait === 'walk' ? SPEED.walk : (this.maxSpeed || SPEED.run);   // maxSpeed: chase mode (cops sprint, crew bikers ride)
           if (this.crouch > 0.5) sp = Math.min(sp, SPEED.crouch + 0.6);
           if (this.stagger > 0) sp *= 0.25;
           // climb waypoint (wagon deck, loading dock ≤ 1.25 m): vault — lift the body first so the ledge collider stops pushing us back, then step in
@@ -152,6 +152,8 @@ export class Soldier {
     this.vel.x = damp(this.vel.x, desired.x, acc, dt); this.vel.z = damp(this.vel.z, desired.z, acc, dt);
     this.position.x += this.vel.x * dt; this.position.z += this.vel.z * dt;
     nav.resolveCircle(this.position, 0.3);
+    // chase mode: never step into a no-go zone (building lobbies, interiors) — even on a straight-line fallback path
+    if (this.noGo && this.noGo(this.position.x, this.position.z, this.position.y) && !this.noGo(px0, pz0, this.position.y)) { this.position.x = px0; this.position.z = pz0; this.vel.x = 0; this.vel.z = 0; }
     // ---- vertical: feet follow the nav floor of the layer we are on; stairs are smoothed, drops use gravity ----
     const f = nav.floorAt(this.position.x, this.position.z, this.position.y + (this.airborne ? 0 : 0.3));
     if (vault) { if (Number.isFinite(f) && f > this.position.y) this.position.y = f; }
@@ -237,7 +239,7 @@ export class Soldier {
   updateVisual(dt) {
     const inst = this.inst, b = this.bones;
     // animation blend from speed
-    const s = this.speed;
+    const s = this.riding ? 0 : this.speed;   // riding a motorbike (chase crews): legs stay put, crouch folds them onto the pegs
     const wIdle = clamp(1 - s / 1.2, 0, 1);
     const wRun = clamp((s - 2.0) / 2.0, 0, 1);
     const wWalk = clamp(1 - wIdle - wRun, 0, 1);
@@ -255,6 +257,7 @@ export class Soldier {
 
     // root
     this.group.position.copy(this.position); this.group.rotation.y = this.yaw;
+    if (this.riding) this.group.position.y += this.riding.seat || 0;
     this.group.updateWorldMatrix(false, true);
 
     const yaw = this.yaw; const right = _v2.set(-Math.cos(yaw), 0, Math.sin(yaw)); // character right (-X at yaw 0)

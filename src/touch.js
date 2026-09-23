@@ -1,5 +1,6 @@
 // Mobile / touch controls. Owned by: main. Renders a CoD-Mobile-style overlay and drives ctx.input (axis, look, buttons).
-// Left half: floating virtual stick (auto-sprint when pushed to the rim). Right half: drag to look; button cluster for fire/ADS/jump/crouch/reload/swap/grenade.
+// Left half: floating virtual stick (auto-sprint when pushed to the rim). Right half: drag to look, quick tap (no drag) toggles ADS; button cluster for fire/ADS/jump/crouch/reload/swap/grenade.
+// Weapon buttons dim + go inert while the weapon is stowed (elevator / passenger / driving a car).
 const CSS = `
 #touch{position:fixed;inset:0;z-index:30;pointer-events:none;-webkit-user-select:none;user-select:none;touch-action:none;font-family:"Barlow Condensed","Arial Narrow",system-ui,sans-serif}
 #touch.on{pointer-events:auto}
@@ -22,6 +23,7 @@ const CSS = `
 #touch .pause{right:calc(env(safe-area-inset-right,0px) + 16px);top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:30px;border-radius:6px;font-size:12px}
 #touch .act{left:calc(env(safe-area-inset-left,0px) + 120px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);min-width:96px;height:44px;padding:0 14px;border-radius:22px;font-size:13px;background:rgba(233,162,59,.35);border-color:#e9a23b;display:none}
 #touch .act.show{display:flex}
+#touch.stow .fire,#touch.stow .fireL,#touch.stow .ads,#touch.stow .reload,#touch.stow .nade{opacity:.22;pointer-events:none}
 #touch .fireL{left:calc(env(safe-area-inset-left,0px) + 30px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);width:70px;height:70px;background:rgba(160,40,30,.3);border-color:rgba(255,120,100,.45)}
 `;
 
@@ -55,10 +57,13 @@ export async function init(ctx) {
   const zl = q('.zone.l');
   zl.addEventListener('touchstart', (e) => { e.preventDefault(); if (S.stickId !== null) return; const t = e.changedTouches[0]; S.stickId = t.identifier; S.stickOrigin = { x: t.clientX, y: t.clientY }; S.stick.style.display = 'block'; S.stick.style.left = t.clientX + 'px'; S.stick.style.top = t.clientY + 'px'; setAxis(0, 0); }, { passive: false });
   const onMove = (e) => { e.preventDefault(); for (const t of e.changedTouches) { if (t.identifier === S.stickId) setAxis(t.clientX - S.stickOrigin.x, t.clientY - S.stickOrigin.y); else if (S.looks.has(t.identifier)) { const l = S.looks.get(t.identifier); input.mouse.dx += (t.clientX - l.x) * S.lookSens; input.mouse.dy += (t.clientY - l.y) * S.lookSens; l.x = t.clientX; l.y = t.clientY; } } };
-  const onEnd = (e) => { for (const t of e.changedTouches) { if (t.identifier === S.stickId) clearStick(); S.looks.delete(t.identifier); } };
+  const onEnd = (e) => { for (const t of e.changedTouches) { if (t.identifier === S.stickId) clearStick(); const l = S.looks.get(t.identifier);
+    // tap-to-aim: a quick tap on the look zone (no drag) toggles ADS, same as the ADS button
+    if (l && l.zone && e.type === 'touchend' && performance.now() - l.t0 < 220 && Math.hypot(t.clientX - l.x0, t.clientY - l.y0) < 12 && !S.stowed) setAds(!T.ads);
+    S.looks.delete(t.identifier); } };
   // ---- right zone + buttons: look-drag (a finger that starts on a button can also drag to look)
-  const startLook = (e) => { for (const t of e.changedTouches) S.looks.set(t.identifier, { x: t.clientX, y: t.clientY }); };
-  q('.zone.r').addEventListener('touchstart', (e) => { e.preventDefault(); startLook(e); }, { passive: false });
+  const startLook = (e, zone = false) => { const now = performance.now(); for (const t of e.changedTouches) S.looks.set(t.identifier, { x: t.clientX, y: t.clientY, x0: t.clientX, y0: t.clientY, t0: now, zone }); };
+  q('.zone.r').addEventListener('touchstart', (e) => { e.preventDefault(); startLook(e, true); }, { passive: false });
   root.addEventListener('touchmove', onMove, { passive: false });
   root.addEventListener('touchend', onEnd); root.addEventListener('touchcancel', onEnd);
 
@@ -71,7 +76,8 @@ export async function init(ctx) {
   const tap = (el, fn) => el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 120); fn(); }, { passive: false });
   const press = (code) => { input.keys.add(code); input.pressed.add(code); setTimeout(() => input.keys.delete(code), 120); };
   for (const sel of ['.fire', '.fireL']) hold(q(sel), () => { T.fire = true; input.pressed.add('Mouse0'); }, () => { T.fire = false; }, { look: sel === '.fire' });
-  const adsEl = q('.ads'); tap(adsEl, () => { T.ads = !T.ads; adsEl.classList.toggle('on', T.ads); });
+  const adsEl = q('.ads'); const setAds = (v) => { T.ads = !!v; adsEl.classList.toggle('on', T.ads); }; S.setAds = setAds;
+  tap(adsEl, () => setAds(!T.ads));
   const crEl = q('.crouch'); tap(crEl, () => { const on = !input.keys.has('KeyC'); if (on) input.keys.add('KeyC'); else input.keys.delete('KeyC'); crEl.classList.toggle('on', on); });
   hold(q('.jump'), () => { input.keys.add('Space'); input.pressed.add('Space'); }, () => input.keys.delete('Space'));
   tap(q('.reload'), () => press('KeyR'));
@@ -80,7 +86,8 @@ export async function init(ctx) {
   S.act = q('.act'); tap(S.act, () => { input.pressed.add('KeyF'); }); // contextual: pick up weapon / mount / dismount (same F both systems read)
   tap(q('.pause'), () => ctx.setState('paused'));
 
-  const show = (v) => { root.classList.toggle('hidden', !v); root.classList.toggle('on', v); if (!v) { clearStick(); S.looks.clear(); T.fire = false; } };
+  const show = (v) => { root.classList.toggle('hidden', !v); root.classList.toggle('on', v); if (!v) { clearStick(); S.looks.clear(); T.fire = false; setAds(false); } };
+  ctx.bus.on('playerDied', () => { T.fire = false; setAds(false); });
   ctx.bus.on('state', ({ state }) => show(state === 'playing'));
   show(ctx.state === 'playing');
   // QA hooks
@@ -89,14 +96,17 @@ export async function init(ctx) {
     qaStick: (x, y) => { T.axis.x = x; T.axis.y = y; T.sprint = Math.hypot(x, y) > 0.92 && y < -0.5; },
     qaLook: (dx, dy) => { input.mouse.dx += dx; input.mouse.dy += dy; },
     qaFire: (on) => { T.fire = on; if (on) input.pressed.add('Mouse0'); },
+    qaAds: (on) => setAds(on),
   };
 }
 
 export function update(dt, ctx) {
   if (!S || !S.act) return;
+  const m = ctx.player?.mounted, stowed = !!(m && (m.elevator || m.passenger || m.spec?.car));
+  if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { ctx.input.touch.fire = false; S.setAds?.(false); } }
   // contextual action button: weapon pickup or motorcycle mount/dismount
   const pk = ctx.ai?.nearPickup, bike = ctx.vehicles?.nearBike, mounted = ctx.vehicles?.mounted || ctx.player?.mounted;
   const label = mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;
   if (label !== S.actLabel) { S.actLabel = label; S.act.textContent = label || ''; S.act.classList.toggle('show', !!label && ctx.state === 'playing'); }
 }
-export function reset(ctx) { if (S) { ctx.input.touch.fire = false; ctx.input.touch.ads = false; } }
+export function reset(ctx) { if (S) { ctx.input.touch.fire = false; if (S.setAds) S.setAds(false); else ctx.input.touch.ads = false; } }
