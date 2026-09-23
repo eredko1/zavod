@@ -36,7 +36,7 @@ export function buildHangout(world, M) {
   ctx.bus.on('net:elev', (m) => onRemoteElev(m));
   ctx.bus.on('net:steal', (m) => stealLocal(m.i, false));
   ctx.bus.on('net:red', (m) => onRemoteRed(m));
-  ctx.bus.on('net:smoke', (m) => { if (Array.isArray(m.p)) puff(new THREE.Vector3(...m.p)); });
+  ctx.bus.on('net:smoke', (m) => { if (!Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = ctx.player?.position; if (me && !me.dead && at.distanceTo(me) < 5) { H.high = Math.min(1, H.high + 0.18); H.highT = Math.max(H.highT, 150); } });   // passing it around: friends within 5 m get lifted too
   ctx.bus.on('net:igor', (m) => ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'Someone'} bought from Igor`, 1800));
   ctx.bus.on('playerDied', () => { endRide(true); leavePassenger(); });
   world.updaters.push((dt) => update(dt));
