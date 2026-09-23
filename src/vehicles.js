@@ -75,7 +75,7 @@ function spotFree(x, z, yRef = 0, ignoreBox = null) {
 function placeBikes() {
   const W = C.world; S.grid.build(C.colliders);
   const spots = Array.isArray(W?.vehicleSpots) ? W.vehicleSpots : null;
-  if (spots && spots.length) { for (const s of spots.slice(0, 5)) makeBike(s.x, s.z, s.yaw ?? 0, s.y ?? 0); if (S.bikes.length >= 3) return; }
+  if (spots && spots.length) { for (const s of spots.slice(0, W.vehicleMax || 5)) makeBike(s.x, s.z, s.yaw ?? 0, s.y ?? 0); if (S.bikes.length >= 3) return; }   // maps may raise the cap via W.vehicleMax
   const spawns = (W?.playerSpawns?.length ? W.playerSpawns : [new THREE.Vector3(0, 0, 0)]);
   const want = 5, R = C.rng, MIN_APART = 25;
   // candidates = every walkable anchor the map exposes (player spawns, enemy spawns, cover points) → bikes dispersed over the whole map
