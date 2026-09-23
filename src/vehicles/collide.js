@@ -56,3 +56,25 @@ export function rectBlocked(grid, minX, minZ, maxX, maxZ, y0, y1, skip = null) {
   for (let i = 0; i < boxes.length; i++) { const b = boxes[i]; if (b === skip) continue; if (b.max.y <= y0 || b.min.y >= y1) continue; if (b.max.x > minX && b.min.x < maxX && b.max.z > minZ && b.min.z < maxZ) return true; }
   return false;
 }
+
+/**
+ * First hit of the segment a→b against boxes in the grid (ignoring `skip` and boxes whose top is below `minTop`).
+ * Returns t in [0,1] (1 = clear). Used by the chase camera so it never ends up inside a wall.
+ */
+export function segmentHit(grid, ax, ay, az, bx, by, bz, skip = null, minTop = -Infinity) {
+  const boxes = grid.query(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz));
+  const dx = bx - ax, dy = by - ay, dz = bz - az; let best = 1;
+  for (let i = 0; i < boxes.length; i++) {
+    const b = boxes[i]; if (b === skip || b.max.y < minTop) continue;
+    let t0 = 0, t1 = best, ok = true;
+    for (let k = 0; k < 3 && ok; k++) {
+      const o = k === 0 ? ax : k === 1 ? ay : az, d = k === 0 ? dx : k === 1 ? dy : dz;
+      const mn = k === 0 ? b.min.x : k === 1 ? b.min.y : b.min.z, mx = k === 0 ? b.max.x : k === 1 ? b.max.y : b.max.z;
+      if (Math.abs(d) < 1e-9) { if (o < mn || o > mx) ok = false; continue; }
+      let ta = (mn - o) / d, tb = (mx - o) / d; if (ta > tb) { const t = ta; ta = tb; tb = t; }
+      if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) ok = false;
+    }
+    if (ok && t0 < best) best = t0;
+  }
+  return best;
+}

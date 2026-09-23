@@ -153,3 +153,34 @@ export function buildBike(ctx) {
   fi.add(headlight); fi.add(headlight.target);
   return { group, body, fork, wheelF, wheelR, headlight, lens, meshes };
 }
+
+/**
+ * Seated rider for the third-person chase view of your own bike (bike local frame: forward -Z, seat top ~0.95 m).
+ * Jacket, jeans, boots, gloves, full-face helmet with a dark visor. ~1.2k tris, one merged mesh per material. Not a raycast target.
+ */
+let RIDER = null;
+export function buildRider() {
+  if (!RIDER) {
+    const J = [], D = [], K = [], H = [], V = [];
+    const limb = (list, a, b, r0, r1 = r0) => { const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), l = d.length(); const g = new THREE.CylinderGeometry(r1, r0, l, 10, 1); g.applyMatrix4(new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()), new THREE.Vector3(1, 1, 1))); list.push(g); const j = new THREE.SphereGeometry(r1 * 1.02, 10, 6); j.translate(...b); list.push(j); };
+    // torso: hips on the seat, leaning ~25° toward the bars
+    put(J, new THREE.SphereGeometry(0.5, 14, 10), 0, 1.3, 0.24, E(-0.42, 0, 0), 0.38, 0.62, 0.26);
+    put(D, new THREE.SphereGeometry(0.5, 12, 8), 0, 1.02, 0.34, null, 0.34, 0.2, 0.3);
+    limb(J, [0, 1.52, 0.14], [0, 1.6, 0.1], 0.06);                                        // neck
+    for (const s of [-1, 1]) {
+      limb(J, [s * 0.18, 1.48, 0.16], [s * 0.3, 1.24, 0.02], 0.055, 0.05);                // upper arm
+      limb(J, [s * 0.3, 1.24, 0.02], [s * 0.39, 1.09, 0.04], 0.048, 0.042);               // forearm to grip
+      put(K, new THREE.SphereGeometry(0.05, 8, 6), s * 0.4, 1.08, 0.04);                     // glove
+      limb(D, [s * 0.11, 1.0, 0.34], [s * 0.2, 0.84, -0.06], 0.08, 0.065);                // thigh forward to the tank
+      limb(D, [s * 0.2, 0.84, -0.06], [s * 0.24, 0.36, 0.08], 0.06, 0.05);                // shin down to the peg
+      put(K, new THREE.BoxGeometry(0.1, 0.1, 0.26), s * 0.24, 0.33, 0.04);                   // boot
+    }
+    put(H, new THREE.SphereGeometry(0.15, 16, 12), 0, 1.72, 0.08, null, 1, 1.05, 1.1);    // helmet
+    put(V, new THREE.SphereGeometry(0.152, 14, 8, -Math.PI * 0.32, Math.PI * 0.64, Math.PI * 0.36, Math.PI * 0.26), 0, 1.72, 0.08, E(0, -Math.PI / 2, 0), 1, 1.05, 1.1); // visor band (front)
+    const mats = { J: new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: 0.7, metalness: 0.05 }), D: new THREE.MeshStandardMaterial({ color: 0x2c3a52, roughness: 0.9 }), K: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }), H: new THREE.MeshStandardMaterial({ color: 0x0d0f11, roughness: 0.25, metalness: 0.3 }), V: new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 0.05, metalness: 0.6 }) };
+    RIDER = [[merged(J), mats.J], [merged(D), mats.D], [merged(K), mats.K], [merged(H), mats.H], [merged(V), mats.V]];
+  }
+  const g = new THREE.Group(); g.name = 'rider';
+  for (const [geo, mat] of RIDER) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m); }
+  return g;
+}
