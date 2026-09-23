@@ -103,11 +103,11 @@ export function graffitiTexture({ text = 'ЗАВОД', color = '#d8322d', w = 51
 }
 
 /** Lit window grid texture for distant apartment blocks (emissive). */
-export function windowsTexture(R, cols = 12, rows = 24) {
+export function windowsTexture(R, cols = 12, rows = 24, density = 0.13) {
   const w = cols * 16, h = rows * 16; const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
   g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    if (R() < 0.13) { const warm = R() < 0.75; g.fillStyle = warm ? `rgba(255,${170 + R() * 60},${80 + R() * 60},${0.5 + R() * 0.5})` : `rgba(150,200,255,${0.4 + R() * 0.5})`; g.fillRect(x * 16 + 4, y * 16 + 3, 8, 10); }
+    if (R() < density) { const warm = R() < 0.75; g.fillStyle = warm ? `rgba(255,${170 + R() * 60},${80 + R() * 60},${0.5 + R() * 0.5})` : `rgba(150,200,255,${0.4 + R() * 0.5})`; g.fillRect(x * 16 + 4, y * 16 + 3, 8, 10); }
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter;
   return t;

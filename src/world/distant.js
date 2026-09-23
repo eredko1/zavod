@@ -5,20 +5,26 @@ import { windowsTexture } from './mats.js';
 
 export function buildDistant(world) {
   const { scene, R } = world;
-  const dark = new THREE.MeshStandardMaterial({ color: 0x0c1016, roughness: 0.95, metalness: 0.1 });
+  // The yard's FogExp2 (0.0105) is ~97 % opaque at 180 m and darker than the glowing city sky, so fogged backdrop geometry
+  // read as pure black cut-outs. The backdrop opts out of fog and carries its own aerial-perspective tone instead.
+  const dark = new THREE.MeshBasicMaterial({ color: 0x0b0b0d, fog: false });
   const geos = [];
   const box = (w, h, d, x, y, z, ry = 0) => { const g = new THREE.BoxGeometry(w, h, d); if (ry) g.rotateY(ry); g.translate(x, y, z); geos.push(g); };
   const cyl = (r, h, x, y, z) => { const g = new THREE.CylinderGeometry(r, r, h, 12); g.translate(x, y, z); geos.push(g); };
 
   // ---- apartment blocks (panelki) north & west with lit windows ------------------
-  const winTex = windowsTexture(R);
-  const winMat = new THREE.MeshStandardMaterial({ color: 0x0c1016, roughness: 0.9, emissive: 0xffffff, emissiveMap: winTex, emissiveIntensity: 0.9 });
+  const winTex = windowsTexture(R, 12, 24, 0.3); winTex.anisotropy = 8;
+  const winMat = new THREE.MeshBasicMaterial({ map: winTex, color: 0xb09880, fog: false });
+  winMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb = max(diffuseColor.rgb * 1.6, vec3(0.006, 0.006, 0.007)); '); };
   const blocks = [];
   const block = (w, h, d, x, z, ry) => {
     box(w, h, d, x, h / 2, z, ry);
     // lit facade planes slightly proud of the box
-    const f = new THREE.PlaneGeometry(w, h); const uv = f.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w / 3.2), uv.getY(i) * (h / 3.0));
-    f.translate(0, h / 2, d / 2 + 0.2); f.rotateY(ry); f.translate(x, 0, z); blocks.push(f);
+    // lit facade planes slightly proud of every face (the backs and ends read as black slabs from the yard otherwise)
+    for (const [fw, off, rot] of [[w, d / 2, 0], [w, d / 2, Math.PI], [d, w / 2, Math.PI / 2], [d, w / 2, -Math.PI / 2]]) {
+      const f = new THREE.PlaneGeometry(fw, h); const uv = f.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (fw / 38.4) + x * 0.37, uv.getY(i) * (h / 72));   // texture = 12 bays × 24 floors (3.2 × 3 m each)
+      f.translate(0, h / 2, off + 0.2); f.rotateY(ry + rot); f.translate(x, 0, z); blocks.push(f);
+    }
   };
   block(60, 42, 14, -30, -150, 0.1); block(48, 30, 14, 50, -160, -0.2); block(70, 48, 16, -120, -110, 0.9); block(40, 36, 14, -150, -20, 1.5); block(36, 27, 14, -140, 60, 1.6); block(55, 33, 14, 20, -215, 0.05);
   block(40, 30, 14, -175, -60, 1.2);
@@ -43,6 +49,9 @@ export function buildDistant(world) {
   for (let i = 0; i < 5; i++) cyl(4.5, 34, -60 + i * 10, 17, -125);
   cyl(2.8, 70, -85, 35, -140); cyl(2.2, 58, 90, 29, -135); cyl(14, 24, 110, 12, -120);
   box(90, 22, 30, 80, 11, -120); box(50, 16, 24, -70, 8, -128);
+  // sparse lit windows + a band of high clerestory glazing on the two factory halls
+  { const fac = []; for (const [w, h, d, x, z] of [[90, 22, 30, 80, -120], [50, 16, 24, -70, -128]]) for (const sd of [1, -1]) { const f = new THREE.PlaneGeometry(w, h * 0.35); const uv = f.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w / 54) + x, uv.getY(i) * (h * 0.35 / 72)); f.translate(0, h * 0.72, sd * (d / 2 + 0.2)); if (sd < 0) f.rotateY(Math.PI); f.translate(x, 0, z); fac.push(f); }
+    const fm = new THREE.MeshBasicMaterial({ map: winTex, color: 0x806a54, fog: false }); const m = new THREE.Mesh(BGU.mergeGeometries(fac, false), fm); m.frustumCulled = false; scene.add(m); }
   // pylons
   for (let i = 0; i < 4; i++) { const x = -110 + i * 55; box(2, 40, 2, x, 20, -175); box(22, 1.2, 1.2, x, 34, -175); box(16, 1.2, 1.2, x, 29, -175); }
 

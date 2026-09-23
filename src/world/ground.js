@@ -64,7 +64,11 @@ export function buildGround(world) {
         diffuseColor.rgb *= mix(1.0, 0.45, gPuddle);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = roughnessFactor * (0.78 - 0.3 * gMask.b);
-        roughnessFactor = mix(roughnessFactor, 0.035, gPuddle);`)
+        roughnessFactor = mix(roughnessFactor, 0.09, gPuddle);`)
+      .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+        // the env map is a distant city HDRI: mirrored in a puddle it paints a skyscraper that is not in the yard.
+        // Keep only a dim, blurred sky tint from it; SSR supplies the real reflections (lamps, containers, sheds).
+        radiance = mix(radiance, vec3(0.05, 0.055, 0.07) + min(radiance, vec3(0.6)) * 0.08, gPuddle);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         if (gPuddle > 0.001) {
           vec2 g = rippleGrad(vWPos.xz * 1.6, uTime) * uRain;

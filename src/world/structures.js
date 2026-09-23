@@ -38,6 +38,9 @@ export function buildStructures(world) {
   const M = {
     corr: addGrime(A.material('corrugated', { grayscale: true, color: 0x59626c, repeat: 1, normalScale: 1.1, envMapIntensity: 0.7 }), R, { strength: 0.9, scale: 0.35, height: 2.5, key: 's1' }),
     corrDark: addGrime(A.material('corrugated', { grayscale: true, color: 0x3b4149, repeat: 1, normalScale: 1.1, envMapIntensity: 0.6 }), R, { strength: 0.7, scale: 0.35, height: 2.5, key: 's2' }),
+    // roof/canopy undersides are seen at grazing angles under point lights: the full-strength rib normal map aliased into
+    // heavy moiré there. Softer normals + rougher sheet for anything overhead.
+    corrRoof: addGrime(A.material('corrugated', { grayscale: true, color: 0x3b4149, repeat: 1, normalScale: 0.3, envMapIntensity: 0.35, roughness: 1 }), R, { strength: 0.7, scale: 0.35, height: 2.5, key: 's3' }),
     concrete: addGrime(A.material('concrete_wall', { repeat: 1, color: 0xa8a8a8, envMapIntensity: 0.5 }), R, { strength: 0.9, scale: 0.5, height: 1.6, tint: [0.3, 0.28, 0.25], key: 's3' }),
     concreteFloor: A.material('concrete_floor', { repeat: 1, color: 0x9a9a9a, envMapIntensity: 0.7 }),
     cracked: addGrime(A.material('cracked_concrete', { repeat: 1, color: 0xa0a0a0, envMapIntensity: 0.5 }), R, { strength: 0.8, scale: 0.5, height: 0.9, key: 's4' }),
@@ -121,7 +124,7 @@ function buildWarehouse(world, M, add, solidBox) {
   for (let i = 0; i < 6; i++) add(M.glass, new THREE.PlaneGeometry(2.2, 1.2), -54 + i * 4.4, 7.4, z1 + 0.02);
   for (let i = 0; i < 6; i++) add(M.glass, new THREE.PlaneGeometry(2.2, 1.2), x1 + 0.02, 7.4, -52 + i * 5.5, Math.PI / 2);
   // roof slab + parapet + trusses + rooftop units
-  add(M.corrDark, tbox(W + 0.6, 0.3, D + 0.6, 3), cx, h + 0.15, cz);
+  add(M.corrRoof, tbox(W + 0.6, 0.3, D + 0.6, 3.5), cx, h + 0.15, cz);
   world.box([x0 - 0.3, h, z0 - 0.3], [x1 + 0.3, h + 0.3, z1 + 0.3]);
   for (const [w, d, x, z] of [[W + 0.6, 0.3, cx, z0 - 0.15], [W + 0.6, 0.3, cx, z1 + 0.15], [0.3, D + 0.6, x0 - 0.15, cz], [0.3, D + 0.6, x1 + 0.15, cz]]) add(M.concrete, tbox(w, 0.9, d, 2), x, h + 0.75, z);
   for (let i = 0; i < 6; i++) { const rx = x0 + 4 + i * 7; add(M.steel, tbox(6, 1.4, 4, 2), rx, h + 1.0, cz + (i % 2 ? 8 : -6)); }
@@ -175,7 +178,7 @@ function buildDock(world, M, add, solidBox) {
   // railing
   for (const zz of [z0 + 0.2, z1 - 0.2]) add(M.steel, new THREE.CylinderGeometry(0.03, 0.03, x1 - x0 - 0.4, 6).rotateZ(Math.PI / 2), cx, h + 1.0, zz);
   // canopy over the dock from the warehouse wall
-  add(M.corrDark, tbox(x1 - x0 + 2, 0.12, z1 - z0 + 2, 2), cx + 1, 4.2, cz);
+  add(M.corrRoof, tbox(x1 - x0 + 2, 0.12, z1 - z0 + 2, 3.5), cx + 1, 4.2, cz);
   for (const zz of [z0 + 0.5, z1 - 0.5]) solidBox(M.steel, 0.15, 3.0, 0.15, x1 + 0.7, h + 1.5, zz, 1, 'metal');
   world.cover(x1 + 1.2, z0 + 3, 1, 0); world.cover(x1 + 1.2, z1 - 3, 1, 0); world.cover(cx, z1 + 3.2, 0, 1); world.cover(cx, z0 - 3.2, 0, -1);
 }
