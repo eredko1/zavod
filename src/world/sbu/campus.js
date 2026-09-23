@@ -4,6 +4,7 @@
 // features are only laid outside it so nothing doubles up.
 import * as THREE from 'three';
 import { Batch, polyGeo, boxGeo } from './geo.js';
+import { segDist, walk, ribbon, footprint, pip, bbox, cen } from '../osmkit.js';
 import { facade, roofKit, block } from './buildings.js';
 import { OSM, PLAY } from './osm.js';
 import { BOUNDS } from './layout.js';
@@ -11,9 +12,6 @@ import { placeCars, CAR_KINDS } from '../carkit.js';
 
 const CORE = { x0: BOUNDS.x0 + 4, x1: BOUNDS.x1 - 4, z0: BOUNDS.z0 + 4, z1: BOUNDS.z1 - 4 };
 const inCore = (x, z) => x > CORE.x0 && x < CORE.x1 && z > CORE.z0 && z < CORE.z1;
-const cen = (p) => { let x = 0, z = 0; for (const q of p) { x += q[0]; z += q[1]; } return [x / p.length, z / p.length]; };
-const pip = (x, z, p) => { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, zi] = p[i], [xj, zj] = p[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
-const bbox = (p) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of p) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { x0, x1, z0, z1 }; };
 
 /** Everything that must exist before props.js instances trees: returns extra tree placements for props.js. */
 export function planCampusTrees(world) {
@@ -39,23 +37,7 @@ export function planCampusTrees(world) {
   return kept;
 }
 
-function segDist(x, z, p) { let best = 1e9; for (let i = 0; i + 1 < p.length; i++) { const [ax, az] = p[i], [bx, bz] = p[i + 1]; const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t)); } return best; }
-function walk(pts, step, fn) { let next = step / 2, acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const [x0, z0] = pts[i], [x1, z1] = pts[i + 1]; const L = Math.hypot(x1 - x0, z1 - z0); if (L < 1e-3) continue; const ux = (x1 - x0) / L, uz = (z1 - z0) / L; while (next <= acc + L) { const d = next - acc; fn(x0 + ux * d, z0 + uz * d, ux, uz); next += step; } acc += L; } }
 
-/** Ribbon (road / path) along a polyline at height y: flat strip of width w, mitred joints. */
-function ribbon(pts, w, y) {
-  const pos = [], idx = []; const n = pts.length; if (n < 2) return null;
-  for (let i = 0; i < n; i++) {
-    const p = pts[i], a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
-    let dx = b[0] - a[0], dz = b[1] - a[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
-    pos.push(p[0] - dz * w / 2, y, p[1] + dx * w / 2, p[0] + dz * w / 2, y, p[1] - dx * w / 2);
-    if (i) { const k = (i - 1) * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
-  }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-  // make sure the strip faces up whichever way the polyline runs
-  if (g.attributes.normal.getY(0) < 0) { const ix = g.index.array; for (let i = 0; i < ix.length; i += 3) { const t = ix[i + 1]; ix[i + 1] = ix[i + 2]; ix[i + 2] = t; } g.computeVertexNormals(); }
-  return g;
-}
 
 /** Split a polyline into runs outside the hand-built core. */
 function outsideRuns(p) { const runs = []; let cur = []; for (const q of p) { if (inCore(q[0], q[1])) { if (cur.length > 1) runs.push(cur); cur = []; } else cur.push(q); } if (cur.length > 1) runs.push(cur); return runs; }
@@ -117,65 +99,25 @@ const STYLE = {
 
 function building(S, world, M, b) {
   const floors = Math.max(1, b.f | 0);
-  // campus-grid aligned? (dominant edge direction within 4 deg of an axis) — else build in a rotated local frame
-  let best = 0, bestL = 0; const hist = new Map();
-  for (let i = 0; i < b.p.length; i++) { const [ax, az] = b.p[i], [bx, bz] = b.p[(i + 1) % b.p.length]; const L = Math.hypot(bx - ax, bz - az); if (L < 2) continue; const a = ((Math.atan2(bz - az, bx - ax) % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2); const k = Math.round(a / 0.035); const v = (hist.get(k) || 0) + L; hist.set(k, v); if (v > bestL) { bestL = v; best = k * 0.035; } }
-  const ang = best > Math.PI / 4 ? best - Math.PI / 2 : best;
-  const aligned = Math.abs(ang) < 0.07;
-  const c = Math.cos(-ang), s = Math.sin(-ang); const [ox, oz] = cen(b.p);
-  const loc = b.p.map(([x, z]) => aligned ? [x, z] : [ox + (x - ox) * c - (z - oz) * s, oz + (x - ox) * s + (z - oz) * c]);
-  const rects = decompose(loc);
-  if (!rects.length) return;
-  // rotated buildings: build into a scratch batch whose colliders are recorded, then rotate its geometry into place
-  const T = aligned ? S : new Batch(proxyWorld(world), M, 'campusRot');
   const style = b.s;
-  for (const r of rects) {
+  const rects = footprint(S, world, M, b.p, (T, r) => {
     const w = r.x1 - r.x0, d = r.z1 - r.z0;
-    if (style === 'stadium') { stands(T, r); continue; }
-    if (style === 'garage') { garage(T, r, Math.max(3, floors)); continue; }
-    if (w < 4 || d < 4) { block(T, style === 'brick' ? 'brickRed' : style === 'glassbrick' ? 'brickBrown' : 'precast', r.x0, r.z0, r.x1, r.z1, floors * 3.6, { hvac: 0 }); continue; }
+    if (style === 'stadium') { stands(T, r); return; }
+    if (style === 'garage') { garage(T, r, Math.max(3, floors)); return; }
+    if (w < 4 || d < 4) { block(T, style === 'brick' ? 'brickRed' : style === 'glassbrick' ? 'brickBrown' : 'precast', r.x0, r.z0, r.x1, r.z1, floors * 3.6, { hvac: 0 }); return; }
     if (style === 'arena') {
       const h = 15;
       block(T, 'brickBrown', r.x0, r.z0, r.x1, r.z1, h, { hvac: 0 });
       if (w > 20 && d > 20) T.hcyl('roofMetal', w > d ? 'x' : 'z', w > d ? r.x0 + 1 : r.z0 + 1, w > d ? r.x1 - 1 : r.z1 - 1, w > d ? (r.z0 + r.z1) / 2 : (r.x0 + r.x1) / 2, h - Math.min(w, d) * 0.35, Math.min(w, d) * 0.5, 24);
-      continue;
+      return;
     }
     facade(T, { hvac: b.play ? 3 : 1, x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, floors: style === 'service' ? Math.min(floors, 2) : floors, ...(STYLE[style] || STYLE.precast), ...(b.play ? {} : { mullionPitch: 0 }), ground: floors >= 4 && style !== 'brick' && world.R() < 0.4 ? { h: 4.2, inset: 1.0, pitch: 7.2 } : undefined });
-  }
-  if (!aligned) {
-    const m = new THREE.Matrix4().makeTranslation(ox, 0, oz).multiply(new THREE.Matrix4().makeRotationY(-ang)).multiply(new THREE.Matrix4().makeTranslation(-ox, 0, -oz));
-    for (const [key, list] of T.lists) for (const g of list) { g.applyMatrix4(m); (S.lists.get(key) || S.lists.set(key, []).get(key)).push(g); }
-    T.lists.clear();
-    for (const [mn, mx] of T.world._boxes) { // conservative AABB of each rotated collider
-      const pts = [[mn[0], mn[2]], [mx[0], mn[2]], [mn[0], mx[2]], [mx[0], mx[2]]].map(([x, z]) => new THREE.Vector3(x, 0, z).applyMatrix4(m));
-      world.box([Math.min(...pts.map((p) => p.x)), mn[1], Math.min(...pts.map((p) => p.z))], [Math.max(...pts.map((p) => p.x)), mx[1], Math.max(...pts.map((p) => p.z))]);
-    }
-  }
+  });
   // a few cover points along the long faces of playable buildings
-  if (b.play) for (const r of rects) { if (r.x1 - r.x0 < 12) continue; for (let x = r.x0 + 6; x < r.x1 - 4; x += 14) { world.cover(x, r.z0 - 1.2, 0, -1); world.cover(x, r.z1 + 1.2, 0, 1); } }
+  if (b.play && rects.aligned) for (const r of rects) { if (r.x1 - r.x0 < 12) continue; for (let x = r.x0 + 6; x < r.x1 - 4; x += 14) { world.cover(x, r.z0 - 1.2, 0, -1); world.cover(x, r.z1 + 1.2, 0, 1); } }
 }
 
-function proxyWorld(world) { return { ...world, R: world.R, _boxes: [], box(min, max) { this._boxes.push([min, max]); }, walkable(min, max) { this._boxes.push([min, max]); }, cover() {} }; }
 
-/** Rectilinear decomposition of a (roughly) axis-aligned footprint: coordinate compression -> inside cells -> merged rects. */
-function decompose(p) {
-  const snap = (v) => Math.round(v * 2) / 2;
-  const xs = [...new Set(p.map((q) => snap(q[0])))].sort((a, b) => a - b), zs = [...new Set(p.map((q) => snap(q[1])))].sort((a, b) => a - b);
-  // drop tiny coordinate steps (< 1.5 m) that only produce slivers
-  const clean = (arr) => arr.filter((v, i) => i === 0 || i === arr.length - 1 || (v - arr[i - 1] >= 1.5));
-  const X = clean(xs), Z = clean(zs);
-  const on = [];
-  for (let j = 0; j + 1 < Z.length; j++) { on.push([]); for (let i = 0; i + 1 < X.length; i++) on[j].push(pip((X[i] + X[i + 1]) / 2, (Z[j] + Z[j + 1]) / 2, p)); }
-  const rects = []; const used = on.map((row) => row.map(() => false));
-  for (let j = 0; j < on.length; j++) for (let i = 0; i < on[j].length; i++) {
-    if (!on[j][i] || used[j][i]) continue;
-    let i1 = i; while (i1 + 1 < on[j].length && on[j][i1 + 1] && !used[j][i1 + 1]) i1++;
-    let j1 = j; outer: while (j1 + 1 < on.length) { for (let k = i; k <= i1; k++) if (!on[j1 + 1][k] || used[j1 + 1][k]) break outer; j1++; }
-    for (let jj = j; jj <= j1; jj++) for (let k = i; k <= i1; k++) used[jj][k] = true;
-    rects.push({ x0: X[i], x1: X[i1 + 1], z0: Z[j], z1: Z[j1 + 1] });
-  }
-  return rects.filter((r) => r.x1 - r.x0 >= 2 && r.z1 - r.z0 >= 2);
-}
 
 function stands(B, r) {
   // stadium: stepped concrete bleachers along both long sides of the footprint, open in the middle (the field is a pitch polygon)
