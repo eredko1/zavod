@@ -12,6 +12,7 @@ import * as audio from './audio.js';
 import * as touch from './touch.js';
 import * as vehicles from './vehicles.js';
 import * as net from './net.js';
+import * as netwaves from './netwaves.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
 // BVH-accelerated raycasts for every mesh (bullets, AI line of sight, impact FX). Merged map batches are 100k+ triangle
@@ -99,8 +100,8 @@ addEventListener('keydown', e => {
 const bootbar = document.getElementById('bootbar'), boottxt = document.getElementById('boottxt');
 ctx.progress = (frac, txt) => { bootbar.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`; if (txt) boottxt.textContent = txt; };
 
-const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch], ['vehicles', vehicles], ['net', net]];
-const UPDATE_ORDER = ['touch', 'vehicles', 'player', 'weapons', 'ai', 'world', 'audio', 'hud', 'net']; // vehicles before player: a mounted player is driven by the vehicle // post.render() runs last
+const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch], ['vehicles', vehicles], ['net', net], ['netwaves', netwaves]];
+const UPDATE_ORDER = ['touch', 'vehicles', 'player', 'weapons', 'ai', 'world', 'audio', 'hud', 'net', 'netwaves']; // vehicles before player: a mounted player is driven by the vehicle // post.render() runs last
 const mods = Object.fromEntries(MODULES);
 
 async function boot() {

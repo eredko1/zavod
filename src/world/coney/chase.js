@@ -32,6 +32,9 @@ export function buildChase(world) {
   if (ctx.isTouch) { MAX_COPS = 5; MAX_CREW = 4; MAX_CARS = 4; }
   // nav-only no-go: lobby floors vanish from the AI grid (players are unaffected)
   W.navBlockers = (W.navBlockers || []).concat(zones.map((z) => ({ min: z.min, max: z.max, test: (x, zz) => inZone(z, x, zz, 0.6) })));
+  // shared with the wave AI (ai.js / netwaves.js): where is "indoors" for any player, and where may soldiers never step
+  W.indoorAt = (pos, mounted) => { const z = zoneFor(pos, mounted); return z ? z.doors : null; };
+  W.chaseNoGo = (x, z, y) => noGo(x, z, y ?? 0);
   K = {
     world, ctx, W, towers, zones, roads: buildRoads(W),
     stars: 0, seenT: -1e9, crimeT: -1e9, lastKnown: new THREE.Vector3(), bump: { shot: -1e9, steal: -1e9 },
@@ -41,9 +44,10 @@ export function buildChase(world) {
   };
   buildUI();
   const bus = ctx.bus;
-  bus.on('shot', (e) => { if (e && e.who === 'player') crime('shot', e.origin || ctx.player?.position); });
+  // online wave fights (netwaves.js) are self-defence: shooting at / killing wave mercs doesn't bring the cops
+  bus.on('shot', (e) => { if (e && e.who === 'player' && !ctx.netwaves?.busy) crime('shot', e.origin || ctx.player?.position); });
   bus.on('vehicle', (e) => { if (e?.stage === 'mount' && e.bike?.spec?.car) crime('steal', e.bike.pos || ctx.player?.position); });
-  bus.on('enemyKilled', (d) => { if (!d || d.qa) return; crime(d.chase === 'cop' ? 'copKill' : d.chase === 'crew' ? 'crewKill' : 'kill', d.position || ctx.player?.position); });
+  bus.on('enemyKilled', (d) => { if (!d || d.qa || (d.wave && ctx.netwaves)) return; crime(d.chase === 'cop' ? 'copKill' : d.chase === 'crew' ? 'crewKill' : 'kill', d.position || ctx.player?.position); });
   bus.on('playerDied', () => wasted());
   bus.on('restart', () => { for (const u of K.units) disposeBike(u); K.units.length = 0; for (const c of K.cars) disposeCar(c); K.cars.length = 0; K.stars = 0; K.crew.heat = 0; renderUI(); });
   bus.on('net:chase', (m) => onRemote(m));
@@ -71,11 +75,16 @@ function nearestTower(p) { let best = null, bd = 1e9; for (const t of K.towers) 
 
 /** Where the player "is" for the chasers: outdoors → the player; in a lobby / up on the 19th floor / riding an elevator → the doors of that building */
 function playerSpot() {
-  const p = K.ctx.player; const pos = p.position;
+  const p = K.ctx.player; const zone = zoneFor(p.position, p.mounted);
+  return zone ? { indoor: true, zone } : { indoor: false, zone: null };
+}
+/** the lobby zone a position is "inside" (in a lobby, riding an elevator, or high up in / on a tower), else null — any player */
+function zoneFor(pos, mounted) {
+  if (!K) return null;
   const gh = K.W.groundHeight ? K.W.groundHeight(pos.x, pos.z) : 0;
   let zone = null; for (const q of K.zones) if (inZone(q, pos.x, pos.z, 0.8) && pos.y < 3) { zone = q; break; }
-  if (!zone && (pos.y - gh > 6 || p.mounted?.elevator)) { const nt = nearestTower(pos); if (nt && nt.d < 90) zone = K.zones.find((q) => q.tower === nt.t) || null; }
-  return zone ? { indoor: true, zone } : { indoor: false, zone: null };
+  if (!zone && (pos.y - gh > 6 || mounted?.elevator)) { const nt = nearestTower(pos); if (nt && nt.d < 90) zone = K.zones.find((q) => q.tower === nt.t) || null; }
+  return zone;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------

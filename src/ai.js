@@ -14,6 +14,11 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const wrapAngle = (a) => { a = (a + Math.PI) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return a - Math.PI; };
 
 let S = null; // module state
+// Multiplayer (src/netwaves.js, host only): soldiers pick a target among ALL players; PL is the one the soldier being processed
+// is fighting (the local player object itself, or a proxy for a remote player: same shape — position, eye(), yaw, damage()).
+// Single-player: PL is always ctx.player.
+let PL = null;
+const P = (ctx) => PL || ctx.player;
 
 class Squad {
   constructor(id) { this.id = id; this.members = []; this.alerted = false; this.alertT = -100; this.lastKnown = new THREE.Vector3(); this.engagedT = 0; this.flankT = 0; this.flanker = null; }
@@ -68,7 +73,7 @@ function rayClear(ctx, a, b) {
   let clear = true;
   try {
     const hits = _ray.intersectObjects(targets, false);
-    for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.soldier || o.userData.noLOS) continue; clear = false; break; }
+    for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.soldier || o.userData.noLOS || o.userData.remote) continue; clear = false; break; }
   } catch (e) { clear = true; }
   S.raysThisFrame++;
   const ms = performance.now() - t0; losStats.n++; losStats.ms += ms;
@@ -85,7 +90,7 @@ function rayClearStrict(ctx, a, b) {
   _ray.set(a, _v.multiplyScalar(1 / dist)); _ray.near = 0.05; _ray.far = dist - 0.05;
   try {
     const hits = _ray.intersectObjects(targets, false);
-    for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.soldier || o.userData.noLOS) continue; return false; }
+    for (let i = 0; i < hits.length; i++) { const o = hits[i].object; if (o.userData.soldier || o.userData.noLOS || o.userData.remote) continue; return false; }
   } catch (e) { return false; }
   return true;
 }
@@ -190,8 +195,8 @@ function coverPoints(ctx) {
 }
 
 function pickCover(ctx, s, opt) {
-  const pts = coverPoints(ctx); const pp = opt.around || ctx.player.position; const eye = ctx.player.eye ? ctx.player.eye() : _v3.set(pp.x, pp.y + 1.6, pp.z);
-  const pf = _v2.set(-Math.sin(ctx.player.yaw || 0), 0, -Math.cos(ctx.player.yaw || 0));
+  const pl = P(ctx); const pts = coverPoints(ctx); const pp = opt.around || pl.position; const eye = pl.eye ? pl.eye() : _v3.set(pp.x, pp.y + 1.6, pp.z);
+  const pf = _v2.set(-Math.sin(pl.yaw || 0), 0, -Math.cos(pl.yaw || 0));
   let best = null, bestScore = 1e9; const cands = [];
   const region = S.nav.regionAt(s.position.x, s.position.z, s.position.y);
   // level play: sometimes (per decision) want cover on a different level than the target — high ground when the player is below, and vice versa
@@ -231,9 +236,9 @@ function claim(s, c) { if (s.cover && s.cover !== c && s.cover.claimedBy === s) 
 
 // peek side: tangent direction giving LOS to the player from standing eye height
 function choosePeek(ctx, s, c) {
-  const eye = ctx.player.eye ? ctx.player.eye() : _v3.set(ctx.player.position.x, ctx.player.position.y + 1.6, ctx.player.position.z);
+  const pl = P(ctx); const eye = pl.eye ? pl.eye() : _v3.set(pl.position.x, pl.position.y + 1.6, pl.position.z);
   const t = new THREE.Vector3().crossVectors(c.normal, new THREE.Vector3(0, 1, 0)).normalize();
-  const toP = _v.subVectors(ctx.player.position, c.position); const side = Math.sign(toP.dot(t)) || 1;
+  const toP = _v.subVectors(pl.position, c.position); const side = Math.sign(toP.dot(t)) || 1;
   for (const k of [side, -side]) {
     const p = c.position.clone().addScaledVector(t, 0.75 * k);
     if (!S.nav.isFree(p.x, p.z, c.position.y)) continue; p.y = S.nav.floorAt(p.x, p.z, c.position.y);
@@ -244,7 +249,7 @@ function choosePeek(ctx, s, c) {
 
 // ---------- perception ----------
 function perceive(ctx, s, t) {
-  const pl = ctx.player; const eye = pl.eye ? pl.eye() : _v3.set(pl.position.x, pl.position.y + 1.6, pl.position.z);
+  const pl = P(ctx); const eye = pl.eye ? pl.eye() : _v3.set(pl.position.x, pl.position.y + 1.6, pl.position.z);
   const se = s.eye(new THREE.Vector3());
   const d = _v.subVectors(eye, se); const dist = d.length(); d.multiplyScalar(1 / dist);
   const alerted = s.squad?.alerted || t - s.lastSeen < 6;
@@ -265,12 +270,18 @@ function perceive(ctx, s, t) {
 
 // ---------- behaviour ----------
 function think(ctx, s, t) {
-  const pl = ctx.player; const vis = perceive(ctx, s, t); const dist = s.playerDist; const sq = s.squad;
+  if (S.mp && !s.qaLock && !s.brain) { chooseTarget(ctx, s, t); PL = s.tgt; if (!PL) { s.wantFire = false; s.clearAim(); s.seesPlayer = false; if (s.arrived) s.setGoal(null); return; } }
+  const pl = P(ctx); const vis = perceive(ctx, s, t); const dist = s.playerDist; const sq = s.squad;
   const known = t - s.lastSeen < 4 || sq?.alerted;
   s.stateT += t - (s.thinkT || t); s.thinkT = t;
   s.wantFire = false;
   if (s.qaLock) return qaThink(ctx, s, t, vis);
   if (s.brain) { s.brain(s, vis, t); return; }   // chase mode (coney cops / crews): behaviour lives in world/coney/chase.js
+
+  // target inside a building (coney: Luna Park lobbies / elevators / 19th floor — world.indoorAt from coney/chase.js): stake out the doors
+  const doors = ctx.world?.indoorAt?.(pl.position, pl === ctx.player ? pl.mounted : null);
+  if (doors && doors.length) { loiterAtDoors(ctx, s, doors, vis, dist); return; }
+  s.loiter = null;
 
   // hurt: fall back once
   if (s.health < s.maxHealth * 0.35 && !s.fellBack && s.archetype !== 'rusher' && s.state !== 'hurt') {
@@ -341,11 +352,44 @@ function think(ctx, s, t) {
   }
 }
 
+// ---------- multiplayer targeting (netwaves host) ----------
+const tgtPos = (x) => x.position;
+/** pick who this soldier fights: keep the current target unless it is gone/dead, or someone else is much closer, or the current
+ *  one has been out of sight a while and the nearest other player is in plain view (one LOS ray, only then) */
+function chooseTarget(ctx, s, t) {
+  const list = S.mp.targets(); if (!list.length) { s.tgt = null; return; }
+  let near = null, nd = 1e9, cd = 1e9;
+  for (const x of list) { const d = tgtPos(x).distanceTo(s.position) + (S.mp.indoor?.(x) ? 40 : 0); if (d < nd) { nd = d; near = x; } if (x === s.tgt) cd = d; }   // indoor players (safe spots) rank 40 m further away
+  const cur = list.includes(s.tgt) ? s.tgt : null;
+  let pick = cur;
+  if (!cur) pick = near;
+  else if (near !== cur) {
+    const unseen = t - s.lastSeen;
+    if (nd < cd * 0.6 - 3) pick = near;
+    else if (unseen > 2.5 && nd < cd && t - (s.tgtCheckT || -9) > 1) { s.tgtCheckT = t; const e = near.eye ? near.eye() : _v3.set(near.position.x, near.position.y + 1.6, near.position.z); if (rayClear(ctx, s.eye(new THREE.Vector3()), e)) pick = near; }
+  }
+  if (pick !== s.tgt) { s.tgt = pick; s.lastKnown.copy(tgtPos(pick)); s.lastSeen = Math.min(s.lastSeen, t - 2.5); s.engageTime *= 0.5; }
+}
+
+/** stake out a building's doors (target indoors — the AI never goes in): loiter a few metres off one door, shoot whoever shows */
+function loiterAtDoors(ctx, s, doors, vis, dist) {
+  if (!s.loiter || s.loiterKey !== doors) {
+    const d = doors[s.id % doors.length]; const a = ctx.rng() * Math.PI * 2, r = 2.5 + ctx.rng() * 4.5;
+    let q = S.nav.nearestFree(d.x + Math.cos(a) * r, d.z + Math.sin(a) * r, 5, 0) || new THREE.Vector3(d.x, 0, d.z);
+    if (ctx.world?.chaseNoGo?.(q.x, q.z, q.y)) q = new THREE.Vector3(d.x, q.y, d.z);
+    s.loiter = q; s.loiterKey = doors; s.state = 'advance'; claim(s, null);
+  }
+  s.leanTarget = 0;
+  if (s.position.distanceTo(s.loiter) > 1.5) { s.crouchTarget = 0; if (!s.moveGoal || s.moveGoal.distanceTo(s.loiter) > 1) s.setGoal(s.loiter, s.position.distanceTo(s.loiter) > 8 ? 'run' : 'walk'); }
+  else { s.setGoal(null); s.crouchTarget = 0.35; }
+  if (vis && dist < 10) s.wantFire = true;   // indoors is safe: they only shoot someone standing right in the doorway
+}
+
 /** the objective this soldier's squad should press: api.setObjective() if set, else the world objective nearest the player, else null */
 function objectiveFor(ctx, s) {
   if (S.objective) return S.objective;
   const list = ctx.world?.objectives; if (!list || !list.length) return null;
-  const pp = ctx.player.position; let best = null, bd = 1e9;
+  const pp = P(ctx).position; let best = null, bd = 1e9;
   for (const o of list) { const p = o?.position || o; if (!p || !isFinite(p.x)) continue; const d = p.distanceTo(pp); if (d < bd) { bd = d; best = p; } }
   return best;
 }
@@ -368,7 +412,7 @@ function qaThink(ctx, s, t, vis) {
 
 // ---------- firing ----------
 function fireRound(ctx, s, t) {
-  const pl = ctx.player; const origin = s.muzzleWorld(new THREE.Vector3());
+  const pl = P(ctx); const origin = s.muzzleWorld(new THREE.Vector3());
   const targetY = pl.position.y + (pl.crouching ? 0.8 : 1.2);
   const target = s.seesPlayer ? _v.set(pl.position.x, targetY, pl.position.z) : _v.set(s.lastKnown.x, s.lastKnown.y + 1.2, s.lastKnown.z);
   const dir = target.sub(origin).normalize();
@@ -394,7 +438,8 @@ function fireRound(ctx, s, t) {
     if (hitPlayer) hitPlayer = rayClearStrict(ctx, origin, end);
   }
   ctx.bus.emit('shot', { origin: origin.clone(), dir: shotDir, weapon: 'ak', who: 'enemy', soldier: s, hit: hitPlayer });
-  if (hitPlayer && ctx.state === 'playing') {
+  // remote players (multiplayer proxies) take the hit on their own machine (victim-authoritative); spawn protection for the local player
+  if (hitPlayer && (pl.remote || (ctx.state === 'playing' && !(S.protectUntil > performance.now())))) {
     const dmg = Math.max(1, Math.round((8 + Math.floor(ctx.rng() * 7)) * (s.dmgMul ?? 1)));
     try { pl.damage?.(dmg, s.position.clone()); } catch (e) { console.error('[ai] player.damage', e); }
   }
@@ -430,12 +475,13 @@ function killSoldier(ctx, s, hit) {
   placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6, s.position.y + 0.2);
   // score (QA-spawned dummies don't count)
   const t = ctx.time.elapsed; const headshot = !!hit?.headshot;
+  if (hit?.by) { ctx.bus.emit('netEnemyKilled', { soldier: s, by: hit.by, headshot, position: s.position.clone() }); if (s.squad) s.squad.alert(t, (s.tgt || ctx.player).position); return; }   // killed by a remote player (netwaves credits them)
   if (s.brain) { ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score, name: s.displayName, chase: s.chase }); return; }
   if (s.qaLock) { ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score, qa: true }); if (s.squad) s.squad.alert(t, ctx.player.position); return; }
   if (t - S.streakT < 4) S.streak = Math.min(S.streak + 1, 5); else S.streak = 1; S.streakT = t;
   const mult = 1 + (S.streak - 1) * 0.5;
   S.score += Math.round((headshot ? 150 : 100) * mult); S.kills++;
-  ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score });
+  ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score, wave: !!s.wave });
   if (s.squad) { s.squad.alert(t, ctx.player.position); }
 }
 
@@ -460,6 +506,7 @@ export async function init(ctx) {
     asset, nav, soldiers: [], squads: [], pools: { merc: [] }, lookN: 0, dropped: [], blood, bloodN: 0, variantN: 0, squadN: 0,
     wave: 0, score: 0, kills: 0, streak: 0, streakT: -100, phase: 'idle', phaseT: 0, pending: [], waveClock: 0,
     raysThisFrame: 0, rayBudget: 6, rebuildT: 0, enabled: ctx.qs?.get('ai') !== '0', startDelay: 2.5, cover: null, coverSrc: null, coverNav: -1, objective: null, spawns: [], badSpawns: [], spawnSrc: null, spawnNav: -1,
+    mp: null, puppets: [], view: null, mirror: null, protectUntil: 0,
   };
   // pre-warm a few instances
   for (let i = 0; i < 4; i++) { const inst = createInstance(asset, S.variantN++ % 3); inst.rifleLocal = { p: inst.rifle.position.clone(), q: inst.rifle.quaternion.clone(), s: inst.rifle.scale.clone() }; S.pools.merc.push(inst); }
@@ -472,15 +519,21 @@ export async function init(ctx) {
   ctx.bus.on('state', ({ state }) => { if (state === 'playing' && S.phase === 'idle' && S.enabled) { S.phase = 'countdown'; S.phaseT = S.startDelay; } });
 
   const api = {
-    get soldiers() { return S.soldiers; }, frozen: false, get asset() { return S.asset; }, get enabled() { return S.enabled; },
-    get wave() { return S.wave; }, get score() { return S.score; }, get kills() { return S.kills; }, get streak() { return S.streak; },
+    // soldiers: + netwaves puppets online (HUD compass, respawn safety, run-overs)
+    get soldiers() { return S.view || S.soldiers; }, frozen: false, get asset() { return S.asset; }, get enabled() { return S.enabled; },
+    get wave() { return S.mirror ? S.mirror.wave : S.wave; }, get score() { return S.score; }, get kills() { return S.kills; }, get streak() { return S.streak; },
     get phase() { return S.phase; }, get totalWaves() { return TOTAL_WAVES; }, get waveEnemies() { return WAVES[Math.max(0, S.wave - 1)]; },
     get nextWaveIn() { return S.phase === 'between' || S.phase === 'countdown' ? S.phaseT : 0; },
-    alive: () => S.soldiers.filter(s => !s.dead && !s.brain).length,   // wave soldiers only (chase-mode chasers don't hold a wave open)
+    alive: () => S.mirror ? S.mirror.alive() : S.soldiers.filter(s => !s.dead && !s.brain).length,   // wave soldiers only (chase-mode chasers don't hold a wave open)
     remaining: () => S.soldiers.filter(s => !s.dead && !s.brain).length + S.pending.reduce((a, p) => a + p.size, 0),
     damage: (soldier, amount, point, headshot) => {
       if (!soldier || soldier.dead) return;
+      if (soldier.netPuppet) { // another client's (the host's) soldier: the host applies it; flinch here for feedback
+        soldier.onNetHit?.(Math.round(+amount || 0), !!headshot, point);
+        const pe = ctx.player.eye ? ctx.player.eye() : ctx.player.position; soldier.flinch(new THREE.Vector3().subVectors(soldier.chest(new THREE.Vector3()), pe).normalize(), headshot ? 1.5 : 0.8); return;
+      }
       amount = +amount || 0; if (headshot) amount = Math.max(amount, soldier.maxHealth);
+      if (S.mp && soldier.wave && !ctx.player.dead) soldier.tgt = ctx.player;   // shot by the host: turn on the host
       soldier.health -= amount;
       const pe = ctx.player.eye ? ctx.player.eye() : ctx.player.position;
       const dir = new THREE.Vector3().subVectors(soldier.chest(new THREE.Vector3()), pe).normalize();
@@ -497,6 +550,7 @@ export async function init(ctx) {
         const dir = new THREE.Vector3().subVectors(c, pos).normalize(); dir.y += 0.6; dir.normalize();
         soldierDamageDir(ctx, s, amount, c, dir, 6 + 4 * (1 - d / r));
       }
+      for (const s of S.puppets) { if (s.dead) continue; const c = s.chest(new THREE.Vector3()); const d = c.distanceTo(pos); if (d > r || (segBlocked3D(pos, c, S.nav.solids) && d > 1.5)) continue; s.onNetHit?.(Math.round(dmg * Math.pow(1 - d / r, 0.7)), false, c); }
     },
     qaKillAll: () => { for (const s of S.soldiers.slice()) if (!s.dead) killSoldier(ctx, s, { dir: new THREE.Vector3(ctx.rng() - 0.5, 0.2, ctx.rng() - 0.5).normalize(), strength: 3 }); },
     qaSpawnAt: (x, z, opts = {}) => {
@@ -529,6 +583,54 @@ export async function init(ctx) {
     /** puppet death: ragdoll it (caller steps s.ragdoll.step(dt) + apply()) */
     puppetKill: (s, dir) => { try { s.dead = true; s.inst.flash.visible = false; s.inst.flash2.visible = false; s.ragdoll = new Ragdoll(s, S.nav, { dir: dir || new THREE.Vector3(0, 0.2, 1), strength: 3 }); } catch (e) { s.ragdoll = null; } },
     qaSetEnabled: (v) => { S.enabled = !!v; },
+    // ---- multiplayer waves (src/netwaves.js) ----
+    /** host mode: cfg = { targets() → [ctx.player | remote proxy {id, remote:true, position, eye(), yaw, damage(dmg, from)}] } (alive, not AFK); null = off */
+    mpConfigure: (cfg) => { S.mp = cfg || null; if (!S.mp) for (const s of S.soldiers) s.tgt = null; },
+    /** spawn one squad of wave soldiers: members [{ pos, yaw, health, archetype, dmgMul }], all start on target `tgt` */
+    mpSpawnSquad: (members, tgt) => {
+      const sq = new Squad(S.squadN++); const out = [];
+      for (const m of members) {
+        const s = spawnSoldier(ctx, m.pos, m.yaw ?? 0, { archetype: m.archetype || 'rifleman', health: m.health ?? 100 });
+        if (m.hp !== undefined) s.health = Math.max(1, Math.min(s.maxHealth, m.hp));
+        s.squad = sq; sq.members.push(s); s.state = 'advance'; s.peeks = 0; s.wave = true; s.dmgMul = m.dmgMul ?? 1; s.noGo = ctx.world?.chaseNoGo || null; s.tgt = tgt || null;
+        if (tgt) { s.lastKnown.copy(tgt.position); s.lastSeen = ctx.time.elapsed - 2.5; }
+        out.push(s);
+      }
+      S.squads.push(sq); return out;
+    },
+    /** damage from a remote player's bullet (host): credits `by` (net id) with the kill; the soldier turns on them */
+    netDamage: (s, amount, headshot, by, byTarget) => {
+      if (!s || s.dead || s.netPuppet) return;
+      amount = Math.max(0, +amount || 0); if (headshot) amount = Math.max(amount, s.maxHealth);
+      s.health -= amount; const t = ctx.time.elapsed;
+      const from = byTarget ? byTarget.position : s.position; const dir = new THREE.Vector3().subVectors(s.chest(new THREE.Vector3()), from).setY(0.1).normalize();
+      if (byTarget) { s.tgt = byTarget; s.lastSeen = t; s.lastKnown.copy(byTarget.position); if (s.squad) { const pl = PL; PL = byTarget; s.squad.alert(t, byTarget.position); PL = pl; } }
+      s.engageTime += 0.5;
+      if (s.health <= 0) killSoldier(ctx, s, { dir, headshot: !!headshot, strength: headshot ? 4 : 3.5, by });
+      else s.flinch(dir, headshot ? 1.5 : 0.8 + Math.min(0.6, amount / 60));
+    },
+    /** a hittable stand-in for the host's soldier (non-host clients): hitboxes are raycast targets; hits → s.onNetHit(dmg, hs, point) */
+    netPuppet: (look) => {
+      const inst = acquireInstance(ctx, look || null); const s = new Soldier(ctx, S.asset, inst, {}); s.netPuppet = true;
+      for (const h of inst.hitboxes) { h.userData.soldier = s; if (!ctx.raycastTargets.includes(h)) ctx.raycastTargets.push(h); }
+      S.puppets.push(s); return s;
+    },
+    netPuppetKill: (s, dir, headshot) => {
+      if (!s || s.dead) return; s.dead = true; s.alive = false; s.state = 'dead'; s.deadT = 0; s.health = 0; s.inst.flash.visible = false; s.inst.flash2.visible = false;
+      for (const h of s.inst.hitboxes) { const i = ctx.raycastTargets.indexOf(h); if (i > -1) ctx.raycastTargets.splice(i, 1); }
+      try { s.ragdoll = new Ragdoll(s, S.nav, { dir: dir || new THREE.Vector3(0, 0.2, 1), strength: headshot ? 4 : 3.5, headshot: !!headshot }); } catch (e) { s.ragdoll = null; }
+      placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6, s.position.y + 0.2);
+    },
+    netPuppetRelease: (s) => {
+      const i = S.puppets.indexOf(s); if (i < 0) return; S.puppets.splice(i, 1);
+      for (const h of s.inst.hitboxes) { const k = ctx.raycastTargets.indexOf(h); if (k > -1) ctx.raycastTargets.splice(k, 1); }
+      s.removeMe = true; releaseInstance(ctx, s.inst); S.view = S.puppets.length ? S.soldiers.concat(S.puppets) : null;
+    },
+    get puppets() { return S.puppets; },
+    /** HUD mirror (online): { wave, alive() } overrides the local wave counter on every client */
+    setMirror: (m) => { S.mirror = m || null; },
+    /** the local player can't be hit by AI until performance.now() > ms (online spawn protection) */
+    set protectUntil(ms) { S.protectUntil = ms; }, get protectUntil() { return S.protectUntil; },
     nav, cover: () => coverPoints(ctx), losStats,
     /** squads converge on this point while the player is unknown (null → ctx.world.objectives nearest the player, if any) */
     setObjective: (pos) => { S.objective = pos ? new THREE.Vector3(pos.x, pos.y ?? S.nav.floorAt(pos.x, pos.z), pos.z) : null; },
@@ -566,6 +668,7 @@ export function reset(ctx) {
   if (!S) return;
   for (const s of S.soldiers) { for (const h of s.inst.hitboxes) { const i = ctx.raycastTargets.indexOf(h); if (i > -1) ctx.raycastTargets.splice(i, 1); } releaseInstance(ctx, s.inst); }
   S.soldiers.length = 0; S.squads.length = 0; S.pending.length = 0;
+  for (const s of S.puppets.slice()) S.api.netPuppetRelease(s); S.view = null;
   for (const d of S.dropped) ctx.scene.remove(d.mesh); S.dropped.length = 0;
   for (const b of S.blood) b.visible = false;
   if (S.cover) for (const c of S.cover) c.claimedBy = null;
@@ -575,7 +678,7 @@ export function reset(ctx) {
 
 export function update(dt, ctx) {
   if (!S) return;
-  const t = ctx.time.elapsed; const api = S.api; const playing = ctx.state === 'playing';
+  const t = ctx.time.elapsed; const api = S.api; const playing = ctx.state === 'playing' || (!!S.mp && ctx.state === 'dead');   // mp host: the fight goes on while the host waits to respawn
   const active = playing && !api.frozen && dt > 0;
   S.raysThisFrame = 0; S.nav.budget = 4;
   S.rebuildT += dt; if (S.rebuildT > 1) { S.rebuildT = 0; if (S.nav.maybeRebuild()) { for (const s of S.soldiers) { if (!s.dead) { s.path = null; s.pathT = -10; } } } }
@@ -605,6 +708,7 @@ export function update(dt, ctx) {
       continue;
     }
     if (active) {
+      PL = (S.mp && s.tgt) || ctx.player;
       if (t >= s.nextThink) { s.nextThink = t + 0.15 + ctx.rng() * 0.1; try { think(ctx, s, t); } catch (e) { if (ctx.time.frame % 120 === 0) console.error('[ai] think', e); } }
       s.moveStep(dt, S.nav, others, ctx.player);
       s.updateFacing(dt);
@@ -616,6 +720,8 @@ export function update(dt, ctx) {
     }
     s.updateVisual(dt);
   }
+  PL = null;
+  S.view = S.puppets.length ? S.soldiers.concat(S.puppets) : null;
   // remove finished corpses
   for (let i = soldiers.length - 1; i >= 0; i--) { const s = soldiers[i]; if (s.removeMe) { soldiers.splice(i, 1); releaseInstance(ctx, s.inst); } }
   // squads cleanup
