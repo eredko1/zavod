@@ -733,7 +733,19 @@ const CYCLE = 30 * 60, RUN = 20 * 60, HOLD = 8 * 60;
 /** evening phase 0..1 from wall-clock time: 20 min golden → night, 8 min night, 2 min back */
 export function phaseAt(ms) { const t = (ms / 1000) % CYCLE; if (t < RUN) return t / RUN; if (t < RUN + HOLD) return 1; return 1 - (t - RUN - HOLD) / (CYCLE - RUN - HOLD); }
 
+// time-of-day chooser (bottom-right): Day / Dusk / Night / Cycle, remembered per device; default Day (night was too dark to play)
+const TOD = { day: 0, dusk: 0.5, night: 1, cycle: null };
+function pickFixed() { let v = 'day'; try { v = localStorage.getItem('zavod.tod') || 'day'; } catch {} return v in TOD ? TOD[v] : 0; }
+function todUI() {
+  if (document.querySelector('.zvtod')) return;
+  const d = document.createElement('div'); d.className = 'zvtod';
+  d.style.cssText = 'position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:44;display:flex;gap:4px;font:700 11px Barlow Condensed,Arial;letter-spacing:.1em';
+  const cur = () => { try { return localStorage.getItem('zavod.tod') || 'day'; } catch { return 'day'; } };
+  const draw = () => { d.innerHTML = ''; for (const k of Object.keys(TOD)) { const b = document.createElement('button'); b.textContent = k.toUpperCase(); b.style.cssText = `padding:5px 8px;min-height:28px;border:1px solid rgba(255,255,255,.25);color:#fff;background:${cur() === k ? 'rgba(255,190,80,.7)' : 'rgba(0,0,0,.45)'};cursor:pointer`; b.onclick = (e) => { e.stopPropagation(); try { localStorage.setItem('zavod.tod', k); } catch {} draw(); }; d.appendChild(b); } };
+  draw(); document.body.appendChild(d);
+}
 function buildCycle(world, fw) {
+  todUI();
   const { ctx, scene } = world; const M = world.mats || {};
   const q = ctx.qs?.get?.('time'); const FIX = { golden: 0, sunset: 0.3, dusk: 0.5, blue: 0.72, night: 1 };
   const fixed = q == null ? null : (q in FIX ? FIX[q] : (isFinite(+q) ? Math.max(0, Math.min(1, +q)) : null));
@@ -756,7 +768,7 @@ function buildCycle(world, fw) {
   let last = -1;
   const state = { s: 0, fixed };
   const upd = (dt) => {
-    const now = Date.now(); const s = fixed ?? phaseAt(now); state.s = s;
+    const now = Date.now(); const s = fixed ?? pickFixed() ?? phaseAt(now); state.s = s;
     const K = lerpKeys(s);
     U.uTime.value = (now / 1000) % 3600;
     const el = K.el * D2R; const sunDir = new THREE.Vector3(sunH.x * Math.cos(el), Math.sin(el), sunH.z * Math.cos(el)).normalize();
