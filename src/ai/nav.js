@@ -100,6 +100,18 @@ export class NavGrid {
         for (let j = 0; j < c; j++) { if (blocked[o + j]) continue; const f = cand[o + j]; if (lo < f + CLEAR && hi > f + STEP_BLOCK) blocked[o + j] = 1; }
       }
     }
+    // nav-only no-go zones (ctx.world.navBlockers: { min, max, test?(x, z) } — e.g. coney lobbies the chase AI must never enter):
+    // floors inside [min.y − 0.5, max.y] are removed from the grid; colliders/players are unaffected
+    for (const nb of ctx.world?.navBlockers || []) {
+      if (!nb?.min || !nb?.max) continue;
+      const x0 = Math.max(0, Math.ceil((nb.min.x - minX) / cell - 0.5)), x1 = Math.min(w - 1, Math.floor((nb.max.x - minX) / cell - 0.5));
+      const z0 = Math.max(0, Math.ceil((nb.min.z - minZ) / cell - 0.5)), z1 = Math.min(h - 1, Math.floor((nb.max.z - minZ) / cell - 0.5));
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+        if (nb.test && !nb.test(minX + (x + 0.5) * cell, minZ + (z + 0.5) * cell)) continue;
+        const i = z * w + x, o = i * K, c = candN[i];
+        for (let j = 0; j < c; j++) { const f = cand[o + j]; if (f >= nb.min.y - 0.5 && f <= nb.max.y) blocked[o + j] = 1; }
+      }
+    }
     // border
     for (let x = 0; x < w; x++) { candN[x] = 0; candN[(h - 1) * w + x] = 0; }
     for (let z = 0; z < h; z++) { candN[z * w] = 0; candN[z * w + w - 1] = 0; }

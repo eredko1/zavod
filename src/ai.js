@@ -91,9 +91,10 @@ function rayClearStrict(ctx, a, b) {
 }
 
 // ---------- spawning ----------
-function acquireInstance(ctx) {
-  let inst = S.pool.pop();
-  if (!inst) { inst = createInstance(S.asset, S.variantN++ % 3); inst.rifleLocal = { p: inst.rifle.position.clone(), q: inst.rifle.quaternion.clone(), s: inst.rifle.scale.clone() }; }
+function acquireInstance(ctx, look = null) {
+  const pool = S.pools[look || 'merc'] || (S.pools[look || 'merc'] = []);
+  let inst = pool.pop();
+  if (!inst) { inst = createInstance(S.asset, look ? S.lookN++ : S.variantN++ % 3, look || undefined); inst.rifleLocal = { p: inst.rifle.position.clone(), q: inst.rifle.quaternion.clone(), s: inst.rifle.scale.clone() }; }
   else { // restore rifle to chest
     const r = inst.rifle; if (r.parent !== inst.bones.Spine2) { r.parent?.remove(r); inst.bones.Spine2.add(r); r.position.copy(inst.rifleLocal.p); r.quaternion.copy(inst.rifleLocal.q); r.scale.copy(inst.rifleLocal.s); }
     r.visible = true; inst.group.visible = true;
@@ -101,10 +102,10 @@ function acquireInstance(ctx) {
   ctx.scene.add(inst.group);
   return inst;
 }
-function releaseInstance(ctx, inst) { ctx.scene.remove(inst.group); S.pool.push(inst); }
+function releaseInstance(ctx, inst) { ctx.scene.remove(inst.group); const k = inst.look || 'merc'; (S.pools[k] || (S.pools[k] = [])).push(inst); }
 
 function spawnSoldier(ctx, pos, yaw, opts = {}) {
-  const inst = acquireInstance(ctx);
+  const inst = acquireInstance(ctx, opts.look);
   const s = new Soldier(ctx, S.asset, inst, opts);
   s.placeAt(pos, yaw); s.spawnT = ctx.time.elapsed; s.nextThink = ctx.time.elapsed + ctx.rng() * 0.25;
   for (const h of inst.hitboxes) { h.userData.soldier = s; if (!ctx.raycastTargets.includes(h)) ctx.raycastTargets.push(h); }
@@ -269,6 +270,7 @@ function think(ctx, s, t) {
   s.stateT += t - (s.thinkT || t); s.thinkT = t;
   s.wantFire = false;
   if (s.qaLock) return qaThink(ctx, s, t, vis);
+  if (s.brain) { s.brain(s, vis, t); return; }   // chase mode (coney cops / crews): behaviour lives in world/coney/chase.js
 
   // hurt: fall back once
   if (s.health < s.maxHealth * 0.35 && !s.fellBack && s.archetype !== 'rusher' && s.state !== 'hurt') {
@@ -393,7 +395,7 @@ function fireRound(ctx, s, t) {
   }
   ctx.bus.emit('shot', { origin: origin.clone(), dir: shotDir, weapon: 'ak', who: 'enemy', soldier: s, hit: hitPlayer });
   if (hitPlayer && ctx.state === 'playing') {
-    const dmg = 8 + Math.floor(ctx.rng() * 7);
+    const dmg = Math.max(1, Math.round((8 + Math.floor(ctx.rng() * 7)) * (s.dmgMul ?? 1)));
     try { pl.damage?.(dmg, s.position.clone()); } catch (e) { console.error('[ai] player.damage', e); }
   }
 }
@@ -428,6 +430,7 @@ function killSoldier(ctx, s, hit) {
   placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6, s.position.y + 0.2);
   // score (QA-spawned dummies don't count)
   const t = ctx.time.elapsed; const headshot = !!hit?.headshot;
+  if (s.brain) { ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score, name: s.displayName, chase: s.chase }); return; }
   if (s.qaLock) { ctx.bus.emit('enemyKilled', { soldier: s, headshot, position: s.position.clone(), streak: S.streak, score: S.score, qa: true }); if (s.squad) s.squad.alert(t, ctx.player.position); return; }
   if (t - S.streakT < 4) S.streak = Math.min(S.streak + 1, 5); else S.streak = 1; S.streakT = t;
   const mult = 1 + (S.streak - 1) * 0.5;
@@ -454,12 +457,12 @@ export async function init(ctx) {
     m.visible = false; m.renderOrder = 2; m.receiveShadow = true; m.name = 'blood'; ctx.scene.add(m); blood.push(m);
   }
   S = {
-    asset, nav, soldiers: [], squads: [], pool: [], dropped: [], blood, bloodN: 0, variantN: 0, squadN: 0,
+    asset, nav, soldiers: [], squads: [], pools: { merc: [] }, lookN: 0, dropped: [], blood, bloodN: 0, variantN: 0, squadN: 0,
     wave: 0, score: 0, kills: 0, streak: 0, streakT: -100, phase: 'idle', phaseT: 0, pending: [], waveClock: 0,
     raysThisFrame: 0, rayBudget: 6, rebuildT: 0, enabled: ctx.qs?.get('ai') !== '0', startDelay: 2.5, cover: null, coverSrc: null, coverNav: -1, objective: null, spawns: [], badSpawns: [], spawnSrc: null, spawnNav: -1,
   };
   // pre-warm a few instances
-  for (let i = 0; i < 4; i++) { const inst = createInstance(asset, S.variantN++ % 3); inst.rifleLocal = { p: inst.rifle.position.clone(), q: inst.rifle.quaternion.clone(), s: inst.rifle.scale.clone() }; S.pool.push(inst); }
+  for (let i = 0; i < 4; i++) { const inst = createInstance(asset, S.variantN++ % 3); inst.rifleLocal = { p: inst.rifle.position.clone(), q: inst.rifle.quaternion.clone(), s: inst.rifle.scale.clone() }; S.pools.merc.push(inst); }
 
   ctx.bus.on('shot', (e) => {
     if (!e || e.who === 'enemy' || !S) return;
@@ -473,8 +476,8 @@ export async function init(ctx) {
     get wave() { return S.wave; }, get score() { return S.score; }, get kills() { return S.kills; }, get streak() { return S.streak; },
     get phase() { return S.phase; }, get totalWaves() { return TOTAL_WAVES; }, get waveEnemies() { return WAVES[Math.max(0, S.wave - 1)]; },
     get nextWaveIn() { return S.phase === 'between' || S.phase === 'countdown' ? S.phaseT : 0; },
-    alive: () => S.soldiers.filter(s => !s.dead).length,
-    remaining: () => S.soldiers.filter(s => !s.dead).length + S.pending.reduce((a, p) => a + p.size, 0),
+    alive: () => S.soldiers.filter(s => !s.dead && !s.brain).length,   // wave soldiers only (chase-mode chasers don't hold a wave open)
+    remaining: () => S.soldiers.filter(s => !s.dead && !s.brain).length + S.pending.reduce((a, p) => a + p.size, 0),
     damage: (soldier, amount, point, headshot) => {
       if (!soldier || soldier.dead) return;
       amount = +amount || 0; if (headshot) amount = Math.max(amount, soldier.maxHealth);
@@ -507,6 +510,24 @@ export async function init(ctx) {
       s.nextThink = 0; return s;
     },
     qaStartWave: (n) => startWave(ctx, n || 1),
+    // ---- chase mode (world/coney/chase.js): wanted-level chasers are ordinary soldiers with a brain callback ----
+    /** spawn a chaser: o = { look: 'cop'|'crew', brain(s, sees, t), name, health, speed (max run m/s), dmgMul, noGo(x, z, y) } */
+    spawnChaser: (pos, yaw, o = {}) => {
+      const s = spawnSoldier(ctx, pos, yaw, { archetype: 'rifleman', health: o.health ?? 100, look: o.look });
+      s.brain = o.brain; s.chase = o.tag || o.look || true; s.displayName = o.name; s.noGo = o.noGo || null; s.maxSpeed = o.speed || 0; s.dmgMul = o.dmgMul ?? 1;
+      s.state = 'chase'; s.stateT = 0; return s;
+    },
+    /** remove a (live or dead) soldier immediately, no death, no score */
+    removeSoldier: (s) => {
+      const i = S.soldiers.indexOf(s); if (i < 0) return false;
+      for (const h of s.inst.hitboxes) { const k = ctx.raycastTargets.indexOf(h); if (k > -1) ctx.raycastTargets.splice(k, 1); }
+      claim(s, null); s.dead = true; s.removeMe = true; S.soldiers.splice(i, 1); releaseInstance(ctx, s.inst); return true;
+    },
+    /** visual-only soldier (remote players' chasers): not in the AI list, no hitboxes registered; drive position/yaw/speed + call updateVisual(dt) */
+    createPuppet: (look) => { const inst = acquireInstance(ctx, look || null); const s = new Soldier(ctx, S.asset, inst, {}); for (const h of inst.hitboxes) delete h.userData.soldier; s.puppet = true; return s; },
+    releasePuppet: (s) => { if (s?.inst) releaseInstance(ctx, s.inst); },
+    /** puppet death: ragdoll it (caller steps s.ragdoll.step(dt) + apply()) */
+    puppetKill: (s, dir) => { try { s.dead = true; s.inst.flash.visible = false; s.inst.flash2.visible = false; s.ragdoll = new Ragdoll(s, S.nav, { dir: dir || new THREE.Vector3(0, 0.2, 1), strength: 3 }); } catch (e) { s.ragdoll = null; } },
     qaSetEnabled: (v) => { S.enabled = !!v; },
     nav, cover: () => coverPoints(ctx), losStats,
     /** squads converge on this point while the player is unknown (null → ctx.world.objectives nearest the player, if any) */

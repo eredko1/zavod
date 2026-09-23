@@ -43,12 +43,12 @@ function vnoise(x, y) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-function makeBodyTexture(src, tint, seedOff) {
-  const img = src.image; const w = img.width || 1024, h = img.height || 1024;
+function makeBodyTexture(src, tint, seedOff, { camo = true, size = 0 } = {}) {
+  const img = src.image; const w = size || img.width || 1024, h = size || img.height || 1024;
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d', { willReadFrequently: true });
   try { g.drawImage(img, 0, 0, w, h); } catch (e) { g.fillStyle = '#5a5e4c'; g.fillRect(0, 0, w, h); }
   const id = g.getImageData(0, 0, w, h), d = id.data;
-  const [tr, tg, tb] = tint;
+  const [tr, tg, tb] = tint; const camoOn = camo;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4; let r = d[i], gg = d[i + 1], b = d[i + 2];
@@ -62,7 +62,7 @@ function makeBodyTexture(src, tint, seedOff) {
       const n1 = vnoise(nx, ny), n2 = vnoise(nx * 2.3 + 7.1, ny * 2.3 + 3.3), n3 = vnoise(x / 9 + 11, y / 9 + 5);
       const blot = n1 * 0.65 + n2 * 0.35;
       let camo = 1;
-      if (lum > 105) camo = blot > 0.58 ? 0.62 : blot > 0.47 ? 0.85 : 1.08;
+      if (camoOn && lum > 105) camo = blot > 0.58 ? 0.62 : blot > 0.47 ? 0.85 : 1.08;
       const grime = 0.78 + 0.3 * vnoise(x / 120 + seedOff, y / 120) + 0.08 * (n3 - 0.5);
       const k = camo * grime;
       d[i] = Math.min(255, r * tr * k); d[i + 1] = Math.min(255, gg * tg * k); d[i + 2] = Math.min(255, b * tb * k);
@@ -259,8 +259,40 @@ export async function loadSoldierAsset(ctx, url = new URL('../../assets/models/s
   return { scene, bones, clips, bodyMesh, visorMesh, yawFix, fixQ, measure, geo, mats: { bodyMats, visorMat, gearMat, gearMat2, helmetMat, rifleMat, flashMat, hitMat }, headR, chestW, chestD, waistW, waistD };
 }
 
+// -------- looks (coney chase: cops + neighbourhood crews reuse the soldier rig with different clothes) --------
+// cop: navy uniform (plain, no camo), peaked patrol cap, black duty belt, no plate carrier / knee pads.
+// crew: street clothes (hoodie/jacket colours), bare head or a beanie, no tactical gear.
+const LOOKS = {
+  cop: { tints: [[0.3, 0.36, 0.62]], hat: 'cap', belt: true },
+  crew: { tints: [[0.8, 0.26, 0.2], [0.2, 0.2, 0.22], [0.9, 0.88, 0.82], [0.5, 0.55, 0.36], [0.42, 0.5, 0.68]], hat: 'beanie', belt: false },
+};
+function buildCapGeometry(r) {
+  const crown = new THREE.CylinderGeometry(r * 1.12, r * 0.98, r * 0.62, 18); crown.scale(1, 1, 1.08); crown.translate(0, r * 0.12, 0);
+  const band = new THREE.CylinderGeometry(r * 1.0, r * 1.0, r * 0.3, 18, 1, true); band.scale(1, 1, 1.08); band.translate(0, -r * 0.28, 0);
+  const brim = new THREE.CylinderGeometry(r * 0.75, r * 0.75, 0.012, 16, 1, false, -Math.PI / 2, Math.PI); brim.scale(1.15, 1, 1.0); brim.rotateX(0.18); brim.translate(0, -r * 0.4, r * 0.82);
+  const badge = box(0.035, 0.04, 0.01, 0, r * 0.05, r * 1.12);
+  const g = BGU.mergeGeometries([crown.toNonIndexed(), band.toNonIndexed(), brim.toNonIndexed(), badge.toNonIndexed()], false); [crown, band, brim, badge].forEach(p => p.dispose()); return g;
+}
+function buildBeanieGeometry(r) { const g = new THREE.SphereGeometry(r * 1.06, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55); g.scale(1, 1.05, 1.12); g.translate(0, -r * 0.12, 0); return g; }
+/** Lazily builds (and caches on the asset) the materials + hat geometry for a look; 512 px textures to keep the one-off cost small. */
+export function lookAssets(asset, look) {
+  const L = LOOKS[look]; if (!L) return null;
+  const cache = asset.looks || (asset.looks = {}); if (cache[look]) return cache[look];
+  const srcMat = asset.bodyMesh.material, srcMap = srcMat.map, rough = asset.mats.gearMat.roughnessMap;
+  const bodyMats = L.tints.map((t, i) => new THREE.MeshStandardMaterial({
+    map: srcMap ? makeBodyTexture(srcMap, t, 57 + i * 91, { camo: false, size: 512 }) : null, color: srcMap ? 0xffffff : new THREE.Color(t[0], t[1], t[2]),
+    normalMap: srcMat.normalMap || null, normalScale: new THREE.Vector2(0.7, 0.7), roughness: 0.86, metalness: 0.0, roughnessMap: rough, envMapIntensity: 0.5, name: look + 'Body' + i,
+  }));
+  const hatMats = look === 'cop' ? [new THREE.MeshStandardMaterial({ color: 0x141a2e, roughness: 0.7, metalness: 0.05, name: 'copCap' })]
+    : [0x1b1b1d, 0x5a1616, 0x3a3f44].map((c, i) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, roughnessMap: rough, name: 'crewBeanie' + i }));
+  const hat = look === 'cop' ? buildCapGeometry(asset.headR + 0.018) : buildBeanieGeometry(asset.headR + 0.012);
+  const beltMat = new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.55, metalness: 0.1, name: look + 'Belt' });
+  return (cache[look] = { L, bodyMats, hatMats, hat, beltMat });
+}
+
 // Creates one soldier visual instance: { group, inner, model, bones, mixer, actions, rifle, muzzle, flash, hitboxes[], props[] }
-export function createInstance(asset, variant = 0) {
+// look: undefined (merc) | 'cop' | 'crew' — see LOOKS
+export function createInstance(asset, variant = 0, look) {
   const group = new THREE.Group(); group.name = 'soldier';
   const inner = new THREE.Group(); inner.rotation.y = -asset.yawFix; group.add(inner);
   const model = SkeletonUtils.clone(asset.scene); inner.add(model);
@@ -326,8 +358,21 @@ export function createInstance(asset, variant = 0) {
     hb('hitArm', 'body', bones[side + 'Arm'], a.clone().lerp(e, 0.5), armQ);
   }
 
+  if (look) applyLook(asset, { props, model, variant }, look);
+
   const mixer = new THREE.AnimationMixer(model);
   const actions = {};
   for (const n of ['Idle', 'Walk', 'Run']) { const c = asset.clips[n]; if (c) { const a = mixer.clipAction(c); a.play(); a.setEffectiveWeight(n === 'Idle' ? 1 : 0); actions[n] = a; } }
-  return { group, inner, model, bones, mixer, actions, rifle, muzzle, flash, flash2, hitboxes, props, bodyMesh };
+  return { group, inner, model, bones, mixer, actions, rifle, muzzle, flash, flash2, hitboxes, props, bodyMesh, look: look || null };
+}
+
+function applyLook(asset, inst, look) {
+  const A = lookAssets(asset, look); if (!A) return;
+  const v = inst.variant | 0;
+  inst.model.traverse(o => { if (!o.isSkinnedMesh) return; if (/visor/i.test(o.name)) o.visible = false; else o.material = A.bodyMats[v % A.bodyMats.length]; });
+  for (const m of inst.props) {
+    if (m.name === 'helmet') { const bare = look === 'crew' && v % 3 === 1; if (bare) m.visible = false; else { m.geometry = A.hat; m.material = A.hatMats[v % A.hatMats.length]; } }
+    else if (m.name === 'vest' || m.name === 'knee') m.visible = false;
+    else if (m.name === 'belt') { if (A.L.belt) m.material = A.beltMat; else m.visible = false; }
+  }
 }

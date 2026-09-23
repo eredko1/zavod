@@ -101,7 +101,7 @@ export async function init(ctx) {
     lookX: 0, lookY: 0, bobX: 0, bobY: 0, spreadExtra: 0, recPitch: 0, recYaw: 0, swayPitch: 0, swayYaw: 0,
     flashT: 9, flashLife: 0.045, triggerHeld: false, triggerPressed: false, dryLatch: false,
     grenadeCount: GRENADES, wallPull: 0, lastFov: -1, scaleFov: -1, time: 0, envCheck: 0, dead: false,
-    fired: 0, arsenal: buildArsenal(),
+    fired: 0, arsenal: buildArsenal(), kickP: 0, kickY: 0, stowed: false, sensAds: false, vmScale: -1,
   };
   S._ensureEnv = ensureEnv;
   ctx.bus.on('shot', (d) => { if (d && d.who === 'enemy' && d.origin && d.dir) { const o = d.origin.isVector3 ? d.origin : _v.set(d.origin[0] ?? d.origin.x, d.origin[1] ?? d.origin.y, d.origin[2] ?? d.origin.z); const dir = d.dir.isVector3 ? d.dir : _v2.set(d.dir[0] ?? d.dir.x, d.dir[1] ?? d.dir.y, d.dir[2] ?? d.dir.z); fx.enemyShot(o.clone(), dir.clone()); } });
@@ -146,6 +146,43 @@ export async function init(ctx) {
     qaShowcase: (yaw = 0.6, pitch = 0.1, dist = 0.9, x = 0, y = -0.03) => { S.showcase = yaw == null ? null : { yaw, pitch, dist, x, y }; },
     qaGrenade: (t = 0.0) => { startThrow(true); if (S.throwing) S.throwing.t = t; },
     qaExplode: (x, y, z) => { fx.explosion(new THREE.Vector3(x, y, z)); },
+    /**
+     * QA: sights vs bullets. For each range, stands a temporary wall square to the camera at that distance (the only raycast
+     * target during the check), fires `n` rounds and reports, per range, the impact error vs the aim ray (screen centre) and vs the
+     * iron-sight line (rear notch → front post, extended) in cm, plus where the notch/post project on screen (px from centre).
+     * opts: { ranges:[10,30,60], n:5, spread:false (true = keep the weapon's real cone), settle:true (zero the visual springs first) }
+     */
+    qaAimCheck: (opts = {}) => {
+      const ranges = opts.ranges || [10, 30, 60], n = opts.n ?? 5, w = S.weapons[S.cur], cam = ctx.camera, out = [];
+      const saved = ctx.raycastTargets; const ammo = w.ammo, kp = S.kickP, ky = S.kickY, lastShot = w.lastShot, shots = w.shots, spreadX = S.spreadExtra;
+      const wall = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); wall.userData.surface = 'metal'; scene.add(wall);
+      const W = ctx.renderer.domElement.clientWidth || innerWidth, H = ctx.renderer.domElement.clientHeight || innerHeight;
+      const px = (v) => { const q = v.clone().project(cam); return [+(q.x * W / 2).toFixed(2), +(q.y * H / 2).toFixed(2)]; };
+      try {
+        if (opts.settle !== false) { S.rp.set(0, 0, 0); S.rr.set(0, 0, 0); S.rpv.set(0, 0, 0); S.rrv.set(0, 0, 0); }
+        S.qaNoSpread = !opts.spread;
+        for (const d of ranges) {
+          cam.updateMatrixWorld(true); S.vmRoot.updateMatrixWorld(true);
+          const o = cam.getWorldPosition(new THREE.Vector3()), f = cam.getWorldDirection(new THREE.Vector3());
+          wall.position.copy(o).addScaledVector(f, d); wall.lookAt(o); wall.updateMatrixWorld(true); ctx.raycastTargets = [wall];
+          const aim = wall.position.clone(); const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(f.clone().negate(), aim);
+          const rear = w.parts.sight.getWorldPosition(new THREE.Vector3());
+          const front = w.parts.sightFront ? w.parts.sightFront.getWorldPosition(new THREE.Vector3()) : rear.clone().add(new THREE.Vector3(0, 0, -1).transformDirection(w.group.matrixWorld));
+          const sightPt = new THREE.Ray(rear, front.clone().sub(rear).normalize()).intersectPlane(plane, new THREE.Vector3());
+          let eAim = 0, eSight = 0, eMax = 0, hits = 0;
+          for (let i = 0; i < n; i++) {
+            w.ammo = Math.max(1, w.ammo); w.needsAction = false; w.lastShot = -9; S.spreadExtra = 0;
+            const sv = [S.rpv.clone(), S.rrv.clone()]; const hp = fireShot(w, { noCamera: true, hold: 0.02 }); S.rpv.copy(sv[0]); S.rrv.copy(sv[1]); if (!hp) continue; hits++; // no visual kick from QA rounds
+            const a = hp.distanceTo(aim), b = sightPt ? hp.distanceTo(sightPt) : NaN; eAim += a; eSight += b; eMax = Math.max(eMax, a);
+          }
+          out.push({ range: d, hits, aimErrCm: +(eAim / Math.max(1, hits) * 100).toFixed(2), aimMaxCm: +(eMax * 100).toFixed(2), sightErrCm: +(eSight / Math.max(1, hits) * 100).toFixed(2), sightVsAimCm: sightPt ? +(sightPt.distanceTo(aim) * 100).toFixed(2) : null, notchPx: px(rear), postPx: px(front) });
+        }
+      } finally {
+        ctx.raycastTargets = saved; scene.remove(wall); wall.geometry.dispose(); wall.material.dispose(); S.qaNoSpread = false; if (opts.clean !== false) S.fx.reset();
+        w.ammo = ammo; w.cur.ammo = ammo; S.kickP = kp; S.kickY = ky; w.lastShot = lastShot; w.shots = shots; S.spreadExtra = spreadX;
+      }
+      return { weapon: w.id, fov: +cam.fov.toFixed(2), ads: +S.ads.toFixed(3), spread: !!opts.spread, results: out };
+    },
     qaImpact: (x, y, z, surface = 'concrete') => { fx.impact(new THREE.Vector3(x, y, z), new THREE.Vector3(0, 1, 0), surface, new THREE.Vector3(0, -1, 0)); },
     materials: mats, fx, grenadeSim: grenades, viewmodel: vmRoot,
     get state() { return S; },
@@ -244,6 +281,7 @@ function dryFire(w) {
 }
 
 function currentSpread() {
+  if (S.qaNoSpread) return 0;
   const w = S.weapons[S.cur], sp = w.spec, p = S.ctx.player;
   const mv = clamp((p?.speed ?? 0) / 4.4, 0, 1.5), air = p && p.onGround === false ? 1.5 : 0;
   return lerp(sp.hipSpread + sp.moveSpread * mv + air, sp.adsSpread + mv * 0.3, S.ads) + S.spreadExtra * (1 - S.ads * 0.8);
@@ -345,12 +383,15 @@ function fireShot(w, opts = {}) {
     const n = w.shots; const patternYaw = n < 4 ? 0.3 : n < 9 ? -0.7 : Math.sin(n * 1.7) * 0.8;
     const kp = sp.recoilPitch * DEG * (0.85 + rng() * 0.3) * (n === 1 ? 1.15 : 1) * lerp(1, 0.85, S.ads);
     const ky = sp.recoilYaw * DEG * (patternYaw + (rng() - 0.5) * 1.2) * lerp(1, 0.85, S.ads);
-    p.pitch = (p.pitch ?? 0) + kp; p.yaw = (p.yaw ?? 0) + ky; cam.rotation.x += kp; cam.rotation.y += ky;
-    S.recPitch += kp * 0.55; S.recYaw += ky * 0.4;
+    S.kickP += kp; S.kickY += ky; // applied over ~50 ms in update() (exp-smoothed, dt-independent) so the climb reads as a push, not a teleport
   }
   ctx.bus.emit('shot', { origin, dir, weapon: sp.name, id: sp.id, who: 'player', muzzle, hit: firstHit ? firstHit.point.clone() : null, pellets: rays });
   w.cur.ammo = w.ammo;
+  return firstHit ? firstHit.point.clone() : null;
 }
+
+/** Weapons are put away while riding an elevator / sitting as a passenger / driving a car (hands on the wheel). Bikes keep the sidearm live. */
+function stowedFor(p) { const m = p?.mounted; return !!(m && (m.elevator || m.passenger || m.spec?.car)); }
 
 // ------------------------------------------------------------------ per-frame
 export function update(dt, ctx) {
@@ -360,9 +401,16 @@ export function update(dt, ctx) {
   S.time += dt;
   if ((S.envCheck += dt) > 1) { S.envCheck = 0; S._ensureEnv(); }
   const actionBusy = !!sp.action && w.needsAction; // pump/bolt cycling (or waiting to start)
+  // elevator / passenger / car driver: weapon goes down and stays inert (vehicles.js may also swap slots on mount — tolerated)
+  const stowed = stowedFor(p);
+  if (stowed !== S.stowed) { S.stowed = stowed; if (stowed) { cancelActions(); S.triggerHeld = false; } }
 
   // ---------- input ----------
-  if (playing && dt > 0 && !S.dead) {
+  if (playing && dt > 0 && !S.dead && stowed) {
+    if (input.consume('Digit1')) startSwap(0);
+    if (input.consume('Digit2')) startSwap(1);
+    S.triggerHeld = false; S.triggerPressed = false; S.adsTarget = 0; if (S.qaAds != null) S.adsTarget = 0;
+  } else if (playing && dt > 0 && !S.dead) {
     if (input.consume('Digit1')) startSwap(0);
     if (input.consume('Digit2')) startSwap(1);
     if (input.mouse.wheel) startSwap(1 - S.cur);
@@ -383,13 +431,34 @@ export function update(dt, ctx) {
   if (S.qaAds != null && S.qaAds > 0 && S.qaAds < 1) S.adsT = S.qaAds; // QA: hold a mid-transition pose
   S.ads = S.adsTarget ? 1 - (1 - S.adsT) ** 2.2 : S.adsT ** 1.8; // ease-out in, ease-in out
   const adsOn = S.adsT > 0.5; if (adsOn !== S.adsOn) { S.adsOn = adsOn; ctx.bus.emit('ads', { on: adsOn, scope: !!sp.scope }); }
-  if (p) p.ads = S.adsTarget === 1;
+  if (p) { p.ads = S.adsTarget === 1; S.sensAds = p.ads; }
   const fovBase = ctx.settings.fov || 75; const adsMul = sp.adsFovMul ?? ADS_FOV_MUL;
   // scopes: fov stays normal until the eye reaches the eyepiece, then snaps down through the last 15% of the transition
-  const fovK = sp.scope ? sstep((S.ads - 0.8) / 0.2) : S.ads;
+  const fovK = sp.scope ? sstep((S.ads - 0.8) / 0.2) : sstep(S.adsT); // irons/dots: smoothstep over adsTime — no velocity pop at either end
   const targetFov = fovBase * lerp(1, adsMul, fovK);
   if (Math.abs(cam.fov - targetFov) > 0.01 || S.lastFov !== targetFov) { cam.fov = targetFov; cam.updateProjectionMatrix(); S.lastFov = targetFov; }
-  if (S.scaleFov !== fovBase) { S.scaleFov = fovBase; const s = Math.tan(fovBase * DEG / 2) / Math.tan(VM_FOV * DEG / 2); S.vmRoot.scale.set(s, s, 1); }
+  // viewmodel projection: x/y scale emulates VM_FOV under the world fov. With spec.adsVmFov the gun is drawn at a steady fov while aimed
+  // instead of magnifying with the world zoom (on-axis points stay on-axis at any scale, so the sight line is unaffected).
+  { const sHip = Math.tan(fovBase * DEG / 2) / Math.tan(VM_FOV * DEG / 2);
+    const s = sp.adsVmFov ? lerp(sHip, Math.tan(cam.fov * DEG / 2) / Math.tan(sp.adsVmFov * DEG / 2), fovK) : sHip;
+    if (Math.abs(s - S.vmScale) > 1e-5) { S.vmScale = s; S.vmRoot.scale.set(s, s, 1); } }
+  // look sensitivity follows the zoom: the player applied base*(ads ? adsSensitivityMul : 1) this frame; correct that to
+  // base * tan(fov/2)/tan(fovBase/2) scaled by the user's ADS multiplier (relative to its 0.6 default) — continuous through the transition.
+  if (p && !p.mounted && playing && dt > 0) {
+    const mdx0 = input?.mouse?.dx ?? 0, mdy0 = input?.mouse?.dy ?? 0;
+    if (mdx0 || mdy0) {
+      const base = ctx.settings.sensitivity ?? 0.0022, userAds = ctx.settings.adsSensitivityMul ?? 0.6;
+      const applied = S.sensAds ? userAds : 1;
+      const want = (Math.tan(cam.fov * DEG / 2) / Math.tan(fovBase * DEG / 2)) * lerp(1, userAds / 0.6, fovK);
+      const k = base * (want - applied);
+      const dyaw = -mdx0 * k, pitch0 = p.pitch, pitch1 = clamp(p.pitch - mdy0 * k, -89 * DEG, 89 * DEG);
+      p.yaw += dyaw; p.pitch = pitch1; cam.rotation.y += dyaw; cam.rotation.x += pitch1 - pitch0;
+      // recoil compensation: pulling down against the climb pays off the recovery debt, so recovery returns to the aim point instead of overshooting below it
+      const dPitch = -mdy0 * base * want, dYaw = -mdx0 * base * want;
+      if (S.recPitch > 0 && dPitch < 0) S.recPitch = Math.max(0, S.recPitch + dPitch); else if (S.recPitch < 0 && dPitch > 0) S.recPitch = Math.min(0, S.recPitch + dPitch);
+      if (S.recYaw * dYaw < 0) S.recYaw = Math.sign(S.recYaw) * Math.max(0, Math.abs(S.recYaw) - Math.abs(dYaw));
+    }
+  }
 
   // ---------- sprint / lowered blends ----------
   const wantSprint = !!(p?.sprinting) && !S.triggerHeld && !S.reload && !S.throwing && S.adsTarget === 0;
@@ -401,7 +470,7 @@ export function update(dt, ctx) {
     if (sw.phase === 'lower') { lowerT = sstep(sw.t / (sw.dur * 0.45)); if (sw.t >= sw.dur * 0.45) { S.weapons[S.cur].group.visible = false; S.cur = sw.to; S.weapons[S.cur].group.visible = true; sw.phase = 'raise'; sw.t = 0; ctx.bus.emit('swap', { slot: S.cur, name: S.weapons[S.cur].spec.name }); S.rrv.x -= 3; } }
     else { lowerT = 1 - sstep(sw.t / (sw.dur * 0.55)); if (sw.t >= sw.dur * 0.55) { S.swap = null; lowerT = 0; } }
   }
-  if (S.dead || ctx.state === 'dead') lowerT = Math.max(lowerT, 1);
+  if (S.dead || ctx.state === 'dead' || stowed) lowerT = Math.max(lowerT, 1);
   // grenade throw
   if (S.throwing) {
     const th = S.throwing; th.t += dt;
@@ -416,7 +485,7 @@ export function update(dt, ctx) {
   S.lower = damp(S.lower, lowerT, 30, dt);
 
   // ---------- firing ----------
-  const canFire = playing && !S.dead && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && S.sprint < 0.45 && (p?.canFire !== false) && !actionBusy;
+  const canFire = playing && !S.dead && !stowed && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && S.sprint < 0.45 && (p?.canFire !== false) && !actionBusy;
   w.fireTimer -= dt;
   if (canFire && dt > 0 && (sp.auto ? S.triggerHeld : S.triggerPressed)) {
     if (w.ammo > 0) { let guard = 0; while (w.fireTimer <= 0 && w.ammo > 0 && guard++ < 3 && !w.needsAction) { fireShot(w); w.fireTimer += 60 / sp.rpm; } }
@@ -426,9 +495,16 @@ export function update(dt, ctx) {
   S.triggerPressed = false;
   if (S.inspect) { S.inspect.t += dt; if (S.inspect.t >= S.inspect.dur) S.inspect = null; }
 
-  // spread decay & camera recoil recovery
+  // spread decay & camera recoil: pending kick lands over ~50 ms (exp, dt-independent), a share of it is "debt" that recovers after the burst
   S.spreadExtra = damp(S.spreadExtra, 0, S.time - w.lastShot > 0.12 ? 9 : 2.5, dt);
-  if (p && S.time - w.lastShot > 0.09) {
+  if (p && dt > 0 && (S.kickP || S.kickY)) {
+    const f = 1 - Math.exp(-dt * 45); let kp = S.kickP * f, ky = S.kickY * f;
+    if (Math.abs(S.kickP - kp) < 1e-5 && Math.abs(S.kickY - ky) < 1e-5) { kp = S.kickP; ky = S.kickY; }
+    S.kickP -= kp; S.kickY -= ky;
+    const pitch0 = p.pitch; p.pitch = clamp(p.pitch + kp, -89 * DEG, 89 * DEG); kp = p.pitch - pitch0; p.yaw += ky; cam.rotation.x += kp; cam.rotation.y += ky;
+    const rec = sp.recoilRecover ?? 0.55; S.recPitch += kp * rec; S.recYaw += ky * (sp.recoilRecover ?? 0.4);
+  } else if (!p) { S.kickP = S.kickY = 0; }
+  if (p && S.time - w.lastShot > 0.09 && !S.kickP) {
     const kr = 1 - Math.exp(-dt * 11);
     const rp = S.recPitch * kr, ry = S.recYaw * kr; S.recPitch -= rp; S.recYaw -= ry; p.pitch -= rp; p.yaw -= ry; cam.rotation.x -= rp; cam.rotation.y -= ry;
     if (Math.abs(S.recPitch) < 1e-4) S.recPitch = 0; if (Math.abs(S.recYaw) < 1e-4) S.recYaw = 0;
@@ -592,7 +668,7 @@ export function update(dt, ctx) {
   // ---------- scope (sniper): overlay replaces the viewmodel once the eye is on the eyepiece; aim sway moves the camera ----------
   const scoped = !!sp.scope && S.ads > 0.85 && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && !S.showcase && !(w.needsAction && w.actionT >= 0);
   if (scoped !== S.scoped) { S.scoped = scoped; S.scope.rig.visible = scoped; if (scoped) ctx.bus.emit('scope', { on: true }); else ctx.bus.emit('scope', { on: false }); }
-  if (!S.swap) w.group.visible = !scoped;
+  if (!S.swap) w.group.visible = !scoped && !(stowed && S.lower > 0.9);
   if (scoped) {
     const sc = S.scope; const half = 0.5 * Math.tan(cam.fov * DEG / 2); sc.rig.scale.set(half, half, 1);
     // scope shadow: eye offset from the recoil spring + bob, so the exit pupil crescent moves like a real eyepiece
@@ -631,6 +707,6 @@ export function reset(ctx) {
   cancelActions(); S.swap = null; S.cur = 0; S.dead = false;
   S.weapons.forEach((w, i) => { resetWeapon(w); w.group.visible = i === 0; });
   S.adsTarget = 0; S.adsT = 0; S.ads = 0; S.adsOn = false; S.scoped = false; S.scope.rig.visible = false; S.sprint = 0; S.lower = 0; S.rp.set(0, 0, 0); S.rr.set(0, 0, 0); S.rpv.set(0, 0, 0); S.rrv.set(0, 0, 0);
-  S.spreadExtra = 0; S.recPitch = 0; S.recYaw = 0; S.swayYaw = 0; S.swayPitch = 0; S.grenadeCount = GRENADES; S.flashW = null; S.wallPull = 0; S.wallTarget = 0;
+  S.spreadExtra = 0; S.recPitch = 0; S.recYaw = 0; S.kickP = 0; S.kickY = 0; S.stowed = false; S.swayYaw = 0; S.swayPitch = 0; S.grenadeCount = GRENADES; S.flashW = null; S.wallPull = 0; S.wallTarget = 0;
   S.fx.reset(); S.grenades.reset();
 }
