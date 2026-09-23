@@ -469,7 +469,7 @@ export async function init(ctx) {
   ctx.bus.on('state', ({ state }) => { if (state === 'playing' && S.phase === 'idle' && S.enabled) { S.phase = 'countdown'; S.phaseT = S.startDelay; } });
 
   const api = {
-    get soldiers() { return S.soldiers; }, frozen: false,
+    get soldiers() { return S.soldiers; }, frozen: false, get asset() { return S.asset; }, get enabled() { return S.enabled; },
     get wave() { return S.wave; }, get score() { return S.score; }, get kills() { return S.kills; }, get streak() { return S.streak; },
     get phase() { return S.phase; }, get totalWaves() { return TOTAL_WAVES; }, get waveEnemies() { return WAVES[Math.max(0, S.wave - 1)]; },
     get nextWaveIn() { return S.phase === 'between' || S.phase === 'countdown' ? S.phaseT : 0; },

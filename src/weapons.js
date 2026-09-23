@@ -279,21 +279,26 @@ function fireShot(w, opts = {}) {
   // hitscan (one ray per bullet; `pellets` rays for shotguns, each in its own sub-cone around the shot direction)
   S._rc = S._rc || new THREE.Raycaster(); const rc = S._rc; rc.near = 0.05; rc.far = sp.range;
   const rays = sp.pellets || 1; const pelletSpread = (sp.pelletSpread || 0) * DEG;
-  const soldierHits = new Map(); let firstHit = null, firstDist = sp.range;
+  const soldierHits = new Map(), remoteHits = new Map(); let firstHit = null, firstDist = sp.range;
   const _pd = new THREE.Vector3();
   for (let i = 0; i < rays; i++) {
     let d = dir;
     if (rays > 1) { const a = rng() * Math.PI * 2, rad = Math.sqrt(rng()) * pelletSpread, tr = Math.tan(rad); _right.set(1, 0, 0).applyQuaternion(cam.quaternion); _up.set(0, 1, 0).applyQuaternion(cam.quaternion); d = _pd.copy(dir).addScaledVector(_right, Math.cos(a) * tr).addScaledVector(_up, Math.sin(a) * tr).normalize(); }
     rc.set(origin, d);
     let hit = null;
-    if (ctx.raycastTargets?.length) { const hits = rc.intersectObjects(ctx.raycastTargets, true); for (const h of hits) { if (h.object === S.vmRoot || (!h.object.visible && !h.object.userData?.soldier)) continue; hit = h; break; } } // soldier hitboxes are invisible meshes by design
+    if (ctx.raycastTargets?.length) { const hits = rc.intersectObjects(ctx.raycastTargets, true); for (const h of hits) { if (h.object === S.vmRoot || (!h.object.visible && !h.object.userData?.soldier && !h.object.userData?.remote)) continue; hit = h; break; } } // soldier hitboxes are invisible meshes by design
     if (!hit) continue;
     const dist = hit.distance; if (!firstHit || dist < firstDist) { firstHit = hit; firstDist = dist; }
     let n = hit.normal ? hit.normal.clone() : null;
     if (!n) { n = hit.face ? hit.face.normal.clone() : d.clone().negate(); if (hit.instanceId !== undefined && hit.object.getMatrixAt) { hit.object.getMatrixAt(hit.instanceId, _m); _m.premultiply(hit.object.matrixWorld); n.transformDirection(_m); } else n.transformDirection(hit.object.matrixWorld); }
     if (n.dot(d) > 0) n.negate();
     const ud = hit.object.userData || {};
-    if (ud.soldier) {
+    if (ud.remote) {   // another online player (net.js hitbox): accumulate like a soldier, resolved by the victim's client
+      const head = ud.part === 'head';
+      let acc = remoteHits.get(ud.remote); if (!acc) { acc = { dmg: 0, head: 0, n: 0, point: hit.point.clone() }; remoteHits.set(ud.remote, acc); }
+      acc.dmg += sp.damage * (head ? sp.headMul : 1) * falloff(dist); acc.n++; if (head) acc.head++;
+      S.fx.impact(hit.point, n, 'flesh', d);
+    } else if (ud.soldier) {
       const head = ud.part === 'head';
       const dmg = sp.damage * (head ? sp.headMul : 1) * falloff(dist);
       let acc = soldierHits.get(ud.soldier); if (!acc) { acc = { dmg: 0, head: 0, n: 0, point: hit.point.clone(), dir: d.clone(), normal: n }; soldierHits.set(ud.soldier, acc); }
@@ -312,6 +317,11 @@ function fireShot(w, opts = {}) {
     const dmg = Math.round(acc.dmg); if (dmg <= 0) continue;
     try { ctx.ai?.damage?.(soldier, dmg, acc.point.clone(), headshot); } catch (e) { console.warn('[weapons] ai.damage', e); }
     ctx.bus.emit('hit', { soldier, damage: dmg, headshot, point: acc.point.clone(), pellets: acc.n });
+  }
+  for (const [peer, acc] of remoteHits) {
+    const headshot = rays > 1 ? acc.head * 2 >= rays : acc.head > 0; const dmg = Math.round(acc.dmg); if (dmg <= 0) continue;
+    try { ctx.net?.hit?.(peer, dmg, headshot, acc.point); } catch (e) { console.warn('[weapons] net.hit', e); }
+    ctx.bus.emit('hit', { remote: peer, damage: dmg, headshot, point: acc.point.clone(), pellets: acc.n });
   }
   const dist = firstHit ? firstDist : sp.range;
 
