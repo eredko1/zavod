@@ -9,6 +9,8 @@ import { buildArch } from '../wsp/arch.js';
 import { buildBuildings } from '../wsp/buildings.js';
 import { buildFurniture } from '../wsp/furniture.js';
 import { buildTrees } from '../wsp/trees.js';
+import { buildCrowd, scatter } from '../crowd.js';
+import { PARK } from '../wsp/layout.js';
 
 export const meta = {
   id: 'wsp', name: 'CITY SQUARE', subtitle: 'DAY OPS · DOWNTOWN PARK', time: 'day', weather: 'clear',
@@ -32,6 +34,17 @@ export function build(world) {
   ctx.progress(0.22, 'wsp: furniture + streets'); buildFurniture(world, T);
   ctx.progress(0.24, 'wsp: trees'); buildTrees(world, T);
   buildLadderMeshes(world, ladders);
+  // people: the square is never empty — walkers on the paved paths, loiterers at the fountain rim and around the plaza,
+  // pedestrians on the surrounding sidewalks. Set dressing only (no colliders, not raycast targets).
+  try {
+    const R = world.R, V = world.maskSample, gh = (x, z) => groundHeight(x, z);
+    const onPaved = (x, z) => { const m = V(x, z); return m !== 'hex' && m !== 'side'; };
+    const crowd = scatter(R, 70, PARK.x0 + 3, PARK.x1 - 3, PARK.z0 + 3, PARK.z1 - 3, 0, (x, z) => onPaved(x, z) || Math.hypot(x, z) < FOUNTAIN.coping + 0.6, { walk: 0.55, bag: 0.08, gap: 2.2 });
+    for (let i = 0; i < 14; i++) { const a = R() * Math.PI * 2, r = FOUNTAIN.coping + 0.9 + R() * 1.5; crowd.push({ x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r, ry: Math.atan2(-Math.cos(a), -Math.sin(a)) + (R() - 0.5) * 0.8, pose: R() < 0.35 ? 'phone' : 'stand' }); }
+    crowd.push(...scatter(R, 60, BOUNDS.x0 + 6, BOUNDS.x1 - 6, BOUNDS.z0 + 6, BOUNDS.z1 - 6, 0, (x, z) => V(x, z) !== 'side' || (x > PARK.x0 - 2 && x < PARK.x1 + 2 && z > PARK.z0 - 2 && z < PARK.z1 + 2), { walk: 0.75, bag: 0.05, gap: 3 }));
+    for (const c of crowd) c.y = gh(c.x, c.z);
+    buildCrowd(world, crowd);
+  } catch (e) { console.warn('[wsp] crowd', e); }
 
   // ---- gameplay ------------------------------------------------------------------------------------------------------
   const v = (x, y, z) => new THREE.Vector3(x, y, z);

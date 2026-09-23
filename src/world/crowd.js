@@ -10,7 +10,7 @@ const BOTTOMS = [0x1c1f26, 0x2a2e35, 0x3b4150, 0x151515, 0x4a4238, 0x2b3444, 0x5
 const SKIN = [0xf1c9a5, 0xe0ac86, 0xc68b62, 0x9a6440, 0x6e4529, 0x4a2e1c, 0xf5d5bb];
 const HAIR = [0x1a1410, 0x2d2118, 0x4a3524, 0x7a5a3a, 0x9a9590, 0x0e0e0e, 0xb58a52];
 
-const cap = (r, len, rs = 8) => new THREE.CapsuleGeometry(r, len, 3, rs);
+const cap = (r, len, rs = 8) => new THREE.CapsuleGeometry(r, len, 2, Math.min(rs, 6));
 const place = (g, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => { g.scale(sx, sy, sz); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); return g; };
 const merge = (arr) => mergeGeometries(arr.map((g) => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g; }), false);
 
@@ -48,9 +48,9 @@ function figure(pose) {
   }
   // neck + head + hair
   const neck = new THREE.CylinderGeometry(0.05, 0.055, 0.1, 8); neck.translate(0, 1.57, 0); skin.push(neck);
-  const head = new THREE.SphereGeometry(0.105, 12, 9); head.scale(0.88, 1.08, 0.98); head.translate(0, 1.66 + (phone ? -0.015 : 0), phone ? 0.03 : 0); skin.push(head);
+  const head = new THREE.SphereGeometry(0.105, 10, 7); head.scale(0.88, 1.08, 0.98); head.translate(0, 1.66 + (phone ? -0.015 : 0), phone ? 0.03 : 0); skin.push(head);
   const nose = new THREE.ConeGeometry(0.018, 0.04, 4); nose.rotateX(Math.PI / 2); nose.translate(0, 1.655, 0.105); skin.push(nose);
-  const hr = new THREE.SphereGeometry(0.112, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55); hr.scale(0.9, 1.05, 1.02); hr.translate(0, 1.672, -0.012); hair.push(hr);
+  const hr = new THREE.SphereGeometry(0.112, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55); hr.scale(0.9, 1.05, 1.02); hr.translate(0, 1.672, -0.012); hair.push(hr);
   return { top: merge(top), bottom: merge(bottom), skin: merge(skin), hair: merge(hair), shoes: merge(shoes) };
 }
 

@@ -189,7 +189,7 @@ export function facadeTexture(R, style = 'brick', { bays = 4, floors = 4 } = {})
 
 /** Storefront strip (ground floor of a village shopping block): 1024×256 = 4 shops × 6 m, 4.2 m tall. */
 export function storefrontTexture(R) {
-  const W = 1024, H = 256; const [c, g] = canvas(W, H);
+  const W = 1024, H = 256; const [c, g] = canvas(W, H); const [ec, e] = canvas(W, H);
   const names = ['CAFFE', 'FALAFEL', 'BOOKS', 'PIZZA', 'RECORDS', 'ESPRESSO', 'COMEDY', 'NOODLES', 'TATTOO', 'BAR', 'BAGELS', 'VINTAGE'];
   const cols = ['#2b3a2e', '#7a2222', '#1f2f4a', '#3a2a1a', '#223', '#5a4a10', '#0e3a3a', '#4a1a3a'];
   for (let s = 0; s < 4; s++) {
@@ -197,13 +197,27 @@ export function storefrontTexture(R) {
     g.fillStyle = '#6e6a63'; g.fillRect(x0, 0, 256, H);                      // pier masonry
     g.fillStyle = col; g.fillRect(x0 + 8, 0, 240, 64);                         // fascia / signboard
     g.fillStyle = '#e8e2cf'; g.font = 'bold 34px Arial Narrow, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(names[(R() * names.length) | 0], x0 + 128, 32);
-    g.fillStyle = '#20262b'; g.fillRect(x0 + 16, 70, 224, 176);                // shop window + door
-    const gr = g.createLinearGradient(0, 70, 0, 246); gr.addColorStop(0, 'rgba(170,200,225,0.55)'); gr.addColorStop(1, 'rgba(60,70,80,0.05)'); g.fillStyle = gr; g.fillRect(x0 + 16, 70, 224, 176);
-    g.fillStyle = 'rgba(255,225,160,0.35)'; for (let i = 0; i < 5; i++) g.fillRect(x0 + 30 + R() * 120, 100 + R() * 100, 8 + R() * 30, 6 + R() * 20); // interior
-    g.fillStyle = '#4a4238'; g.fillRect(x0 + 176, 96, 60, 150); g.fillStyle = '#c9b98a'; g.fillRect(x0 + 226, 170, 5, 5); // door + handle
-    g.fillStyle = '#2a2a2a'; g.fillRect(x0 + 16, 70, 224, 4); g.fillRect(x0 + 172, 96, 4, 150);
+    // shop window: a lit interior (ceiling fixtures, back shelving / counter / tables, a few customers) behind glass that
+    // carries a sky reflection gradient; door with a glazed upper panel. The interior also goes into an emissive mask so
+    // the shops glow a little in shade (the old window was a flat blue-grey gradient with two white blobs).
+    const kind = (R() * 3) | 0, warm = R() < 0.7;
+    for (const gg of [g, e]) { gg.fillStyle = '#000'; }
+    const inter = (gg) => {
+      const ig = gg.createLinearGradient(0, 70, 0, 246); ig.addColorStop(0, warm ? '#f2dcb0' : '#e6edf0'); ig.addColorStop(0.45, warm ? '#9a7a52' : '#8f9aa0'); ig.addColorStop(1, '#2a2420'); gg.fillStyle = ig; gg.fillRect(x0 + 16, 70, 160, 176);
+      for (let i = 0; i < 4; i++) { gg.fillStyle = 'rgba(255,248,230,0.95)'; gg.fillRect(x0 + 24 + i * 38, 76, 22, 3); }
+      if (kind === 0) for (let r = 0; r < 3; r++) { gg.fillStyle = '#3a2c1e'; gg.fillRect(x0 + 16, 120 + r * 30, 160, 3); for (let x = x0 + 18; x < x0 + 174; x += 5 + R() * 6) { gg.fillStyle = `hsl(${R() * 360},${35 + R() * 35}%,${35 + R() * 30}%)`; gg.fillRect(x, 120 + r * 30 - 14 - R() * 8, 3 + R() * 4, 16); } }
+      else if (kind === 1) { gg.fillStyle = '#2a1e14'; gg.fillRect(x0 + 90, 170, 86, 76); gg.fillStyle = '#6a4a2a'; gg.fillRect(x0 + 90, 166, 86, 6); for (let i = 0; i < 3; i++) { gg.fillStyle = '#4a3624'; gg.fillRect(x0 + 24 + i * 22, 196, 16, 4); } }
+      else { for (let i = 0; i < 3; i++) { const tx = x0 + 30 + i * 48; gg.fillStyle = '#3a2a1c'; gg.fillRect(tx, 196, 34, 4); gg.fillRect(tx + 15, 200, 4, 30); } }
+      for (let i = 0; i < 1 + ((R() * 3) | 0); i++) { const px = x0 + 30 + R() * 130; gg.fillStyle = 'rgba(28,22,18,0.9)'; gg.beginPath(); gg.ellipse(px, 150, 8, 10, 0, 0, 7); gg.fill(); gg.fillRect(px - 13, 160, 26, 86); }
+    };
+    inter(g);
+    const rf = g.createLinearGradient(0, 70, 0, 246); rf.addColorStop(0, 'rgba(190,210,230,0.45)'); rf.addColorStop(0.5, 'rgba(160,180,200,0.12)'); rf.addColorStop(1, 'rgba(60,70,80,0.0)'); g.fillStyle = rf; g.fillRect(x0 + 16, 70, 160, 176);
+    g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.moveTo(x0 + 40, 70); g.lineTo(x0 + 70, 70); g.lineTo(x0 + 30, 246); g.lineTo(x0 + 16, 246); g.lineTo(x0 + 16, 150); g.fill();   // glare streak
+    e.fillStyle = '#000'; e.fillRect(x0, 0, 256, H); inter(e);
+    g.fillStyle = '#3a342c'; g.fillRect(x0 + 176, 96, 64, 150); g.fillStyle = '#1e2226'; g.fillRect(x0 + 186, 104, 44, 70); g.fillStyle = '#c9b98a'; g.fillRect(x0 + 226, 176, 5, 5); // door + glazed panel + handle
+    g.fillStyle = '#2a2a2a'; g.fillRect(x0 + 16, 70, 224, 5); g.fillRect(x0 + 172, 70, 5, 176); g.fillRect(x0 + 92, 70, 3, 176); g.fillStyle = '#3b3630'; g.fillRect(x0 + 16, 236, 156, 10);   // head, mullions, stall riser
   }
-  return finish(c, { aniso: 16 });
+  const t = finish(c, { aniso: 16 }); t.userData.glow = finish(ec, { aniso: 16 }); return t;
 }
 
 /** Arch attic inscription band (tileable in x is not needed): 2048×256. */

@@ -93,7 +93,7 @@ export function buildBuildings(world, T) {
   solidMesh(rooftop.bulk, new THREE.MeshStandardMaterial({ color: 0x7b6a5c, roughness: 0.92 }), 'roofBulkheads');
   solidMesh(rooftop.vent, new THREE.MeshStandardMaterial({ color: 0x3f4448, roughness: 0.6, metalness: 0.5 }), 'roofVents', 'metal');
   solidMesh(doors, new THREE.MeshStandardMaterial({ color: 0x1d1c1a, roughness: 0.6, metalness: 0.2 }), 'doors', 'wood', false);
-  const sf = new THREE.MeshStandardMaterial({ map: storefrontTexture(R), roughness: 0.4, metalness: 0.1 });
+  const sfTex = storefrontTexture(R); const sf = new THREE.MeshStandardMaterial({ map: sfTex, emissiveMap: sfTex.userData.glow, emissive: 0xffffff, emissiveIntensity: 0.15, roughness: 0.3, metalness: 0.1 });
   solidMesh(glassG, sf, 'storefronts', 'metal', false);
   solidMesh(awnA, new THREE.MeshStandardMaterial({ color: 0x2d5a3a, roughness: 0.9, side: THREE.DoubleSide }), 'awningsA', 'wood');
   solidMesh(awnB, new THREE.MeshStandardMaterial({ color: 0x8a2a24, roughness: 0.9, side: THREE.DoubleSide }), 'awningsB', 'wood');
