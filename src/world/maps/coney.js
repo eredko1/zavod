@@ -57,9 +57,10 @@ export function build(world) {
     surf: look(-80, -2.2, 262, -300, 0, 262),                    // wet sand at the waterline, along the beach
     pier: look(-363, 0, 330, -300, 15, 120),                     // out on the pier looking back at the strip
     sideshow: look(20, 0, -100, 110, 4, -60),                    // the amusement strip street: shutters and painted banners
-    surfave: look(-140, 0, -160, 100, 6, -160),                  // the avenue
+    surfave: look(-200, 0, -141, 40, 6, -112),                   // down the avenue: shop fronts, the terminal, the rides beyond
     terminal: look(-55, 0, -225, -55, 8, -270),                  // the terminal frontage + train shed
-    ballpark: look(-300, 0, -130, -330, 10, -60),                // the ballpark's brick wall and light towers
+    ballpark: look(-250, 0, -128, -350, 12, -90),                // the ballpark's brick street wall and light towers from the avenue
+    cyclone: look(222, 0, -72, 188, 14, 10),                     // the wooden coaster from the avenue at its north end
     rides: look(-30, 0, 60, 60, 6, 40),                          // inside the amusement park among the flat rides
   };
   // QA guard: a pose whose eye is inside a collider is walked backwards along its view line until it is in the open

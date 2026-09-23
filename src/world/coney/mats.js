@@ -88,7 +88,15 @@ export function makeConeyMats(world) {
   fas.forEach((c, i) => reg('fascia' + i, std({ color: c, roughness: 0.6, metalness: 0.1 }), 'metal', 1));
   M.fasciaKeys = fas.map((_, i) => 'fascia' + i);
   // stucco / painted masonry for 1–3 storey amusement-zone buildings
-  [0xe8e0cc, 0xd9c7a6, 0xc9d4d6, 0xe6cfc0, 0xb9c9b2, 0xf1ece0].forEach((c, i) => reg('paintWall' + i, std({ color: c, roughness: 0.9 }), 'concrete', 0.5));
+  // painted masonry: greyscale stucco (roller marks, hairline cracks, rust/dirt streaks under the parapet, a darker splash
+  // band at the foot) so the per-building tint reads true — the Poly Haven painted-concrete scan is green peeling paint
+  { const [c, g] = canvas(512, 512); g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 9000; i++) { const v = 200 + R() * 55; g.fillStyle = `rgba(${v},${v},${v},${0.25 + R() * 0.3})`; g.fillRect(R() * 512, R() * 512, 2 + R() * 5, 2 + R() * 5); }
+    for (let i = 0; i < 40; i++) { const x = R() * 512; const L = 40 + R() * 220; const gr = g.createLinearGradient(0, 0, 0, L); gr.addColorStop(0, 'rgba(90,82,70,0.35)'); gr.addColorStop(1, 'rgba(90,82,70,0)'); g.fillStyle = gr; g.fillRect(x, 0, 2 + R() * 8, L); }
+    g.strokeStyle = 'rgba(80,80,80,0.35)'; g.lineWidth = 1; for (let i = 0; i < 14; i++) { g.beginPath(); let x = R() * 512, y = R() * 512; g.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (R() - 0.5) * 30; y += 8 + R() * 18; g.lineTo(x, y); } g.stroke(); }
+    const gr = g.createLinearGradient(0, 512, 0, 430); gr.addColorStop(0, 'rgba(70,64,56,0.45)'); gr.addColorStop(1, 'rgba(70,64,56,0)'); g.fillStyle = gr; g.fillRect(0, 430, 512, 82);
+    const st = tex(c);
+    [0xfff4df, 0xf2dcb4, 0xdcecef, 0xfbe2d2, 0xd6e6cc, 0xffffff].forEach((col, i) => reg('paintWall' + i, std({ map: st, color: col, roughness: 0.92, metalness: 0, envMapIntensity: 0.35 }), 'concrete', 1 / 4)); }
   M.paintWallKeys = [0, 1, 2, 3, 4, 5].map((i) => 'paintWall' + i);
   return M;
 }

@@ -144,8 +144,9 @@ function woodCoaster(world, M, B, c) {
     const L = 2 * hu * k, rr = hv * k;
     if (d < L) { u = -hu * k + d; v = -rr; } else if ((d -= L) < Math.PI * rr) { const a = -Math.PI / 2 + d / rr; u = hu * k + Math.cos(a) * rr * 0.9; v = Math.sin(a) * rr; } else if ((d -= Math.PI * rr) < L) { u = hu * k - d; v = rr; } else { d -= L; const a = Math.PI / 2 + d / rr; u = -hu * k + Math.cos(a) * rr * 0.9; v = Math.sin(a) * rr; }
     let y;
-    if (!lap) { y = t < 0.42 ? 3 + (Hmax - 3) * Math.min(1, t / 0.4) : 3 + (Hmax - 3) * (0.5 + 0.5 * Math.cos((t - 0.42) / 0.58 * Math.PI * 3.2)) * Math.exp(-(t - 0.42) * 1.5); }
-    else y = 3 + (Hmax * 0.45) * (0.5 + 0.5 * Math.cos(t * Math.PI * 5)) * (1 - t * 0.8);
+    // lap 0: long lift to the top, the big first drop, then hills that stay high; lap 1: lower, faster camelbacks
+    if (!lap) { y = t < 0.3 ? 4 + (Hmax - 4) * Math.sin(Math.min(1, t / 0.3) * Math.PI / 2) : 8 + (Hmax - 8) * (0.5 + 0.5 * Math.cos((t - 0.3) / 0.7 * Math.PI * 3.4)) * (1 - (t - 0.3) * 0.45); }
+    else y = 7 + (Hmax * 0.55) * (0.5 + 0.5 * Math.cos(t * Math.PI * 5)) * (1 - t * 0.55);
     const [x, z] = F.toWorld(u, v); pts.push(V(x, Math.max(2.5, y), z));
   }
   const white = new Struts('coasterBents', M.coasterWhite), track = new Struts('coasterTrack', M.coasterTrack), red = new Struts('coasterRail', M.coasterRed);
@@ -154,14 +155,14 @@ function woodCoaster(world, M, B, c) {
     const tl = [a.clone().addScaledVector(side, 0.8), b.clone().addScaledVector(side, 0.8)], tr = [a.clone().addScaledVector(side, -0.8), b.clone().addScaledVector(side, -0.8)];
     track.add(tl[0], tl[1], 0.35); track.add(tr[0], tr[1], 0.35); track.add(a.clone().addScaledVector(side, -1.1).setY(a.y - 0.15), a.clone().addScaledVector(side, 1.1).setY(a.y - 0.15), 0.25);
     red.add(a.clone().addScaledVector(side, 1.6).setY(a.y + 1.0), b.clone().addScaledVector(side, 1.6).setY(b.y + 1.0), 0.09);
-    if (i % 2) continue;                               // bents every ~2 samples: posts, ledgers, X-bracing to the next bent
+    if (i % 2) continue;                               // bents every other sample (~1.5 m): posts, ledgers, X-bracing to the next bent
     const j = (i + 2) % N; const a2 = pts[j]; const d2 = new THREE.Vector3().subVectors(pts[(j + 1) % N], a2); d2.y = 0; d2.normalize(); const side2 = V(-d2.z, 0, d2.x);
     for (const s of [-1.5, 1.5]) {
       const top = a.clone().addScaledVector(side, s).setY(a.y - 0.3), bot = top.clone().setY(0); white.add(bot, top, 0.28);
       const top2 = a2.clone().addScaledVector(side2, s).setY(a2.y - 0.3);
-      for (let y = 3; y < Math.min(top.y, top2.y) - 1; y += 3.2) { white.add(top.clone().setY(y), top2.clone().setY(y), 0.14); if (y + 3.2 < Math.min(top.y, top2.y)) { white.add(top.clone().setY(y), top2.clone().setY(y + 3.2), 0.08); white.add(top2.clone().setY(y), top.clone().setY(y + 3.2), 0.08); } }
+      for (let y = 2.4; y < Math.min(top.y, top2.y) - 0.8; y += 2.4) { white.add(top.clone().setY(y), top2.clone().setY(y), 0.16); if (y + 2.4 < Math.min(top.y, top2.y)) { white.add(top.clone().setY(y), top2.clone().setY(y + 2.4), 0.1); white.add(top2.clone().setY(y), top.clone().setY(y + 2.4), 0.1); } }
     }
-    for (let y = 3; y < a.y - 1; y += 3.2) white.add(a.clone().addScaledVector(side, -1.5).setY(y), a.clone().addScaledVector(side, 1.5).setY(y), 0.12);
+    for (let y = 2.4; y < a.y - 0.8; y += 2.4) { white.add(a.clone().addScaledVector(side, -1.5).setY(y), a.clone().addScaledVector(side, 1.5).setY(y), 0.14); white.add(a.clone().addScaledVector(side, -1.5).setY(y), a.clone().addScaledVector(side, 1.5).setY(Math.min(a.y - 0.4, y + 2.4)), 0.08); }
     world.box([a.x - 0.3, 0, a.z - 0.3], [a.x + 0.3, Math.min(a.y, 4), a.z + 0.3]);
   }
   white.build(world.scene); track.build(world.scene); red.build(world.scene);
@@ -219,7 +220,7 @@ function terminal(world, M, B) {
     for (let k = 0; k <= 12; k++) { const a0 = k / 12 * Math.PI, a1 = (k + 1) / 12 * Math.PI; if (k === 12) break; const R0 = w / 2; const p0 = [T.x0 + w / 2 - Math.cos(a0) * R0, Y + 1.1 + Math.sin(a0) * 9], p1 = [T.x0 + w / 2 - Math.cos(a1) * R0, Y + 1.1 + Math.sin(a1) * 9]; const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); const g = new THREE.BoxGeometry(L, 0.6, 0.5); g.rotateZ(Math.atan2(p1[1] - p0[1], p1[0] - p0[0])); g.translate((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, z); B.add('railSteelGreen', g, { uv: false }); }
   }
   const roof = new THREE.CylinderGeometry(w / 2 + 0.3, w / 2 + 0.3, T.z1 - 8 - T.z0, 24, 1, true, -Math.PI / 2, Math.PI); roof.rotateX(Math.PI / 2); roof.scale(1, 9 / (w / 2 + 0.3), 1); roof.translate((T.x0 + T.x1) / 2, Y + 1.1, (T.z0 + T.z1 - 8) / 2);
-  const rm = new THREE.Mesh(roof, new THREE.MeshStandardMaterial({ color: 0x3a4652, roughness: 0.25, metalness: 0.6, side: THREE.DoubleSide, envMapIntensity: 1.2, name: 'shedRoof' })); rm.castShadow = true; rm.receiveShadow = true; world.scene.add(rm);
+  const rm = new THREE.Mesh(roof, new THREE.MeshStandardMaterial({ color: 0x8e9aa4, roughness: 0.35, metalness: 0.5, side: THREE.DoubleSide, envMapIntensity: 1.0, name: 'shedRoof' })); rm.castShadow = true; rm.receiveShadow = true; world.scene.add(rm);
   // two parked trains in the shed (stainless, lit windows)
   for (const x of [T.x0 + w * 0.3, T.x0 + w * 0.7]) for (let z = T.z0 + 8; z < T.z1 - 30; z += 19) { B.box('alu', [x - 1.5, Y, z], [x + 1.5, Y + 3.6, z + 18.2], { collide: false }); B.box('glassLit', [x - 1.52, Y + 1.5, z + 1], [x + 1.52, Y + 2.6, z + 17], { collide: false }); }
   for (let x = T.x0 + 2; x < T.x1 - 2; x += 8) world.cover(x, T.z1 + 1.2, 0, 1);
@@ -235,7 +236,14 @@ function ballpark(world, M, B) {
   const rows = 14;
   for (let k = 0; k < rows; k++) { const y = 1 + k * 0.55, d = 1.2 + k * 0.85; B.box(k % 2 ? 'concrete' : 'concreteGrey', [P.x0 + 20, 0, P.z0 + d], [P.x1 - 1.2 - d, y, P.z0 + d + 0.85], { walkable: true }); B.box(k % 2 ? 'concrete' : 'concreteGrey', [P.x1 - 1.2 - d - 0.85, 0, P.z0 + d], [P.x1 - 1.2 - d, y, P.z1 - 40], { walkable: true }); }
   const seat = new Struts('stadiumSeats', M.wheelBlue); for (let k = 0; k < rows; k++) { const y = 1.25 + k * 0.55, d = 1.6 + k * 0.85; seat.add(V(P.x0 + 20, y, P.z0 + d), V(P.x1 - 2.2 - d, y, P.z0 + d), 0.4); } seat.build(world.scene);
-  B.box('steelDark', [P.x0 + 20, 12.5, P.z0], [P.x1, 13, P.z0 + 14]);                                                                         // grandstand roof
+  // grandstand canopy: thin white steel roof on raked columns (was a black slab)
+  B.box('white', [P.x0 + 20, 13.4, P.z0 + 2], [P.x1 - 2, 13.7, P.z0 + 14]);
+  for (let x = P.x0 + 24; x < P.x1 - 4; x += 12) B.box('white', [x - 0.2, 0, P.z0 + 1.3], [x + 0.2, 13.4, P.z0 + 1.7], { collide: true });
+  // street wall: pilasters, a stone band, a row of pennants and a big arched main gate at the east end
+  for (let x = P.x0 + 3; x < P.x1; x += 7) B.box('brickDark', [x, 0, P.z0 - 0.35], [x + 0.9, wallH + 0.6, P.z0 + 0.1], { collide: false });
+  B.box('precast', [P.x0, wallH, P.z0 - 0.3], [P.x1, wallH + 0.6, P.z0 + 1.2], { collide: false });
+  for (let x = P.x0 + 6; x < P.x1 - 4; x += 8) { B.cyl('steel', x, P.z0 - 0.1, wallH + 0.6, wallH + 5, 0.05, 6); B.box(['fascia0', 'fascia2', 'fascia5'][Math.abs(Math.round(x / 8)) % 3], [x, wallH + 3.8, P.z0 - 0.12], [x + 1.4, wallH + 4.9, P.z0 - 0.08], { collide: false }); }
+  { const gx = P.x1 - 26; B.box('precast', [gx - 8, 0, P.z0 - 1.5], [gx + 8, 11, P.z0 + 1.2], { collide: false }); B.box('glassDark', [gx - 5, 0, P.z0 - 1.52], [gx + 5, 6, P.z0 - 1.48], { collide: false }); B.cyl('precast', gx, P.z0 - 1.5, 6, 6.2, 5, 24); B.box('fascia0', [gx - 6, 8, P.z0 - 1.55], [gx + 6, 9.8, P.z0 - 1.5], { collide: false }); }
   for (const [x, z] of [[P.x0 + 6, P.z0 + 6], [P.x1 - 6, P.z1 - 6], [P.x0 + 6, P.z1 - 6], [P.x1 - 6, P.z0 + 6], [(P.x0 + P.x1) / 2, P.z1 - 4], [P.x0 + 4, (P.z0 + P.z1) / 2]]) { B.cyl('steel', x, z, 0, 30, 0.45, 10, { collide: true }); B.box('steelDark', [x - 3, 30, z - 0.4], [x + 3, 33, z + 0.4], { collide: false }); B.box('lampHead', [x - 2.8, 30.3, z - 0.45], [x + 2.8, 32.7, z - 0.4], { collide: false }); }
   B.box('steelDark', [P.x0 + 8, 6, P.z1 - 6], [P.x0 + 30, 14, P.z1 - 5]); B.box('glassLit', [P.x0 + 9, 7, P.z1 - 6.05], [P.x0 + 29, 13, P.z1 - 6.01], { collide: false });
   // infield dirt and bases

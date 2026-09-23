@@ -49,6 +49,30 @@ background silhouettes, dock-ceiling moiré; railyard interiors (office/shed) + 
 shopfront interiors, row poses; sbu roads-pose concrete apron + white curb slab (ground:concretePav at -109,78), pines,
 Staller lawn stripes, plaza blank walls. Apply car kit to terminal street.
 
+
+## 2026-09-22 session 3 (cont.) — all proposed updates landed + University campus + new Coney Island map
+
+Landed since the re-baseline (all pushed): Central Station grade/crowd/booth/shops/trains; Zavod puddle HDRI fix,
+lit skyline, dock moiré; Railyard furnished signal box + stocked shed + scrubland; City Square lit shops + crowd;
+University = the whole OSM campus (10x area, 80 buildings, BVH raycasts); Coney Island map (new, `?map=coney`).
+
+| Map | Baseline | Now (strict, same rubric) | Still costing points |
+|---|---|---|---|
+| zavod | 5.0 | 6.2 | props are good; yard ground/containers still the weakest, no people/vehicles |
+| railyard | 5.5 | 6.6 | skyline blocks untextured up close, wagons are plain boxes |
+| terminal | 5.0 | 6.6 | no vault ornament/rosettes, platform grime, crowd figures are mannequins |
+| wsp | 5.5 | 7.0 | crowd mannequins, arch ornament, row-house stoops close up |
+| sbu | 4.5 | 6.4 | OSM halls are generic banded facades; lawns flat; wider campus has no signage/props |
+| coney | — | 6.9 | shop/kiosk geometry is boxy, crowd mannequins, far towers textured blocks, 6.6 M rendered tri |
+
+Cross-map blockers for 8/10 (same on every map, so worth doing once): (1) crowd figures read as mannequins at < 15 m —
+needs a skinned/sculpted low-poly human with clothing variation (or the soldier model with civilian materials); (2)
+contact AO on day maps (buildings float slightly); (3) signage/prop density at eye level on the OSM-built areas.
+
+Coney critique r1–r6 (frames in qa/critic/r1..r6/coney-*.png): wheel/parachute/pier/boardwalk/beach recognisable from the
+refs; wooden coaster now a dense white bent lattice with dark track + red rail (r6); fixed: phantom black shed roof,
+camo-green shop walls (Poly Haven painted_concrete is green paint — never tint it), poses inside colliders (auto guard).
+
 ## Next session — start here (older)
 
 **Nothing has been re-scored since its fixes landed.** All three maps carry stale numbers. Re-measuring is
