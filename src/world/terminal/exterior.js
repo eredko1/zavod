@@ -2,6 +2,7 @@
 // facade (attic, clock group, flank wings, exterior shell), the elevated viaduct with its approach, the far-side buildings, a tower directly
 // north, a hazy midtown-style skyline and a sky dome. Closed one block out. TERMINAL agent.
 import * as THREE from 'three';
+import { placeCars } from '../carkit.js';
 import { Bucket, mat4, lathe, instanced } from './kit.js';
 import { P } from './plan.js';
 import { SUN_DIR } from './lighting.js';
@@ -118,7 +119,7 @@ export function buildExterior(world, M, Z) {
     // ground-floor shopfronts: glass + awnings + signs
     const awn = [0x8b1d1d, 0x1d4b8b, 0x1f6b3a, 0x8b6a1d].map(c => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }); m.name = 'awning'; return m; });
     let k = 0; const names = ['DELI  ·  GROCERY', 'PHARMACY', 'DINER', 'BOOKS & NEWS', 'COFFEE', 'SHOE REPAIR', 'BANK', 'FLOWERS'];
-    for (let x = -58; x < 60; x += 9) { if (Math.abs(x) < 10) continue; B.box(M.darkGlass, [x - 3.4, 0.4, z0 - 0.35], [x + 3.4, 3.6, z0 - 0.3], { uvScale: 1 }); const aw = awn[k % 4]; B.add(aw, new THREE.BoxGeometry(7, 0.12, 1.8), mat4(x, 3.7, z0 - 1.2, 0.35)); B.add(M.atlas, M.signGeo(names[k % names.length], { bg: '#1a1a1a', fg: '#f2e6c8', font: 'bold 60px Georgia, serif' }, 6, 0.6), mat4(x, 4.05, z0 - 0.36, 0, Math.PI, 0)); k++; }
+    const shopTex = [0, 1, 2].map((v) => shopInteriorTexture(world.R, v)); for (let x = -58; x < 60; x += 9) { if (Math.abs(x) < 10) continue; { const inside = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 3.2), new THREE.MeshBasicMaterial({ map: shopTex[k % 3], color: 0xd9ccb4, fog: true })); inside.position.set(x, 2.0, z0 - 0.305); inside.rotation.y = Math.PI; world.scene.add(inside); const pane = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 3.2), shopGlass()); pane.position.set(x, 2.0, z0 - 0.37); pane.rotation.y = Math.PI; world.scene.add(pane); B.box(dark, [x - 3.5, 0.3, z0 - 0.4], [x + 3.5, 0.42, z0 - 0.3], { uvScale: 1 }); for (const fx of [x - 3.45, x + 3.45, x - 1.1]) B.box(dark, [fx - 0.06, 0.4, z0 - 0.42], [fx + 0.06, 3.6, z0 - 0.3], { uvScale: 1 }); } const aw = awn[k % 4]; B.add(aw, new THREE.BoxGeometry(7, 0.12, 1.8), mat4(x, 3.7, z0 - 1.2, 0.35)); B.add(M.atlas, M.signGeo(names[k % names.length], { bg: '#1a1a1a', fg: '#f2e6c8', font: 'bold 60px Georgia, serif' }, 6, 0.6), mat4(x, 4.05, z0 - 0.36, 0, Math.PI, 0)); k++; }
     // viaduct portal in the far facade
     B.box(M.asphalt, [-8, ST.viaductY + 1.2, z0 - 0.4], [8, ST.viaductY + 7, z0 + 6], { uvScale: 1 }); B.box(granite, [-9.5, ST.viaductY + 7, z0 - 0.6], [9.5, ST.viaductY + 8.2, z0 + 0.2], { uvScale: uv(granite) });
     // side seals: cross-street building faces + road-end walls at |x| = 62
@@ -143,7 +144,8 @@ export function buildExterior(world, M, Z) {
     { const kx = -30, kz = ST.curbS + 3.2; B.box(M.asphalt, [kx - 1.6, 0.16, kz - 2.5], [kx + 1.6, 0.17, kz + 2.5], { uvScale: 1 }); for (const s of [-1, 1]) { B.box(M.steelGreen, [kx + s * 1.7 - 0.06, 0.15, kz - 2.6], [kx + s * 1.7 + 0.06, 1.2, kz + 2.6], { uvScale: 1 }); for (let z = kz - 2.4; z <= kz + 2.4; z += 0.3) B.add(M.steelGreen, new THREE.CylinderGeometry(0.02, 0.02, 1.0, 5), mat4(kx + s * 1.7, 0.65, z)); } B.box(M.steelGreen, [kx - 1.7, 0.15, kz + 2.5], [kx + 1.7, 1.2, kz + 2.6], { uvScale: 1 }); world.box([kx - 1.8, 0, kz - 2.6], [kx + 1.8, 1.2, kz + 2.7]); B.add(M.steelGreen, new THREE.CylinderGeometry(0.06, 0.07, 3.2, 8), mat4(kx - 1.7, 1.75, kz - 2.6)); B.add(M.lampGlass, new THREE.SphereGeometry(0.24, 12, 8), mat4(kx - 1.7, 3.5, kz - 2.6)); B.add(M.atlas, M.signGeo('SUBWAY  ·  1 · 2 · 3 · 4', { bg: '#0d3b1f', fg: '#ffffff', font: 'bold 64px Helvetica, Arial' }, 3.4, 0.45), mat4(kx, 3.6, kz - 2.6, 0, Math.PI, 0)); B.box(M.brassDark, [kx - 1.75, 3.35, kz - 2.66], [kx + 1.75, 3.85, kz - 2.56], { uvScale: 1 }); world.termLamps.push([kx - 1.7, 3.5, kz - 2.6]); }
     // parked / stopped vehicles on the road (cover)
     const cars = [[-50, ST.curbN + 1.6, 0, 'taxi'], [-38, ST.curbN + 1.6, 0.03, 'car'], [-14, ST.curbN + 1.7, -0.02, 'taxi'], [8, ST.curbS - 1.7, Math.PI, 'taxi'], [26, ST.curbS - 1.6, Math.PI + 0.04, 'car2'], [46, ST.curbS - 1.6, Math.PI, 'taxi'], [-30, 63, 0.02, 'taxi'], [36, 63, Math.PI, 'car']];
-    for (const [x, z, yaw, kind] of cars) { if (kind === 'taxi') taxi(B, taxiYellow, dark, x, 0, z, yaw); else car(B, kind === 'car' ? carPaint : carPaint2, dark, x, 0, z, yaw); world.box([x - 2.4, 0, z - 1.05], [x + 2.4, 1.5, z + 1.05]); world.cover(x, z + 1.7, 0, 1); world.cover(x, z - 1.7, 0, -1); }
+    placeCars(world, cars.map(([x, z, yaw, kind]) => ({ x, z, ry: yaw, kind: kind === 'taxi' ? 'cab' : kind === 'car' ? 'sedan' : 'suv' })));
+    for (const [x, z, yaw, kind] of cars) { world.box([x - 2.4, 0, z - 1.05], [x + 2.4, 1.5, z + 1.05]); world.cover(x, z + 1.7, 0, 1); world.cover(x, z - 1.7, 0, -1); }
     // traffic light on the near corner + bus stop shelter (far side)
     B.add(dark, new THREE.CylinderGeometry(0.1, 0.12, 6, 8), mat4(-56, 3.15, ST.curbN - 0.6)); B.add(dark, new THREE.BoxGeometry(6, 0.14, 0.14), mat4(-53, 6.1, ST.curbN - 0.6)); B.add(dark, new THREE.BoxGeometry(0.4, 1.1, 0.4), mat4(-50.5, 5.4, ST.curbN - 0.6)); B.add(hydrantRed, new THREE.SphereGeometry(0.12, 8, 6), mat4(-50.5, 5.75, ST.curbN - 0.85)); world.box([-56.15, 0, ST.curbN - 0.75], [-55.85, 6, ST.curbN - 0.45]);
     B.box(M.darkGlass, [10, 0.15, ST.curbS + 0.9], [16, 0.16, ST.curbS + 2.4], { uvScale: 1 }); for (const px of [10.2, 15.8]) B.add(dark, new THREE.BoxGeometry(0.1, 2.6, 0.1), mat4(px, 1.45, ST.curbS + 2.35)); B.box(M.darkGlass, [10, 2.7, ST.curbS + 0.8], [16, 2.85, ST.curbS + 2.5], { uvScale: 1 }); B.box(M.darkGlass, [10.1, 0.15, ST.curbS + 2.3], [15.9, 2.7, ST.curbS + 2.4], { uvScale: 1 }); world.box([10, 0, ST.curbS + 2.25], [16, 2.7, ST.curbS + 2.45]); B.box(M.wood, [10.5, 0.55, ST.curbS + 1.7], [15.5, 0.62, ST.curbS + 2.2], { uvScale: 1, collide: true });
@@ -175,3 +177,16 @@ function car(B, paint, dark, x, y, z, yaw) {
   for (const dx of [-1.5, 1.5]) for (const dz of [-0.82, 0.82]) { const w = new THREE.CylinderGeometry(0.33, 0.33, 0.24, 14); w.rotateX(Math.PI / 2); add(w, dark, dx, 0.33, dz); }
   add(new THREE.BoxGeometry(4.6, 0.12, 1.95), dark, 0, 0.32, 0);
 }
+
+// Lit shop interior seen through the glass: warm ceiling light, shelving with product colour, counter, a couple of people.
+function shopInteriorTexture(R, v) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, v === 1 ? '#e8ecef' : '#f3dfb8'); gr.addColorStop(0.35, v === 1 ? '#aeb4b8' : '#b89868'); gr.addColorStop(1, '#3a3026'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(255,250,235,0.9)'; g.fillRect(30 + i * 85, 6, 50, 5); }                                     // ceiling fixtures
+  for (let row = 0; row < 3; row++) { const y = 70 + row * 42; g.fillStyle = '#4a3a2a'; g.fillRect(0, y + 30, 512, 5); for (let x = 0; x < 512; x += 6 + R() * 8) { g.fillStyle = `hsl(${R() * 360},${30 + R() * 40}%,${35 + R() * 30}%)`; g.fillRect(x, y + 30 - (10 + R() * 18), 4 + R() * 5, 30); } }
+  g.fillStyle = '#2a2018'; g.fillRect(v === 2 ? 40 : 300, 180, 180, 76); g.fillStyle = '#5a4630'; g.fillRect(v === 2 ? 40 : 300, 176, 180, 6);        // counter
+  for (let i = 0; i < 2 + v; i++) { const x = 60 + R() * 400; g.fillStyle = 'rgba(25,20,16,0.85)'; g.beginPath(); g.ellipse(x, 150, 11, 13, 0, 0, 7); g.fill(); g.fillRect(x - 17, 163, 34, 93); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+let SHOPGLASS = null;
+function shopGlass() { return SHOPGLASS || (SHOPGLASS = new THREE.MeshPhysicalMaterial({ color: 0x2a3036, roughness: 0.04, metalness: 0.0, transparent: true, opacity: 0.32, envMapIntensity: 1.8, depthWrite: false, name: 'shopGlass' })); }

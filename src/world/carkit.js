@@ -158,3 +158,21 @@ export function carMaterials() {
   return MATS;
 }
 export const CAR_COLORS = [0x1a1a1c, 0x9a9ea3, 0x5f656b, 0x22305c, 0x6a1c1c, 0xb4b2ab, 0x33383c, 0x16181a, 0x7b8086, 0x1a4433, 0x4a4036, 0x2d4a55, 0xd8d6cf, 0x0f1e3a].map(c => new THREE.Color(c));
+
+/** Instances parked cars: list of { x, y?, z, ry, kind, color? } → one InstancedMesh per kind × slot. No colliders (callers add them). */
+export function placeCars(world, list, { raycast = true } = {}) {
+  const { scene, ctx, R } = world; const CM = carMaterials();
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+  for (const kind of CAR_KINDS) {
+    const P = list.filter((c) => c.kind === kind); if (!P.length) continue;
+    const G = carGeometries(kind).geos;
+    for (const slot of Object.keys(G)) {
+      if (!G[slot]) continue;
+      const im = new THREE.InstancedMesh(G[slot], CM[slot], P.length); im.name = `cars:${kind}:${slot}`;
+      P.forEach((c, i) => { q.setFromAxisAngle(up, c.ry || 0); p.set(c.x, c.y || 0, c.z); im.setMatrixAt(i, m4.compose(p, q, one)); if (slot === 'paint') im.setColorAt(i, c.color ? new THREE.Color(c.color) : (kind === 'cab' ? new THREE.Color(0xf2b820) : CAR_COLORS[((R ? R() : Math.random()) * CAR_COLORS.length) | 0])); });
+      im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      im.castShadow = slot === 'paint' || slot === 'rubber'; im.receiveShadow = true; im.userData.surface = 'metal'; scene.add(im);
+      if (raycast && (slot === 'paint' || slot === 'glass')) ctx.raycastTargets.push(im);
+    }
+  }
+}

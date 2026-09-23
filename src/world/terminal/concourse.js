@@ -243,7 +243,17 @@ export function buildConcourse(world, M, Z) {
   {
     const r = 3.1;
     B.add(M.marble, new THREE.CylinderGeometry(r, r + 0.15, 1.1, 18), mat4(0, 0.55, 0), { uvScale: uv(M.marble) });
-    B.add(M.darkGlass, new THREE.CylinderGeometry(r - 0.08, r - 0.08, 1.5, 18), mat4(0, 1.85, 0));
+    { // glazing you can see into: warm-lit interior (counter, clerks, timetable racks) behind a tinted, reflective pane
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 128; const g = c.getContext('2d');
+      const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#6b5434'); gr.addColorStop(0.55, '#c9a46a'); gr.addColorStop(0.72, '#3a2a1a'); gr.addColorStop(1, '#241a10'); g.fillStyle = gr; g.fillRect(0, 0, 1024, 128);
+      for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(40,28,16,${0.25 + world.R() * 0.3})`; g.fillRect(world.R() * 1024, 8 + world.R() * 20, 6 + world.R() * 30, 30 + world.R() * 20); }   // racks
+      for (let i = 0; i < 9; i++) { const x = 60 + i * 110 + world.R() * 40; g.fillStyle = '#1c150e'; g.beginPath(); g.ellipse(x, 58, 11, 13, 0, 0, 7); g.fill(); g.fillRect(x - 17, 70, 34, 30); }   // clerks behind the counter
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+      const inner = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.6, r - 0.6, 1.5, 24, 1, true), new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, color: 0xd8c8a8 }));
+      inner.position.set(0, 1.85, 0); inner.name = 'boothInterior'; world.scene.add(inner);
+      const pane = new THREE.Mesh(new THREE.CylinderGeometry(r - 0.08, r - 0.08, 1.5, 36, 1, true), new THREE.MeshPhysicalMaterial({ color: 0x3a4148, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.38, envMapIntensity: 1.6, depthWrite: false }));
+      pane.position.set(0, 1.85, 0); pane.name = 'boothGlass'; pane.userData.surface = 'glass'; world.scene.add(pane); world.ctx.raycastTargets.push(pane);
+    }
     for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; B.box(M.brass, [-0.06, 1.1, -0.06], [0.06, 2.65, 0.06], { uvScale: 1 }); const g = B.parts.get(M.brass); const last = g[g.length - 1]; last.applyMatrix4(mat4(Math.cos(a) * r, 0, Math.sin(a) * r, 0, -a)); }
     B.add(M.brass, new THREE.CylinderGeometry(r + 0.25, r + 0.1, 0.25, 18), mat4(0, 2.75, 0));
     B.add(M.brass, new THREE.CylinderGeometry(r + 0.06, r + 0.06, 0.08, 18), mat4(0, 1.12, 0));

@@ -8,6 +8,7 @@ import { buildSouth } from '../terminal/south.js';
 import { buildSubway } from '../terminal/subway.js';
 import { buildPassage } from '../terminal/passage.js';
 import { buildExterior } from '../terminal/exterior.js';
+import { buildCrowd, scatter } from '../crowd.js';
 
 export const meta = {
   id: 'terminal', name: 'CENTRAL STATION', subtitle: 'DAY OPS · MAIN CONCOURSE', time: 'day', weather: 'clear',
@@ -36,6 +37,21 @@ export function build(world) {
       return false; };
     for (let i = ctx.colliders.length - 1; i >= 0; i--) { const b = ctx.colliders[i]; const w = b.max.x - b.min.x, d = b.max.z - b.min.z; if (w < 4 && d < 4 && inArch(b)) ctx.colliders.splice(i, 1); } };
   clearOpenings(); { let t = 0, n = ctx.colliders.length; world.updaters.push((dt) => { t += dt; if (t < 12 && ctx.colliders.length !== n) { n = ctx.colliders.length; clearOpenings(); n = ctx.colliders.length; } }); } // async GLTF props add colliders later
+  // ---- people: a transit hall with nobody in it reads as a greybox (critic r1 #8). Non-colliding set dressing. ----
+  try {
+    const R = world.R, face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z);
+    const crowd = [];
+    for (let i = 0; i < 12; i++) { const a = R() * Math.PI * 2, r = 4.6 + R() * 1.8; const x = Math.cos(a) * r, z = Math.sin(a) * r; crowd.push({ x, y: 0, z, ry: R() < 0.6 ? face(x, z, 0, 0) : R() * 6.3, pose: R() < 0.3 ? 'phone' : 'stand', bag: R() < 0.35 ? 1 : 0 }); }
+    for (const qx of [11, 15.5, 20, 24]) { const n = 2 + ((R() * 4) | 0); for (let k = 0; k < n; k++) crowd.push({ x: qx + (R() - 0.5) * 0.3, y: 0, z: 13.9 - k * 0.85, ry: (R() - 0.5) * 0.3, pose: R() < 0.25 ? 'phone' : 'stand', bag: R() < 0.3 ? 1 : 0 }); }
+    const hall = (x, z) => Math.hypot(x, z) < 6.8 || (Math.abs(x) > 17.5 && Math.abs(z) < 5.5) || (x > 9 && z > 9.5) || Math.abs(x + 38.5) < 3;
+    crowd.push(...scatter(R, 30, -27, 27, -14, 13.5, 0, hall, { walk: 0.6, bag: 0.3, gap: 1.4 }));
+    for (let i = 0; i < 7; i++) { const sx = R() < 0.5 ? -1 : 1; crowd.push({ x: sx * 32.3, y: P.BAL_Y, z: -10 + R() * 20, ry: -sx * Math.PI / 2 + (R() - 0.5) * 0.4, pose: R() < 0.3 ? 'phone' : 'stand' }); }
+    const isl = P.ISL[1]; crowd.push(...scatter(R, 16, -40, 40, isl[0] + 1.3, isl[1] - 1.3, -12, (x) => Math.abs(x) < 8 || Math.abs(Math.abs(x) - 24) < 5, { walk: 0.25, bag: 0.2, gap: 2 }).map((c) => ({ ...c, ry: R() < 0.7 ? (R() < 0.5 ? 0 : Math.PI) + (R() - 0.5) * 0.5 : c.ry })));
+    const walkAlong = (c) => ({ ...c, ry: (R() < 0.5 ? Math.PI / 2 : -Math.PI / 2) + (R() - 0.5) * 0.3 });
+    crowd.push(...scatter(R, 8, -58, 58, P.ST.z0 + 0.8, P.ST.curbN - 0.6, 0, () => false, { walk: 0.7, bag: 0.1, gap: 3 }).map(walkAlong));
+    crowd.push(...scatter(R, 9, -58, 58, P.ST.curbS + 0.6, P.ST.facadeZ - 1.2, 0, (x) => Math.abs(x) < 10, { walk: 0.65, bag: 0.1, gap: 3 }).map(walkAlong));
+    buildCrowd(world, crowd);
+  } catch (e) { console.warn('[terminal] crowd', e); }
   W.groundHeight = (x, z) => {
     let h = 0;
     // balconies/tabs (h ≥ 5.9) are collider slabs you stand on via collision — the ground beneath them stays the concourse floor, so the arcades are walkable

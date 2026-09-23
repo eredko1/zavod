@@ -10,7 +10,7 @@ export const HDRI_URL = './assets/hdri/st_fagans_interior_2k.hdr';
 
 export function buildLighting(world, M) {
   const { ctx, scene, R } = world; const { renderer } = ctx;
-  renderer.toneMappingExposure = 0.82;
+  renderer.toneMappingExposure = 0.7;
   scene.background = new THREE.Color(0x0b0d10);      // never visible (closed shell); dark neutral
   scene.fog = new THREE.FogExp2(0xcfc2a8, 0.0022);    // very light warm haze for depth
 
@@ -57,7 +57,10 @@ export function buildLighting(world, M) {
   const cove = (w, h, x, y, z, lx, ly, lz, intensity) => {
     const l = new THREE.RectAreaLight(0xffd9a0, intensity, w, h); l.position.set(x, y, z); l.lookAt(lx, ly, lz); scene.add(l); return l;
   };
-  cove(82, 3.6, 0, P.CORNICE - 3.0, P.Z1 - 1.7, 0, P.CORNICE - 13, P.Z1 - 0.4, 13);   // south cornice, raking down its own wall
+  cove(82, 3.6, 0, P.CORNICE - 3.0, P.Z1 - 1.7, 0, P.CORNICE - 13, P.Z1 - 0.4, 13);
+  // street skylight: the exterior shares the hall's dim interior ambient, so Main Street read several stops under. A broad
+  // down-facing area light over the street (z 51..76) fills it without reaching into the closed hall.
+  { const sky = new THREE.RectAreaLight(0xcfdcec, 2.6, 130, 30); sky.position.set(0, 34, (P.ST.z0 + P.ST.facadeZ) / 2); sky.lookAt(0, 0, (P.ST.z0 + P.ST.facadeZ) / 2); scene.add(sky); }   // south cornice, raking down its own wall
   cove(82, 3.6, 0, P.CORNICE - 3.0, P.Z0 + 1.7, 0, P.CORNICE - 13, P.Z0 + 0.4, 13);   // north cornice
   cove(34, 4.0, P.X0 + 2.6, 24.0, 0, P.X0 + 0.6, 14, 0, 14);                          // west lunette
   cove(34, 4.0, P.X1 - 2.6, 24.0, 0, P.X1 - 0.6, 14, 0, 14);                          // east lunette

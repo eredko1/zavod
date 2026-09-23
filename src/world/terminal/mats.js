@@ -59,7 +59,7 @@ export function makeMats(ctx, R, env) {
     // traffic lanes (worn = rougher)
     for (let i = 0; i < 6; i++) { const x = R() * 512; const gr = rg.createLinearGradient(x - 60, 0, x + 60, 0); gr.addColorStop(0, 'rgba(120,120,120,0)'); gr.addColorStop(0.5, 'rgba(140,140,140,0.5)'); gr.addColorStop(1, 'rgba(120,120,120,0)'); rg.fillStyle = gr; rg.fillRect(x - 60, 0, 120, 512); }
     const rough = tex(rc, { srgb: false });
-    M.marbleFloor = std('marbleFloor', { map, roughnessMap: rough, roughness: 1.0, metalness: 0.02, color: 0xffffff, envMapIntensity: 0.9 });
+    M.marbleFloor = std('marbleFloor', { map, roughnessMap: rough, roughness: 0.75, metalness: 0.02, color: 0xb9a490, envMapIntensity: 1.3 }); // polished warm pink-tan, mirrors the windows
     M.marbleFloor.userData.uv = 0.25;
   }
   // ---- Caen stone ashlar (walls) tile = 4 m ----------------------------------------
@@ -80,7 +80,7 @@ export function makeMats(ctx, R, env) {
       }
     }
     for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(90,70,50,${R() * 0.18})`; g.fillRect(R() * S, R() * S, 1 + R() * 3, 1 + R() * 3); }
-    M.stone = std('caenStone', { map: tex(c), roughness: 0.82, metalness: 0.0, color: 0xffffff });
+    M.stone = std('caenStone', { map: tex(c), roughness: 0.82, metalness: 0.0, color: 0xd6c3a4 });
     M.stone.userData.uv = 0.25;
   }
   // ---- Botticino cream marble (wainscot, booths, stairs) tile = 2 m -----------------
@@ -89,10 +89,11 @@ export function makeMats(ctx, R, env) {
     g.fillStyle = '#ddd0b8'; g.fillRect(0, 0, S, S);
     const nf = noiseField(R, 256, 5);
     for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const n = nf[((y >> 2) % 256) * 256 + ((x >> 2) % 256)]; g.fillStyle = `rgba(${200 + n * 45},${185 + n * 40},${160 + n * 35},0.8)`; g.fillRect(x, y, 4, 4); }
-    veins(g, R, S, { color: '#9a8468', count: 22, width: 1.8, alpha: 0.35 });
+    veins(g, R, S, { color: '#8a7255', count: 34, width: 2.0, alpha: 0.5 });
+    veins(g, R, S, { color: '#6e5a44', count: 10, width: 1.2, alpha: 0.45 });
     veins(g, R, S, { color: '#f4ecdd', count: 18, width: 2.5, alpha: 0.4 });
     g.strokeStyle = 'rgba(80,65,50,0.5)'; g.lineWidth = 3; for (let i = 0; i <= 2; i++) { g.beginPath(); g.moveTo(0, i * 512); g.lineTo(S, i * 512); g.stroke(); g.beginPath(); g.moveTo(i * 512, 0); g.lineTo(i * 512, S); g.stroke(); }
-    M.marble = std('botticino', { map: tex(c), roughness: 0.28, metalness: 0.02, color: 0xffffff, envMapIntensity: 0.8 });
+    M.marble = std('botticino', { map: tex(c), roughness: 0.28, metalness: 0.02, color: 0xc6b498, envMapIntensity: 1.0 });
     M.marble.userData.uv = 0.5;
     M.marbleDark = std('marbleDark', { map: M.marble.map, roughness: 0.3, metalness: 0.02, color: 0x8d7f6d });
     M.marbleDark.userData.uv = 0.5;
@@ -136,7 +137,13 @@ export function makeMats(ctx, R, env) {
   M.bronze = std('bronze', { color: 0x4a3a26, metalness: 0.9, roughness: 0.5 });
   M.ironDark = std('iron', { color: 0x23262a, metalness: 0.8, roughness: 0.55 });
   M.steelGreen = std('steelGreen', { color: 0x2f4a3a, metalness: 0.6, roughness: 0.6 });
-  M.stainless = std('stainless', { color: 0xb9bcc0, metalness: 1.0, roughness: 0.38, envMapIntensity: 1.1 });
+  { // fluted stainless (subway cars, handrails): vertical flutes every ~3 cm in the roughness/normal response + streaky grime, 1 m tile
+    const S = 512, [c, g] = canvas(S, S), [rc, rg] = canvas(S, S);
+    g.fillStyle = '#b4b7ba'; g.fillRect(0, 0, S, S); rg.fillStyle = '#6a6a6a'; rg.fillRect(0, 0, S, S);
+    for (let x = 0; x < S; x += 16) { g.fillStyle = 'rgba(70,74,78,0.35)'; g.fillRect(x, 0, 3, S); g.fillStyle = 'rgba(235,238,240,0.35)'; g.fillRect(x + 5, 0, 4, S); rg.fillStyle = 'rgba(160,160,160,0.8)'; rg.fillRect(x, 0, 4, S); }
+    for (let i = 0; i < 160; i++) { const x = R() * S; g.fillStyle = `rgba(60,52,44,${0.04 + R() * 0.1})`; g.fillRect(x, R() * S * 0.5, 1 + R() * 3, 40 + R() * 200); }
+    M.stainless = std('stainless', { map: tex(c), roughnessMap: tex(rc, { srgb: false }), color: 0xffffff, metalness: 0.85, roughness: 0.55, envMapIntensity: 0.9 });
+  }
   M.steelBlue = std('steelBlue', { color: 0x1f2f4a, metalness: 0.7, roughness: 0.5 });
   M.rubber = std('rubber', { color: 0x151515, roughness: 0.95, metalness: 0 });
   // ---- plaster / paint ------------------------------------------------------------
@@ -234,7 +241,14 @@ export function makeMats(ctx, R, env) {
   M.skin = std('skin', { color: 0xffffff, roughness: 0.72, metalness: 0 });
   M.luggage = std('luggage', { color: 0xffffff, roughness: 0.6, metalness: 0.05 });
   M.darkGlass = std('darkGlass', { color: 0x0e1418, roughness: 0.08, metalness: 0.9, envMapIntensity: 1.3 });
-  M.trainWindow = std('trainWindow', { color: 0x1a2530, roughness: 0.1, metalness: 0.6, emissive: 0x4a5560, emissiveIntensity: 0.6 });
+  { // lit car interior seen through the windows: seat backs, grab poles, standing riders, fluorescent strip
+    const [c, g] = canvas(512, 256); const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#dfe6ea'); gr.addColorStop(0.25, '#9aa4aa'); gr.addColorStop(1, '#4a5258'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = '#f4f8fa'; g.fillRect(0, 10, 512, 10);
+    for (let x = 20; x < 512; x += 64) { g.fillStyle = '#8f98a0'; g.fillRect(x, 0, 5, 256); }
+    for (let i = 0; i < 5; i++) { const x = 30 + R() * 450; g.fillStyle = 'rgba(30,32,36,0.8)'; g.beginPath(); g.ellipse(x, 110, 16, 19, 0, 0, 7); g.fill(); g.fillRect(x - 26, 128, 52, 128); }
+    g.fillStyle = '#2d4a6a'; g.fillRect(0, 200, 512, 56);
+    M.trainWindow = std('trainWindow', { color: 0x283038, roughness: 0.06, metalness: 0.3, emissiveMap: tex(c), emissive: 0xffffff, emissiveIntensity: 0.55, envMapIntensity: 1.2 });
+  }
   M.redSeat = std('redSeat', { color: 0xa8451f, roughness: 0.7, metalness: 0 });
   M.blueSeat = std('blueSeat', { color: 0x2b4670, roughness: 0.7, metalness: 0 });
   M.shutter = std('shutter', { color: 0x6b6f72, metalness: 0.7, roughness: 0.5 });
