@@ -56,6 +56,7 @@ export function build(world) {
     ballpark: look(-250, 0, -128, -350, 12, -90),                // the ballpark's brick street wall and light towers from the avenue
     cyclone: look(222, 0, -72, 188, 14, 10),                     // the wooden coaster from the avenue at its north end
     rides: look(-30, 0, 60, 60, 6, 40),                          // inside the amusement park among the flat rides
+    luna: look(195, 0, -118, 255, 28, -190),                      // the public-housing towers north of the avenue, from the lawn edge
   };
   // QA guard: a pose whose eye is inside a collider is walked backwards along its view line until it is in the open
   for (const [k, p] of Object.entries(W.poses)) {
