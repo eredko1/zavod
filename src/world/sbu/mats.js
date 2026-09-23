@@ -329,7 +329,7 @@ export function makeMats(world) {
   reg('grass', pbr('grass', 'wsp_grass', '1k', { color: 0x86a05c, normalScale: 0.8, arm: false, roughness: 0.95, envMapIntensity: 0.3 }), 'ground', 1 / 2.5);
   reg('hex', new THREE.MeshStandardMaterial({ map: hexPaverTexture(R), color: 0xc6c8c6, roughness: 0.9, metalness: 0, envMapIntensity: 0.5, name: 'hex' }), 'concrete', 1 / 2);
   reg('brickPav', pbr('brickPav', 'wsp_brick', '1k', { color: 0x9a6a58, normalScale: 0.7, arm: false, roughness: 0.9, envMapIntensity: 0.4 }), 'concrete', 1 / 1.2);
-  reg('concretePav', pbr('concretePav', 'concrete_floor_02', '1k', { color: 0xc4c3bf, normalScale: 0.5, grime: { strength: 0.3, height: 0.2, wet: 0, tint: [0.46, 0.46, 0.45] } }), 'concrete', 1 / 3);
+  reg('concretePav', pbr('concretePav', 'concrete_floor_02', '1k', { color: 0xb4b6b8, normalScale: 0.5, grime: { strength: 0.3, height: 0.2, wet: 0, tint: [0.46, 0.46, 0.45] } }), 'concrete', 1 / 3);
   reg('asphalt', pbr('asphalt', 'asphalt_02', '2k', { color: 0x8f8f8d, normalScale: 0.6, envMapIntensity: 0.5 }), 'concrete', 1 / 5);
   reg('cobble', new THREE.MeshStandardMaterial({ map: cobbleTexture(R), color: 0xd6d2ca, roughness: 0.9, envMapIntensity: 0.4, name: 'cobble' }), 'concrete', 1 / 1.5);
   reg('curb', plain('curb', 0xb9b6ae, { roughness: 0.85 }), 'concrete', 0.5);
@@ -359,7 +359,7 @@ export function makeMats(world) {
   reg('glass', plain('glass', 0x5c7a74, { roughness: 0.04, metalness: 0.95, envMapIntensity: 1.2 }), 'metal', 0.5);
   reg('glassLit', plain('glassLit', 0x5f746e, { roughness: 0.05, metalness: 0.9, envMapIntensity: 1.0, emissive: 0xffd9a0, emissiveIntensity: 0.14 }), 'metal', 0.5);
   reg('granite', pbr('granite', 'cracked_concrete', '1k', { color: 0xcfcabe, normalScale: 1.6, envMapIntensity: 0.4 }), 'concrete', 1 / 1.2);
-  reg('graniteCap', plain('graniteCap', 0xa8a294, { roughness: 0.75 }), 'concrete', 0.5);
+  reg('graniteCap', plain('graniteCap', 0x7d7a74, { roughness: 0.8 }), 'concrete', 0.5);
   reg('cobbleWet', new THREE.MeshStandardMaterial({ map: cobbleTexture(R, { dark: true }), color: 0xffffff, roughness: 0.35, metalness: 0.05, envMapIntensity: 0.8, name: 'cobbleWet' }), 'concrete', 1 / 1.5);
   reg('terrazzo', pbr('terrazzo', 'concrete_floor_02', '1k', { color: 0xa9a6a0, normalScale: 0.3, envMapIntensity: 0.6 }), 'concrete', 1 / 2);
   reg('fascia', plain('fascia', 0xd2d2ce, { roughness: 0.5, metalness: 0.15, envMapIntensity: 0.6 }), 'metal', 0.5);
@@ -428,7 +428,9 @@ export function makeMats(world) {
   // mottled bark (replaces the near-black plank texture)
   { const bk = barkTexture(R); M.bark.map = bk.map; M.bark.normalMap = bk.normalMap; M.bark.color.set(0xffffff); M.bark.roughness = 1; M.bark.metalness = 0; M.bark.aoMap = null; M.bark.roughnessMap = null; M.bark.metalnessMap = null; M.bark.envMapIntensity = 0.3; M.uvScale.bark = 1 / 1.6; M.bark.needsUpdate = true; }
   // alpha-tested grass clump cards
-  { const gc = grassCardTexture(R); M.grassCard = new THREE.MeshStandardMaterial({ map: gc.map, alphaMap: gc.alphaMap, color: 0xc2d493, roughness: 1, metalness: 0, alphaTest: 0.4, side: THREE.DoubleSide, envMapIntensity: 0.45, name: 'grassCard' }); }
+  { const gc = grassCardTexture(R); M.grassCard = new THREE.MeshLambertMaterial({ map: gc.map, alphaMap: gc.alphaMap, color: 0xa8a878, alphaTest: 0.4, side: THREE.DoubleSide, name: 'grassCard' });
+    // tufts are lit like the lawn they sit on (normal bent to +Y): upright cards facing the sun glowed neon against the flat lawn
+    M.grassCard.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(mix(normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), normal, 0.2));'); }; M.grassCard.customProgramCacheKey = () => 'sbu-grasscard'; }
   M.surface.grassCard = 'ground'; M.uvScale.grassCard = 1;
   // baked contact occlusion (multiply blend over the ground)
   M.aoEdge = new THREE.MeshBasicMaterial({ map: aoGradTexture(0.5), transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false, fog: false, name: 'aoEdge' });

@@ -99,11 +99,11 @@ export function buildDetail(world, M) {
   ];
   const cards = [];
   for (const [x0, z0, x1, z1, st] of LAWNS) {
-    const sp = st ?? 2.1;
+    const sp = (st ?? 2.1) * 0.7;
     for (let x = x0; x < x1; x += sp) for (let z = z0; z < z1; z += sp) {
       if (R() < 0.22) continue;
       const px = x + j(sp * 0.9), pz = z + j(sp * 0.9);
-      cards.push({ x: px, z: pz, y: gh(px, pz), ry: R() * Math.PI, s: 0.7 + R() * 0.75 });
+      cards.push({ x: px, z: pz, y: gh(px, pz), ry: R() * Math.PI, s: 0.4 + R() * 0.45 });
     }
   }
   {

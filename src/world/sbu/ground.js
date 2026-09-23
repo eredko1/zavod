@@ -114,7 +114,7 @@ export function buildGround(world, M) {
   B.poly('brickPav', circlePts(pc.x, pc.z, 5.5, 40), PAV_Y + 0.006);
   // bus loop link walk (plaza → loop) and the SAC south service alley
   pav('hex', -112, 55, -100, 75);
-  pav('concretePav', -112, 75, -104, 118);
+  pav('hex', -112, 75, -104, 118);   // continue the link walk in hex pavers (plain concrete read as a dirt strip at eye level)
 
   // ---- east lawn, fountain, pond, Staller ---------------------------------------------------------------------------------
   const F = FOUNTAIN;
