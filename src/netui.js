@@ -51,6 +51,14 @@ export function install(ctx, opts) {
   U = { ctx, opts, badge: null, board: null, room: null, over: null, act: null, boardShown: false, boardHtml: '', lastStatus: '' };
   // "Play online" in the main menu → our overlay (hud has no case for it; it only emits the ui event)
   ctx.bus.on('ui', (e) => { if (e?.action === 'online') openOnline(); });
+  // the one-tap friends button: shared room 'lunapark' on Coney; asks for a name only the first time on this device
+  ctx.bus.on('ui', (e) => {
+    if (e?.action !== 'coney') return;
+    let name = ''; try { name = cleanName(localStorage.getItem('zavod.name')); } catch {}
+    if (!name) { U.forceMap = 'coney'; openOnline(); if (U.f) { U.f.room.value = 'lunapark'; } return; }
+    const info = netInfo(); if (info && info.room === 'lunapark' && curMap() === 'coney') { if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
+    const u = new URL(location.href); u.search = ''; u.searchParams.set('map', 'coney'); u.searchParams.set('room', 'lunapark'); u.searchParams.set('name', name); location.href = u.toString();
+  });
   ctx.bus.on('state', () => refresh());
   // phones: hangout F-prompts ("F — TALK TO IGOR") get a tappable button
   if (ctx.isTouch) installTouchAct(ctx);
@@ -171,7 +179,7 @@ function join() {
   try { localStorage.setItem('zavod.room', room); if (name) localStorage.setItem('zavod.name', name); } catch {}
   const info = netInfo();
   if (info && info.room === room && (!name || name === info.name)) { closeOnline(); if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
-  const u = new URL(location.href); u.searchParams.set('map', curMap()); u.searchParams.set('room', room); u.searchParams.delete('mp');
+  const u = new URL(location.href); u.searchParams.set('map', U.forceMap || curMap()); u.searchParams.set('room', room); u.searchParams.delete('mp');
   if (name) u.searchParams.set('name', name); else u.searchParams.delete('name');
   location.href = u.toString();
 }

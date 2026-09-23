@@ -7,6 +7,7 @@ import { buildCrowd } from '../crowd.js';
 import { hideParkedCar } from '../carkit.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const B2 = new THREE.Vector3(163, 0, -445);      // OSM "Luna Park Houses 2" centre (map frame)
 const START_CASH = 20, PRICE = 10;
@@ -34,6 +35,7 @@ export function buildHangout(world, M) {
   buildUI(); buildPuffs(world);
   ctx.bus.on('net:elev', (m) => onRemoteElev(m));
   ctx.bus.on('net:steal', (m) => stealLocal(m.i, false));
+  ctx.bus.on('net:red', (m) => onRemoteRed(m));
   ctx.bus.on('net:smoke', (m) => { if (Array.isArray(m.p)) puff(new THREE.Vector3(...m.p)); });
   ctx.bus.on('net:igor', (m) => ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'Someone'} bought from Igor`, 1800));
   ctx.bus.on('playerDied', () => { endRide(true); leavePassenger(); });
@@ -103,6 +105,11 @@ function buildIgor(world, M, pos) {
     part(new THREE.CapsuleGeometry(0.075, 0.3, 4, 10), jeans, s2 * 0.15, 0.27, 0.44);          // shins
     part(new THREE.BoxGeometry(0.11, 0.08, 0.27), shoe, s2 * 0.15, 0.05, 0.5);                 // sneakers
   }
+  // merge the static park (pad, fence, tables, benches, litter, Igor) into one mesh per material: it was ~600 draw calls
+  { park.updateMatrixWorld(true); const inv = park.matrixWorld.clone().invert(); const byMat = new Map(); const kill = [];
+    park.traverse((o) => { if (!o.isMesh) return; const g = o.geometry.clone().applyMatrix4(inv.clone().multiply(o.matrixWorld)); const gg = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(gg.attributes)) if (!['position', 'normal', 'uv'].includes(k)) gg.deleteAttribute(k); if (!gg.attributes.uv) gg.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(gg.attributes.position.count * 2), 2)); (byMat.get(o.material) || byMat.set(o.material, []).get(o.material)).push(gg); kill.push(o); });
+    for (const o of kill) o.parent.remove(o);
+    for (const [mat, list] of byMat) { const m = new THREE.Mesh(mergeGeometries(list, false), mat); m.castShadow = mat !== iron; m.receiveShadow = true; park.add(m); } }
   const ipos = igorBench.getWorldPosition(new THREE.Vector3()); ipos.y = 0;
   // name tag
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.font = '700 34px Barlow, Arial'; x.textAlign = 'center'; x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(40, 10, 176, 44); x.fillStyle = '#ffd27a'; x.fillText('IGOR', 128, 44);
@@ -115,11 +122,12 @@ function update(dt) {
   const { ctx } = H; const p = ctx.player; if (!p) return;
   const playing = ctx.state === 'playing' && !p.dead;
   // effects run regardless
-  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDoors(dt);
+  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDoors(dt); updateRed();
   if (H.riding) return updateRide(dt);
   if (H.passenger) return updatePassenger(dt);
   if (!playing) return;
   const F = ctx.input?.pressed?.has?.('KeyF');
+  if (H.stash && ctx.input?.pressed?.has?.('KeyS') && !ctx.vehicles?.mounted && H.towers.some((t) => Math.abs(p.position.y - t.yF) < 1.5)) { lightUp(); }   // S = smoke (up top)
   const pos = p.position; const near = (v, r, dy = 1.2) => Math.hypot(v.x - pos.x, v.z - pos.z) < r && Math.abs(v.y - pos.y) < dy;
   const mounted = !!ctx.vehicles?.mounted;
   let prompt = null, act = null;
@@ -129,10 +137,10 @@ function update(dt) {
       const t = H.towers[ti];
       t.lobby.cars.forEach((c, k) => { if (!act && near(c.pos, 1.4)) { prompt = 'F — ELEVATOR ▲ 19'; act = () => callElevator(ti, k, 'up'); } });
       t.top.forEach((side, si) => side.cars.forEach((c, k) => { if (!act && near(c.pos, 1.4)) { prompt = 'F — ELEVATOR ▼ LOBBY'; act = () => callElevator(ti, k, 'down', si); } }));
-      if (!act && H.stash && Math.abs(pos.y - t.yF) < 1.2 && t.centre.distanceTo(new THREE.Vector3(pos.x, 0, pos.z)) < 40) { prompt = 'F — LIGHT UP'; act = lightUp; }
+      if (!act && H.stash && Math.abs(pos.y - t.yF) < 1.2 && t.centre.distanceTo(new THREE.Vector3(pos.x, 0, pos.z)) < 40) { prompt = 'S / F — SMOKE'; act = lightUp; }
     }
     if (!act) { const c = nearestParked(3.0); if (c) { prompt = 'F — STEAL CAR'; act = () => steal(c); } }
-    if (!act) { const f = nearestFriendCar(3.8); if (f) { prompt = `F — RIDE WITH ${f.name}`; act = () => enterPassenger(f.id); } }
+    if (!act) { const f = nearestFriendCar(3.8); if (f) { prompt = `F — HOP IN WITH ${f.name}`; act = () => enterPassenger(f.id); } }
   }
   ctx.interactNear = !!act;   // next frame's weapons.js leaves F alone while a prompt is up
   H.promptT -= dt;
@@ -169,6 +177,35 @@ function updateDoors(dt) {
   if (changed) try { ctx.player?.rebuildColliders?.(); } catch {}
 }
 
+// ---- the red car: the group's ride, parked by building 2. One real drivable car per client; whoever drives it announces
+// 'red' taken/parked so every other client hides / re-parks its copy (the driver is shown by net.js as a red remote car).
+function buildRedCar(world) {
+  const { ctx } = H; const cars = world.parkedCars || []; const [sx, , sz] = world.W.onlineStart || [H.b2.centre.x, 0, H.b2.centre.z];
+  let best = null, bd = 1e9; for (const c of cars) { if (c.gone || c.kind === 'van') continue; const d = Math.hypot(c.x - sx, c.z - sz); if (d > 12 && d < bd) { bd = d; best = c; } }
+  if (!best || !ctx.vehicles?.spawnCar) return;
+  const i = cars.indexOf(best); stealLocal(i, false);   // the kerb slot becomes the red car
+  const car = ctx.vehicles.spawnCar(best.x, best.z, (best.ry || 0) - Math.PI / 2, 'sedan', 0xb3121c, 0);
+  if (!car) return; car.isRed = true; H.red = { car, mine: false, hidden: false };
+  // a red marker so friends can find it
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '700 30px Barlow, Arial'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(20, 10, 216, 44); g.fillStyle = '#ff5a5a'; g.fillText('THE RED CAR', 128, 42);
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); tag.scale.set(1.8, 0.45, 1); tag.position.set(0, 2.4, 0); car.group.add(tag); H.red.tag = tag;
+}
+function redHide(v) { const r = H.red; if (!r || r.hidden === v) return; r.hidden = v; const car = r.car; car.group.visible = !v;
+  if (v) { r.saved = car.pos.clone(); car.pos.y = -500; } else if (r.saved && car.pos.y < -100) car.pos.copy(r.saved);   // hidden copy must not be mountable (vehicles.js finds cars by pos)
+  const k = H.ctx.colliders.indexOf(car.box); if (v && k > -1) H.ctx.colliders.splice(k, 1); if (!v && k < 0) H.ctx.colliders.push(car.box); try { H.ctx.player?.rebuildColliders?.(); } catch {} }
+function updateRed() {
+  if (!H.redTried && H.ctx.vehicles?.spawnCar) { H.redTried = true; try { buildRedCar(H.world); } catch (e) { console.warn('[hangout] red car', e); } }   // vehicles.js boots after the world
+  const r = H.red; if (!r) return; const mv = H.ctx.vehicles?.mounted;
+  if (mv === r.car && !r.mine) { r.mine = true; r.tag.visible = false; H.ctx.net?.send?.('red', { s: 'taken' }); }
+  else if (r.mine && mv !== r.car) { r.mine = false; r.tag.visible = true; const c = r.car; H.ctx.net?.send?.('red', { s: 'parked', x: +c.pos.x.toFixed(2), z: +c.pos.z.toFixed(2), y: +c.pos.y.toFixed(2), h: +c.heading.toFixed(3) }); }
+}
+function onRemoteRed(m) {
+  const r = H.red; if (!r || r.mine) return;
+  if (m.s === 'taken') return redHide(true);
+  if (m.s === 'parked' && Number.isFinite(+m.x)) { const c = r.car; c.pos.set(+m.x, +m.y || 0, +m.z); c.heading = +m.h || 0; c.group.position.copy(c.pos); c.group.rotation.set(0, c.heading, 0);
+    const cs = Math.cos(c.heading), sn = Math.sin(c.heading), hx = Math.abs(cs) * 0.95 + Math.abs(sn) * 2.35, hz = Math.abs(sn) * 0.95 + Math.abs(cs) * 2.35; c.box.min.set(c.pos.x - hx, c.pos.y, c.pos.z - hz); c.box.max.set(c.pos.x + hx, c.pos.y + 1.5, c.pos.z + hz); redHide(false); }
+}
+
 // ---- Igor -------------------------------------------------------------------------------------------------------------------
 function buyIgor() {
   const { ctx } = H;
@@ -193,7 +230,7 @@ function onRemoteElev(m) {
 function startRide(ti, k, dir, side, delay = 0) {
   const { ctx } = H; const t = H.towers[ti]; if (!t) return;
   const dest = dir === 'up' ? { ...t.top[0].cars[k], face: t.top[0].view.yaw } : { ...t.lobby.cars[k], face: t.lobby.cars[k].yaw + Math.PI };
-  H.riding = { t: -delay, dest, dir, floor: dir === 'up' ? 1 : 19, jitter: (Math.random() - 0.5) * 0.9, moved: false };
+  H.riding = { t: -delay, dest, dir, floor: dir === 'up' ? 1 : 19, jitter: (Math.random() - 0.5) * 0.5, moved: false };
   ctx.player.mounted = { elevator: true };
   try { ctx.audio?.play?.('ui_click'); } catch {}
 }
@@ -233,13 +270,13 @@ function updateJoint(dt) {
     const cam = ctx.camera; const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()));
     const at = cam.getWorldPosition(new THREE.Vector3()).addScaledVector(fwd, 0.45).add(new THREE.Vector3(0, -0.08, 0));
     puff(at); ctx.net?.send?.('smoke', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)] });
-    H.high = Math.min(1, H.high + 0.22); H.highT = 55;   // each hit deepens it; it lingers ~55 s after the last one
+    H.high = Math.min(1, H.high + 0.22); H.highT = 150;   // each hit deepens it; it lingers ~2.5 min (long enough for the drive), fading over the last 40 s
   }
   if (H.smokeT <= 0) { if (H.joint) H.joint.g.visible = false; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = true; ctx.hud?.toast?.('…the whole island is glowing.', 2400); }
 }
 function updateHigh(dt) {
   const { ctx } = H; const cv = ctx.canvas; if (!cv) return;
-  if (H.highT > 0) { H.highT -= dt; if (H.highT < 20) H.high = Math.max(0, H.high - dt / 20); }
+  if (H.highT > 0) { H.highT -= dt; if (H.highT < 40) H.high = Math.max(0, H.high - dt / 40); }
   const k = H.high;
   if (k <= 0.001) { if (cv.style.filter) { cv.style.filter = ''; cv.style.transform = ''; } return; }
   const t = performance.now() / 1000;
@@ -283,7 +320,7 @@ function stealLocal(i, mine) {
 // ---- passenger in a friend's car ---------------------------------------------------------------------------------------------
 function nearestFriendCar(r) {
   const net = H.ctx.net; if (!net?.list) return null; const p = H.ctx.player.position; let best = null, bd = r;
-  for (const id of net.list()) { const q = net.peer(id); if (!q?.veh || q.veh.k === 'bike' || q.veh.k === 'pass') continue; const d = Math.hypot(q.pos.x - p.x, q.pos.z - p.z); if (d < bd) { bd = d; best = q; } }
+  for (const id of net.list()) { const q = net.peer(id); if (!q?.veh || q.veh.k === 'pass') continue; const d = Math.hypot(q.pos.x - p.x, q.pos.z - p.z); if (d < bd) { bd = d; best = q; } }
   return best;
 }
 function enterPassenger(id) { H.passenger = { id }; H.ctx.player.mounted = { passenger: true }; H.ctx.hud?.toast?.('F — GET OUT', 1600); }
@@ -294,11 +331,14 @@ function leavePassenger() {
 }
 function updatePassenger(dt) {
   const { ctx } = H; const q = ctx.net?.peer?.(H.passenger.id); const p = ctx.player;
-  if (!q || !q.veh || q.veh.k === 'bike' || q.dead || ctx.input?.pressed?.has?.('KeyF')) { ctx.input?.pressed?.delete?.('KeyF'); return leavePassenger(); }
+  if (!q || !q.veh || q.dead || ctx.input?.pressed?.has?.('KeyF')) { ctx.input?.pressed?.delete?.('KeyF'); return leavePassenger(); }
   const h = q.heading; const fwd = new THREE.Vector3(-Math.sin(h), 0, -Math.cos(h)), right = new THREE.Vector3(-fwd.z, 0, fwd.x);
-  const seat = q.pos.clone().addScaledVector(right, 0.4).addScaledVector(fwd, 0.15);
-  p.position.set(seat.x, seat.y + 0.3, seat.z); p.velocity?.set?.(0, 0, 0);
-  const cam = ctx.camera; cam.position.set(seat.x, seat.y + 1.17, seat.z); cam.rotation.set(p.pitch, p.yaw, 0); p.cameraPosition?.copy?.(cam.position);
+  const bike = q.veh.k === 'bike', sid = [...(ctx.net?.id || 'x')].reduce((a, c) => a + c.charCodeAt(0), 0) % 3;
+  const SEATS = [[0.4, 0.15], [-0.4, -0.85], [0.4, -0.85]];   // front passenger, rear left, rear right (metres right, forward)
+  const [sr, sf] = bike ? [0, -0.55] : SEATS[sid];
+  const seat = q.pos.clone().addScaledVector(right, sr).addScaledVector(fwd, sf);
+  p.position.set(seat.x, seat.y + (bike ? 0.55 : 0.3), seat.z); p.velocity?.set?.(0, 0, 0);
+  const cam = ctx.camera; cam.position.set(seat.x, seat.y + (bike ? 1.5 : 1.17), seat.z); cam.rotation.set(p.pitch, p.yaw, 0); p.cameraPosition?.copy?.(cam.position);
 }
 
 // ---- UI: cash + elevator fade -------------------------------------------------------------------------------------------------
