@@ -25,7 +25,11 @@ export function buildBeachLife(world, M) {
   }
   inst(scene, umbrellaGeo(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide, name: 'umbrella' }), umbrellas, true);
   inst(scene, new THREE.CylinderGeometry(0.025, 0.025, 2.3, 6).translate(0, 1.15, 0), M.alu, umbrellas.map((u) => ({ ...u, c: null })), true);
-  inst(scene, new THREE.PlaneGeometry(0.9, 1.8).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, name: 'towel' }), towels, false);
+  { // towels: 1.8 x 0.9 m, 1 cm thick, with a woven stripe texture (critic r7 #10 — they were zero-thickness flat quads)
+    const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 128);
+    for (let y = 0; y < 128; y += 16) { g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(0, y, 64, 6); } g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(0, 0, 64, 5); g.fillRect(0, 123, 64, 5);
+    const tt = new THREE.CanvasTexture(c); tt.colorSpace = THREE.SRGBColorSpace;
+    inst(scene, new THREE.BoxGeometry(0.9, 0.012, 1.8), new THREE.MeshStandardMaterial({ color: 0xffffff, map: tt, roughness: 0.95, name: 'towel' }), towels, false); }
   // lifeguard chairs every ~120 m near the water (white wooden A-frame chair with a red cross panel)
   for (let x = PLAY.x0 + 40; x < PLAY.x1; x += 120) { const z = waterZ(x) - 22, y = sandHeight(x, z); for (const [dx, dz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) B.add('coasterWhite', boxGeo([x + dx - 0.08, y, z + dz - 0.08], [x + dx * 0.5 + 0.08, y + 3.2, z + dz * 0.5 + 0.08]), { uv: false }); B.box('coasterWhite', [x - 0.7, y + 2.2, z - 0.5], [x + 0.7, y + 2.35, z + 0.5]); B.box('coasterRed', [x - 0.6, y + 2.35, z - 0.52], [x + 0.6, y + 3.1, z - 0.45], { collide: false }); world.cover(x, z - 1.5, 0, -1, y); }
   // bathers standing in the shallows

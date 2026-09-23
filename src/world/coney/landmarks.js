@@ -154,7 +154,8 @@ function woodCoaster(world, M, B, c) {
     const a = pts[i], b = pts[(i + 1) % N]; const d = new THREE.Vector3().subVectors(b, a); d.y = 0; d.normalize(); const side = V(-d.z, 0, d.x);
     const tl = [a.clone().addScaledVector(side, 0.8), b.clone().addScaledVector(side, 0.8)], tr = [a.clone().addScaledVector(side, -0.8), b.clone().addScaledVector(side, -0.8)];
     track.add(tl[0], tl[1], 0.35); track.add(tr[0], tr[1], 0.35); track.add(a.clone().addScaledVector(side, -1.1).setY(a.y - 0.15), a.clone().addScaledVector(side, 1.1).setY(a.y - 0.15), 0.25);
-    red.add(a.clone().addScaledVector(side, 1.6).setY(a.y + 1.0), b.clone().addScaledVector(side, 1.6).setY(b.y + 1.0), 0.09);
+    red.add(a.clone().addScaledVector(side, 1.05).setY(a.y + 0.55), b.clone().addScaledVector(side, 1.05).setY(b.y + 0.55), 0.08);
+    if (i % 4 === 0) red.add(a.clone().addScaledVector(side, 1.05).setY(a.y - 0.1), a.clone().addScaledVector(side, 1.05).setY(a.y + 0.55), 0.05);
     if (i % 2) continue;                               // bents every other sample (~1.5 m): posts, ledgers, X-bracing to the next bent
     const j = (i + 2) % N; const a2 = pts[j]; const d2 = new THREE.Vector3().subVectors(pts[(j + 1) % N], a2); d2.y = 0; d2.normalize(); const side2 = V(-d2.z, 0, d2.x);
     for (const s of [-1.5, 1.5]) {
@@ -166,6 +167,19 @@ function woodCoaster(world, M, B, c) {
     world.box([a.x - 0.3, 0, a.z - 0.3], [a.x + 0.3, Math.min(a.y, 4), a.z + 0.3]);
   }
   white.build(world.scene); track.build(world.scene); red.build(world.scene);
+  // site (critic r7 #6): 3 m white corrugated wall around the footprint, a blue palisade on one corner, ticket booth + marquee, barricades
+  if (!M.corrWhite) { const c2 = document.createElement('canvas'); c2.width = 128; c2.height = 256; const g = c2.getContext('2d'); for (let x = 0; x < 128; x += 16) { const gr = g.createLinearGradient(x, 0, x + 16, 0); gr.addColorStop(0, '#d6d5cf'); gr.addColorStop(0.5, '#f6f5f0'); gr.addColorStop(1, '#c9c8c2'); g.fillStyle = gr; g.fillRect(x, 0, 16, 256); }
+    for (let i = 0; i < 30; i++) { const x = Math.random() * 128, L = 20 + Math.random() * 120; const gr = g.createLinearGradient(0, 0, 0, L); gr.addColorStop(0, 'rgba(120,90,60,0.35)'); gr.addColorStop(1, 'rgba(120,90,60,0)'); g.fillStyle = gr; g.fillRect(x, 0, 2 + Math.random() * 3, L); }
+    const t = new THREE.CanvasTexture(c2); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; M.corrWhite = new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.2, name: 'corrWhite' }); M.surface.corrWhite = 'metal'; M.uvScale.corrWhite = 1 / 1.6; }
+  { const q = bbox(c.p), m = 3; const wall = (x0, z0, x1, z1, key, h) => B.box(key, [Math.min(x0, x1), 0, Math.min(z0, z1)], [Math.max(x0, x1), h, Math.max(z0, z1)]);
+    wall(q.x0 - m, q.z0 - m, q.x1 + m, q.z0 - m + 0.15, 'corrWhite', 3); wall(q.x0 - m, q.z1 + m - 0.15, q.x1 + m, q.z1 + m, 'corrWhite', 3);
+    wall(q.x0 - m, q.z0 - m, q.x0 - m + 0.15, q.z1 + m, 'corrWhite', 3); wall(q.x1 + m - 0.15, q.z0 - m, q.x1 + m, (q.z0 + q.z1) / 2, 'corrWhite', 3);
+    for (let z = (q.z0 + q.z1) / 2; z < q.z1 + m; z += 0.25) B.box('wheelBlue', [q.x1 + m - 0.05, 0, z], [q.x1 + m + 0.05, 2.4, z + 0.08], { collide: false });
+    B.box('wheelBlue', [q.x1 + m - 0.08, 2.2, (q.z0 + q.z1) / 2], [q.x1 + m + 0.08, 2.35, q.z1 + m], { collide: false }); world.box([q.x1 + m - 0.1, 0, (q.z0 + q.z1) / 2], [q.x1 + m + 0.1, 2.4, q.z1 + m]);
+    const bx = q.x1 + m + 3, bz = q.z0 + 8; B.box('steelRed', [bx - 1.2, 0, bz - 0.8], [bx + 1.2, 2.8, bz + 0.8]); B.box('wheelBlue', [bx - 1.3, 2.8, bz - 0.9], [bx + 1.3, 3.1, bz + 0.9], { collide: false }); B.box('glassLit', [bx - 0.8, 1.1, bz - 0.82], [bx + 0.8, 2.0, bz - 0.8], { collide: false });
+    B.box('pjYellow', [bx - 0.5, 3.1, bz - 0.1], [bx + 0.5, 10.1, bz + 0.1]); for (let y = 3.4; y < 10; y += 0.45) B.box('bulb', [bx - 0.55, y, bz - 0.16], [bx + 0.55, y + 0.06, bz - 0.1], { collide: false });
+    for (let k = 0; k < 10; k++) { const x = bx + 3 + (k % 5) * 2.2, z = bz - 3 + Math.floor(k / 5) * 5; B.box('steelOrange', [x - 1.1, 0.9, z - 0.03], [x + 1.1, 1.0, z + 0.03], { collide: false }); for (const s2 of [-1, 1]) B.box('steelOrange', [x + s2 * 1.05 - 0.03, 0, z - 0.3], [x + s2 * 1.05 + 0.03, 1.0, z + 0.3], { collide: false }); world.box([x - 1.1, 0, z - 0.1], [x + 1.1, 1.0, z + 0.1]); }
+    world.cover(bx, bz - 1.4, 0, -1); }
   // station shed at the start
   const [sx, sz] = F.toWorld(-hu * 0.6, -hv); B.box('paintWall1', [sx - 12, 0, sz - 5], [sx + 12, 4.2, sz + 3]); B.box('coasterRed', [sx - 13, 4.2, sz - 6], [sx + 13, 4.6, sz + 4]); world.cover(sx, sz - 6, 0, -1);
   // animated train on the outer lap
@@ -188,7 +202,7 @@ function steelCoaster(world, M, B, c) {
     } else { const a = s * Math.PI * 2; u = Math.cos(a) * hu; v = Math.sin(a) * Math.max(3, F.hv - 3); y = 3 + H * 0.5 * (1 + Math.sin(a * 3)) * (0.6 + 0.4 * Math.cos(a)); }
     const [x, z] = F.toWorld(u, v); pts.push(V(x, y, z));
   }
-  const rail = new Struts('steelTrack', big ? M.steelRed : M.steelOrange), sup = new Struts('steelSupport', big ? M.steelRed : M.steelYellow);
+  const rail = new Struts('steelTrack', M.steelOrange), sup = new Struts('steelSupport', big ? M.coasterWhite : M.steelYellow);
   for (let i = 0; i < N; i++) {
     const a = pts[i], b = pts[(i + 1) % N]; const d = new THREE.Vector3().subVectors(b, a); const dh = V(d.x, 0, d.z).normalize(); const side = V(-dh.z, 0, dh.x);
     for (const s of [-0.55, 0.55]) rail.add(a.clone().addScaledVector(side, s), b.clone().addScaledVector(side, s), 0.22);
@@ -199,17 +213,25 @@ function steelCoaster(world, M, B, c) {
     }
   }
   rail.build(world.scene); sup.build(world.scene);
-  if (big) { const [lx, lz] = F.toWorld(-hu, -2.5); const lift = new Struts('liftTower', M.steelRed); for (const dx of [-1.2, 1.2]) for (const dz of [-1.2, 1.2]) lift.add(V(lx + dx, 0, lz + dz), V(lx + dx * 0.6, H, lz + dz * 0.6), 0.35); for (let y = 4; y < H; y += 4) { lift.add(V(lx - 1.2, y, lz - 1.2), V(lx + 1.2, y, lz + 1.2), 0.15); lift.add(V(lx + 1.2, y, lz - 1.2), V(lx - 1.2, y, lz + 1.2), 0.15); } lift.build(world.scene); world.box([lx - 1.5, 0, lz - 1.5], [lx + 1.5, H, lz + 1.5]); }
+  if (big) { const [lx, lz] = F.toWorld(-hu, -2.5); const lift = new Struts('liftTower', M.coasterWhite); B.box('coasterRed', [lx - 1.0, H * 0.35, lz - 1.35], [lx + 1.0, H * 0.35 + 20, lz - 1.25], { collide: false }); for (const dx of [-1.2, 1.2]) for (const dz of [-1.2, 1.2]) lift.add(V(lx + dx, 0, lz + dz), V(lx + dx * 0.6, H, lz + dz * 0.6), 0.35); for (let y = 4; y < H; y += 4) { lift.add(V(lx - 1.2, y, lz - 1.2), V(lx + 1.2, y, lz + 1.2), 0.15); lift.add(V(lx + 1.2, y, lz - 1.2), V(lx - 1.2, y, lz + 1.2), 0.15); } lift.build(world.scene); world.box([lx - 1.5, 0, lz - 1.5], [lx + 1.5, H, lz + 1.5]); }
 }
 
 // =========================================================================================================================
 function terminal(world, M, B) {
   const T = LM.terminal; const Y = 7.5, w = T.x1 - T.x0;
+  // white glazed terracotta: 0.6 x 0.3 m blocks, dark 3 mm joints, a little chipping and grime (critic r7 #5)
+  if (!M.terracotta.map) { const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d'); g.fillStyle = '#ebe8df'; g.fillRect(0, 0, 512, 512);
+    for (let r = 0; r < 16; r++) for (let k = -1; k < 5; k++) { const x = k * 128 + (r % 2) * 64, y = r * 32; g.fillStyle = `rgb(${226 + Math.random() * 20},${223 + Math.random() * 18},${212 + Math.random() * 16})`; g.fillRect(x + 2, y + 2, 124, 28); }
+    g.fillStyle = 'rgba(60,56,50,0.55)'; for (let r = 0; r <= 16; r++) g.fillRect(0, r * 32, 512, 2); for (let r = 0; r < 16; r++) for (let k = 0; k < 5; k++) g.fillRect(k * 128 + (r % 2) * 64, r * 32, 2, 32);
+    for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(${140 + Math.random() * 40},${130 + Math.random() * 40},110,${0.2 + Math.random() * 0.4})`; g.beginPath(); g.ellipse(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 7, 1 + Math.random() * 4, 0, 0, 7); g.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; M.terracotta.map = t; M.terracotta.color.set(0xffffff); M.terracotta.roughness = 0.35; M.terracotta.needsUpdate = true; M.uvScale.terracotta = 1 / 2.4; }
   // street-level concourse: white terracotta frontage on the south (Surf Avenue) face with tall arched windows, shops inside
   B.box('terracotta', [T.x0, 0, T.z1 - 8], [T.x1, 10.5, T.z1]);
   for (let x = T.x0 + 3; x < T.x1 - 3; x += 6) { B.box('glassLight', [x, 2.2, T.z1 + 0.01], [x + 4, 8.8, T.z1 + 0.06], { collide: false }); B.box('steelDark', [x + 1.95, 2.2, T.z1 + 0.02], [x + 2.05, 8.8, T.z1 + 0.09], { collide: false }); B.cyl('terracotta', x + 2, T.z1 + 0.05, 8.8, 9.0, 2.05, 16); }
   for (let x = T.x0 + 8; x < T.x1 - 8; x += 12) { B.box('glassDark', [x, 0, T.z1 + 0.01], [x + 6, 2.1, T.z1 + 0.06], { collide: false }); }
   B.box('terracotta', [T.x0 - 0.3, 10.5, T.z1 - 0.3], [T.x1 + 0.3, 11.3, T.z1 + 0.4]);                     // cornice
+  for (let x = T.x0 + 3; x < T.x1 - 3; x += 6) { for (let k = 1; k < 7; k++) B.box('wheelBrown', [x + k * 0.6 - 0.03, 2.2, T.z1 + 0.07], [x + k * 0.6 + 0.03, 8.8, T.z1 + 0.1], { collide: false }); for (let y = 3.1; y < 8.8; y += 0.9) B.box('wheelBrown', [x, y - 0.03, T.z1 + 0.07], [x + 4, y + 0.03, T.z1 + 0.1], { collide: false }); }
+  for (let x = T.x0; x < T.x1; x += 0.4) B.box('bulb', [x, 11.35, T.z1 + 0.38], [x + 0.08, 11.43, T.z1 + 0.46], { collide: false });
   B.cyl('railSteelGreen', (T.x0 + T.x1) / 2, T.z1 + 0.15, 6.2, 6.4, 1.3, 24);                                 // roundel (blank, no lettering)
   B.box('wheelGreen', [(T.x0 + T.x1) / 2 - 1.1, 5.2, T.z1 + 0.2], [(T.x0 + T.x1) / 2 + 1.1, 7.4, T.z1 + 0.25], { collide: false });
   // under the platforms: the arcade of steel columns (open, walkable), the train shed above on steel arches with a glazed/solar barrel roof
@@ -229,22 +251,26 @@ function terminal(world, M, B) {
 function ballpark(world, M, B) {
   const P = LM.ballpark; const R = world.R;
   // brick outer wall with arched gates on the north (street) side, grandstand wrapping the NE corner, light towers, scoreboard
-  const wallH = 6;
-  B.box('brickRed', [P.x0, 0, P.z0], [P.x1, wallH, P.z0 + 1.2]); B.box('brickRed', [P.x1 - 1.2, 0, P.z0], [P.x1, wallH, P.z1]);
+  const wallH = 6; if (!M.brickTan) { // tan brick (running bond, 0.24 x 0.075 m module, 1 cm joints) as a light texture — tinting the dark red scan only made it brown
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#b8a888'; g.fillRect(0, 0, 256, 256);
+    for (let r = 0; r < 32; r++) for (let k = -1; k < 9; k++) { const v = 205 + Math.random() * 30; g.fillStyle = `rgb(${v + 12},${v - 4},${v - 40})`; g.fillRect(k * 32 + (r % 2) * 16 + 1, r * 8 + 1, 30, 6); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    M.brickTan = new THREE.MeshStandardMaterial({ map: t, roughness: 0.88, normalMap: M.brickRed.normalMap || null, name: 'brickTan' }); M.surface.brickTan = 'concrete'; M.uvScale.brickTan = 1 / 1.92; }
+  B.box('brickTan', [P.x0, 0, P.z0], [P.x1, wallH, P.z0 + 1.2]); B.box('brickTan', [P.x1 - 1.2, 0, P.z0], [P.x1, wallH, P.z1]);
+  for (let y = 1.2; y < wallH; y += 1.2) { B.box('brickRed', [P.x0, y, P.z0 - 0.02], [P.x1, y + 0.3, P.z0 + 0.01], { collide: false }); B.box('brickRed', [P.x1 - 0.01, y, P.z0], [P.x1 + 0.02, y + 0.3, P.z1], { collide: false }); }
+  B.box('pjBlue', [P.x0, wallH + 0.6, P.z0 - 0.35], [P.x1, wallH + 3.6, P.z0 - 0.25], { collide: false });
   B.box('brickRed', [P.x0, 0, P.z0], [P.x0 + 1.2, 3.5, P.z1]); B.box('brickRed', [P.x0, 0, P.z1 - 1.2], [P.x1, 3.5, P.z1]);
   for (let x = P.x0 + 10; x < P.x1 - 10; x += 14) { B.box('glassDark', [x, 0.3, P.z0 - 0.02], [x + 4, 3.6, P.z0 + 0.02], { collide: false }); B.cyl('brickRed', x + 2, P.z0 - 0.01, 3.6, 3.9, 2.05, 16); }
   const rows = 14;
   for (let k = 0; k < rows; k++) { const y = 1 + k * 0.55, d = 1.2 + k * 0.85; B.box(k % 2 ? 'concrete' : 'concreteGrey', [P.x0 + 20, 0, P.z0 + d], [P.x1 - 1.2 - d, y, P.z0 + d + 0.85], { walkable: true }); B.box(k % 2 ? 'concrete' : 'concreteGrey', [P.x1 - 1.2 - d - 0.85, 0, P.z0 + d], [P.x1 - 1.2 - d, y, P.z1 - 40], { walkable: true }); }
   const seat = new Struts('stadiumSeats', M.wheelBlue); for (let k = 0; k < rows; k++) { const y = 1.25 + k * 0.55, d = 1.6 + k * 0.85; seat.add(V(P.x0 + 20, y, P.z0 + d), V(P.x1 - 2.2 - d, y, P.z0 + d), 0.4); } seat.build(world.scene);
   // grandstand canopy: thin white steel roof on raked columns (was a black slab)
-  B.box('white', [P.x0 + 20, 13.4, P.z0 + 2], [P.x1 - 2, 13.7, P.z0 + 14]);
-  for (let x = P.x0 + 24; x < P.x1 - 4; x += 12) B.box('white', [x - 0.2, 0, P.z0 + 1.3], [x + 0.2, 13.4, P.z0 + 1.7], { collide: true });
   // street wall: pilasters, a stone band, a row of pennants and a big arched main gate at the east end
   for (let x = P.x0 + 3; x < P.x1; x += 7) B.box('brickDark', [x, 0, P.z0 - 0.35], [x + 0.9, wallH + 0.6, P.z0 + 0.1], { collide: false });
   B.box('precast', [P.x0, wallH, P.z0 - 0.3], [P.x1, wallH + 0.6, P.z0 + 1.2], { collide: false });
   for (let x = P.x0 + 6; x < P.x1 - 4; x += 8) { B.cyl('steel', x, P.z0 - 0.1, wallH + 0.6, wallH + 5, 0.05, 6); B.box(['fascia0', 'fascia2', 'fascia5'][Math.abs(Math.round(x / 8)) % 3], [x, wallH + 3.8, P.z0 - 0.12], [x + 1.4, wallH + 4.9, P.z0 - 0.08], { collide: false }); }
   { const gx = P.x1 - 26; B.box('precast', [gx - 8, 0, P.z0 - 1.5], [gx + 8, 11, P.z0 + 1.2], { collide: false }); B.box('glassDark', [gx - 5, 0, P.z0 - 1.52], [gx + 5, 6, P.z0 - 1.48], { collide: false }); B.cyl('precast', gx, P.z0 - 1.5, 6, 6.2, 5, 24); B.box('fascia0', [gx - 6, 8, P.z0 - 1.55], [gx + 6, 9.8, P.z0 - 1.5], { collide: false }); }
-  for (const [x, z] of [[P.x0 + 6, P.z0 + 6], [P.x1 - 6, P.z1 - 6], [P.x0 + 6, P.z1 - 6], [P.x1 - 6, P.z0 + 6], [(P.x0 + P.x1) / 2, P.z1 - 4], [P.x0 + 4, (P.z0 + P.z1) / 2]]) { B.cyl('steel', x, z, 0, 30, 0.45, 10, { collide: true }); B.box('steelDark', [x - 3, 30, z - 0.4], [x + 3, 33, z + 0.4], { collide: false }); B.box('lampHead', [x - 2.8, 30.3, z - 0.45], [x + 2.8, 32.7, z - 0.4], { collide: false }); }
+  for (const [x, z] of [[P.x0 + 6, P.z0 + 6], [P.x1 - 6, P.z1 - 6], [P.x0 + 6, P.z1 - 6], [P.x1 - 6, P.z0 + 6], [(P.x0 + P.x1) / 2, P.z1 - 4], [P.x0 + 4, (P.z0 + P.z1) / 2]]) { B.cyl('steel', x, z, 0, 40, 0.5, 10, { collide: true }); B.add('steel', new THREE.TorusGeometry(3.4, 0.12, 6, 28).translate(x, 43, z), { uv: false }); B.box('lampHead', [x - 2.8, 41, z - 0.3], [x + 2.8, 45, z + 0.3], { collide: false }); }
   B.box('steelDark', [P.x0 + 8, 6, P.z1 - 6], [P.x0 + 30, 14, P.z1 - 5]); B.box('glassLit', [P.x0 + 9, 7, P.z1 - 6.05], [P.x0 + 29, 13, P.z1 - 6.01], { collide: false });
   // infield dirt and bases
   const hx = P.x1 - 32, hz = P.z0 + 32;
@@ -271,7 +297,7 @@ function flatRides(world, M, B) {
     if (!(r.x > PLAY.x0 && r.x < PLAY.x1 && r.z > PLAY.z0 && r.z < BW.z0 - 4)) continue;
     if (placed.some((p) => Math.hypot(p[0] - r.x, p[1] - r.z) < 9)) continue; placed.push([r.x, r.z]);
     const c1 = pal[(R() * pal.length) | 0], c2 = pal[(R() * pal.length) | 0];
-    const fence = (rad) => { for (let i = 0; i < 20; i++) { const a0 = i / 20 * Math.PI * 2, a1 = (i + 1) / 20 * Math.PI * 2; const g = new THREE.BoxGeometry(rad * 2 * Math.sin(Math.PI / 20), 1.1, 0.06); g.translate(0, 0.55, 0); g.rotateY(-(a0 + a1) / 2 + Math.PI / 2); g.translate(r.x + Math.cos((a0 + a1) / 2) * rad, 0, r.z + Math.sin((a0 + a1) / 2) * rad); B.add('steel', g, { uv: false }); } world.box([r.x - rad, 0, r.z - rad], [r.x + rad, 1.1, r.z + rad]); world.cover(r.x, r.z - rad - 0.8, 0, -1); world.cover(r.x, r.z + rad + 0.8, 0, 1); };
+    const fence = (rad) => { for (let i = 0; i < 20; i++) { const a0 = i / 20 * Math.PI * 2, a1 = (i + 1) / 20 * Math.PI * 2; const L = rad * 2 * Math.sin(Math.PI / 20); const mk = (w, h, y, d = 0.04) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(0, y, 0); g.rotateY(-(a0 + a1) / 2 + Math.PI / 2); g.translate(r.x + Math.cos((a0 + a1) / 2) * rad, 0, r.z + Math.sin((a0 + a1) / 2) * rad); B.add('alu', g, { uv: false }); }; mk(L, 0.05, 1.05); mk(L, 0.05, 0.25); for (let k = -4; k <= 4; k++) { const g = new THREE.BoxGeometry(0.025, 0.8, 0.025); g.translate(k * L / 9, 0.65, 0); g.rotateY(-(a0 + a1) / 2 + Math.PI / 2); g.translate(r.x + Math.cos((a0 + a1) / 2) * rad, 0, r.z + Math.sin((a0 + a1) / 2) * rad); B.add('alu', g, { uv: false }); } } world.box([r.x - rad, 0, r.z - rad], [r.x + rad, 1.1, r.z + rad]); world.cover(r.x, r.z - rad - 0.8, 0, -1); world.cover(r.x, r.z + rad + 0.8, 0, 1); };
     if (r.t === 'drop' || r.h > 30) { const h = r.h || 40; B.cyl('steelDark', r.x, r.z, 0, h, 1.1, 12, { collide: true }); B.cyl(c1, r.x, r.z, h * 0.3, h * 0.33, 3.2, 20); B.cyl(c2, r.x, r.z, h, h + 1.5, 2.2, 16); fence(6); continue; }
     if (r.t === 'carousel') {
       B.cyl('white', r.x, r.z, 0, 0.5, 7, 28); B.add(c1, new THREE.ConeGeometry(7.6, 2.6, 24).translate(r.x, 5.8, r.z), { uv: false }); B.add('bulb', new THREE.TorusGeometry(7.4, 0.08, 4, 48).rotateX(Math.PI / 2).translate(r.x, 4.5, r.z), { uv: false });

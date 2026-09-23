@@ -50,7 +50,7 @@ export class NavGrid {
     const b = ctx.world?.bounds;
     let minX = -60, maxX = 60, minZ = -60, maxZ = 60;
     if (b && isFinite(b.min.x) && b.max.x - b.min.x > 4) { minX = b.min.x; maxX = b.max.x; minZ = b.min.z; maxZ = b.max.z; }
-    const span = Math.max(maxX - minX, maxZ - minZ); if (span > 500) { const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2; minX = cx - 250; maxX = cx + 250; minZ = cz - 250; maxZ = cz + 250; }
+    const span = Math.max(maxX - minX, maxZ - minZ); if (span > 1200) { const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2; minX = cx - 600; maxX = cx + 600; minZ = cz - 600; maxZ = cz + 600; }   // big OSM maps (campus, coney) are ~0.8-1.1 km
     const area = (maxX - minX) * (maxZ - minZ); if (area / (cell * cell) > MAX_CELLS) cell = Math.ceil(Math.sqrt(area / MAX_CELLS) * 20) / 20; // big maps: coarser cells, capped node count
     this.cell = cell; this.minX = minX; this.minZ = minZ;
     const w = this.w = Math.max(4, Math.ceil((maxX - minX) / cell)), h = this.h = Math.max(4, Math.ceil((maxZ - minZ) / cell));

@@ -51,11 +51,11 @@ export function buildShore(world, M) {
           float wet = smoothstep(${(WATER_Y + 0.55).toFixed(2)}, ${(WATER_Y + 0.05).toFixed(2)}, vWP.y);
           float tide = smoothstep(${(WATER_Y + 0.9).toFixed(2)}, ${(WATER_Y + 0.5).toFixed(2)}, vWP.y) * 0.35;         // darker tide-line band above the wet sand
           float n = fract(sin(dot(floor(vWP.xz * 1.7), vec2(12.9898, 78.233))) * 43758.5453);
-          diffuseColor.rgb *= mix(1.0, 0.62, max(wet, tide * (0.6 + 0.4 * n)));
+          diffuseColor.rgb *= mix(1.0, 0.55, max(wet, tide * (0.6 + 0.4 * n)));
           diffuseColor.rgb *= 0.94 + 0.08 * n;
           // the scan is a warm orange sand; the refs are a pale grey-beige: desaturate hard, keep the grain
           float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-          diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 0.35) * vec3(1.06, 1.02, 0.94);`)
+          diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, 0.45) * vec3(0.98, 0.92, 0.80);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
           roughnessFactor = mix(roughnessFactor, 0.28, smoothstep(${(WATER_Y + 0.4).toFixed(2)}, ${(WATER_Y + 0.02).toFixed(2)}, vWP.y));`);
     };
@@ -91,12 +91,24 @@ export function buildShore(world, M) {
   // lamps (tall pole, twin globes) every 30 m on both edges, benches facing the ocean, bins
   const lamps = [], benches = [], bins = [];
   for (let lx = BW.x0 + 12; lx < BW.x1; lx += 30) { lamps.push([lx, BW.z1 - 1.2]); lamps.push([lx + 15, BW.z0 + 1.2]); }
-  for (let bx = BW.x0 + 20; bx < BW.x1; bx += 15) if (!stairX.some((s) => s !== null && Math.abs(s - bx) < 5)) benches.push([bx, BW.z1 - 2.4]);
+  for (let bx = BW.x0 + 20; bx < BW.x1; bx += 8) if (!stairX.some((s) => s !== null && Math.abs(s - bx) < 5)) benches.push([bx, BW.z1 - 2.4]);
   for (let bx = BW.x0 + 27; bx < BW.x1; bx += 45) bins.push([bx, BW.z1 - 1.6]);
+  // critic r7 #4: a row of painted 55-gal drums (trash) down the centre every 12 m, alternating green / blue
+  for (let dx = BW.x0 + 6; dx < BW.x1; dx += 12) { const k = Math.round(dx / 12) % 2 ? 'binGreen' : 'binBlue'; S.cyl(k, dx, 146.2, 0, 0.88, 0.29, 12); S.cyl('steelDark', dx, 146.2, 0.86, 0.9, 0.3, 12); world.box([dx - 0.3, 0, 145.9], [dx + 0.3, 0.9, 146.5]); }
+  // herringbone chevron strip (planks laid at 45 deg) flanking the concrete lane
+  for (const cz of [146.2, 151.8]) for (let cx = BW.x0; cx < BW.x1; cx += 0.9) { const g = new THREE.BoxGeometry(1.3, 0.012, 0.16); g.rotateY((Math.round(cx / 0.9) % 2 ? 1 : -1) * Math.PI / 4); g.translate(cx, 0.026, cz); G.add('planksDark', g, { uvScale: 1 / 2.4 }); }
+  // sightline breakers: a pair of boardwalk kiosks (3 x 2 x 3 m) every ~100 m, alternating sides of the lane
+  for (let kx = BW.x0 + 48, i = 0; kx < BW.x1; kx += 100, i++) {
+    const kz = i % 2 ? 141.5 : 155.5; const fk = ['fascia0', 'fascia1', 'fascia2', 'fascia3'][i % 4];
+    S.box('paintWall' + (i % 6), [kx - 1.5, 0, kz - 1], [kx + 1.5, 2.8, kz + 1]); S.box(fk, [kx - 1.7, 2.8, kz - 1.2], [kx + 1.7, 3.1, kz + 1.2], { collide: false });
+    for (const sz of [-1, 1]) S.box('glassLit', [kx - 1.2, 1.0, kz + sz * 1.01 - 0.01], [kx + 1.2, 2.1, kz + sz * 1.01 + 0.01], { collide: false });
+    world.cover(kx - 2.2, kz, -1, 0); world.cover(kx + 2.2, kz, 1, 0);
+  }
   for (const [lx, lz] of lamps) {
     S.cyl('steelDark', lx, lz, 0, 0.5, 0.2, 10); S.cyl('steelDark', lx, lz, 0.5, 7.5, 0.09, 8);
     S.add('steelDark', boxGeo([lx - 0.9, 7.4, lz - 0.05], [lx + 0.9, 7.5, lz + 0.05]), { uv: false });
     for (const s of [-0.85, 0.85]) { const gl = new THREE.SphereGeometry(0.28, 12, 8); gl.translate(lx + s, 7.2, lz); S.add('lampHead', gl, { uv: false }); }
+    if (lz > 150) for (const [s2, key] of [[-1, 'wheelBlue'], [1, 'pjYellow']]) { S.add('steelDark', boxGeo([lx - 0.02, 5.9, lz + s2 * 0.1 - 0.02], [lx + 0.02, 5.94, lz + s2 * 0.62]), { uv: false }); S.add(key, boxGeo([lx - 0.015, 4.7, lz + s2 * 0.14], [lx + 0.015, 5.9, lz + s2 * 0.62]), { uv: false }); }
     world.box([lx - 0.2, 0, lz - 0.2], [lx + 0.2, 7.5, lz + 0.2]);
   }
   for (const [bx, bz] of benches) {
@@ -149,7 +161,7 @@ function buildOcean(world) {
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const dx = H[y * S + (x + 1) % S] - H[y * S + (x - 1 + S) % S], dy = H[((y + 1) % S) * S + x] - H[((y - 1 + S) % S) * S + x]; const n = new THREE.Vector3(-dx * 2.2, -dy * 2.2, 1).normalize(); const i = (y * S + x) * 4; img.data[i] = (n.x * 0.5 + 0.5) * 255; img.data[i + 1] = (n.y * 0.5 + 0.5) * 255; img.data[i + 2] = (n.z * 0.5 + 0.5) * 255; img.data[i + 3] = 255; }
   g.putImageData(img, 0, 0);
   const nt = new THREE.CanvasTexture(c); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.repeat.set(1, 1);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x2c5a63, roughness: 0.16, metalness: 0.0, normalMap: nt, normalScale: new THREE.Vector2(0.35, 0.35), envMapIntensity: 0.55, transparent: true, opacity: 0.96, name: 'ocean' });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2c5a63, roughness: 0.12, metalness: 0.0, normalMap: nt, normalScale: new THREE.Vector2(0.45, 0.45), envMapIntensity: 0.8, transparent: true, opacity: 0.96, name: 'ocean' });
   const U = { uT: { value: 0 } };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uT = U.uT;
@@ -162,7 +174,8 @@ function buildOcean(world) {
         normal = normalize(tbn * nt);`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         float far = smoothstep(40.0, 600.0, length(vWP.xz - cameraPosition.xz));
-        diffuseColor.rgb = mix(vec3(0.07, 0.17, 0.17), vec3(0.09, 0.16, 0.22), far);          // green-teal near shore, blue offshore
+        float shallow = 1.0 - smoothstep(0.0, 45.0, vWP.z - 290.0);
+        diffuseColor.rgb = mix(mix(vec3(0.07, 0.15, 0.17), vec3(0.10, 0.20, 0.24), far), vec3(0.13, 0.27, 0.26), shallow * 0.8);          // green-teal near shore, blue offshore
         // breaking surf: foam bands parallel to the shore, animated toward the beach
         float shore = vWP.z;`)
       ;
