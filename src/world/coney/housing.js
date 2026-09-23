@@ -759,5 +759,5 @@ function towerInfo(core, m, centre) {
     view: { pos: toWorld(core.mid, core.yF, w.cOut + w.sg * 0.6), yaw: yawOf(ec.clone().multiplyScalar(-w.sg)) },
     walk: { a0: toWorld(core.mid - core.walkHalf + 0.6, core.yF, w.cOut + w.sg * 0.85), a1: toWorld(core.mid + core.walkHalf - 0.6, core.yF, w.cOut + w.sg * 0.85) },
   }));
-  return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, toWorld };
+  return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, toWorld, core };
 }

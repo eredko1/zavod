@@ -160,6 +160,7 @@ function treeTex(R) {
 // =========================================================================================================================
 export function buildHorizon(world) {
   const { ctx, scene } = world; const R = rng(90210);
+  if (ctx.qs?.get?.('horizon') === '0') return null;   // QA: A/B the cost
   const t0 = performance.now();
   ctx.camera.far = CAM_FAR; ctx.camera.updateProjectionMatrix();
   const stats = { dc: 0, tris: 0 }; const count = (m) => { stats.dc++; const g = m.geometry; stats.tris += (g.index ? g.index.count : g.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); };
@@ -170,7 +171,7 @@ export function buildHorizon(world) {
   const sprawl = buildSprawl(world, R, texF, texR); sprawl.meshes.forEach(count);
   const sky = buildSkyline(world, R); sky.meshes.forEach(count);
   // lights sample the rides' struts and the scene's lamp meshes: those are built after us (landmarks, park), so defer to frame 1
-  let lightsDone = false; world.updaters.push(() => { if (lightsDone) return; lightsDone = true; try { buildLights(world, R, sprawl, sky).forEach(count); console.info(`[horizon] lights: ${stats.dc} draws total`); } catch (e) { console.warn('[horizon] lights', e); } });
+  let lightsDone = false; world.updaters.push(() => { if (lightsDone) return; lightsDone = true; try { const L = buildLights(world, R, sprawl, sky); L.forEach(count); cyc.lights = L; console.info(`[horizon] lights: ${stats.dc} draws total`); } catch (e) { console.warn('[horizon] lights', e); } });
   const fw = buildFireworks(world); count(fw.mesh);
   const cyc = buildCycle(world, fw);
   world.W.horizon = { stats, cycle: cyc, fireworks: fw, sprawl };
@@ -313,7 +314,7 @@ const boxFrag = /* glsl */`
       vec4 f = texture2D(tFac, uv); alb = f.rgb * vTint;
       float bottom = smoothstep(0.0, 1.2, vW.y - vBase); alb *= 0.75 + 0.25 * bottom;
       vec2 wc = floor(uv * 4.0); float lit = step(h12(wc + vSeed * 17.0), 0.34) * (0.6 + 0.4 * h12(wc.yx + 3.0));
-      float fw = length(fwidth(uv * 4.0)); lit = mix(lit, 0.2, smoothstep(0.35, 0.9, fw));
+      float fw = length(fwidth(uv * 4.0)); lit = mix(lit, 0.13, smoothstep(0.35, 0.9, fw));
       emi = vec3(1.0, 0.72, 0.42) * f.a * lit * uNight * 1.4;
     }
     vec3 col = shade(alb, n);
@@ -668,6 +669,7 @@ function buildFireworks(world) {
       if (age > 1.6 && age < 2.6) { const f = Math.exp(-(age - 1.6) * 4); flash.r += c[0] * f; flash.g += c[1] * f; flash.b += c[2] * f; flashK += f; }
       s++;
     }
+    mesh.visible = s > 0;
     for (; s < SLOTS; s++) uS.value[s].w = -1;
   };
   const fwApi = { mesh, update, flash, offset: 0, get flashK() { return flashK; },
@@ -744,6 +746,8 @@ function buildCycle(world, fw) {
   // night-boosted emissives: base intensity → x(1 + k * night)
   const boost = [['lampLens', 10], ['lampHead', 8], ['bulb', 2.5], ['glassLit', 3], ['shopInterior', 3], ['elSoffit', 0.6], ['ssBanner', 2], ['ssFrieze', 2], ['hLobbyCeil', 0.4], ['hIndicator', 0.5], ['hButton', 0.3]].map(([k, f]) => M[k] && { m: M[k], e0: M[k].emissiveIntensity, f }).filter(Boolean);
   if (M.lampHead && M.lampHead.emissive && M.lampHead.emissive.getHex() === 0) { M.lampHead.emissive.set(0xffe0b0); boost.find((b) => b.m === M.lampHead).e0 = 0.05; }
+  // unlit (MeshBasic) surf foam would glow white at night: dim it with the light level
+  const foam = []; scene.traverse((o) => { if (o.isMesh && /^surf\d$/.test(o.name) && o.material?.color) foam.push({ m: o.material, c0: o.material.color.clone() }); });
   const nightWin = ['hBrickWin', 'hCreamWin', 'hBrickTop'].map((k) => M[k]).filter((m) => m && m.emissiveMap);
   const moonDir = new THREE.Vector3(0.55, 0.55, 0.62).normalize(); sky.u.uMoonDir.value.copy(moonDir);
   const sunH = new THREE.Vector3(-0.989, 0, -0.145);    // due west in the map frame (the sun sets behind the Narrows)
@@ -782,8 +786,10 @@ function buildCycle(world, fw) {
     if (Math.abs(s - last) > 0.002) { last = s;
       for (const b of boost) b.m.emissiveIntensity = b.e0 * (1 + b.f * K.lamp);
       for (const m of nightWin) m.emissiveIntensity = 0.9 * K.night;
+      for (const f of foam) f.m.color.copy(f.c0).multiplyScalar(1 - 0.88 * K.night).lerp(K.hor, 0.15);
     }
     if (!haveHaze) haveHaze = grabHaze();
+    if (state.lights) for (const m of state.lights) if (m.isPoints || m.name === 'horizon:lampPools') m.visible = K.lamp > 0.02 || K.night > 0.02;
   };
   const sunDirOwn = { value: new THREE.Vector3() }; sky.dome.material.uniforms.uSunDir = sunDirOwn;
   upd(0); world.updaters.push(upd);
