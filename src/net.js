@@ -8,6 +8,8 @@
 // Public brokers are shared and unauthenticated: rooms are not private and a modified client could lie. Fine for casual play.
 import * as THREE from 'three';
 import { createInstance } from './ai/model.js';
+import { carGeometries, carMaterials } from './world/carkit.js';
+import { buildBike } from './vehicles/bike.js';
 
 const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
 const RATE = 1 / 15, INTERP = 0.1, TIMEOUT = 6000, RESPAWN = 4, PROTECT = 2.5;
@@ -30,6 +32,8 @@ export async function init(ctx) {
   // online = free-for-all: no AI waves, and every spawn point on the map is fair game
   if (qs.get('ai') !== '1') { try { ctx.ai?.qaSetEnabled?.(false); ctx.ai?.qaKillAll?.(); } catch {} }
   const W = ctx.world; if (W?.enemySpawns?.length) W.playerSpawns = [...(W.playerSpawns || []), ...W.enemySpawns];
+  // maps may define where an online session starts (coney: outside Luna Park building 2) — jittered so friends don't stack
+  if (W?.onlineStart) { const [x, y, z, yaw] = W.onlineStart; const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.2; try { ctx.player.teleport(x + Math.cos(a) * r, y, z + Math.sin(a) * r, yaw, 0); } catch {} }
   ctx.bus.on('shot', (e) => { if (!e || e.who !== 'player' || !S.client?.connected) return; const o = e.muzzle || e.origin; send({ t: 'shot', o: v3(o), d: v3(e.dir), w: e.id || '' }); });
   ctx.bus.on('playerDied', () => { const a = S.lastAttacker && performance.now() - S.lastAttacker.at < 8000 ? S.lastAttacker : null; send({ t: 'kill', k: a?.id || null, v: id, hs: !!a?.hs }); onKill(a?.id || null, id, !!a?.hs); S.respawnT = RESPAWN; });
   ctx.bus.on('explosion', (e) => { if (e && !e.remote && e.position) send({ t: 'boom', p: v3(e.position), r: e.radius || 6 }); });
@@ -40,6 +44,9 @@ export async function init(ctx) {
     get peers() { return S.peers.size; }, get connected() { return !!S.client?.connected; }, room, name, id,
     hit: (peer, dmg, hs, point) => { const p = S.peers.get(peer); if (!p || p.dead) return; send({ t: 'hit', to: peer, dmg: Math.min(250, dmg | 0), hs: !!hs }); },
     scores: () => [...S.score.entries()].map(([k, v]) => ({ id: k, ...v })),
+    send: (t, data = {}) => send({ ...data, t }),
+    peer: (id) => { const p = S.peers.get(id); return p ? { id, name: p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead } : null; },
+    list: () => [...S.peers.keys()],
   };
 }
 
@@ -82,7 +89,8 @@ function onState(pid, m) {
   if (pid === S.id || !Array.isArray(m.p)) return;
   const p = peerFor(pid, m.n); if (!p) return;
   p.seen = performance.now();
-  p.snaps.push({ t: p.seen / 1000, x: m.p[0], y: m.p[1], z: m.p[2], yaw: m.p[3] || 0, sp: m.p[4] || 0, f: m.p[5] | 0 });
+  const v = m.v && m.v.k !== 'pass' ? m.v : null;
+  p.snaps.push({ t: p.seen / 1000, x: v ? v.x : m.p[0], y: v ? v.y : m.p[1], z: v ? v.z : m.p[2], yaw: v ? v.h : (m.p[3] || 0), sp: m.p[4] || 0, f: m.p[5] | 0, v });
   if (p.snaps.length > 20) p.snaps.shift();
 }
 function onEvent(m) {
@@ -109,6 +117,7 @@ function onEvent(m) {
     return;
   }
   if (m.t === 'kill') return onKill(m.k, m.v, !!m.hs);
+  ctx.bus.emit('net:' + m.t, m);   // game-mode events (coney hangout: igor, elev, steal, smoke …)
 }
 function onKill(killer, victim, hs) {
   const ctx = S.ctx; const nm = (id) => id === S.id ? S.name : (S.peers.get(id)?.name || S.score.get(id)?.name || '?');
@@ -128,7 +137,8 @@ export function update(dt, ctx) {
   if (S.respawnT > 0 && (S.respawnT -= dt) <= 0) { S.respawnT = -1; try { me.respawn(); } catch (e) { console.warn('[net] respawn', e); } }
   if (me?.position && S.t >= RATE && S.client?.connected) {
     S.t = 0; const p = me.position; const flags = (me.dead ? 1 : 0) | (me.crouching ? 2 : 0) | (me.ads ? 4 : 0);
-    try { S.client.publish(S.base + 's/' + S.id, JSON.stringify({ n: S.name, p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags] })); } catch {}
+    try { const mv = ctx.vehicles?.mounted; const vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null);
+    S.client.publish(S.base + 's/' + S.id, JSON.stringify({ n: S.name, p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi })); } catch {}
   }
   const now = performance.now(), rt = now / 1000 - INTERP;
   for (const [pid, p] of S.peers) {
@@ -147,6 +157,11 @@ export function update(dt, ctx) {
     const sp = b.sp; const A = p.inst.actions;
     if (A) { const w = sp > 4.5 ? [0, 0, 1] : sp > 0.4 ? [0, 1, 0] : [1, 0, 0]; ['Idle', 'Walk', 'Run'].forEach((n, i) => { const act = A[n]; if (act) act.setEffectiveWeight(THREE.MathUtils.lerp(act.getEffectiveWeight(), p.dead ? (n === 'Idle' ? 1 : 0) : w[i], Math.min(1, dt * 8))); }); }
     p.inst.mixer?.update(dt);
+    // driving: show their vehicle instead of the soldier (interpolated with the same snapshots)
+    const vk = b.v ? b.v.k + ':' + b.v.c : null;
+    if (vk !== p.vehKey) { if (p.vehObj) { ctx.scene.remove(p.vehObj); p.vehObj = null; } p.vehKey = vk; p.veh = b.v ? { ...b.v } : null; if (b.v) { p.vehObj = remoteVehicle(ctx, b.v); ctx.scene.add(p.vehObj); } }
+    if (p.vehObj) { p.vehObj.position.copy(g.position); p.vehObj.rotation.set(0, g.rotation.y - Math.PI, 0); g.visible = false; p.heading = g.rotation.y - Math.PI; } else { g.visible = true; p.heading = g.rotation.y - Math.PI; }
+    p.tag.visible = !p.dead; if (p.vehObj) { p.tag.position.y = 2.25; }
   }
   if (S.ui) S.ui.board.style.display = (ctx.input?.keys?.has?.('Tab') || S.tab) ? 'block' : 'none';
 }
@@ -175,3 +190,14 @@ function renderBoard() {
   S.ui.board.innerHTML = `<h3>FREE FOR ALL · ${esc(S.room.toUpperCase())}</h3><table><tr><td style="opacity:.5">PLAYER</td><td class="n" style="opacity:.5">K</td><td class="n" style="opacity:.5">D</td></tr>${rows}</table>`;
 }
 const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+// ---------- remote vehicles (cars from the car kit, bikes from the bike kit) ----------
+const _carGeo = new Map();
+function remoteVehicle(ctx, v) {
+  const grp = new THREE.Group();
+  if (v.k === 'bike') { try { const b = buildBike(ctx); grp.add(b.group); } catch {} return grp; }
+  const G = _carGeo.get(v.k) || (_carGeo.set(v.k, carGeometries(v.k).geos), _carGeo.get(v.k)); const CM = carMaterials();
+  const paint = CM.paint.clone(); paint.color = new THREE.Color(v.c || 0x22305c);
+  for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : CM[slot]); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; grp.add(m); }
+  return grp;
+}

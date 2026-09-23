@@ -10,6 +10,7 @@ import { buildShore, BW, sandHeight, waterZ, SAND_TOP } from '../coney/shore.js'
 import { buildLandmarks, LM } from '../coney/landmarks.js';
 import { buildBeachLife } from '../coney/life.js';
 import { buildPark } from '../coney/park.js';
+import { buildHangout, hangoutQA } from '../coney/hangout.js';
 import { OSM, PLAY } from '../coney/osm.js';
 import { bbox, segDist, pip } from '../osmkit.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
@@ -22,7 +23,7 @@ export const meta = {
 
 export function build(world) {
   const { ctx, W } = world;
-  W.bounds.set(new THREE.Vector3(PLAY.x0, -6, PLAY.z0), new THREE.Vector3(PLAY.x1, 90, PLAY.z1));
+  W.bounds.set(new THREE.Vector3(PLAY.x0, -6, Math.min(PLAY.z0, -560)), new THREE.Vector3(PLAY.x1, 90, PLAY.z1));   // z extended north to take in Luna Park Houses 2 (hangout start)
   const piers = OSM.pi.map((p) => bbox(p.p)).filter((q) => q.z1 > BW.z1 + 40 && q.z0 < BW.z1 + 20).map((q) => ({ x0: (q.x0 + q.x1) / 2 - 5.5, x1: (q.x0 + q.x1) / 2 + 5.5, z1: q.z1 }));
   W.groundHeight = (x, z) => {
     if (z <= BW.z1) return 0;
@@ -33,6 +34,7 @@ export function build(world) {
   const M = makeConeyMats(world); world.mats = M;
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
   ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
+  try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);

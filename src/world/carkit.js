@@ -162,16 +162,21 @@ export const CAR_COLORS = [0x1a1a1c, 0x9a9ea3, 0x5f656b, 0x22305c, 0x6a1c1c, 0xb
 export function placeCars(world, list, { raycast = true } = {}) {
   const { scene, ctx, R } = world; const CM = carMaterials();
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
+  const reg = world.parkedCars || (world.parkedCars = []);
+  for (const c of list) { c.refs = []; if (c.color == null) c.color = null; reg.push(c); }
   for (const kind of CAR_KINDS) {
     const P = list.filter((c) => c.kind === kind); if (!P.length) continue;
     const G = carGeometries(kind).geos;
     for (const slot of Object.keys(G)) {
       if (!G[slot]) continue;
       const im = new THREE.InstancedMesh(G[slot], CM[slot], P.length); im.name = `cars:${kind}:${slot}`;
-      P.forEach((c, i) => { q.setFromAxisAngle(up, c.ry || 0); p.set(c.x, c.y || 0, c.z); im.setMatrixAt(i, m4.compose(p, q, one)); if (slot === 'paint') im.setColorAt(i, c.color ? new THREE.Color(c.color) : (kind === 'cab' ? new THREE.Color(0xf2b820) : CAR_COLORS[((R ? R() : Math.random()) * CAR_COLORS.length) | 0])); });
+      P.forEach((c, i) => { q.setFromAxisAngle(up, c.ry || 0); p.set(c.x, c.y || 0, c.z); im.setMatrixAt(i, m4.compose(p, q, one)); c.refs.push({ im, i }); if (slot === 'paint') { const col = c.color != null ? new THREE.Color(c.color) : (kind === 'cab' ? new THREE.Color(0xf2b820) : CAR_COLORS[((R ? R() : Math.random()) * CAR_COLORS.length) | 0]); c.color = col.getHex(); im.setColorAt(i, col); } });
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
       im.castShadow = slot === 'paint'; im.receiveShadow = true; im.userData.surface = 'metal'; scene.add(im);
       if (raycast && (slot === 'paint' || slot === 'glass')) ctx.raycastTargets.push(im);
     }
   }
 }
+
+/** Remove one parked car from its instanced meshes (hangout: stolen). */
+export function hideParkedCar(c) { const z = new THREE.Matrix4().makeScale(0, 0, 0); for (const { im, i } of c.refs || []) { im.setMatrixAt(i, z); im.instanceMatrix.needsUpdate = true; } c.gone = true; }

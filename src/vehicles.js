@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { buildBike, WHEEL_R, WHEELBASE, FRONT_Z, REAR_Z } from './vehicles/bike.js';
 import { BoxGrid, resolveCircle, rectBlocked } from './vehicles/collide.js';
+import { carGeometries, carMaterials, carSpec } from './world/carkit.js';
 
 // ---- tunables ----
 const MAX_SPEED = 22, REV_MAX = 4.5, ACCEL = 9.5, BRAKE = 11, HARD_BRAKE = 17, DRAG = 0.4, ROLL_FRICTION = 0.5;
@@ -11,6 +12,9 @@ const LEAN_MAX = THREE.MathUtils.degToRad(12), LOOK_YAW = THREE.MathUtils.degToR
 const SEAT_Y = 0.85, EYE_UP = 0.58, EYE_BACK = 0.34, MOUNT_DIST = 2.0, BODY_R = 0.42;
 const FOV_KICK = 9, BOUNCE = 0.28, HIT_LOSS = 0.55;
 const DEG = Math.PI / 180;
+// per-vehicle handling + rider geometry. Bikes use the tunables above; cars (stolen from the kerb, hangout mode) override.
+const BIKE_SPEC = { car: false, max: MAX_SPEED, wheelbase: WHEELBASE, front: FRONT_Z, rear: REAR_Z, bodyR: BODY_R, leanK: 1, seatY: SEAT_Y, eyeUp: EYE_UP, eyeBack: EYE_BACK, eyeSide: 0, mountDist: MOUNT_DIST, hx: 0.45, hz: 1.05, h: 1.1, accel: ACCEL };
+const CAR_SPEC = { car: true, max: 30, wheelbase: 2.8, front: -1.45, rear: 1.45, bodyR: 0.95, leanK: 0, seatY: 0.55, eyeUp: 0.62, eyeBack: -0.15, eyeSide: -0.38, mountDist: 3.2, hx: 0.95, hz: 2.35, h: 1.5, accel: 8 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const damp = (a, b, l, dt) => a + (b - a) * (1 - Math.exp(-l * dt));
@@ -44,7 +48,7 @@ function makeBike(x, z, yaw, yRef = 0) {
     ...parts, home: { x, z, yaw, y: floorAt(x, z, yRef) },
     pos: new THREE.Vector3(x, floorAt(x, z, yRef), z), vy: 0, heading: yaw, vel: new THREE.Vector3(), speed: 0, fwdSpeed: 0,
     steer: 0, lean: 0, susp: 0, suspV: 0, spin: 0, skid: 0, throttle: 0, parked: true, box: new THREE.Box3(),
-    hitT: 0,
+    hitT: 0, spec: BIKE_SPEC,
   };
   bike.group.position.copy(bike.pos); bike.group.rotation.y = yaw;
   for (const m of bike.meshes) { m.userData.vehicle = bike; C.raycastTargets.push(m); }
@@ -53,10 +57,27 @@ function makeBike(x, z, yaw, yRef = 0) {
   S.bikes.push(bike);
   return bike;
 }
+/** A drivable car from the shared car kit (geometry faces +x in the kit; vehicles face -z, so the kit is turned +90 deg). */
+function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
+  const G = carGeometries(kind).geos, CM = carMaterials();
+  const group = new THREE.Group(), body = new THREE.Group(); group.add(body);
+  const meshes = []; const paint = CM.paint.clone(); paint.color = new THREE.Color(color);
+  for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : CM[slot]); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; m.receiveShadow = true; m.userData.surface = 'metal'; body.add(m); meshes.push(m); }
+  const headlight = new THREE.SpotLight(0xfff2d8, 0, 45, 0.5, 0.5, 1.4); headlight.position.set(0, 0.8, -2.2); headlight.target.position.set(0, 0, -14); group.add(headlight); group.add(headlight.target); headlight.visible = false;
+  const lens = { material: { emissiveIntensity: 0 } };
+  const dummy = new THREE.Group();
+  const car = { group, body, fork: dummy, wheelF: dummy, wheelR: dummy, headlight, lens, meshes, kind, color,
+    home: { x, z, yaw, y: floorAt(x, z, yRef) }, pos: new THREE.Vector3(x, floorAt(x, z, yRef), z), vy: 0, heading: yaw, vel: new THREE.Vector3(), speed: 0, fwdSpeed: 0,
+    steer: 0, lean: 0, susp: 0, suspV: 0, spin: 0, skid: 0, throttle: 0, parked: true, box: new THREE.Box3(), hitT: 0, spec: CAR_SPEC };
+  group.position.copy(car.pos); group.rotation.y = yaw;
+  for (const m of meshes) { m.userData.vehicle = car; C.raycastTargets.push(m); }
+  C.scene.add(group); parkBox(car); C.colliders.push(car.box); S.bikes.push(car); rebuildGrids();
+  return car;
+}
 function parkBox(bike) {
-  const c = Math.cos(bike.heading), s = Math.sin(bike.heading);
-  const hx = Math.abs(c) * 0.45 + Math.abs(s) * 1.05, hz = Math.abs(s) * 0.45 + Math.abs(c) * 1.05;
-  bike.box.min.set(bike.pos.x - hx, bike.pos.y, bike.pos.z - hz); bike.box.max.set(bike.pos.x + hx, bike.pos.y + 1.1, bike.pos.z + hz);
+  const c = Math.cos(bike.heading), s = Math.sin(bike.heading), sp = bike.spec || BIKE_SPEC;
+  const hx = Math.abs(c) * sp.hx + Math.abs(s) * sp.hz, hz = Math.abs(s) * sp.hx + Math.abs(c) * sp.hz;
+  bike.box.min.set(bike.pos.x - hx, bike.pos.y, bike.pos.z - hz); bike.box.max.set(bike.pos.x + hx, bike.pos.y + sp.h, bike.pos.z + hz);
 }
 function unparkBox(bike) { bike.box.min.set(0, -9999, 0); bike.box.max.set(0.001, -9998, 0.001); rebuildGrids(); }
 function rebuildGrids() { S.grid.build(C.colliders); try { C.player?.rebuildColliders?.(); } catch {} }
@@ -107,7 +128,7 @@ function mount(bike) {
   if (w?.swap) { const cur = w.current?.slot ?? w.slot ?? 0; if (cur !== 1) { try { if (w.swap(1)) S.prevSlot = cur; } catch {} } }
   try { C.audio?.play?.('bike_idle', { position: bike.pos, volume: 0.6 }); } catch {}
   C.bus.emit('vehicle', { stage: 'mount', bike });
-  C.hud?.toast?.('F — DISMOUNT · W/S THROTTLE · SPACE BRAKE', 2200);
+  C.hud?.toast?.(bike.spec?.car ? 'F — GET OUT · W/S GAS/BRAKE · A/D STEER · SPACE HANDBRAKE' : 'F — DISMOUNT · W/S THROTTLE · SPACE BRAKE', 2200);
   // first frame: write player + camera immediately so nothing pops
   applyRider(0);
   return true;
@@ -138,7 +159,7 @@ function dismount() {
 
 // ---------- physics ----------
 function stepBike(bike, dt, inThr, inBrake, inHard, inSteer) {
-  const p = bike.pos, v = bike.vel;
+  const p = bike.pos, v = bike.vel, sp = bike.spec || BIKE_SPEC, MAX_SPEED = sp.max, WHEELBASE = sp.wheelbase, FRONT_Z = sp.front, REAR_Z = sp.rear, BODY_R = sp.bodyR, ACCEL = sp.accel;
   fwdOf(bike.heading, _f); _r.set(-_f.z, 0, _f.x);
   let fs = v.x * _f.x + v.z * _f.z;         // forward component
   let ls = v.x * _r.x + v.z * _r.z;         // lateral (slide)
@@ -170,7 +191,7 @@ function stepBike(bike, dt, inThr, inBrake, inHard, inSteer) {
   // integrate + collide (two circles: front & rear axle) with slide, speed loss, small bounce
   const nx0 = p.x + v.x * dt, nz0 = p.z + v.z * dt;
   let px = nx0, pz = nz0, hitN = null;
-  const y0 = p.y + STEP_UP, y1 = p.y + 1.25;
+  const y0 = p.y + (sp.car ? 0.3 : STEP_UP), y1 = p.y + 1.25;
   for (let i = 0; i < 2; i++) {
     const az = i === 0 ? FRONT_Z : REAR_Z; const ax = px - _f.x * az, azz = pz - _f.z * az; // axle world pos (fwd = -Z → -az along fwd)
     if (resolveCircle(S.grid, ax, azz, BODY_R, y0, y1, bike.box, _res)) { px += _res.x - ax; pz += _res.z - azz; if (!hitN || _res.depth > hitN.depth) hitN = { nx: _res.nx, nz: _res.nz, depth: _res.depth }; }
@@ -204,7 +225,7 @@ function stepBike(bike, dt, inThr, inBrake, inHard, inSteer) {
   fs = v.x * _f.x + v.z * _f.z; bike.fwdSpeed = fs; bike.speed = v.length();
   // lean: from lateral acceleration, capped ±12°, plus counter-lean from slide
   const leanT = clamp(-(yawRate * fs) / 9.81, -1, 1) * LEAN_MAX * 1.35 + bike.skid * bike.steer * 0.35;
-  bike.lean = damp(bike.lean, clamp(leanT, -LEAN_MAX * 1.4, LEAN_MAX * 1.4), 7, dt);
+  bike.lean = damp(bike.lean, clamp(leanT, -LEAN_MAX * 1.4, LEAN_MAX * 1.4) * sp.leanK, 7, dt);
   // suspension: spring on vertical offset excited by throttle/brake changes + speed rumble
   const kS = 90, cS = 9;
   bike.suspV += (-kS * bike.susp - cS * bike.suspV) * dt - (inThr - inBrake - (inHard ? 1.4 : 0)) * 0.5 * dt * Math.min(1, Math.abs(fs) / 6 + 0.3);
@@ -220,6 +241,7 @@ function stepBike(bike, dt, inThr, inBrake, inHard, inSteer) {
 // ---------- rider (player + camera) ----------
 function applyRider(dt) {
   const bike = S.mounted, p = C.player, cam = C.camera; if (!bike || !p) return;
+  const sp = bike.spec || BIKE_SPEC, SEAT_Y = sp.seatY, EYE_UP = sp.eyeUp, EYE_BACK = sp.eyeBack;
   fwdOf(bike.heading, _f); _r.set(-_f.z, 0, _f.x);
   const leanS = Math.sin(bike.lean);
   // player capsule sits on the seat (feet at seat height so the hitbox spans the rider)
@@ -230,7 +252,7 @@ function applyRider(dt) {
   const rpm = 8 + Math.abs(bike.fwdSpeed) * 2.2 + bike.throttle * 6; S.vib += dt * rpm * 2.4;
   const vibA = 0.0035 + bike.throttle * 0.006 + Math.min(1, Math.abs(bike.fwdSpeed) / 12) * 0.004 + bike.hitT * 0.05;
   const vx = Math.sin(S.vib * 1.7) * vibA, vy = Math.sin(S.vib) * vibA * 0.8;
-  _v.set(bike.pos.x, eyeH, bike.pos.z).addScaledVector(_f, -EYE_BACK).addScaledVector(_r, leanS * (SEAT_Y + EYE_UP) * 0.85 + vx);
+  _v.set(bike.pos.x, eyeH, bike.pos.z).addScaledVector(_f, -EYE_BACK).addScaledVector(_r, leanS * (SEAT_Y + EYE_UP) * 0.85 + vx + sp.eyeSide);
   _v.y -= (1 - Math.cos(bike.lean)) * (SEAT_Y + EYE_UP) + vy * 0.5; _v.y += vy;
   S.roll = damp(S.roll, -bike.lean * 0.8 + bike.skid * bike.steer * 0.15, 10, dt || 1);
   const yaw = bike.heading + S.lookYaw, pitch = clamp(S.lookPitch - bike.suspV * 0.03 + Math.sin(S.vib * 0.9) * vibA * 0.5, -LOOK_PITCH - 0.1, LOOK_PITCH + 0.1);
@@ -239,8 +261,8 @@ function applyRider(dt) {
 }
 
 function nearestBike(maxDist = Infinity) {
-  const p = C.player; if (!p) return null; let best = null, bd = maxDist;
-  for (const b of S.bikes) { const d = Math.hypot(b.pos.x - p.position.x, b.pos.z - p.position.z); if (d < bd) { bd = d; best = b; } }
+  const p = C.player; if (!p) return null; let best = null, bd = Infinity;
+  for (const b of S.bikes) { const d = Math.hypot(b.pos.x - p.position.x, b.pos.z - p.position.z); const lim = Math.min(maxDist, maxDist === Infinity ? Infinity : (b.spec?.mountDist ?? MOUNT_DIST)); if (d < lim && d < bd) { bd = d; best = b; } }
   return best;
 }
 
@@ -256,6 +278,7 @@ export async function init(ctx) {
     qaMount() { const b = nearestBike(); if (!b) return false; return mount(b); },
     /** Drive with fixed inputs for `seconds`; resolves when done. throttle: -1..1 (negative = brake/reverse), steer: -1..1 (+ = right), opts {hard} */
     qaDrive(throttle = 1, steer = 0, seconds = 3, opts = {}) { if (!S.mounted) api.qaMount(); if (!S.mounted) return Promise.resolve(false); if (S.qa) S.qa.res(false); return new Promise((res) => { S.qa = { thr: throttle, steer, t: seconds, hard: !!opts.hard, res }; }); },
+    spawnCar: (x, z, yaw, kind, color, y) => makeCar(x, z, yaw, kind, color, y ?? ctx.player?.position.y ?? 0),
     qaState() { const b = S.mounted; return b ? { x: b.pos.x, y: b.pos.y, z: b.pos.z, heading: b.heading, speed: b.speed, fwd: b.fwdSpeed, lean: b.lean, steer: b.steer } : null; },
   };
   S.api = api; return api;
@@ -270,11 +293,11 @@ export function update(dt, ctx) {
   // F is only consumed when it means something to us (mounted, or a bike in reach that is closer than a weapon pickup) — ai.js reads it for gun pickups after us
   const fHeld = playing && (input.pressed?.has?.('KeyF') || S.uiMount); S.uiMount = false;
   if (!S.mounted) {
-    const b = nearestBike(MOUNT_DIST); S.api.nearBike = b;
+    const b = nearestBike(9); S.api.nearBike = b;
     if (b && playing) {
       const dBike = Math.hypot(b.pos.x - p.position.x, b.pos.z - p.position.z);
       const dGun = ctx.ai?.nearPickupDist; const gunWins = typeof dGun === 'number' && dGun < dBike;
-      if (!gunWins) { S.toastT -= dt; if (S.toastT <= 0) { S.toastT = 0.35; ctx.hud?.toast?.('F — RIDE', 600); } if (fHeld) { input.pressed?.delete?.('KeyF'); mount(b); } }
+      if (!gunWins) { S.toastT -= dt; if (S.toastT <= 0) { S.toastT = 0.35; ctx.hud?.toast?.(b.spec?.car ? 'F — DRIVE' : 'F — RIDE', 600); } if (fHeld) { input.pressed?.delete?.('KeyF'); mount(b); } }
     }
     return;
   }
@@ -307,7 +330,7 @@ export function update(dt, ctx) {
   }
   // audio
   S.revT -= dt;
-  if (thr > 0 && S.revT <= 0) { S.revT = 1.6; try { ctx.audio?.play?.('bike_rev', { position: bike.pos, volume: 0.5 + 0.5 * clamp(bike.speed / MAX_SPEED, 0, 1) }); } catch {} }
+  if (thr > 0 && S.revT <= 0) { S.revT = 1.6; if (!bike.spec?.car) try { ctx.audio?.play?.('bike_rev', { position: bike.pos, volume: 0.5 + 0.5 * clamp(bike.speed / MAX_SPEED, 0, 1) }); } catch {} }
   applyRider(dt);
 }
 

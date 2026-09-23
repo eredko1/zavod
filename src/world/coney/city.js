@@ -48,7 +48,7 @@ export function buildCity(world, M) {
   for (const r of OSM.r) { if (r.w < 9 || r.w > 16) continue; walk(r.p, 6.5, (x, z, dx, dz) => { if (R() < 0.6) return; if (!(x > PLAY.x0 && x < PLAY.x1 && z > PLAY.z0 && z < BW.z0 - 5)) return; for (const s of [-1, 1]) { if (R() < 0.4) continue; const off = r.w / 2 - 1.3; cars.push({ x: x - dz * s * off, z: z + dx * s * off, ry: Math.atan2(dx, dz) - Math.PI / 2 + (s > 0 ? Math.PI : 0), kind: ['sedan', 'sedan', 'suv', 'hatch', 'van', 'cab'][(R() * 6) | 0] }); } }); }
   for (const p of OSM.l) { const q = bbox(p); if (!(q.x1 > PLAY.x0 && q.x0 < PLAY.x1 && q.z1 > PLAY.z0 && q.z0 < PLAY.z1)) continue; for (let x = q.x0 + 3; x < q.x1 - 3; x += 2.8) for (let z = q.z0 + 4; z < q.z1 - 3; z += 7) if (pip(x, z, p) && R() < 0.25) cars.push({ x, z, ry: Math.PI / 2 * (R() < 0.5 ? 1 : -1), kind: ['sedan', 'suv', 'hatch', 'van'][(R() * 4) | 0] }); }
   placeCars(world, cars, { raycast: false });
-  for (const c of cars) { world.box([c.x - 1.6, 0, c.z - 1.6], [c.x + 1.6, 1.5, c.z + 1.6]); if (R() < 0.12) world.cover(c.x, c.z + 2, 0, 1); }
+  for (const c of cars) { c.box = world.box([c.x - 1.6, 0, c.z - 1.6], [c.x + 1.6, 1.5, c.z + 1.6]); if (R() < 0.12) world.cover(c.x, c.z + 2, 0, 1); }
 }
 
 function ribbonOffset(pts, off, w, y) { // thin ribbon offset sideways from a polyline (paint lines)
