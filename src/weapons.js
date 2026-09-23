@@ -368,7 +368,7 @@ export function update(dt, ctx) {
     if (input.mouse.wheel) startSwap(1 - S.cur);
     if (input.consume('KeyR')) startReload();
     if (input.consume('KeyG')) startThrow();
-    if ((!ctx.ai?.nearPickup && !ctx.vehicles?.nearBike && input.consume('KeyF'))) startInspect();
+    if ((!ctx.ai?.nearPickup && !ctx.vehicles?.nearBike && !ctx.interactNear && input.consume('KeyF'))) startInspect();   // interactNear: a map interaction (hangout) owns F
     const trig = !!input.fire; if (trig && !S.triggerHeld) S.triggerPressed = true; if (!trig) S.dryLatch = false; S.triggerHeld = trig;
     if (S.triggerPressed && S.reload?.style === 'shell' && S.reload.phase === 'shell' && w.ammo > 0) S.reload.interrupt = true; // fire interrupts a shell-by-shell reload
     const busy = S.swap || S.throwing;

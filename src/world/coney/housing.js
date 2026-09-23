@@ -17,7 +17,8 @@ const ST = 2.62;        // storey height (m)
 const PAR = 0.9;        // parapet above the top floor slab
 const TILE_BAYS = 2, TILE_FLOORS = 4;
 const SILL = 0.85, WIN_H = 1.5, WIN_W = 1.12, WIN_AT = [0.28, 0.72];   // window layout inside one bay (fractions of the bay)
-const GAL = 1.7;        // gallery recess depth on the core faces
+const GAL = 1.7;        // lobby glass / 19th-floor vestibule line on the core faces (hangout geometry keys off this)
+const GALV = 2.5;       // visual gallery recess: dark back wall + slabs run this deep so the core self-shadows (critic r9 #2)
 const DOOR_HALF = 1.1, LOBBY_HALF = 7, WALK_HALF = 8.3;   // hangout: lobby entrance gap, lobby half-length, 19th-floor walkway half-length
 
 /** The five Luna Park Houses towers in OSM.b (tall 'tower' style buildings north of the avenue, x 60..380, z -520..-110). */
@@ -111,15 +112,79 @@ function galleryTexture(aniso) {
   // one storey x 6 m of the open-gallery front: slab edge band, perforated railing panel, slim posts; everything else open
   const W = 512, H = 256; const [c, g] = canvas(W, H); g.clearRect(0, 0, W, H);
   const py = H / ST, px = W / 6;
-  g.fillStyle = '#8b867b'; g.fillRect(0, H - 0.24 * py, W, 0.24 * py);                              // slab edge
+  g.fillStyle = '#7d786c'; g.fillRect(0, H - 0.24 * py, W, 0.24 * py);                              // slab edge
   g.fillStyle = 'rgba(40,36,30,0.6)'; g.fillRect(0, H - 0.24 * py, W, 2);
-  g.fillStyle = '#303132'; g.fillRect(0, H - 1.1 * py, W, 0.86 * py);                                  // railing panel
+  g.fillStyle = '#1e1f20'; g.fillRect(0, H - 1.1 * py, W, 0.86 * py);                                  // railing panel (black steel, 1.1 m)
   g.fillStyle = 'rgba(255,255,255,0.08)'; for (let y = H - 1.08 * py; y < H - 0.32 * py; y += 5) g.fillRect(0, y, W, 1);
   g.clearRect(0, H - 0.95 * py, W, 2); g.clearRect(0, H - 0.6 * py, W, 2);                             // slits (sub-50% so it survives mips)
   g.fillStyle = '#38393a'; g.fillRect(0, H - 1.14 * py, W, 0.06 * py);                                 // top rail
   g.fillStyle = '#3c3c3a'; for (let x = 0; x <= W; x += 1.5 * px) g.fillRect(x - 0.05 * px, 0, 0.1 * px, H);   // posts
   g.fillStyle = '#57544d'; g.fillRect(0, 0, 0.16 * px, H); g.fillRect(W - 0.16 * px, 0, 0.16 * px, H);  // column at the tile seam
   const t = texOf(c, true, aniso); return t;
+}
+
+/** the dark gallery back wall (6 m x 1 storey, 'gal' UVs): near-black painted block with apartment doors and small windows,
+ *  darker under the slab above (the recess never sees the sky) — averages ~#151513 so the core reads as a black slot */
+function galleryBackTexture(R, aniso) {
+  const W = 512, H = 256; const [c, g] = canvas(W, H); const px = W / 6, py = H / ST;
+  g.fillStyle = '#171715'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 400; i++) { const v = 14 + R() * 14; g.fillStyle = `rgba(${v},${v},${v - 2},0.5)`; g.fillRect(R() * W, R() * H, 2 + R() * 10, 1 + R() * 4); }
+  for (const [x0, kind] of [[0.35, 'door'], [1.6, 'win'], [3.35, 'door'], [4.6, 'win']]) {
+    if (kind === 'door') { g.fillStyle = '#23211e'; g.fillRect(x0 * px, H - 2.1 * py, 0.92 * px, 2.1 * py); g.fillStyle = '#2d2a26'; g.fillRect(x0 * px + 3, H - 2.05 * py, 0.92 * px - 6, 2.0 * py); g.fillStyle = '#5a5347'; g.fillRect((x0 + 0.75) * px, H - 1.05 * py, 4, 3); }
+    else { g.fillStyle = '#0f1214'; g.fillRect(x0 * px, H - 2.05 * py, 1.2 * px, 1.1 * py); g.fillStyle = 'rgba(90,105,115,0.18)'; g.fillRect(x0 * px + 4, H - 2.0 * py, 1.2 * px - 8, 0.5 * py); g.fillStyle = '#34322d'; g.fillRect(x0 * px - 3, H - 0.95 * py, 1.2 * px + 6, 4); }
+  }
+  const gr = g.createLinearGradient(0, 0, 0, H * 0.45); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H * 0.45);   // slab-soffit occlusion
+  const gb = g.createLinearGradient(0, H, 0, H * 0.85); gb.addColorStop(0, 'rgba(0,0,0,0.4)'); gb.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gb; g.fillRect(0, H * 0.85, W, H * 0.15);
+  return texOf(c, true, aniso);
+}
+
+function lobbyFloorTexture(R) {
+  // 12" VCT in a cream / brown checker with a speckle, 4 x 4 tiles per 1.22 m repeat
+  const S = 256; const [c, g] = canvas(S, S); const t = S / 4;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    const dark = (i + j) & 1; g.fillStyle = dark ? '#7b5f46' : '#d6ccb4'; g.fillRect(i * t, j * t, t, t);
+    for (let k = 0; k < 90; k++) { g.fillStyle = dark ? `rgba(40,28,18,${R() * 0.4})` : `rgba(120,110,90,${R() * 0.35})`; g.fillRect(i * t + R() * t, j * t + R() * t, 1 + R() * 2, 1 + R() * 2); }
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(i * t, j * t, t, 1); g.fillRect(i * t, j * t, 1, t);
+  }
+  const x = texOf(c, true, 8); return x;
+}
+
+function lobbyWallTexture(R) {
+  // one storey tall x 2.62 m: cream glazed-tile wainscot to 1.4 m, a teal cap band, pale painted block above
+  const W = 256, H = 256; const [c, g] = canvas(W, H); const py = H / ST, px = W / ST;
+  g.fillStyle = '#c9cdbf'; g.fillRect(0, 0, W, H);
+  for (let y = 0; y < H - 1.5 * py; y += 0.2 * py) { g.fillStyle = 'rgba(0,0,0,0.07)'; g.fillRect(0, y, W, 1); }   // block courses
+  const top = H - 1.4 * py;
+  for (let r = 0, y = top; y < H; r++, y += 0.1 * py) for (let x = (r & 1) ? -0.1 * px : 0; x < W; x += 0.2 * px) { const v = R(); g.fillStyle = v < 0.2 ? '#d9cfae' : v > 0.85 ? '#ece4c8' : '#e3dabb'; g.fillRect(x + 1, y + 1, 0.2 * px - 2, 0.1 * py - 2); }
+  g.fillStyle = '#2f6f6a'; g.fillRect(0, top - 0.12 * py, W, 0.12 * py); g.fillStyle = '#244f4c'; g.fillRect(0, H - 0.12 * py, W, 0.12 * py);
+  return texOf(c, true, 8);
+}
+
+function mailTexture(R) {
+  // 0.6 m repeat: 2 x 4 small aluminium doors with a name slot and a keyhole
+  const S = 256; const [c, g] = canvas(S, S); g.fillStyle = '#8d9194'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) {
+    const x = i * 128 + 5, y = j * 64 + 4; g.fillStyle = '#b9bdbf'; g.fillRect(x, y, 118, 56);
+    for (let k = 0; k < 30; k++) { g.fillStyle = `rgba(255,255,255,${R() * 0.15})`; g.fillRect(x + R() * 118, y + R() * 56, 20 + R() * 40, 1); }
+    g.fillStyle = '#f2efe6'; g.fillRect(x + 12, y + 10, 50, 10); g.fillStyle = '#3a3c3e'; g.beginPath(); g.arc(x + 98, y + 30, 5, 0, 7); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x, y + 55, 118, 2);
+  }
+  return texOf(c, true, 8);
+}
+
+/** NYCHA-style white-on-blue plaque (generic text only) */
+function plaqueTexture(lines, bg = '#1f3f7a', { w = 512, h = 160, fg = '#ffffff' } = {}) {
+  const [c, g] = canvas(w, h); g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 5; g.strokeRect(8, 8, w - 16, h - 16);
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  lines.forEach((t, i) => { const px = Math.min(52, Math.floor((h - 40) / lines.length * 0.72)); g.font = `bold ${px}px "Helvetica Neue", Helvetica, Arial, sans-serif`; const m = g.measureText(t).width; if (m > w - 40) g.font = `bold ${Math.floor(px * (w - 40) / m)}px "Helvetica Neue", Helvetica, Arial, sans-serif`; g.fillText(t, w / 2, 20 + (h - 40) * (i + 0.5) / lines.length); });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+
+function floorNumberTexture(n) {
+  const [c, g] = canvas(256, 256); g.fillStyle = '#d9b43a'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(80,60,20,${Math.random() * 0.12})`; g.fillRect(Math.random() * 256, Math.random() * 256, 4 + Math.random() * 14, 2 + Math.random() * 6); }
+  g.fillStyle = '#141414'; g.font = 'bold 170px "Helvetica Neue", Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(n, 128, 138);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
 function fenceTexture() {
@@ -152,8 +217,9 @@ function makeHousingMats(world, M) {
   reg('hBrickPlain', new THREE.MeshStandardMaterial({ map: T.plain, normalMap: T.normalPlain, color: 0xe0d6d3, roughness: 0.92, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
   reg('hCreamPlain', new THREE.MeshStandardMaterial({ map: T.cream, color: 0xe2dbd0, roughness: 0.85, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
   reg('hGallery', new THREE.MeshStandardMaterial({ map: galleryTexture(aniso), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7, metalness: 0.2 }), 'metal');
-  reg('hGalleryBack', new THREE.MeshStandardMaterial({ color: 0x1b1a19, roughness: 0.95, metalness: 0 }), 'concrete', 0.5);
-  reg('hSlab', new THREE.MeshStandardMaterial({ color: 0x6f6b63, roughness: 0.9, metalness: 0 }), 'concrete', 0.5);
+  reg('hGalleryBack', new THREE.MeshStandardMaterial({ map: galleryBackTexture(R, aniso), roughness: 0.9, metalness: 0, envMapIntensity: 0.25 }), 'concrete', 0.5);
+  reg('hVestibule', new THREE.MeshStandardMaterial({ color: 0x3a3833, roughness: 0.85, metalness: 0 }), 'concrete', 0.5);
+  reg('hSlab', new THREE.MeshStandardMaterial({ color: 0x7d786c, roughness: 0.9, metalness: 0 }), 'concrete', 0.5);
   reg('hRail', new THREE.MeshStandardMaterial({ color: 0x1d2022, roughness: 0.5, metalness: 0.6, envMapIntensity: 0.6 }), 'metal', 0.5);
   reg('hRoof', new THREE.MeshStandardMaterial({ color: 0x5f5c57, roughness: 0.95, metalness: 0 }), 'concrete', 0.25);
   reg('hFence', new THREE.MeshStandardMaterial({ map: fenceTexture(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.5 }), 'metal');
@@ -166,7 +232,15 @@ function makeHousingMats(world, M) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     reg('hElev', new THREE.MeshStandardMaterial({ map: t, roughness: 0.28, metalness: 0.9, envMapIntensity: 1.2 }), 'metal', 1); }
   reg('hTerrazzo', new THREE.MeshStandardMaterial({ color: 0x9a948a, roughness: 0.35, metalness: 0, envMapIntensity: 0.7 }), 'concrete', 0.5);
-  reg('hLobbyWall', new THREE.MeshStandardMaterial({ color: 0xcfd6cf, roughness: 0.5, metalness: 0 }), 'concrete', 0.5);
+  { const t = lobbyFloorTexture(R); reg('hLobbyFloor', new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.12, roughness: 0.3, metalness: 0, envMapIntensity: 0.8 }), 'concrete', 1 / 1.22); }
+  { const t = lobbyWallTexture(R); reg('hLobbyWall', new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.16, roughness: 0.35, metalness: 0, envMapIntensity: 0.6 }), 'concrete', 1 / ST); }
+  reg('hLobbyCeiling', new THREE.MeshStandardMaterial({ color: 0xd9d6cc, emissive: 0x2a2926, roughness: 0.9, metalness: 0 }), 'concrete', 0.5);
+  reg('hLobbyGlass', new THREE.MeshStandardMaterial({ color: 0x8fa6ad, transparent: true, opacity: 0.3, depthWrite: false, roughness: 0.05, metalness: 0.2, envMapIntensity: 1.4, side: THREE.DoubleSide }), 'metal', 0.5);
+  { const t = mailTexture(R); reg('hMail', new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.1, roughness: 0.35, metalness: 0.75, envMapIntensity: 1 }), 'metal', 1 / 0.6); }
+  reg('hPanel', new THREE.MeshStandardMaterial({ color: 0xa3a8ab, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 }), 'metal', 1);
+  reg('hIndicator', new THREE.MeshStandardMaterial({ color: 0x2a1406, emissive: 0xff7a20, emissiveIntensity: 1.3, roughness: 0.4 }), 'metal', 1);
+  reg('hDirectory', new THREE.MeshStandardMaterial({ map: plaqueTexture(['RESIDENTS & GUESTS ONLY', 'NO LOITERING · NO SMOKING'], '#1f3f7a'), roughness: 0.4, metalness: 0.1 }), 'metal', 1);
+  { const t = floorNumberTexture('19'); reg('hFloor19', new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.12, roughness: 0.8, metalness: 0 }), 'concrete', 1); }
   reg('hLobbyCeil', new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf2f6ff, emissiveIntensity: 1.1, roughness: 0.6 }), 'concrete', 0.5);
   reg('hButton', new THREE.MeshStandardMaterial({ color: 0xffd27a, emissive: 0xffb040, emissiveIntensity: 2.2, roughness: 0.4 }), 'metal', 1);
   reg('hCanopy', new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.5 }), 'metal', 0.5);
@@ -183,6 +257,12 @@ class Local {
     const A = this.arr(key); const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
     let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const L = Math.hypot(...n) || 1; n = n.map((v) => v / L);
     for (const i of [0, 1, 2, 0, 2, 3]) { A.p.push(...[a, b, c, d][i]); A.n.push(...n); A.u.push(...uv[i]); }
+  }
+  /** upright quad centred at c facing horizontal normal n = [nx, nz], uv 0..1 reading left-to-right for a viewer in front */
+  sign(key, c, n, w, h, uv = [0, 0, 1, 1]) {
+    const rx = n[1] * w / 2, rz = -n[0] * w / 2, y0 = c[1] - h / 2, y1 = c[1] + h / 2;
+    const [u0, v0, u1, v1] = uv;
+    this.quad(key, [c[0] - rx, y0, c[2] - rz], [c[0] + rx, y0, c[2] + rz], [c[0] + rx, y1, c[2] + rz], [c[0] - rx, y1, c[2] - rz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);
   }
   box(key, min, max, { uvScale = null, collide = true } = {}) { this.boxes.push([key, min, max, uvScale]); if (collide) this.cols.push([min, max]); }
   collide(min, max) { this.cols.push([min, max]); }
@@ -216,9 +296,9 @@ function plan(R, H) {
     const M = (t0, t1, s0, s1) => sg > 0 ? [t0, t1, s0, s1] : [-t1, -t0, -s1, -s0];
     // axial wing (the tall tower with the cream strip): one block, full height
     const hA = H + (sg > 0 ? 0 : (R() < 0.5 ? 0 : -1));
-    push(...M(-10.5, 3.5, 19, 45.5), hA, 'wing', { entrance: sg > 0 ? 's1' : 's0' });
-    // perpendicular wing: 7 bays, steps down twice outward (4 bays at -2, 2 bays at -5, 1 bay at -7)
-    const L = 32, n = bays(L), bw = L / n; let t = 3.5; const steps = [[4, hA - 2], [2, hA - 5], [n - 6, hA - 7]];
+    push(...M(-10.5, 3.5, 19, 45.5), hA, 'wing', { entrance: sg > 0 ? 's1' : 's0', main: true });
+    // perpendicular wing: 7 bays, steps down outward like the refs' 20 / 17 / 14 profile (4 bays at -3, 2 at -6, 1 at -8)
+    const L = 32, n = bays(L), bw = L / n; let t = 3.5; const steps = [[4, hA - 3], [2, hA - 6], [n - 6, hA - 8]];
     for (const [k, fl] of steps) { if (k <= 0) continue; const t1 = t + k * bw; push(...M(t, t1, 8.5, 22.5), fl, 'wing', { bwT: bw, entrance: (t1 > 35) ? (sg > 0 ? 't1' : 't0') : null }); t = t1; }
   }
   push(-4.5, 3.5, -19, 19, H - 1, 'core');
@@ -247,12 +327,13 @@ function buildAll(world, M) {
     const lb = bbox(loc); const spineX = (lb.x1 - lb.x0) > (lb.z1 - lb.z0);
     const cx = (lb.x0 + lb.x1) / 2, cz = (lb.z0 + lb.z1) / 2;
     const m = new THREE.Matrix4().makeTranslation(ox, 0, oz).multiply(new THREE.Matrix4().makeRotationY(-ang)).multiply(new THREE.Matrix4().makeTranslation(cx, 0, cz));
-    const H = Math.max(18, Math.min(22, Math.round(b.h / ST)));
+    // complexes vary 20 / 21 / 22 storeys (the core is H-1 and must keep a 19th floor for the hangout walkway)
+    const H = [21, 20, 22, 20, 21][towers.indexOf(b) % 5];
     const parts = plan(R, H).map((p) => {
       // (t, s) -> local (x, z): spine along z unless the footprint's long axis is x
       const q = spineX ? { x0: p.s0, x1: p.s1, z0: p.t0, z1: p.t1 } : { x0: p.t0, x1: p.t1, z0: p.s0, z1: p.s1 };
       let ent = p.entrance; if (ent && spineX) ent = { s0: 'x0', s1: 'x1', t0: 'z0', t1: 'z1' }[ent]; else if (ent) ent = { s0: 'z0', s1: 'z1', t0: 'x0', t1: 'x1' }[ent];
-      return { ...q, floors: p.floors, kind: p.kind, entrance: ent, top: p.floors * ST + PAR, galleryAxis: spineX ? 'x' : 'z' };
+      return { ...q, floors: p.floors, kind: p.kind, main: !!p.main, entrance: ent, top: p.floors * ST + PAR, galleryAxis: spineX ? 'x' : 'z' };
     });
     const L = new Local();
     const core = buildTower(L, parts, R, acs, m);
@@ -324,11 +405,12 @@ function buildTower(L, parts, R, acs, m) {
       }
       const isGallery = p.kind === 'core' && f.axis === p.galleryAxis;
       // cream strip: bays [k0,k1) centred; end faces always, long faces on a coin flip; floors 1 .. top-4
+      // refs: brick in the bottom 2 floors, the top 3 floors and the outer bays; <= 6 bays wide on the main wings, 4 on the steps
       let strip = null;
-      if (!isGallery && p.kind !== 'core' && nb >= 3 && (len < 17 || R() < 0.55)) {
-        const k = nb >= 5 ? nb - 2 - (R() < 0.4 ? 1 : 0) : nb - 1; const k0 = Math.floor((nb - k) / 2); const k1 = Math.min(nb, k0 + k);
+      if (!isGallery && p.kind !== 'core' && nb >= 3 && p.floors >= 9 && (len < 17 || R() < 0.6)) {
+        const k = Math.min(p.main ? 6 : 4, nb - 2 - (nb >= 6 && R() < 0.4 ? 1 : 0)); const k0 = Math.floor((nb - k) / 2); const k1 = Math.min(nb, k0 + k);
         const u0 = f.dir > 0 ? f.a0 + k0 * bw : f.a1 - k1 * bw, u1 = f.dir > 0 ? f.a0 + k1 * bw : f.a1 - k0 * bw;
-        strip = { a0: u0, a1: u1, y0: ST * (R() < 0.5 ? 1 : 0.35), y1: Math.max(ST * 3, Hw - ST * (3 + ((R() * 2) | 0))) };
+        if (k >= 1) strip = { a0: u0, a1: u1, y0: ST * 2, y1: Hw - ST * 3 };
       }
       // entrance door on this face?
       let door = null;
@@ -344,20 +426,33 @@ function buildTower(L, parts, R, acs, m) {
         if (isGallery) {
           const yg = Math.max(yb, 0);
           if (yg < Hw) {
-            rect('hGalleryBack', f, a, bnd, Math.max(yg, ST), Hw, -GAL, bw);
-            if (yg < ST) { // lobby glass at the ground floor, with the entrance gap (hangout lobby, see coreInterior)
+            rect('hGalleryBack', f, a, bnd, Math.max(yg, ST), Hw, -GALV, bw, 'gal');
+            if (yg < ST) { // ground floor at the lobby line: lit lobby glass (hangout lobby, see coreInterior) with the entrance gap, brick beyond
               const mid = f.axis === 'z' ? (p.z0 + p.z1) / 2 : (p.x0 + p.x1) / 2, lo = Math.min(a, bnd), hi = Math.max(a, bnd);
-              if (hi <= mid - DOOR_HALF || lo >= mid + DOOR_HALF) rect('hDoor', f, a, bnd, 0, ST, -GAL, bw);
-              else { if (lo < mid - DOOR_HALF) rect('hDoor', f, lo, mid - DOOR_HALF, 0, ST, -GAL, bw); if (hi > mid + DOOR_HALF) rect('hDoor', f, mid + DOOR_HALF, hi, 0, ST, -GAL, bw); rect('hDoor', f, mid - DOOR_HALF, mid + DOOR_HALF, ST - 0.35, ST, -GAL, bw); }
+              const cutsG = [lo, hi, mid - LOBBY_HALF, mid - DOOR_HALF, mid + DOOR_HALF, mid + LOBBY_HALF].filter((v) => v >= lo && v <= hi).sort((u, v) => u - v);
+              for (let k = 0; k + 1 < cutsG.length; k++) {
+                const u0 = cutsG[k], u1 = cutsG[k + 1], um = (u0 + u1) / 2; if (u1 - u0 < 0.01) continue;
+                if (Math.abs(um - mid) < DOOR_HALF) { rect('hLobbyGlass', f, u0, u1, ST - 0.42, ST, -GAL, bw); continue; }   // transom over the door gap
+                if (Math.abs(um - mid) < LOBBY_HALF) {
+                  rect('hLobbyGlass', f, u0, u1, 0, ST, -GAL, bw);
+                  const nm = Math.max(1, Math.round((u1 - u0) / 1.5)); for (let j = 0; j <= nm; j++) mullion(L, f, P, u0 + (u1 - u0) * j / nm, -GAL, 0, ST);
+                  continue;
+                }
+                rect('hBrickWin', f, u0, u1, 0, ST, -GAL, bw);
+              }
+              for (const e of [mid - DOOR_HALF, mid + DOOR_HALF]) if (e > lo && e < hi) mullion(L, f, P, e, -GAL, 0, ST, 0.09);
+              if (mid - DOOR_HALF > lo && mid + DOOR_HALF < hi) { const t0 = P(f, mid - DOOR_HALF, ST - 0.47, -GAL - 0.05), t1 = P(f, mid + DOOR_HALF, ST - 0.4, -GAL + 0.07); L.box('hRail', [Math.min(t0[0], t1[0]), ST - 0.47, Math.min(t0[2], t1[2])], [Math.max(t0[0], t1[0]), ST - 0.4, Math.max(t0[2], t1[2])], { collide: false }); }
+              // the strip between the lobby line and the deeper gallery wall stays dark under the first slab
+              rect('hGalleryBack', f, a, bnd, ST - 0.02, ST, -GALV, bw);
             }
             rect('hGallery', f, a, bnd, Math.max(yg, ST), Hw, 0, bw, 'gal');
             // slabs (their edges show at oblique angles, their soffits when looking up)
-            for (let fl = 1; fl <= p.floors; fl++) { const y = fl * ST; if (y < yg) continue; const lo = Math.min(a, bnd), hi = Math.max(a, bnd); const o0 = -GAL, o1 = 0; const mn = f.axis === 'z' ? [Math.min(f.c + f.n[0] * o0, f.c + f.n[0] * o1), y - 0.02, lo] : [lo, y - 0.02, Math.min(f.c + f.n[1] * o0, f.c + f.n[1] * o1)]; const mx = f.axis === 'z' ? [Math.max(f.c + f.n[0] * o0, f.c + f.n[0] * o1), y + 0.22, hi] : [hi, y + 0.22, Math.max(f.c + f.n[1] * o0, f.c + f.n[1] * o1)]; L.box('hSlab', mn, mx, { collide: false }); }
+            for (let fl = 1; fl <= p.floors; fl++) { const y = fl * ST; if (y < yg) continue; const lo = Math.min(a, bnd), hi = Math.max(a, bnd); const o0 = -GALV, o1 = 0; const mn = f.axis === 'z' ? [Math.min(f.c + f.n[0] * o0, f.c + f.n[0] * o1), y - 0.02, lo] : [lo, y - 0.02, Math.min(f.c + f.n[1] * o0, f.c + f.n[1] * o1)]; const mx = f.axis === 'z' ? [Math.max(f.c + f.n[0] * o0, f.c + f.n[0] * o1), y + 0.23, hi] : [hi, y + 0.23, Math.max(f.c + f.n[1] * o0, f.c + f.n[1] * o1)]; L.box('hSlab', mn, mx, { collide: false }); }
             // recess side walls where the run ends against a covering neighbour or the face end
             const prevCovered = i === 0 || (() => { const m0 = (xs[i - 1] + a) / 2; let y = 0; for (const [lo, hi, top] of cov) if (m0 > lo && m0 < hi) y = Math.max(y, top); return y > yg + 0.1; })();
             const nextCovered = i + 2 >= xs.length || (() => { const m0 = (bnd + xs[i + 2]) / 2; let y = 0; for (const [lo, hi, top] of cov) if (m0 > lo && m0 < hi) y = Math.max(y, top); return y > yg + 0.1; })();
-            if (prevCovered) side('hBrickPlain', f, a, -GAL, 0, yg, Hw, 1);
-            if (nextCovered) side('hBrickPlain', f, bnd, -GAL, 0, yg, Hw, -1);
+            if (prevCovered) side('hBrickPlain', f, a, -GALV, 0, yg, Hw, 1);
+            if (nextCovered) side('hBrickPlain', f, bnd, -GALV, 0, yg, Hw, -1);
             // entrance canopy in front of the lobby
             if (door && mid > door.a0 - 3 && mid < door.a1 + 3 && yg < 0.1 && a <= (door.a0 + door.a1) / 2 && bnd >= (door.a0 + door.a1) / 2) canopy(L, f, P, (door.a0 + door.a1) / 2, 0);
           }
@@ -434,10 +529,17 @@ function buildTower(L, parts, R, acs, m) {
 }
 const H0 = (parts) => Math.max(...parts.map((p) => p.floors));
 
+/** vertical lobby-glass mullion at along-position a (offset o), y0..y1 */
+function mullion(L, f, P, a, o, y0, y1, w = 0.05) {
+  const p0 = P(f, a - w, y0, o - 0.06), p1 = P(f, a + w, y1, o + 0.06);
+  L.box('hRail', [Math.min(p0[0], p1[0]), y0, Math.min(p0[2], p1[2])], [Math.max(p0[0], p1[0]), y1, Math.max(p0[2], p1[2])], { collide: false });
+}
+
 function canopy(L, f, P, a, o) {
   // flat steel entrance canopy on two posts: 5.2 m wide, 3 m deep, soffit at 2.95 m
   const box = (a0, a1, o0, o1, y0, y1, key, col = false) => { const p0 = P(f, a0, y0, o0), p1 = P(f, a1, y1, o1); L.box(key, [Math.min(p0[0], p1[0]), y0, Math.min(p0[2], p1[2])], [Math.max(p0[0], p1[0]), y1, Math.max(p0[2], p1[2])], { collide: col }); };
   box(a - 2.6, a + 2.6, o, o + 3.0, 2.95, 3.25, 'hCanopy');
+  for (const s of [-1.3, 1.3]) box(a + s - 0.22, a + s + 0.22, o + 1.3, o + 1.74, 2.93, 2.95, 'hLobbyCeil');   // downlights
   box(a - 2.65, a + 2.65, o + 2.95, o + 3.05, 2.9, 3.45, 'hRail');
   for (const s of [-1, 1]) box(a + s * 2.4 - 0.07, a + s * 2.4 + 0.07, o + 2.75, o + 2.89, 0, 2.95, 'hRail', true);
 }
@@ -551,18 +653,25 @@ function coreInterior(L, p, Ht) {
   // lobby glass walls (colliders) with the entrance gaps
   for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + LOBBY_HALF, ST, c + 0.06); }
   // lobby dressing
-  vis('hTerrazzo', mid - LOBBY_HALF, 0, i0, mid + LOBBY_HALF, 0.03, i1);
-  vis('hLobbyWall', mid - LOBBY_HALF, ST - 0.02, i0, mid + LOBBY_HALF, ST, i1);
-  for (let a = mid - LOBBY_HALF + 1.5; a < mid + LOBBY_HALF - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.08, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.02, (i0 + i1) / 2 + 0.3);
+  // lobby dressing: 12" VCT checker floor, glazed-tile wainscot walls, a dropped ceiling with light panels, three steel cars
+  // with call-button plates and lit floor indicators, a bank of aluminium mailboxes, a directory board, a bench
+  vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + LOBBY_HALF, 0.03, i1);
+  vis('hLobbyCeiling', mid - LOBBY_HALF, ST - 0.02, i0, mid + LOBBY_HALF, ST, i1);
+  for (let a = mid - LOBBY_HALF + 1.5; a < mid + LOBBY_HALF - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.05, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.02, (i0 + i1) / 2 + 0.3);
   vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); vis('hLobbyWall', mid + LOBBY_HALF, 0, i0, mid + LOBBY_HALF + 0.05, ST, i1);
   const cars = [0, 1, 2].map((k) => i0 + (i1 - i0) * (k + 0.5) / 3);
   for (const cc of cars) {
     vis('hElev', mid - LOBBY_HALF, 0.03, cc - 0.52, mid - LOBBY_HALF + 0.05, 2.12, cc + 0.52);
     vis('hRail', mid - LOBBY_HALF, 2.12, cc - 0.62, mid - LOBBY_HALF + 0.07, 2.22, cc + 0.62);
-    vis('hButton', mid - LOBBY_HALF, 1.05, cc + 0.62, mid - LOBBY_HALF + 0.08, 1.2, cc + 0.7);
-    vis('hButton', mid - LOBBY_HALF, 2.28, cc - 0.2, mid - LOBBY_HALF + 0.06, 2.36, cc + 0.2);    // floor indicator
+    for (const s of [-1, 1]) vis('hRail', mid - LOBBY_HALF, 0.03, cc + s * 0.52 - 0.05, mid - LOBBY_HALF + 0.07, 2.12, cc + s * 0.52 + 0.05);   // jambs
+    vis('hPanel', mid - LOBBY_HALF, 0.95, cc + 0.6, mid - LOBBY_HALF + 0.06, 1.3, cc + 0.72);                                                  // call plate
+    vis('hButton', mid - LOBBY_HALF, 1.16, cc + 0.63, mid - LOBBY_HALF + 0.08, 1.22, cc + 0.69); vis('hButton', mid - LOBBY_HALF, 1.03, cc + 0.63, mid - LOBBY_HALF + 0.08, 1.09, cc + 0.69);
+    vis('hIndicator', mid - LOBBY_HALF, 2.26, cc - 0.25, mid - LOBBY_HALF + 0.06, 2.4, cc + 0.25);    // floor indicator
   }
-  vis('hElev', mid + LOBBY_HALF - 0.28, 0.9, i0 + 0.5, mid + LOBBY_HALF, 1.95, i1 - 0.5);          // mailboxes
+  vis('hMail', mid + LOBBY_HALF - 0.3, 0.85, i0 + 0.45, mid + LOBBY_HALF, 1.95, i1 - 0.45);          // mailboxes
+  vis('hRail', mid + LOBBY_HALF - 0.33, 0.8, i0 + 0.4, mid + LOBBY_HALF, 0.85, i1 - 0.4);
+  const nrm = (dc) => { const q = P3(0, 0, dc); return [q[0], q[2]]; };   // local normal pointing along +/-c
+  { const q = P3(1, 0, 0); L.sign('hDirectory', P3(mid + LOBBY_HALF - 0.02, 2.25, (i0 + i1) / 2), [-q[0], -q[2]], 1.6, 0.5); }   // "MAIL ROOM · BLDG" plaque over the boxes
   // the 19th floor: walkable gallery walkway on both faces, railing, end caps, elevator doors on the back wall
   const yF = (Math.min(19, p.floors) - 1) * ST;
   const walks = [];
@@ -572,8 +681,19 @@ function coreInterior(L, p, Ht) {
     col(mid - WALK_HALF - 0.3, yF, cOut, mid - WALK_HALF, yF + 2.6, cIn); col(mid + WALK_HALF, yF, cOut, mid + WALK_HALF + 0.3, yF + 2.6, cIn);
     vis('hSlab', mid - WALK_HALF, yF - 0.02, cOut, mid + WALK_HALF, yF + 0.01, cIn);
     vis('hRail', mid - WALK_HALF, yF + 1.05, cOut, mid + WALK_HALF, yF + 1.12, cOut + sg * 0.08);
+    // elevator vestibule: the wall that carries the doors stands at the lobby line, proud of the deeper gallery back wall
+    vis('hVestibule', mid - WALK_HALF, yF + 0.01, cIn, mid + WALK_HALF, yF + ST - 0.02, cIn + sg * (GALV - GAL));
+    for (const e of [mid - WALK_HALF - 0.05, mid + WALK_HALF + 0.05]) {   // steel gates closing the walkway ends
+      vis('hRail', e - 0.04, yF, cOut, e + 0.04, yF + 2.2, cIn); for (const y of [0.1, 1.1, 2.15]) vis('hRail', e - 0.03, yF + y, cOut, e + 0.03, yF + y + 0.05, cIn);
+      for (let c = 0.15; c < GAL - 0.05; c += 0.14) vis('hRail', e - 0.012, yF + 0.1, cOut + sg * c - 0.012, e + 0.012, yF + 2.15, cOut + sg * c + 0.012);
+    }
     const doors = [-2.4, 0, 2.4].map((d) => mid + d);
-    for (const a of doors) { vis('hElev', a - 0.52, yF + 0.02, cIn - sg * 0.05, a + 0.52, yF + 2.1, cIn); vis('hButton', a + 0.62, yF + 1.05, cIn - sg * 0.07, a + 0.7, yF + 1.2, cIn); }
+    for (const a of doors) {
+      vis('hElev', a - 0.52, yF + 0.02, cIn - sg * 0.05, a + 0.52, yF + 2.1, cIn);
+      vis('hRail', a - 0.62, yF + 2.1, cIn - sg * 0.07, a + 0.62, yF + 2.2, cIn); for (const s of [-1, 1]) vis('hRail', a + s * 0.57 - 0.05, yF + 0.02, cIn - sg * 0.07, a + s * 0.57 + 0.05, yF + 2.1, cIn);
+      vis('hPanel', a + 0.6, yF + 0.95, cIn - sg * 0.05, a + 0.74, yF + 1.3, cIn); vis('hButton', a + 0.63, yF + 1.1, cIn - sg * 0.08, a + 0.71, yF + 1.18, cIn);
+    }
+    for (const d of [-4, 4]) L.sign('hFloor19', P3(mid + d, yF + 1.6, cIn - sg * 0.015), nrm(-sg), 1.2, 1.2);   // painted floor number beside the cars
     walks.push({ cOut, cIn, sg, doors });
   }
   return { ax, A, C, mid, i0, i1, cars, yF, walks, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF };
@@ -588,7 +708,7 @@ function towerInfo(core, m, centre) {
   const lobby = {
     // stand in front of each elevator door, facing it
     cars: core.cars.map((cc) => ({ pos: toWorld(core.mid - core.lobbyHalf + 1.1, 0, cc), yaw: yawOf(ea.clone().negate()) })),
-    doors: [core.i0, core.i1].map((c, k) => ({ inside: toWorld(core.mid, 0, c + (k ? -1.2 : 1.2)), outside: toWorld(core.mid, 0, c + (k ? 1 : -1) * (GAL + 5)), yawIn: yawOf(ec.clone().multiplyScalar(k ? -1 : 1)) })),
+    doors: [core.i0, core.i1].map((c, k) => ({ inside: toWorld(core.mid, 0, c + (k ? -1.2 : 1.2)), outside: toWorld(core.mid, 0, c + (k ? 1 : -1) * (GAL + 5)), yawIn: yawOf(ec.clone().multiplyScalar(k ? -1 : 1)), plane: toWorld(core.mid, 0, c), along: ea.clone().normalize(), half: core.doorHalf })),
   };
   const top = core.walks.map((w) => ({
     cars: w.doors.map((a) => ({ pos: toWorld(a, core.yF, w.cIn - w.sg * 0.85), yaw: yawOf(ec.clone().multiplyScalar(w.sg)) })),
