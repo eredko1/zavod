@@ -307,7 +307,6 @@ export function buildBuildings(world, M) {
   facade(B, { x0: HUM.x0, x1: HUM.x1, z0: HUM.z0, z1: HUM.z1, floors: 3, storey: 4.0, band: 1.4, inset: 0.6, pitch: 3.6, pierW: 0.5, wall: 'precast', parapet: 0.9 });
   facade(B, { x0: ADMIN.x0, x1: ADMIN.x1, z0: ADMIN.z0, z1: ADMIN.z1, floors: 4, storey: 4.0, band: 1.5, inset: 0.7, pitch: 3.6, pierW: 0.55, wall: 'concrete', pier: 'concrete', ground: { h: 4.2, inset: 1.2, pitch: 7.2 }, parapet: 0.9 });
   B.box('concreteGrey', [ADMIN.x0 - 4, 4.2, ADMIN.z0 + 22], [ADMIN.x0 + 0.5, 4.9, ADMIN.z0 + 46], { collide: false });     // entrance canopy on the mall axis
-  block(B, 'concreteGrey', 277, -60, 339, 84, 13);                                                                          // Administration parking garage (backdrop)
 
   // ---- north backdrop: Stony Brook Union (brick), Campus Recreation Center (stucco + glass) --------------------------------------------
   facade(B, { x0: UNION.x0, x1: UNION.x1, z0: UNION.z0, z1: UNION.z1, floors: 3, storey: 4.4, band: 1.8, inset: 0.4, pitch: 3.4, pierW: 0.8, wall: 'brickRed', pier: 'brickRed', parapet: 0.8, mullionPitch: 0, sillStain: false });

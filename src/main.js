@@ -11,6 +11,14 @@ import * as hud from './hud.js';
 import * as audio from './audio.js';
 import * as touch from './touch.js';
 import * as vehicles from './vehicles.js';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+// BVH-accelerated raycasts for every mesh (bullets, AI line of sight, impact FX). Merged map batches are 100k+ triangle
+// meshes whose bounding sphere covers the whole map, so an unaccelerated ray tested every triangle (14 fps with AI on the
+// big campus). Trees are built lazily for any raycast target over ~500 triangles, including meshes added after boot.
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 const ctx = createCtx();
 // Phones: every image loader (textures, GLTF props, HDR stays) is redirected to the <=512px mirror in assets-m/ (see qa/build-mobile-assets.sh)
@@ -104,6 +112,9 @@ async function boot() {
   }
   // memory budget for phones: cap shadow maps after the map built its lights
   if (ctx.settings.shadowMax < 4096) scene.traverse((o) => { if (o.isLight && o.shadow && o.shadow.mapSize.x > ctx.settings.shadowMax) { o.shadow.mapSize.set(ctx.settings.shadowMax, ctx.settings.shadowMax); if (o.shadow.map) { o.shadow.map.dispose(); o.shadow.map = null; } } });
+  // spatial index for large static raycast targets (skinned/soldier hitboxes excluded)
+  const bvhFor = () => { for (const o of ctx.raycastTargets) { const g = o.geometry; if (!o.isMesh || o.isSkinnedMesh || !g || g.boundsTree || o.userData.soldier) continue; const n = (g.index ? g.index.count : g.attributes.position?.count || 0) / 3; if (n > 500) { try { g.computeBoundsTree({ maxLeafTris: 8 }); } catch (e) { /* non-indexable geometry: plain raycast */ } } } };
+  bvhFor(); ctx.bus.on?.('boot', () => setTimeout(bvhFor, 4000)); setTimeout(bvhFor, 12000);   // async GLTF props arrive later
   ctx.progress(1, 'ready');
   document.getElementById('boot').classList.add('hide');
   setState(ctx.qa ? 'playing' : 'menu');

@@ -10,7 +10,7 @@ const SKY_ROT_Y = (34 - 135) * Math.PI / 180;
 export const FOG_COLOR = new THREE.Color(0xcdd8e3);
 const ENV_SUN_CAP = 3.0;
 
-export function buildSky(world, { shadowHalf = 200, center = [50, 0, -60] } = {}) {
+export function buildSky(world, { shadowHalf = 130, center = [50, 0, -60] } = {}) {
   const { ctx, scene } = world;
   const { renderer } = ctx;
   renderer.toneMappingExposure = 0.85;
@@ -21,7 +21,7 @@ export function buildSky(world, { shadowHalf = 200, center = [50, 0, -60] } = {}
   scene.environmentRotation = new THREE.Euler(0, SKY_ROT_Y, 0);
   scene.background = FOG_COLOR.clone();
   // exponential-squared haze: soft, no hard horizon stripe, distant tree line dissolves into it
-  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0032);
+  scene.fog = new THREE.FogExp2(FOG_COLOR.getHex(), 0.0019);   // lighter: the playable campus is now ~1 km across
 
   const hemi = new THREE.HemisphereLight(0xb7cbe6, 0x7d7666, 0.55);
   scene.add(hemi); ctx.lights.hemi = hemi;
@@ -36,6 +36,10 @@ export function buildSky(world, { shadowHalf = 200, center = [50, 0, -60] } = {}
   sm.bias = -0.00016; sm.normalBias = 0.04; sm.radius = 2.4;   // soft PCF: grounded contact shadows, no acne on the terraces
   sm.camera.updateProjectionMatrix();
   scene.add(sun); scene.add(sun.target); ctx.lights.key = sun;
+  // the campus is ~0.8 x 1.1 km: one fixed shadow frustum would be either blurry or cropped, so the shadow box follows the
+  // player (snapped to whole shadow texels so edges do not shimmer while walking)
+  { const off = sun.position.clone().sub(sun.target.position); const texel = (2 * shadowHalf) / sm.mapSize.x;
+    world.updaters?.push(() => { const p = ctx.camera?.position; if (!p) return; const k = texel * 8; const tx = Math.round(p.x / k) * k, tz = Math.round(p.z / k) * k; if (tx === sun.target.position.x && tz === sun.target.position.z) return; sun.target.position.set(tx, 0, tz); sun.position.copy(sun.target.position).add(off); sun.target.updateMatrixWorld(); }); }
 
   const fill = new THREE.DirectionalLight(0xc5d5ec, 0.45);
   fill.position.set(-sunDir.x * 100, 70, -sunDir.z * 100); scene.add(fill); ctx.lights.fill = fill;

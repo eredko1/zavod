@@ -7,6 +7,9 @@ import { buildGround, groundHeight } from '../sbu/ground.js';
 import { buildBuildings } from '../sbu/buildings.js';
 import { buildProps } from '../sbu/props.js';
 import { buildDetail } from '../sbu/detail.js';
+import { buildCampus, planCampusTrees, campusPathPoints } from '../sbu/campus.js';
+import { buildCrowd } from '../crowd.js';
+import { PLAY } from '../sbu/osm.js';
 import { BOUNDS, MALL, SAC_PLAZA, PIT, BUS_LOOP, ENG_DRIVE, LIB, SAC, FREY, ZEBRA, PSY, STALLER, FOUNTAIN, EAST_LAWN } from '../sbu/layout.js';
 
 export const meta = {
@@ -17,13 +20,14 @@ export const meta = {
 
 export function build(world) {
   const { ctx, W } = world;
-  W.bounds.set(new THREE.Vector3(BOUNDS.x0, -4, BOUNDS.z0), new THREE.Vector3(BOUNDS.x1, 60, BOUNDS.z1));
+  W.bounds.set(new THREE.Vector3(PLAY.x0, -4, PLAY.z0), new THREE.Vector3(PLAY.x1, 60, PLAY.z1));   // the whole mapped campus (OSM), not just the hand-built core
   W.groundHeight = groundHeight;
 
   ctx.progress(0.13, 'university: sky'); buildSky(world);
   const M = makeMats(world); world.mats = M;
   ctx.progress(0.15, 'university: ground'); buildGround(world, M);
   ctx.progress(0.18, 'university: buildings'); buildBuildings(world, M);
+  ctx.progress(0.2, 'university: wider campus'); buildCampus(world, M); world.sbuExtraTrees = planCampusTrees(world);
   ctx.progress(0.22, 'university: props'); buildProps(world, M);
   ctx.progress(0.24, 'university: detail'); buildDetail(world, M);
 
@@ -35,6 +39,8 @@ export function build(world) {
     v(90, 0, -100), v(120, groundHeight(120, -95), -95), v(139, PIT.floor, -100), v(144, 0, -80),              // Staller terraces / plaza / wing terrace
     v(60, 0, 24), v(140, 0, 40), v(-35, 0, -80), v(-70, 0, -40), v(-125, 0, -50), v(30, 0, 92), v(160, 0, 4),   // Psychology, east lawn, Zebra Path, Frey, Harriman alley, south alley, Admin gate
   ];
+  // wider campus: enemies can come from anywhere on the mapped campus, players can also start in the residential quad / athletics
+  { const pts = campusPathPoints(world, 26, { gap: 40 }); for (const [x, z] of pts.slice(0, 20)) W.enemySpawns.push(v(x, 0, z)); for (const [x, z] of pts.slice(20)) W.playerSpawns.push(v(x, 0, z)); }
   // extra cover along facades and the mall furniture (props/ground added the rest)
   for (let x = -8; x < 70; x += 12) world.cover(x, LIB.z1 + 1.4, 0, 1);                                        // library face
   for (let x = -76; x < -46; x += 10) world.cover(x, FREY.z1 + 1.2, 0, 1);                                     // Frey south face
@@ -61,6 +67,14 @@ export function build(world) {
     terrace: [-83.2, 4.6, 33, 2.2, -0.1],                  // SAC vestibule roof (ladder), looking SW over the plaza
     javits: [142, 0, 116, 2.95, 0.1],                      // SE lawn edge, south to the round lecture-hall drums
     plaza: [-96, 0, 24, 1.0, -0.05],                        // centre of the SAC plaza, radial bands, buses beyond
+    // ---- wider campus (OSM-built) ----
+    quad: [205, 0, -470, -0.9, 0.06],                        // north residential quad: brick dorm blocks
+    dining: [157, 0, -222, 0.15, 0.08],                     // the dining hall + new residence hall
+    stadium: [-60, 0, -400, 1.5, 0.08],                     // athletics: stadium stands across the fields
+    physics: [-190, 0, -150, 1.2, 0.06],                    // west science quad
+    southsci: [230, 0, 250, -1.3, 0.06],                    // south science buildings
+    garage: [250, 0, 30, -1.35, 0.04],                      // east: parking structure and lots
+    aerial: [60, 190, 360, 0.0, -0.55],                     // the whole mapped campus from the south
   };
   W.surfaceAt = (p) => {
     const { x, z } = p;
@@ -73,4 +87,10 @@ export function build(world) {
     if (x >= ENG_DRIVE.x0 - 3 && x <= ENG_DRIVE.x1 + 3 && z >= ENG_DRIVE.z0) return 'concrete';
     return 'ground';
   };
+  // students: walkers on the footpaths across the whole campus + small groups outside the dining hall / union (set dressing)
+  try {
+    const R = world.R; const crowd = campusPathPoints(world, 140, { gap: 9 }).map(([x, z]) => ({ x, y: 0, z, ry: R() * 6.3, pose: R() < 0.6 ? 'walk' : R() < 0.5 ? 'phone' : 'stand', bag: 0 }));
+    for (const [cx, cz, n] of [[-30, -6, 10], [40, 5, 8], [-96, 30, 12], [160, -240, 9], [20, -225, 10], [110, -8, 6]]) for (let i = 0; i < n; i++) { const a = R() * 6.3, r = 1.5 + R() * 6; crowd.push({ x: cx + Math.cos(a) * r, y: 0, z: cz + Math.sin(a) * r, ry: R() * 6.3, pose: R() < 0.5 ? 'stand' : R() < 0.5 ? 'phone' : 'walk' }); }
+    const cams = Object.values(W.poses || {}); buildCrowd(world, crowd.filter((c) => !cams.some((p) => Math.hypot(p[0] - c.x, p[2] - c.z) < 4)));
+  } catch (e) { console.warn('[sbu] crowd', e); }
 }

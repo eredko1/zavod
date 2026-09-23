@@ -414,7 +414,7 @@ export function makeMats(world) {
   { const ht = hedgeTexture(R); reg('hedgeLeaf', new THREE.MeshStandardMaterial({ map: ht, color: 0x3d5a2a, roughness: 0.9, metalness: 0, envMapIntensity: 0.22, name: 'hedgeLeaf' }), 'ground', 1 / 1.2); }
   // soot / rain staining under window sills (flat transparent overlay on the wall face)
   reg('sillStain', new THREE.MeshStandardMaterial({ color: 0x2e2a24, roughness: 0.95, transparent: true, opacity: 0.35, depthWrite: false, name: 'sillStain' }), 'concrete', 0.5);
-  M.noShadow.sillStain = true;
+  M.noShadow.sillStain = true; M.noShadow.darkMullion = true; M.noShadow.whiteMullion = true;
   // baked window strip for buildings only ever read at distance (kills mullion shimmer)
   reg('windowStrip', new THREE.MeshStandardMaterial({ map: windowStripTexture(R), color: 0xffffff, roughness: 0.55, metalness: 0.2, envMapIntensity: 0.7, name: 'windowStrip' }), 'concrete', 1 / 8);
   reg('windowStripBrick', new THREE.MeshStandardMaterial({ map: windowStripTexture(R, { wall: '#7d5c47', glass: '#3f5158', lit: '#c8b489' }), color: 0xffffff, roughness: 0.65, metalness: 0.15, envMapIntensity: 0.6, name: 'windowStripBrick' }), 'concrete', 1 / 8);
@@ -423,7 +423,7 @@ export function makeMats(world) {
   reg('busGlass', plain('busGlass', 0x2b3a3c, { roughness: 0.08, metalness: 0.9, envMapIntensity: 1.1 }), 'metal', 0.5);
   reg('tailLight', plain('tailLight', 0x8c1418, { roughness: 0.35, metalness: 0.2, emissive: 0x9a1418, emissiveIntensity: 0.5 }), 'metal', 0.5);
   reg('mulchDark', plain('mulchDark', 0x3f3025, { roughness: 1, envMapIntensity: 0.2 }), 'ground', 0.5);
-  M.noShadow.sillStain = true;
+  M.noShadow.sillStain = true; M.noShadow.darkMullion = true; M.noShadow.whiteMullion = true;
 
   // mottled bark (replaces the near-black plank texture)
   { const bk = barkTexture(R); M.bark.map = bk.map; M.bark.normalMap = bk.normalMap; M.bark.color.set(0xffffff); M.bark.roughness = 1; M.bark.metalness = 0; M.bark.aoMap = null; M.bark.roughnessMap = null; M.bark.metalnessMap = null; M.bark.envMapIntensity = 0.3; M.uvScale.bark = 1 / 1.6; M.bark.needsUpdate = true; }

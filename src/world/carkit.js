@@ -99,11 +99,10 @@ export function carGeometries(kind = 'sedan') {
   // wheels: tyre with a rounded shoulder, rim face with 5 spokes, dark hub; dark arch liner behind each wheel
   for (const wx of K.wheels) for (const sz of [1, -1]) {
     const zc = sz * (halfW(wx) - 0.13);
-    const tyre = new THREE.LatheGeometry([[0.2, -0.11], [wheelR - 0.035, -0.115], [wheelR, -0.08], [wheelR + 0.004, 0], [wheelR, 0.08], [wheelR - 0.035, 0.115], [0.2, 0.11]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
+    const tyre = new THREE.LatheGeometry([[0.2, -0.11], [wheelR - 0.035, -0.115], [wheelR, -0.08], [wheelR + 0.004, 0], [wheelR, 0.08], [wheelR - 0.035, 0.115], [0.2, 0.11]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
     tyre.rotateX(Math.PI / 2); tyre.translate(wx, wheelR, zc); parts.rubber.push(tyre);
     const face = new THREE.CylinderGeometry(0.215, 0.215, 0.02, 12); face.rotateX(Math.PI / 2); face.translate(wx, wheelR, zc + sz * 0.1); parts.trim.push(face);
     for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; const sp = new THREE.BoxGeometry(0.2, 0.045, 0.03); sp.translate(0.1, 0, 0); sp.rotateZ(a); sp.translate(wx, wheelR, zc + sz * 0.115); parts.rim.push(sp); }
-    const lip = new THREE.TorusGeometry(0.205, 0.016, 3, 14); lip.translate(wx, wheelR, zc + sz * 0.112); parts.rim.push(lip);
     const hub = new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10); hub.rotateX(Math.PI / 2); hub.translate(wx, wheelR, zc + sz * 0.12); parts.rim.push(hub);
     const liner = new THREE.CylinderGeometry(archR - 0.01, archR - 0.01, HW * 1.5, 8, 1, true, -Math.PI / 2, Math.PI); liner.rotateX(Math.PI / 2); liner.translate(wx, 0.33, 0); parts.trim.push(liner);
   }
@@ -171,7 +170,7 @@ export function placeCars(world, list, { raycast = true } = {}) {
       const im = new THREE.InstancedMesh(G[slot], CM[slot], P.length); im.name = `cars:${kind}:${slot}`;
       P.forEach((c, i) => { q.setFromAxisAngle(up, c.ry || 0); p.set(c.x, c.y || 0, c.z); im.setMatrixAt(i, m4.compose(p, q, one)); if (slot === 'paint') im.setColorAt(i, c.color ? new THREE.Color(c.color) : (kind === 'cab' ? new THREE.Color(0xf2b820) : CAR_COLORS[((R ? R() : Math.random()) * CAR_COLORS.length) | 0])); });
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.castShadow = slot === 'paint' || slot === 'rubber'; im.receiveShadow = true; im.userData.surface = 'metal'; scene.add(im);
+      im.castShadow = slot === 'paint'; im.receiveShadow = true; im.userData.surface = 'metal'; scene.add(im);
       if (raycast && (slot === 'paint' || slot === 'glass')) ctx.raycastTargets.push(im);
     }
   }

@@ -118,14 +118,14 @@ export function buildDetail(world, M) {
   // ---- distant tree line: 3 silhouettes, ±30 % scale, ringing the campus inside the haze --------
   {
     const lists = [[], [], []];
-    const N = 40, r0 = 330;
+    const N = 70, r0 = 900;   // outside the whole OSM-built campus (it now extends ~700 m from the mall)
     for (let k = 0; k < N; k++) {
       const a = (k + R() * 0.45) * Math.PI * 2 / N;
       const rr = r0 + j(50);
-      const h = 26 * (0.7 + R() * 0.6), w = 96 * (0.7 + R() * 0.6);
+      const h = 40 * (0.7 + R() * 0.6), w = 150 * (0.7 + R() * 0.6);
       const g = new THREE.PlaneGeometry(w, h); g.translate(0, h / 2, 0);
       g.rotateY(-a + Math.PI / 2);
-      g.translate(Math.cos(a) * rr + 20, -1.5, Math.sin(a) * rr - 40);
+      g.translate(Math.cos(a) * rr + 70, -1.5, Math.sin(a) * rr - 150);
       lists[(R() * 3) | 0].push(g);
     }
     for (let i = 0; i < 3; i++) {

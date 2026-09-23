@@ -13,7 +13,7 @@ const LOW_FLOOR = 2.2;      // collider tops this close above the base floor are
 const K = 4;                // candidate slots per cell (base + 3 highest tops)
 const L = 3;                // final layers per cell
 const MAX_EXPAND = 60000;
-const MAX_CELLS = 300000;
+const MAX_CELLS = 900000;       // ~1 m cells on the 0.8 x 1.1 km campus; 0.5 m on the small maps
 
 class Heap {
   constructor() { this.a = []; this.k = []; }

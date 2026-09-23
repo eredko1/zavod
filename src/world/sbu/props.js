@@ -124,6 +124,7 @@ export function buildProps(world, M) {
   grove(380, -300, 520, 400, 50, 0.6, 1.2);
   grove(STALLER.nx0, STALLER.nz0 - 4, STALLER.nx1, STALLER.nz0 - 4, 0, 0.5);
   grove(-118, -140, -100, -60, 8, 0.5, 0.9);
+  for (const t of world.sbuExtraTrees || []) tree(t.x, t.z, t.s, t.kind);   // wider-campus trees planned by campus.js
   for (let i = 0; i < 3; i++) { inst(world, species[i].trunk, M.bark, dec[i], 'wood', { name: 'trunks' + i }); inst(world, species[i].leaf, canopyMat, dec[i], 'wood', { name: 'canopy' + i }); }
   inst(world, pineTrunk, M.bark, pines, 'wood', { name: 'pineTrunks' });
   inst(world, pineGeo, pineMat, pines, 'wood', { name: 'pines' });

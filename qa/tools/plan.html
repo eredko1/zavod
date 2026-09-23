@@ -1,0 +1,15 @@
+<!doctype html><body style="margin:0;background:#111"><canvas id=c width=1400 height=1400></canvas><script type=module>
+import { OSM, PLAY } from '../../src/world/sbu/osm.js';
+import * as L from '../../src/world/sbu/layout.js';
+const c=document.getElementById('c'),g=c.getContext('2d'); const S=1400/1700, ox=700, oz=1020; // x -700..1000, z -1020..680
+const T=(x,z)=>[(x+ox)*S,(z+oz)*S];
+const poly=(p,fill,stroke,close=true)=>{g.beginPath();p.forEach(([x,z],i)=>{const[a,b]=T(x,z);i?g.lineTo(a,b):g.moveTo(a,b)});if(close)g.closePath();if(fill){g.fillStyle=fill;g.fill()}if(stroke){g.strokeStyle=stroke;g.stroke()}};
+OSM.wd.forEach(p=>poly(p,'#1f3a1f'));OSM.g.forEach(o=>poly(o.p,o.k==='plaza'?'#555':'#2d4a2a'));OSM.pi.forEach(o=>poly(o.p,'#3a6a3a'));OSM.tr.forEach(o=>poly(o.p,'#7a3a2a'));OSM.wa.forEach(p=>poly(p,'#2a4a7a'));OSM.l.forEach(p=>poly(p,'#333'));
+OSM.r.forEach(o=>{g.lineWidth=o.w*S;poly(o.p,null,'#777',false)});OSM.w.forEach(o=>{g.lineWidth=Math.max(1,o.w*S);poly(o.p,null,'#bba',false)});g.lineWidth=1;
+OSM.b.forEach(o=>poly(o.p,o.play?'#c96':'#865','#000'));
+for(const k of ['LIB','SAC','FREY','HARRIMAN','ESS','PSY','ADMIN','HUM','ECC','JAVITS','ENG','NEWCS','LIGHTENG','CHEM','VDG','UNION','REC','WANG']){const r=L[k];poly([[r.x0,r.z0],[r.x1,r.z0],[r.x1,r.z1],[r.x0,r.z1]],'rgba(80,160,255,0.5)','#4af')}
+const s=L.STALLER;poly([[s.nx0,s.nz0],[s.nx1,s.nz0],[s.nx1,s.nz1],[s.nx0,s.nz1]],'rgba(80,160,255,0.5)','#4af');
+g.strokeStyle='#f0f';g.lineWidth=2;poly([[PLAY.x0,PLAY.z0],[PLAY.x1,PLAY.z0],[PLAY.x1,PLAY.z1],[PLAY.x0,PLAY.z1]],null,'#f0f');
+const B=L.BOUNDS;g.strokeStyle='#ff0';poly([[B.x0,B.z0],[B.x1,B.z0],[B.x1,B.z1],[B.x0,B.z1]],null,'#ff0');
+window.__game={ready:true};
+</script>
