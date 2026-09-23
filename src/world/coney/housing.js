@@ -105,7 +105,17 @@ function facadeTextures(R, aniso) {
     }
     ng.putImageData(out, 0, 0); return texOf(nc, false, aniso);
   };
-  return { brick: make('brick'), cream: make('cream'), top: make('top'), plain: make('plain'), normal: normalFrom(hc, 2.2), normalPlain: normalFrom(pc, 2.2), rough: texOf(rc, false, aniso) };
+  // night: lit windows (emissive; coney/horizon.js ramps the intensity with the evening): ~35% of the flats have a lamp on,
+  // warm tungsten / cool LED / TV-blue, some half-covered by a blind
+  const [lc, lg] = canvas(S, S); lg.fillStyle = '#000'; lg.fillRect(0, 0, S, S);
+  for (const w of wins) {
+    const k = (w.rnd * 9301 + w.cx * 0.37 + w.f * 0.71) % 1; if (k > 0.36) continue;
+    const x0 = w.cx - ww / 2 + 0.1 * px, x1 = w.cx + ww / 2 - 0.1 * px, yT = w.y1 + 0.1 * py, yB = w.y0 - 0.06 * py;
+    const col = k < 0.2 ? '#ffc98a' : k < 0.3 ? '#ffe7c4' : '#9fb8ff';
+    const gr = lg.createLinearGradient(0, yT, 0, yB); gr.addColorStop(0, col); gr.addColorStop(1, k < 0.3 ? '#b8804a' : '#5a6aa8'); lg.fillStyle = gr; lg.fillRect(x0, yT, x1 - x0, yB - yT);
+    if (w.rnd > 0.62) { lg.fillStyle = 'rgba(0,0,0,0.55)'; lg.fillRect(x0, yT, x1 - x0, (yB - yT) * 0.45); }
+  }
+  return { brick: make('brick'), cream: make('cream'), top: make('top'), plain: make('plain'), normal: normalFrom(hc, 2.2), normalPlain: normalFrom(pc, 2.2), rough: texOf(rc, false, aniso), lit: texOf(lc, true, aniso) };
 }
 
 function galleryTexture(aniso) {
@@ -210,7 +220,7 @@ function makeHousingMats(world, M) {
   const R = world.R; const aniso = Math.min(16, world.ctx.renderer?.capabilities?.getMaxAnisotropy?.() ?? 8);
   const reg = (key, mat, surface, uvScale = 1) => { mat.name = key; M[key] = mat; M.surface[key] = surface; M.uvScale[key] = uvScale; return mat; };
   const T = facadeTextures(R, aniso);
-  const fac = (map, normal, color = 0xffffff) => new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(1, 1), roughnessMap: T.rough, roughness: 1, metalness: 0, color, envMapIntensity: 0.55 });
+  const fac = (map, normal, color = 0xffffff) => new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(1, 1), roughnessMap: T.rough, roughness: 1, metalness: 0, color, envMapIntensity: 0.55, emissiveMap: T.lit, emissive: 0xffffff, emissiveIntensity: 0 });
   reg('hBrickWin', fac(T.brick, T.normal, 0xe0d6d3), 'concrete');
   reg('hCreamWin', fac(T.cream, T.normal, 0xe2dbd0), 'concrete');
   reg('hBrickTop', fac(T.top, T.normal, 0xe0d6d3), 'concrete');
