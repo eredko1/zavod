@@ -22,7 +22,7 @@ const smooth = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a
 
 export function carGeometries(kind = 'sedan') {
   const K = KINDS[kind]; const L = K.len, HW = K.w / 2, xf = L / 2, xr = -L / 2;
-  const NS = 30;                       // stations along the length
+  const NS = 22;                       // stations along the length
   const xs = []; for (let i = 0; i <= NS; i++) { const t = i / NS; xs.push(xr + (xf - xr) * (0.5 - 0.5 * Math.cos(Math.PI * t))); } // denser at the ends
   const [wsBase, wsTop] = K.ws, [rsTop, rsBase] = K.rs;
   const archR = 0.43, wheelR = K.clr > 0.25 ? 0.37 : 0.33;

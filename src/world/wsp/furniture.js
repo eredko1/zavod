@@ -381,7 +381,7 @@ function buildStreet(world, T) {
     instance(world, G.paint, CM.paint, P, { surface: 'metal', name: 'cars_' + kind, colors: cols, collide: null });
     P.forEach((c) => { const ax = Math.abs(Math.cos(c.ry)) > 0.5; const hx = kit.len / 2, hz = kit.w / 2; const ex = ax ? hx : hz, ez = ax ? hz : hx; ctx.colliders.push(new THREE.Box3(new THREE.Vector3(c.x - ex, 0, c.z - ez), new THREE.Vector3(c.x + ex, Math.min(kit.h, 1.6), c.z + ez))); const nx = ax ? 0 : 1, nz = ax ? 1 : 0; world.cover(c.x + nx * (hz + 0.6), c.z + nz * (hz + 0.6), nx, nz); world.cover(c.x - nx * (hz + 0.6), c.z - nz * (hz + 0.6), -nx, -nz); });
     for (const c of P) world.contactBlobs.push({ x: c.x, z: c.z, ry: c.ry, ax: kit.len + 0.8, az: kit.w + 0.9 });
-    for (const slot of ['glass', 'rubber', 'rim', 'trim', 'lampW', 'lampR', 'plate']) if (G[slot]) instance(world, G[slot], CM[slot], P, { surface: 'metal', name: slot + '_' + kind, shadow: slot === 'rubber', ray: slot === 'glass' });
+    for (const slot of ['glass', 'rubber', 'rim', 'trim', 'lampW', 'lampR', 'plate']) if (G[slot]) instance(world, G[slot], CM[slot], P, { surface: 'metal', name: slot + '_' + kind, shadow: false, ray: slot === 'glass' });
   }
 
   // ---- hydrants (red), one-way signs, bike racks, tree pits, street trees positions ----------------------------------
