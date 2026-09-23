@@ -82,12 +82,13 @@ export function buildCrowd(world, spots) {
     const im = new THREE.InstancedMesh(geo, mat, list.length); im.name = 'crowd:' + name;
     list.forEach((s, i) => { q.setFromAxisAngle(up, s.ry || 0); p.set(s.x, s.y || 0, s.z); const k = s.s || 1; sc.set(k * (s.wide || 1), k, k * (s.wide || 1)); im.setMatrixAt(i, m4.compose(p, q, sc)); if (colorFn) im.setColorAt(i, colorFn(s)); });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-    im.castShadow = true; im.receiveShadow = true; im.frustumCulled = false; scene.add(im);
+    im.castShadow = !/^lie/.test(name); im.receiveShadow = true; im.frustumCulled = false; scene.add(im);
   };
   for (const s of spots) { s.s = s.s || (0.93 + R() * 0.14); s.wide = 0.92 + R() * 0.18; s.cTop = pick(TOPS); s.cBot = pick(BOTTOMS); s.cSkin = pick(SKIN); s.cHair = pick(HAIR); }
-  for (const pose of ['stand', 'walk', 'phone']) {
+  for (const pose of ['stand', 'walk', 'phone', 'lie']) {
     const list = spots.filter((s) => (s.pose || 'stand') === pose); if (!list.length) continue;
-    const F = figure(pose);
+    const F = figure(pose === 'lie' ? 'stand' : pose);
+    if (pose === 'lie') for (const k of Object.keys(F)) { F[k].rotateX(-Math.PI / 2); F[k].translate(0, 0.13, 0.85); }   // sunbather on their back, centred on the spot
     add(F.top, M.top, list, (s) => s.cTop, pose + 'Top'); add(F.bottom, M.bottom, list, (s) => s.cBot, pose + 'Bot');
     add(F.skin, M.skin, list, (s) => s.cSkin, pose + 'Skin'); add(F.hair, M.hair, list, (s) => s.cHair, pose + 'Hair'); add(F.shoes, M.shoes, list, null, pose + 'Shoes');
   }

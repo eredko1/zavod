@@ -4,5 +4,6 @@ import * as railyard from './railyard.js';
 import * as terminal from './terminal.js';
 import * as wsp from './wsp.js';
 import * as sbu from './sbu.js';
-export const MAPS = { zavod, railyard, terminal, wsp, sbu };
+import * as coney from './coney.js';
+export const MAPS = { zavod, railyard, terminal, wsp, sbu, coney };
 export const DEFAULT_MAP = 'zavod';
