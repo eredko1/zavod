@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { makeConeyMats } from '../coney/mats.js';
 import { buildSky } from '../sbu/sky.js';
 import { buildCity } from '../coney/city.js';
+import { buildHousing } from '../coney/housing.js';
 import { buildShore, BW, sandHeight, waterZ, SAND_TOP } from '../coney/shore.js';
 import { buildLandmarks, LM } from '../coney/landmarks.js';
 import { buildBeachLife } from '../coney/life.js';
@@ -31,6 +32,7 @@ export function build(world) {
   ctx.progress(0.13, 'coney: sky'); buildSky(world, { shadowHalf: 130, center: [0, 0, 0] });
   const M = makeConeyMats(world); world.mats = M;
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
+  ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);

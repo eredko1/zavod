@@ -1,0 +1,515 @@
+// CONEY — Luna Park Houses: the five ~21-storey NYCHA towers north of Surf Avenue (OSM "Luna Park Houses 1..5").
+// Each complex is re-massed from its OSM footprint into the real plan: a dark recessed open-gallery core (slab edges, railing
+// panels, posts, dark back wall, beige penthouse) joining two L-shaped brick towers, each an axial wing at full height plus a
+// perpendicular wing stepping down twice. Facades: red-brown brick with white-framed punched windows two per bay (a 2-bay x
+// 4-storey canvas tile with normal + roughness maps, so reveals read recessed and the glass reflects), full-height cream panel
+// strips standing 0.1 m proud, brick-with-cream-bands top zones, through-wall/window AC units (instanced), dark coping +
+// steel guard railings + stair/elevator bulkheads on the roofs, entrance doors with canopies, lawns with low black steel
+// fences and trees. Every solid has colliders (rotated boxes are cut into <= 4 m cells before their AABBs are taken).
+// Owned by: LUNA HOUSING agent.
+import * as THREE from 'three';
+import { Batch as GeoBatch, boxGeo, worldUV } from '../sbu/geo.js';
+import { OSM, PLAY } from './osm.js';
+import { footprintAngle, cen, bbox, pip, segDist } from '../osmkit.js';
+import { leafTexture, barkTexture } from '../wsp/textures.js';
+
+const ST = 2.62;        // storey height (m)
+const PAR = 0.9;        // parapet above the top floor slab
+const TILE_BAYS = 2, TILE_FLOORS = 4;
+const SILL = 0.85, WIN_H = 1.5, WIN_W = 1.12, WIN_AT = [0.28, 0.72];   // window layout inside one bay (fractions of the bay)
+const GAL = 1.7;        // gallery recess depth on the core faces
+
+/** The five Luna Park Houses towers in OSM.b (tall 'tower' style buildings north of the avenue, x 60..380, z -520..-110). */
+export const isLunaTower = (b) => { if (b.s !== 'tower' || !(b.h > 50)) return false; const [x, z] = cen(b.p); return x > 60 && x < 380 && z > -520 && z < -110; };
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// textures
+const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+const texOf = (c, srgb = true, aniso = 8) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; return t; };
+
+/** Facade tiles: 2 bays x 4 storeys (1024^2). kinds: brick (windows in brick), cream (windows in the cream panel strip),
+ *  top (brick with a cream band behind every window column), plain (brick, no windows). Shared normal + roughness maps. */
+function facadeTextures(R, aniso) {
+  const S = 1024, TW = TILE_BAYS, TH = TILE_FLOORS;   // tile in bay / storey units
+  const X = (b) => b / TW * S, Y = (f) => S - f / TH * S;                  // bay units -> px, storey units (from the bottom) -> px
+  const bayM = 4.8, px = S / (TW * bayM), py = S / (TH * ST);            // nominal px per metre
+  const wins = []; for (let f = 0; f < TH; f++) for (let b = 0; b < TW; b++) for (const a of WIN_AT) wins.push({ cx: X(b + a), y0: Y(f + SILL / ST), y1: Y(f + (SILL + WIN_H) / ST), f, rnd: R() });
+  const ww = WIN_W * px;
+
+  const brick = (g, base, dark, light, mortar) => {
+    g.fillStyle = mortar; g.fillRect(0, 0, S, S);
+    const ch = 0.0667 * py, bl = 0.2 * px;
+    for (let r = 0, y = 0; y < S; r++, y += ch) {
+      const off = (r & 1) ? bl / 2 : 0;
+      for (let x = -off; x < S; x += bl) { const v = R(); g.fillStyle = v < 0.15 ? dark : v > 0.88 ? light : base; g.globalAlpha = 1; g.fillRect(x + 0.6, y + 0.8, bl - 1.2, ch - 1.2); if (R() < 0.5) { g.globalAlpha = 0.12; g.fillStyle = R() < 0.5 ? '#000' : '#fff'; g.fillRect(x + 1, y + 1, bl - 2, ch - 2); } }
+    }
+    g.globalAlpha = 1;
+    for (let i = 0; i < 700; i++) { g.fillStyle = `rgba(${R() < 0.6 ? '30,18,14' : '190,150,120'},${R() * 0.06})`; g.fillRect(R() * S, R() * S, 8 + R() * 40, 3 + R() * 12); }
+  };
+  const cream = (g) => {
+    g.fillStyle = '#c6b99d'; g.fillRect(0, 0, S, S);
+    const ch = 0.0667 * py, bl = 0.2 * px;
+    for (let r = 0, y = 0; y < S; r++, y += ch) { const off = (r & 1) ? bl / 2 : 0; for (let x = -off; x < S; x += bl) { const v = R(); g.fillStyle = v < 0.2 ? '#bdb094' : v > 0.85 ? '#cec3a8' : '#c6b99d'; g.fillRect(x + 0.7, y + 0.8, bl - 1.4, ch - 1.4); } }
+    for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(90,80,64,${R() * 0.05})`; g.fillRect(R() * S, R() * S, 10 + R() * 50, 4 + R() * 16); }
+  };
+  const windows = (g, base) => {
+    for (const w of wins) {
+      const x0 = w.cx - ww / 2, x1 = w.cx + ww / 2, yT = w.y1, yB = w.y0;
+      // stain streak below the sill (brick only), the opening's dark reveal, lintel shadow
+      if (base !== 'cream') { const gr = g.createLinearGradient(0, yB, 0, yB + 0.55 * py); gr.addColorStop(0, 'rgba(25,15,12,0.22)'); gr.addColorStop(1, 'rgba(25,15,12,0)'); g.fillStyle = gr; g.fillRect(x0 + 4, yB, ww - 8, 0.55 * py); }
+      g.fillStyle = '#231a17'; g.fillRect(x0 - 3, yT - 3, ww + 6, yB - yT + 6);
+      const fw = 0.06 * px, inset = 0.035 * px;
+      g.fillStyle = '#e9e8e2'; g.fillRect(x0 + inset, yT + inset, ww - inset * 2, yB - yT - inset);
+      // glass: two sashes (double-hung), sky reflection gradient, blinds / curtains on some
+      const meet = yT + (yB - yT) * 0.47;
+      for (const [s0, s1, top] of [[yT + inset + fw, meet - fw * 0.4, true], [meet + fw * 0.4, yB - fw, false]]) {
+        const gx0 = x0 + inset + fw, gx1 = x1 - inset - fw; const gr = g.createLinearGradient(0, s0, 0, s1);
+        const k = w.rnd; const sky = k < 0.3 ? ['#7e8f9f', '#34404b'] : k < 0.6 ? ['#5d6a76', '#262d34'] : ['#98a6b2', '#46525d'];
+        gr.addColorStop(0, sky[0]); gr.addColorStop(1, sky[1]); g.fillStyle = gr; g.fillRect(gx0, s0, gx1 - gx0, s1 - s0);
+        g.fillStyle = 'rgba(255,255,255,0.10)'; g.beginPath(); g.moveTo(gx0, s1); g.lineTo(gx0 + (gx1 - gx0) * 0.45, s0); g.lineTo(gx0 + (gx1 - gx0) * 0.62, s0); g.lineTo(gx0 + (gx1 - gx0) * 0.17, s1); g.fill();
+        if (top && k > 0.62) { const f = 0.25 + ((k * 7.3) % 1) * 0.75; g.fillStyle = k > 0.85 ? '#b8a684' : '#e2ded3'; g.fillRect(gx0, s0, gx1 - gx0, (s1 - s0) * f); g.fillStyle = 'rgba(0,0,0,0.08)'; for (let y = s0 + 3; y < s0 + (s1 - s0) * f; y += 3) g.fillRect(gx0, y, gx1 - gx0, 1); }
+        if (!top && k > 0.78 && k < 0.85) { g.fillStyle = '#8b6c5a'; g.fillRect(gx0, s0, (gx1 - gx0) * 0.35, s1 - s0); }
+      }
+      g.fillStyle = '#d9d8d1'; g.fillRect(x0 + inset, meet - fw * 0.4, ww - inset * 2, fw * 0.8);         // meeting rail
+      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0 + inset, yT + inset, ww - inset * 2, 0.07 * py);   // head shadow in the reveal
+      g.fillStyle = '#c9c3b5'; g.fillRect(x0 - 0.08 * px, yB, ww + 0.16 * px, 0.07 * py);                  // sill
+      g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x0 - 0.08 * px, yB + 0.07 * py, ww + 0.16 * px, 2);
+    }
+  };
+  const make = (kind) => {
+    const [c, g] = canvas(S, S);
+    if (kind === 'cream') cream(g); else brick(g, '#6c3226', '#5a2a21', '#7a392c', '#6a5c53');
+    if (kind === 'top') { for (let b = 0; b < TW; b++) for (const a of WIN_AT) { const cx = X(b + a), w = (WIN_W + 0.36) * px; g.fillStyle = '#c4b79b'; g.fillRect(cx - w / 2, 0, w, S); g.fillStyle = 'rgba(80,70,55,0.12)'; for (let f = 0; f < TH; f++) g.fillRect(cx - w / 2, Y(f + 1) - 1, w, 2); } }
+    if (kind !== 'plain') windows(g, kind);
+    return texOf(c, true, aniso);
+  };
+  // height field -> normal map (brick courses, window reveals, frames, sills) + roughness map (glass smooth)
+  const [hc, hg] = canvas(S, S); const [rc, rg] = canvas(S, S);
+  hg.fillStyle = '#c8c8c8'; hg.fillRect(0, 0, S, S); rg.fillStyle = 'rgb(0,240,0)'; rg.fillRect(0, 0, S, S);
+  { const ch = 0.0667 * py, bl = 0.2 * px; hg.fillStyle = '#a0a0a0'; for (let r = 0, y = 0; y < S; r++, y += ch) { hg.fillRect(0, y, S, 1.2); const off = (r & 1) ? bl / 2 : 0; for (let x = -off; x < S; x += bl) hg.fillRect(x, y, 1.2, ch); } }
+  const [pc, pg] = canvas(S, S); pg.drawImage(hc, 0, 0);
+  for (const w of wins) {
+    const x0 = w.cx - ww / 2, yT = w.y1, yB = w.y0; const inset = 0.035 * px, fw = 0.06 * px;
+    for (const G of [hg, pg]) { G.fillStyle = '#202020'; G.fillRect(x0 - 3, yT - 3, ww + 6, yB - yT + 6); G.fillStyle = '#707070'; G.fillRect(x0 + inset, yT + inset, ww - inset * 2, yB - yT - inset); G.fillStyle = '#404040'; G.fillRect(x0 + inset + fw, yT + inset + fw, ww - 2 * inset - 2 * fw, yB - yT - inset - 2 * fw); G.fillStyle = '#ffffff'; G.fillRect(x0 - 0.08 * px, yB, ww + 0.16 * px, 0.07 * py); }
+    rg.fillStyle = 'rgb(0,120,0)'; rg.fillRect(x0 + inset, yT + inset, ww - inset * 2, yB - yT - inset);
+    rg.fillStyle = 'rgb(0,28,0)'; rg.fillRect(x0 + inset + fw, yT + inset + fw, ww - 2 * inset - 2 * fw, yB - yT - inset - 2 * fw);
+  }
+  const normalFrom = (hcv, strength) => {
+    const src = hcv.getContext('2d').getImageData(0, 0, S, S).data; const [nc, ng] = canvas(S, S); const out = ng.createImageData(S, S); const d = out.data;
+    const h = (x, y) => src[(((y + S) % S) * S + ((x + S) % S)) * 4] / 255;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = (h(x + 1, y) - h(x - 1, y)) * strength, dy = (h(x, y + 1) - h(x, y - 1)) * strength; const L = Math.hypot(dx, dy, 1); const i = (y * S + x) * 4;
+      d[i] = (-dx / L * 0.5 + 0.5) * 255; d[i + 1] = (dy / L * 0.5 + 0.5) * 255; d[i + 2] = (1 / L * 0.5 + 0.5) * 255; d[i + 3] = 255;
+    }
+    ng.putImageData(out, 0, 0); return texOf(nc, false, aniso);
+  };
+  return { brick: make('brick'), cream: make('cream'), top: make('top'), plain: make('plain'), normal: normalFrom(hc, 2.2), normalPlain: normalFrom(pc, 2.2), rough: texOf(rc, false, aniso) };
+}
+
+function galleryTexture(aniso) {
+  // one storey x 6 m of the open-gallery front: slab edge band, perforated railing panel, slim posts; everything else open
+  const W = 512, H = 256; const [c, g] = canvas(W, H); g.clearRect(0, 0, W, H);
+  const py = H / ST, px = W / 6;
+  g.fillStyle = '#8b867b'; g.fillRect(0, H - 0.24 * py, W, 0.24 * py);                              // slab edge
+  g.fillStyle = 'rgba(40,36,30,0.6)'; g.fillRect(0, H - 0.24 * py, W, 2);
+  g.fillStyle = '#303132'; g.fillRect(0, H - 1.1 * py, W, 0.86 * py);                                  // railing panel
+  g.fillStyle = 'rgba(255,255,255,0.08)'; for (let y = H - 1.08 * py; y < H - 0.32 * py; y += 5) g.fillRect(0, y, W, 1);
+  g.clearRect(0, H - 0.95 * py, W, 2); g.clearRect(0, H - 0.6 * py, W, 2);                             // slits (sub-50% so it survives mips)
+  g.fillStyle = '#38393a'; g.fillRect(0, H - 1.14 * py, W, 0.06 * py);                                 // top rail
+  g.fillStyle = '#3c3c3a'; for (let x = 0; x <= W; x += 1.5 * px) g.fillRect(x - 0.05 * px, 0, 0.1 * px, H);   // posts
+  g.fillStyle = '#57544d'; g.fillRect(0, 0, 0.16 * px, H); g.fillRect(W - 0.16 * px, 0, 0.16 * px, H);  // column at the tile seam
+  const t = texOf(c, true, aniso); return t;
+}
+
+function fenceTexture() {
+  // low black steel picket fence, one 2.4 m panel x 1.05 m
+  const W = 256, H = 128; const [c, g] = canvas(W, H); g.clearRect(0, 0, W, H);
+  g.fillStyle = '#16181a'; const px = W / 2.4, py = H / 1.05;
+  g.fillRect(0, H - 1.0 * py, W, 0.05 * py); g.fillRect(0, H - 0.18 * py, W, 0.04 * py);
+  for (let x = 0.06; x < 2.4; x += 0.13) { g.fillRect(x * px, H - 0.98 * py, Math.max(2, 0.022 * px), 0.92 * py); }
+  g.lineWidth = 2; g.strokeStyle = '#16181a'; for (let x = 0.06; x + 0.13 < 2.4; x += 0.26) { g.beginPath(); g.arc((x + 0.065) * px, H - 1.0 * py, 0.065 * px, Math.PI, 0); g.stroke(); }
+  return texOf(c, true, 4);
+}
+
+function acTexture() {
+  const [c, g] = canvas(64, 64); g.fillStyle = '#d9d5cb'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = 'rgba(40,40,40,0.35)'; for (let y = 8; y < 44; y += 4) g.fillRect(6, y, 52, 2);
+  g.fillStyle = 'rgba(90,80,60,0.25)'; g.fillRect(0, 54, 64, 10);
+  return texOf(c, true, 4);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// materials
+function makeHousingMats(world, M) {
+  const R = world.R; const aniso = Math.min(16, world.ctx.renderer?.capabilities?.getMaxAnisotropy?.() ?? 8);
+  const reg = (key, mat, surface, uvScale = 1) => { mat.name = key; M[key] = mat; M.surface[key] = surface; M.uvScale[key] = uvScale; return mat; };
+  const T = facadeTextures(R, aniso);
+  const fac = (map, normal, color = 0xffffff) => new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(1, 1), roughnessMap: T.rough, roughness: 1, metalness: 0, color, envMapIntensity: 0.55 });
+  reg('hBrickWin', fac(T.brick, T.normal, 0xe0d6d3), 'concrete');
+  reg('hCreamWin', fac(T.cream, T.normal, 0xe2dbd0), 'concrete');
+  reg('hBrickTop', fac(T.top, T.normal, 0xe0d6d3), 'concrete');
+  reg('hBrickPlain', new THREE.MeshStandardMaterial({ map: T.plain, normalMap: T.normalPlain, color: 0xe0d6d3, roughness: 0.92, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
+  reg('hCreamPlain', new THREE.MeshStandardMaterial({ map: T.cream, color: 0xe2dbd0, roughness: 0.85, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
+  reg('hGallery', new THREE.MeshStandardMaterial({ map: galleryTexture(aniso), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7, metalness: 0.2 }), 'metal');
+  reg('hGalleryBack', new THREE.MeshStandardMaterial({ color: 0x1b1a19, roughness: 0.95, metalness: 0 }), 'concrete', 0.5);
+  reg('hSlab', new THREE.MeshStandardMaterial({ color: 0x6f6b63, roughness: 0.9, metalness: 0 }), 'concrete', 0.5);
+  reg('hRail', new THREE.MeshStandardMaterial({ color: 0x1d2022, roughness: 0.5, metalness: 0.6, envMapIntensity: 0.6 }), 'metal', 0.5);
+  reg('hRoof', new THREE.MeshStandardMaterial({ color: 0x5f5c57, roughness: 0.95, metalness: 0 }), 'concrete', 0.25);
+  reg('hFence', new THREE.MeshStandardMaterial({ map: fenceTexture(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.5 }), 'metal');
+  reg('hDoor', new THREE.MeshStandardMaterial({ color: 0x1c2328, roughness: 0.15, metalness: 0.3, envMapIntensity: 1.1 }), 'metal', 0.5);
+  { const g = M.grass.clone(); g.color = new THREE.Color(0x6e8c4c); reg('hLawn', g, 'ground', 1 / 2.5); }
+  reg('hCanopy', new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.5 }), 'metal', 0.5);
+  return M;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// local-frame geometry collector: quads + boxes per material, transformed into place at the end
+class Local {
+  constructor() { this.q = new Map(); this.boxes = []; this.cols = []; }
+  arr(key) { return this.q.get(key) || this.q.set(key, { p: [], n: [], u: [] }).get(key); }
+  /** quad from bottom-left, bottom-right, top-right, top-left (counter-clockwise seen from the front) */
+  quad(key, a, b, c, d, uv) {
+    const A = this.arr(key); const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+    let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const L = Math.hypot(...n) || 1; n = n.map((v) => v / L);
+    for (const i of [0, 1, 2, 0, 2, 3]) { A.p.push(...[a, b, c, d][i]); A.n.push(...n); A.u.push(...uv[i]); }
+  }
+  box(key, min, max, { uvScale = null, collide = true } = {}) { this.boxes.push([key, min, max, uvScale]); if (collide) this.cols.push([min, max]); }
+  collide(min, max) { this.cols.push([min, max]); }
+  emit(B, M, m, world, cell = 4) {
+    for (const [key, A] of this.q) {
+      if (!A.p.length) continue;
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(A.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(A.n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(A.u, 2));
+      g.applyMatrix4(m); B.add(key, g, { uv: false });
+    }
+    for (const [key, min, max, s] of this.boxes) { const g = boxGeo(min, max); worldUV(g, s ?? (M.uvScale[key] ?? 0.5)); g.applyMatrix4(m); B.add(key, g, { uv: false }); }
+    const v = new THREE.Vector3();
+    for (const [mn, mx] of this.cols) {
+      const nx = Math.max(1, Math.ceil((mx[0] - mn[0]) / cell)), nz = Math.max(1, Math.ceil((mx[2] - mn[2]) / cell));
+      const sx = (mx[0] - mn[0]) / nx, sz = (mx[2] - mn[2]) / nz;
+      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+        let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+        for (const [px, pz] of [[mn[0] + i * sx, mn[2] + j * sz], [mn[0] + (i + 1) * sx, mn[2] + j * sz], [mn[0] + i * sx, mn[2] + (j + 1) * sz], [mn[0] + (i + 1) * sx, mn[2] + (j + 1) * sz]]) { v.set(px, 0, pz).applyMatrix4(m); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z); }
+        world.box([x0, mn[1], z0], [x1, mx[1], z1]);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// massing: canonical plan in (t, s) with the gallery spine along s; point-symmetric halves
+function plan(R, H) {
+  const bays = (L) => Math.max(1, Math.round(L / 4.8));
+  const parts = [];
+  const push = (t0, t1, s0, s1, floors, kind, extra = {}) => parts.push({ t0, t1, s0, s1, floors, kind, ...extra });
+  for (const sg of [1, -1]) {
+    const M = (t0, t1, s0, s1) => sg > 0 ? [t0, t1, s0, s1] : [-t1, -t0, -s1, -s0];
+    // axial wing (the tall tower with the cream strip): one block, full height
+    const hA = H + (sg > 0 ? 0 : (R() < 0.5 ? 0 : -1));
+    push(...M(-10.5, 3.5, 19, 45.5), hA, 'wing', { entrance: sg > 0 ? 's1' : 's0' });
+    // perpendicular wing: 7 bays, steps down twice outward (4 bays at -2, 2 bays at -5, 1 bay at -7)
+    const L = 32, n = bays(L), bw = L / n; let t = 3.5; const steps = [[4, hA - 2], [2, hA - 5], [n - 6, hA - 7]];
+    for (const [k, fl] of steps) { if (k <= 0) continue; const t1 = t + k * bw; push(...M(t, t1, 8.5, 22.5), fl, 'wing', { bwT: bw, entrance: (t1 > 35) ? (sg > 0 ? 't1' : 't0') : null }); t = t1; }
+  }
+  push(-4.5, 3.5, -19, 19, H - 1, 'core');
+  return parts;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+export function buildHousing(world, M) {
+  makeHousingMats(world, M);
+  return buildAll(world, M);
+}
+
+function buildAll(world, M) {
+  const { scene, ctx, R } = world;
+  const B = new GeoBatch(world, M, 'luna'), G = new GeoBatch(world, M, 'lunaGround');
+  const towers = OSM.b.filter(isLunaTower);
+  const acs = [];   // AC unit matrices (world)
+  const trees = [];
+  const lawnWorld = [];
+  const others = OSM.b.filter((b) => !isLunaTower(b)).map((b) => b._bb || (b._bb = bbox(b.p)));
+
+  for (const b of towers) {
+    const ang = footprintAngle(b.p); const [ox, oz] = cen(b.p);
+    const c = Math.cos(-ang), s = Math.sin(-ang);
+    const loc = b.p.map(([x, z]) => [(x - ox) * c - (z - oz) * s, (x - ox) * s + (z - oz) * c]);
+    const lb = bbox(loc); const spineX = (lb.x1 - lb.x0) > (lb.z1 - lb.z0);
+    const cx = (lb.x0 + lb.x1) / 2, cz = (lb.z0 + lb.z1) / 2;
+    const m = new THREE.Matrix4().makeTranslation(ox, 0, oz).multiply(new THREE.Matrix4().makeRotationY(-ang)).multiply(new THREE.Matrix4().makeTranslation(cx, 0, cz));
+    const H = Math.max(18, Math.min(22, Math.round(b.h / ST)));
+    const parts = plan(R, H).map((p) => {
+      // (t, s) -> local (x, z): spine along z unless the footprint's long axis is x
+      const q = spineX ? { x0: p.s0, x1: p.s1, z0: p.t0, z1: p.t1 } : { x0: p.t0, x1: p.t1, z0: p.s0, z1: p.s1 };
+      let ent = p.entrance; if (ent && spineX) ent = { s0: 'x0', s1: 'x1', t0: 'z0', t1: 'z1' }[ent]; else if (ent) ent = { s0: 'z0', s1: 'z1', t0: 'x0', t1: 'x1' }[ent];
+      return { ...q, floors: p.floors, kind: p.kind, entrance: ent, top: p.floors * ST + PAR, galleryAxis: spineX ? 'x' : 'z' };
+    });
+    const L = new Local();
+    buildTower(L, parts, R, acs, m);
+    L.emit(B, M, m, world);
+    // grounds: lawns, fences, paths, trees
+    grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, others);
+  }
+
+  // ---- AC units (instanced, capped) ----------------------------------------------------------------------------------
+  const MAX_AC = 3000; let list = acs; if (list.length > MAX_AC) { list = []; const p = MAX_AC / acs.length; for (const a of acs) if (R() < p && list.length < MAX_AC) list.push(a); }
+  if (list.length) {
+    const g = new THREE.BoxGeometry(0.66, 0.42, 0.52);
+    const mat = new THREE.MeshStandardMaterial({ map: acTexture(), roughness: 0.6, metalness: 0.2 });
+    const im = new THREE.InstancedMesh(g, mat, list.length); const col = new THREE.Color();
+    list.forEach((a, i) => { im.setMatrixAt(i, a); const v = 0.82 + R() * 0.2; col.setRGB(v, v * (0.98 + R() * 0.03), v * (0.93 + R() * 0.05)); im.setColorAt(i, col); });
+    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    im.castShadow = true; im.receiveShadow = true; im.name = 'luna:ac'; im.userData.surface = 'metal'; im.computeBoundingSphere?.();
+    scene.add(im); ctx.raycastTargets.push(im);
+  }
+  B.flush({ shadow: true }); G.flush({ shadow: false });
+  plantTrees(world, trees);
+  return { towers: towers.length, ac: list.length, trees: trees.length };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+/** faces of an axis-aligned local box: plane, outward normal, along-axis range, "right" direction as seen from outside */
+function facesOf(p) {
+  return [
+    { id: 'x0', axis: 'z', c: p.x0, n: [-1, 0], a0: p.z0, a1: p.z1, dir: 1 },
+    { id: 'x1', axis: 'z', c: p.x1, n: [1, 0], a0: p.z0, a1: p.z1, dir: -1 },
+    { id: 'z0', axis: 'x', c: p.z0, n: [0, -1], a0: p.x0, a1: p.x1, dir: -1 },
+    { id: 'z1', axis: 'x', c: p.z1, n: [0, 1], a0: p.x0, a1: p.x1, dir: 1 },
+  ];
+}
+
+function buildTower(L, parts, R, acs, m) {
+  const P = (f, a, y, o) => f.axis === 'z' ? [f.c + f.n[0] * o, y, a] : [a, y, f.c + f.n[1] * o];
+  const tmp = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3();
+  /** rect on a face: [aL,aR] x [yB,yT] at offset o, u = along/bw (tile = 2 bays), v = y / 4 storeys */
+  const rect = (key, f, aL, aR, yB, yT, o, bw, uvMode = 'fac') => {
+    const lo = Math.min(aL, aR), hi = Math.max(aL, aR); if (hi - lo < 0.01 || yT - yB < 0.01) return;
+    const l = f.dir > 0 ? lo : hi, r = f.dir > 0 ? hi : lo;
+    const U = (a) => uvMode === 'gal' ? (f.dir > 0 ? a - f.a0 : f.a1 - a) / 6 : (f.dir > 0 ? a - f.a0 : f.a1 - a) / bw / TILE_BAYS;
+    const V = (y) => uvMode === 'gal' ? y / ST : y / (ST * TILE_FLOORS);
+    L.quad(key, P(f, l, yB, o), P(f, r, yB, o), P(f, r, yT, o), P(f, l, yT, o), [[U(l), V(yB)], [U(r), V(yB)], [U(r), V(yT)], [U(l), V(yT)]]);
+  };
+  /** a quad perpendicular to the face at along-position a, spanning offsets o0..o1 (outward), facing `side` (+1 = +a) */
+  const side = (key, f, a, o0, o1, yB, yT, sgn) => {
+    const A = (o) => P(f, a, 0, o); const p0 = A(o0), p1 = A(o1);
+    // choose order so the normal points toward sgn along the face axis
+    const bl = [p0[0], yB, p0[2]], br = [p1[0], yB, p1[2]], tr = [p1[0], yT, p1[2]], tl = [p0[0], yT, p0[2]];
+    const e1 = [br[0] - bl[0], 0, br[2] - bl[2]]; // normal = e1 x up = (-e1z, 0, e1x)... pick winding by test
+    const nx = -e1[2], nz = e1[0]; const along = f.axis === 'z' ? nz : nx;
+    const uvs = [[0, yB / 10], [Math.abs(o1 - o0) / 10, yB / 10], [Math.abs(o1 - o0) / 10, yT / 10], [0, yT / 10]];
+    if (along * sgn > 0) L.quad(key, bl, br, tr, tl, uvs); else L.quad(key, br, bl, tl, tr, uvs);
+  };
+
+  for (const p of parts) {
+    const Hw = p.floors * ST, Ht = Hw + PAR;
+    for (const f of facesOf(p)) {
+      const len = f.a1 - f.a0; const nb = Math.max(1, Math.round(len / 4.8)); const bw = len / nb;
+      // neighbours touching this face plane from outside -> covered intervals up to their top
+      const cov = [];
+      for (const o of parts) { if (o === p) continue;
+        const touch = f.axis === 'z' ? (f.n[0] > 0 ? Math.abs(o.x0 - f.c) < 0.05 : Math.abs(o.x1 - f.c) < 0.05) : (f.n[1] > 0 ? Math.abs(o.z0 - f.c) < 0.05 : Math.abs(o.z1 - f.c) < 0.05);
+        if (!touch) continue; const b0 = f.axis === 'z' ? o.z0 : o.x0, b1 = f.axis === 'z' ? o.z1 : o.x1; const lo = Math.max(f.a0, b0), hi = Math.min(f.a1, b1); if (hi - lo > 0.05) cov.push([lo, hi, o.top]);
+      }
+      const isGallery = p.kind === 'core' && f.axis === p.galleryAxis;
+      // cream strip: bays [k0,k1) centred; end faces always, long faces on a coin flip; floors 1 .. top-4
+      let strip = null;
+      if (!isGallery && p.kind !== 'core' && nb >= 3 && (len < 17 || R() < 0.55)) {
+        const k = nb >= 5 ? nb - 2 - (R() < 0.4 ? 1 : 0) : nb - 1; const k0 = Math.floor((nb - k) / 2); const k1 = Math.min(nb, k0 + k);
+        const u0 = f.dir > 0 ? f.a0 + k0 * bw : f.a1 - k1 * bw, u1 = f.dir > 0 ? f.a0 + k1 * bw : f.a1 - k0 * bw;
+        strip = { a0: u0, a1: u1, y0: ST * (R() < 0.5 ? 1 : 0.35), y1: Math.max(ST * 3, Hw - ST * (3 + ((R() * 2) | 0))) };
+      }
+      // entrance door on this face?
+      let door = null;
+      if (p.entrance === f.id || (isGallery)) { const mid = (f.a0 + f.a1) / 2; door = { a0: mid - 1.6, a1: mid + 1.6 }; }
+      const cuts = new Set([f.a0, f.a1]); for (const [lo, hi] of cov) { cuts.add(lo); cuts.add(hi); }
+      if (strip) { cuts.add(strip.a0); cuts.add(strip.a1); }
+      const xs = [...cuts].filter((v) => v >= f.a0 - 1e-6 && v <= f.a1 + 1e-6).sort((a, b) => a - b);
+      // gallery: visible runs (for recess side walls)
+      for (let i = 0; i + 1 < xs.length; i++) {
+        const a = xs[i], bnd = xs[i + 1]; if (bnd - a < 0.02) continue; const mid = (a + bnd) / 2;
+        let yb = 0; for (const [lo, hi, top] of cov) if (mid > lo && mid < hi) yb = Math.max(yb, top);
+        if (yb >= Ht - 0.01) continue;
+        if (isGallery) {
+          const yg = Math.max(yb, 0);
+          if (yg < Hw) {
+            rect('hGalleryBack', f, a, bnd, Math.max(yg, ST), Hw, -GAL, bw);
+            if (yg < ST) rect('hDoor', f, a, bnd, 0, ST, -GAL, bw);              // lobby glass at the ground floor
+            rect('hGallery', f, a, bnd, Math.max(yg, ST), Hw, 0, bw, 'gal');
+            // slabs (their edges show at oblique angles, their soffits when looking up)
+            for (let fl = 1; fl <= p.floors; fl++) { const y = fl * ST; if (y < yg) continue; const lo = Math.min(a, bnd), hi = Math.max(a, bnd); const o0 = -GAL, o1 = 0; const mn = f.axis === 'z' ? [Math.min(f.c + f.n[0] * o0, f.c + f.n[0] * o1), y - 0.02, lo] : [lo, y - 0.02, Math.min(f.c + f.n[1] * o0, f.c + f.n[1] * o1)]; const mx = f.axis === 'z' ? [Math.max(f.c + f.n[0] * o0, f.c + f.n[0] * o1), y + 0.22, hi] : [hi, y + 0.22, Math.max(f.c + f.n[1] * o0, f.c + f.n[1] * o1)]; L.box('hSlab', mn, mx, { collide: false }); }
+            // recess side walls where the run ends against a covering neighbour or the face end
+            const prevCovered = i === 0 || (() => { const m0 = (xs[i - 1] + a) / 2; let y = 0; for (const [lo, hi, top] of cov) if (m0 > lo && m0 < hi) y = Math.max(y, top); return y > yg + 0.1; })();
+            const nextCovered = i + 2 >= xs.length || (() => { const m0 = (bnd + xs[i + 2]) / 2; let y = 0; for (const [lo, hi, top] of cov) if (m0 > lo && m0 < hi) y = Math.max(y, top); return y > yg + 0.1; })();
+            if (prevCovered) side('hBrickPlain', f, a, -GAL, 0, yg, Hw, 1);
+            if (nextCovered) side('hBrickPlain', f, bnd, -GAL, 0, yg, Hw, -1);
+            // entrance canopy in front of the lobby
+            if (door && mid > door.a0 - 3 && mid < door.a1 + 3 && yg < 0.1 && a <= (door.a0 + door.a1) / 2 && bnd >= (door.a0 + door.a1) / 2) canopy(L, f, P, (door.a0 + door.a1) / 2, 0);
+          }
+          if (yb < Ht) rect('hBrickPlain', f, a, bnd, Math.max(yb, Hw), Ht, 0, bw);
+          continue;
+        }
+        const inStrip = strip && mid > Math.min(strip.a0, strip.a1) && mid < Math.max(strip.a0, strip.a1);
+        if (inStrip) {
+          if (strip.y0 > yb) rect('hBrickWin', f, a, bnd, yb, strip.y0, 0, bw);
+          const c0 = Math.max(yb, strip.y0), c1 = Math.min(strip.y1, Hw);
+          if (c1 > c0) {
+            rect('hCreamWin', f, a, bnd, c0, c1, 0.1, bw);
+            if (Math.abs(a - Math.min(strip.a0, strip.a1)) < 1e-3) side('hCreamPlain', f, a, 0, 0.1, c0, c1, -1);
+            if (Math.abs(bnd - Math.max(strip.a0, strip.a1)) < 1e-3) side('hCreamPlain', f, bnd, 0, 0.1, c0, c1, 1);
+          }
+          if (Hw > Math.max(yb, strip.y1)) rect('hBrickTop', f, a, bnd, Math.max(yb, strip.y1), Hw, 0, bw);
+        } else if (Hw > yb) rect('hBrickWin', f, a, bnd, yb, Hw, 0, bw);
+        rect('hBrickPlain', f, a, bnd, Math.max(yb, Hw), Ht, 0, bw);
+        // AC units under / in the windows of this run
+        for (let k = 0; k < nb; k++) for (const w of WIN_AT) {
+          const u = (k + w) * bw; const aw = f.dir > 0 ? f.a0 + u : f.a1 - u; if (!(aw > Math.min(a, bnd) + 0.4 && aw < Math.max(a, bnd) - 0.4)) continue;
+          const onStrip = strip && aw > Math.min(strip.a0, strip.a1) && aw < Math.max(strip.a0, strip.a1);
+          for (let fl = 1; fl < p.floors; fl++) {
+            if (R() > 0.3) continue; const sleeve = R() < 0.45; const y = fl * ST + SILL + (sleeve ? -0.42 : 0.24); if (y < yb + 0.3) continue;
+            const off = (onStrip && fl * ST >= strip.y0 && fl * ST < strip.y1 ? 0.1 : 0) + (sleeve ? 0.14 : 0.02);
+            const pt = P(f, aw, y, off); pos.set(pt[0], pt[1], pt[2]);
+            q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(f.n[0], f.n[1]));
+            acs.push(new THREE.Matrix4().multiplyMatrices(m, tmp.compose(pos, q, sc)));
+          }
+        }
+      }
+      if (door && !isGallery) {
+        const dA = door.a0, dB = door.a1; rect('hDoor', f, dA, dB, 0, 2.7, 0.03, bw);
+        for (const aa of [dA, dB]) { const mn = P(f, aa - 0.08, 0, 0), mx = P(f, aa + 0.08, 2.85, 0.12); L.box('hRail', [Math.min(mn[0], mx[0]), 0, Math.min(mn[2], mx[2])], [Math.max(mn[0], mx[0]), 2.85, Math.max(mn[2], mx[2])], { collide: false }); }
+        const t0 = P(f, dA - 0.08, 2.7, 0), t1 = P(f, dB + 0.08, 2.85, 0.12); L.box('hRail', [Math.min(t0[0], t1[0]), 2.7, Math.min(t0[2], t1[2])], [Math.max(t0[0], t1[0]), 2.85, Math.max(t0[2], t1[2])], { collide: false });
+        canopy(L, f, P, (dA + dB) / 2, 0);
+      }
+    }
+    // roof: deck, dark coping, guard railing (skipping edges against taller neighbours), bulkheads
+    L.box('hRoof', [p.x0, Ht - 0.12, p.z0], [p.x1, Ht - 0.02, p.z1], { collide: false });
+    L.collide([p.x0, 0, p.z0], [p.x1, Ht, p.z1]);
+    const cp = 0.07;
+    for (const [mn, mx] of [[[p.x0 - cp, Ht - 0.22, p.z0 - cp], [p.x1 + cp, Ht, p.z0 + 0.25]], [[p.x0 - cp, Ht - 0.22, p.z1 - 0.25], [p.x1 + cp, Ht, p.z1 + cp]], [[p.x0 - cp, Ht - 0.22, p.z0], [p.x0 + 0.25, Ht, p.z1]], [[p.x1 - 0.25, Ht - 0.22, p.z0], [p.x1 + cp, Ht, p.z1]]]) L.box('hRail', mn, mx, { collide: false });
+    for (const f of facesOf(p)) {
+      let blocked = 0; for (const o of parts) { if (o === p || o.top < Ht - 0.1) continue; const touch = f.axis === 'z' ? (f.n[0] > 0 ? Math.abs(o.x0 - f.c) < 0.05 : Math.abs(o.x1 - f.c) < 0.05) : (f.n[1] > 0 ? Math.abs(o.z0 - f.c) < 0.05 : Math.abs(o.z1 - f.c) < 0.05); if (!touch) continue; const b0 = f.axis === 'z' ? o.z0 : o.x0, b1 = f.axis === 'z' ? o.z1 : o.x1; blocked += Math.max(0, Math.min(f.a1, b1) - Math.max(f.a0, b0)); }
+      if (blocked > (f.a1 - f.a0) * 0.5) continue;
+      const ins = 0.35; const a0 = f.a0 + ins, a1 = f.a1 - ins; const cc = f.c - (f.axis === 'z' ? f.n[0] : f.n[1]) * ins;
+      const seg = (lo, hi, y0, y1, w) => { const mn = f.axis === 'z' ? [cc - w, y0, lo] : [lo, y0, cc - w], mx = f.axis === 'z' ? [cc + w, y1, hi] : [hi, y1, cc + w]; L.box('hRail', mn, mx, { collide: false }); };
+      seg(a0, a1, Ht + 1.02, Ht + 1.08, 0.03); seg(a0, a1, Ht + 0.5, Ht + 0.54, 0.02);
+      const np = Math.max(2, Math.round((a1 - a0) / 2.6)); for (let i = 0; i <= np; i++) { const a = a0 + (a1 - a0) * i / np; seg(a - 0.03, a + 0.03, Ht, Ht + 1.08, 0.03); }
+    }
+    const w = p.x1 - p.x0, d = p.z1 - p.z0;
+    if (p.kind === 'core') {
+      // beige penthouse (machine room) + elevator overrun, like the refs
+      const ax = p.galleryAxis === 'x'; const L0 = (ax ? w : d);
+      const c0 = [(p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2];
+      const hw = ax ? [L0 * 0.18, d / 2 - 0.6] : [w / 2 - 0.6, L0 * 0.18];
+      L.box('hCreamPlain', [c0[0] - hw[0], Ht - 0.1, c0[1] - hw[1]], [c0[0] + hw[0], Ht + 5.4, c0[1] + hw[1]], { uvScale: 1 / 9.6 });
+      L.box('hRail', [c0[0] - hw[0] - 0.08, Ht + 5.4, c0[1] - hw[1] - 0.08], [c0[0] + hw[0] + 0.08, Ht + 5.6, c0[1] + hw[1] + 0.08], { collide: false });
+      const e = ax ? [hw[0] * 0.45, hw[1] * 0.7] : [hw[0] * 0.7, hw[1] * 0.45];
+      L.box('hCreamPlain', [c0[0] - e[0], Ht + 5.4, c0[1] - e[1]], [c0[0] + e[0], Ht + 8.2, c0[1] + e[1]], { uvScale: 1 / 9.6 });
+      L.box('hGalleryBack', ax ? [c0[0] - hw[0] * 0.6, Ht + 1.2, c0[1] - hw[1] - 0.03] : [c0[0] - hw[0] - 0.03, Ht + 1.2, c0[1] - hw[1] * 0.6], ax ? [c0[0] + hw[0] * 0.6, Ht + 2.4, c0[1] + hw[1] + 0.03] : [c0[0] + hw[0] + 0.03, Ht + 2.4, c0[1] + hw[1] * 0.6], { collide: false });   // louvre band
+      L.box('hRail', [c0[0] + e[0] * 0.3, Ht + 8.2, c0[1] - 0.2], [c0[0] + e[0] * 0.3 + 0.4, Ht + 9.6, c0[1] + 0.2], { collide: false });  // vent stack
+    } else if (w > 8 && d > 8 && p.floors >= H0(parts) - 3) {
+      // stair / elevator bulkhead in brick + a small cream one
+      const bx = p.x0 + w * (0.3 + R() * 0.2), bz = p.z0 + d * (0.3 + R() * 0.2);
+      L.box('hBrickPlain', [bx - 2.4, Ht - 0.1, bz - 1.8], [bx + 2.4, Ht + 3.2, bz + 1.8], { uvScale: 1 / 9.6 });
+      L.box('hRail', [bx - 2.5, Ht + 3.2, bz - 1.9], [bx + 2.5, Ht + 3.4, bz + 1.9], { collide: false });
+      L.box('hDoor', [bx - 0.5, Ht, bz - 1.83], [bx + 0.5, Ht + 2.1, bz - 1.8], { collide: false });
+      if (R() < 0.6) L.box('hCreamPlain', [bx + 3.5, Ht - 0.1, bz - 1], [bx + 5.3, Ht + 2.2, bz + 1], { uvScale: 1 / 9.6 });
+    }
+  }
+}
+const H0 = (parts) => Math.max(...parts.map((p) => p.floors));
+
+function canopy(L, f, P, a, o) {
+  // flat steel entrance canopy on two posts: 5.2 m wide, 3 m deep, soffit at 2.95 m
+  const box = (a0, a1, o0, o1, y0, y1, key, col = false) => { const p0 = P(f, a0, y0, o0), p1 = P(f, a1, y1, o1); L.box(key, [Math.min(p0[0], p1[0]), y0, Math.min(p0[2], p1[2])], [Math.max(p0[0], p1[0]), y1, Math.max(p0[2], p1[2])], { collide: col }); };
+  box(a - 2.6, a + 2.6, o, o + 3.0, 2.95, 3.25, 'hCanopy');
+  box(a - 2.65, a + 2.65, o + 2.95, o + 3.05, 2.9, 3.45, 'hRail');
+  for (const s of [-1, 1]) box(a + s * 2.4 - 0.07, a + s * 2.4 + 0.07, o + 2.75, o + 2.89, 0, 2.95, 'hRail', true);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// grounds: lawn cells (local 2 m grid) kept clear of the buildings (3.5 m walks), streets, lots, courts, other buildings and
+// entrance paths; low black fence along every lawn edge; trees on the lawn interiors.
+function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, others) {
+  const R = world.R; const CELL = 2;
+  const v = new THREE.Vector3(); const W = (lx, lz) => { v.set(lx, 0, lz).applyMatrix4(m); return [v.x, v.z]; };
+  const x0 = Math.min(...parts.map((p) => p.x0)) - 26, x1 = Math.max(...parts.map((p) => p.x1)) + 26, z0 = Math.min(...parts.map((p) => p.z0)) - 26, z1 = Math.max(...parts.map((p) => p.z1)) + 26;
+  const nx = Math.ceil((x1 - x0) / CELL), nz = Math.ceil((z1 - z0) / CELL);
+  const [wx0, wz0] = W(x0, z0), [wx1, wz1] = W(x1, z1), [wx2, wz2] = W(x0, z1), [wx3, wz3] = W(x1, z0);
+  const wb = { x0: Math.min(wx0, wx1, wx2, wx3) - 30, x1: Math.max(wx0, wx1, wx2, wx3) + 30, z0: Math.min(wz0, wz1, wz2, wz3) - 30, z1: Math.max(wz0, wz1, wz2, wz3) + 30 };
+  const hit = (q) => q.x1 > wb.x0 && q.x0 < wb.x1 && q.z1 > wb.z0 && q.z0 < wb.z1;
+  const roads = OSM.r.filter((r) => hit(bbox(r.p))); const lots = OSM.l.filter((p) => hit(bbox(p))); const courts = OSM.pt.filter((o) => hit(bbox(o.p)));
+  const obs = others.filter(hit); const walks = OSM.w.filter((w) => hit(bbox(w.p)));
+  const distBox = (lx, lz) => { let d = 1e9; for (const p of parts) { const dx = Math.max(p.x0 - lx, 0, lx - p.x1), dz = Math.max(p.z0 - lz, 0, lz - p.z1); d = Math.min(d, Math.hypot(dx, dz)); } return d; };
+  // entrance path lines (local): from each door straight out
+  const paths = [];
+  for (const p of parts) {
+    if (p.entrance) { const f = facesOf(p).find((f) => f.id === p.entrance); paths.push({ axis: f.axis, a: (f.a0 + f.a1) / 2, c: f.c, dirn: f.axis === 'z' ? f.n[0] : f.n[1] }); }
+    if (p.kind === 'core') for (const f of facesOf(p)) if (f.axis === p.galleryAxis) paths.push({ axis: f.axis, a: (f.a0 + f.a1) / 2, c: f.c, dirn: f.axis === 'z' ? f.n[0] : f.n[1] });
+  }
+  const onPath = (lx, lz) => paths.some((q) => { const along = q.axis === 'z' ? lz : lx, perp = q.axis === 'z' ? lx : lz; return Math.abs(along - q.a) < 1.8 && (perp - q.c) * q.dirn > -1; });
+  const lawn = new Uint8Array(nx * nz);
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+    const lx = x0 + (i + 0.5) * CELL, lz = z0 + (j + 0.5) * CELL;
+    if (distBox(lx, lz) < 3.5 || onPath(lx, lz)) continue;
+    const [x, z] = W(lx, lz);
+    if (roads.some((r) => segDist(x, z, r.p) < r.w / 2 + 2.6)) continue;
+    if (walks.some((w) => segDist(x, z, w.p) < w.w / 2 + 0.8)) continue;
+    if (lots.some((p) => pip(x, z, p)) || courts.some((o) => pip(x, z, o.p))) continue;
+    if (obs.some((q) => x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3)) continue;
+    lawn[i * nz + j] = 1;
+  }
+  // drop isolated specks (fewer than 3 lawn neighbours)
+  const L = (i, j) => i >= 0 && j >= 0 && i < nx && j < nz && lawn[i * nz + j] === 1;
+  for (let pass = 0; pass < 2; pass++) for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if (L(i, j)) { let n = 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (L(i + di, j + dj)) n++; if (n < 2) lawn[i * nz + j] = 0; }
+  const loc = new Local();
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if (L(i, j)) {
+    const a = x0 + i * CELL, b = z0 + j * CELL, y = 0.028;
+    loc.quad('hLawn', [a, y, b + CELL], [a + CELL, y, b + CELL], [a + CELL, y, b], [a, y, b], [[a / 2.5, b / 2.5 + CELL / 2.5], [(a + CELL) / 2.5, (b + CELL) / 2.5], [(a + CELL) / 2.5, b / 2.5], [a / 2.5, b / 2.5]].map(([u, w]) => [u, w]));
+  }
+  // lawn edge runs -> fence (0.3 m inside the lawn) + concrete curb
+  const runs = [];
+  for (let i = 0; i < nx; i++) { let start = null, sideS = 0; for (const s of [-1, 1]) { start = null; for (let j = 0; j <= nz; j++) { const e = j < nz && L(i, j) && !L(i + s, j); if (e && start === null) start = j; if (!e && start !== null) { runs.push({ axis: 'z', c: x0 + (i + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: z0 + start * CELL, a1: z0 + j * CELL }); start = null; } } } }
+  for (let j = 0; j < nz; j++) { for (const s of [-1, 1]) { let start = null; for (let i = 0; i <= nx; i++) { const e = i < nx && L(i, j) && !L(i, j + s); if (e && start === null) start = i; if (!e && start !== null) { runs.push({ axis: 'x', c: z0 + (j + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: x0 + start * CELL, a1: x0 + i * CELL }); start = null; } } } }
+  for (const r of runs) {
+    let a0 = r.a0 + 0.3, a1 = r.a1 - 0.3; const len = a1 - a0; if (len < 1.5) continue;
+    // a gate gap in long runs
+    const segs = len > 24 ? [[a0, a0 + len / 2 - 0.9], [a0 + len / 2 + 0.9, a1]] : [[a0, a1]];
+    for (const [s0, s1] of segs) {
+      const Pp = (a, y) => r.axis === 'z' ? [r.c, y, a] : [a, y, r.c];
+      const u1 = (s1 - s0) / 2.4;
+      loc.quad('hFence', Pp(s0, 0.02), Pp(s1, 0.02), Pp(s1, 1.07), Pp(s0, 1.07), [[0, 0], [u1, 0], [u1, 1], [0, 1]]);
+      const np = Math.max(1, Math.round((s1 - s0) / 2.4));
+      for (let k = 0; k <= np; k++) { const a = s0 + (s1 - s0) * k / np; const p0 = Pp(a - 0.035, 0), p1 = Pp(a + 0.035, 1.12); loc.box('hRail', [Math.min(p0[0], p1[0]) - (r.axis === 'z' ? 0.035 : 0), 0, Math.min(p0[2], p1[2]) - (r.axis === 'x' ? 0.035 : 0)], [Math.max(p0[0], p1[0]) + (r.axis === 'z' ? 0.035 : 0), 1.12, Math.max(p0[2], p1[2]) + (r.axis === 'x' ? 0.035 : 0)], { collide: false }); }
+      const c0 = Pp(s0, 0), c1 = Pp(s1, 1.05); const w = 0.06;
+      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)]);
+    }
+  }
+  // fences + grass go to the ground batch (fence geometry is alpha, keep it out of shadows too)
+  loc.emit(G, M, m, world, 3);
+  // trees: interior lawn cells (all 8 neighbours lawn), >= 6 m from the building, >= 9 m apart
+  const cand = [];
+  for (let i = 1; i < nx - 1; i++) for (let j = 1; j < nz - 1; j++) { let ok = true; for (let di = -1; di <= 1 && ok; di++) for (let dj = -1; dj <= 1; dj++) if (!L(i + di, j + dj)) { ok = false; break; } if (!ok) continue; const lx = x0 + (i + 0.5) * CELL, lz = z0 + (j + 0.5) * CELL; if (distBox(lx, lz) < 6) continue; cand.push([lx, lz]); }
+  const mine = []; const maxN = 26;
+  for (let k = 0; k < 400 && mine.length < maxN && cand.length; k++) { const [lx, lz] = cand[(R() * cand.length) | 0]; if (mine.some(([a, b]) => Math.hypot(a - lx, b - lz) < 7.5)) continue; mine.push([lx, lz]); const [x, z] = W(lx + (R() - 0.5), lz + (R() - 0.5)); trees.push({ x, z, s: 0.9 + R() * 0.5, ry: R() * 6.3 }); }
+}
+
+function plantTrees(world, trees) {
+  const { scene, ctx, R } = world; if (!trees.length) return;
+  const bark = barkTexture(R), leaf = leafTexture(R, { hue: 92 });
+  const trunkG = new THREE.CylinderGeometry(0.14, 0.28, 7.5, 7); trunkG.translate(0, 3.75, 0);
+  const cards = [];
+  for (let i = 0; i < 5; i++) { const q = new THREE.PlaneGeometry(8.5 - (i & 1) * 2, 7.5 - (i & 1) * 1.5); q.rotateX((i & 1 ? 0.25 : -0.2)); q.translate(0, 8.2 + (i & 1) * 0.8, 0); q.rotateY(i / 5 * Math.PI + 0.3); cards.push(q); }
+  for (const [yy, rr, sz] of [[7.6, 0.5, 7], [9.6, 2.1, 5.5]]) { const q = new THREE.PlaneGeometry(sz, sz); q.rotateX(-Math.PI / 2 + 0.35); q.rotateY(rr); q.translate(0, yy, 0); cards.push(q); }
+  const canopyG = mergeSimple(cards);
+  const trunkM = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.9, color: 0xa89f8c });
+  const leafM = new THREE.MeshLambertMaterial({ map: leaf, alphaTest: 0.5, side: THREE.DoubleSide, color: 0xa6b391, emissiveMap: leaf, emissive: 0x33441f, emissiveIntensity: 0.2 });
+  const t = new THREE.InstancedMesh(trunkG, trunkM, trees.length), c = new THREE.InstancedMesh(canopyG, leafM, trees.length);
+  const mm = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  trees.forEach((tr, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), tr.ry); s.set(tr.s, tr.s, tr.s); p.set(tr.x, 0, tr.z); mm.compose(p, q, s); t.setMatrixAt(i, mm); c.setMatrixAt(i, mm); world.box([tr.x - 0.3, 0, tr.z - 0.3], [tr.x + 0.3, 5, tr.z + 0.3]); });
+  for (const im of [t, c]) { im.instanceMatrix.needsUpdate = true; im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); scene.add(im); }
+  t.name = 'luna:trunks'; c.name = 'luna:canopy'; t.userData.surface = 'wood'; c.userData.surface = 'wood'; ctx.raycastTargets.push(t);
+}
+
+function mergeSimple(list) {
+  const pos = [], nor = [], uv = [];
+  for (let g of list) { if (g.index) g = g.toNonIndexed(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
+}

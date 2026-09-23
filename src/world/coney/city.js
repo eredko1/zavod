@@ -31,6 +31,8 @@ export function buildCity(world, M) {
   // ---- buildings ----------------------------------------------------------------------------------------------------
   const inPlay = (b) => b.play;
   for (const b of OSM.b) {
+    // Luna Park Houses (the five ~21-storey towers north of the avenue) are built by coney/housing.js — skip them here
+    if (b.s === 'tower' && b.h > 50) { const [lx, lz] = cen(b.p); if (lx > 60 && lx < 380 && lz > -520 && lz < -110) continue; }
     const T = inPlay(b) ? S : F;
     try { building(T, world, M, b); } catch (e) { console.warn('[coney] building', e); }
   }
