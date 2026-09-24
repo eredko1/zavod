@@ -18,7 +18,7 @@ let c = await car(); ok(c && c.z > 11400, 'drove through the gantry → on the B
 await pg.evaluate(() => window.__ctx.vehicles.qaDrive(1, 0, 5)); await pg.waitForTimeout(2500);
 await pg.screenshot({ path: `${out}/belt-drive.png` });
 await pg.keyboard.press('KeyV'); await pg.waitForTimeout(1500); await pg.screenshot({ path: `${out}/belt-chase.png` }); await pg.keyboard.press('KeyV');
-await pg.waitForTimeout(2500); c = await car(); ok(c && c.x > -1700 && c.z > 11900 && c.z < 12100, 'cruising eastbound on the parkway', JSON.stringify(c));
+await pg.waitForTimeout(2500); c = await car(); ok(c && c.x > 350 && c.z > 11900 && c.z < 12100, 'cruising eastbound on the parkway', JSON.stringify(c));
 // the airport: stand by the terminals and look at the runway as a jet comes in
 await pg.evaluate(() => { window.__ctx.vehicles.dismount?.(); }); await pg.waitForTimeout(600);
 await pg.evaluate(() => window.__game.teleport(1790, 0, 12000 + 12, 0, 0)); await pg.waitForTimeout(1500);
@@ -26,7 +26,7 @@ await pg.screenshot({ path: `${out}/belt-jfk.png` });
 await pg.evaluate(() => window.__game.teleport(1800, 0, 12000 - 420, 0.8, 0.12)); await pg.waitForTimeout(1500);
 await pg.screenshot({ path: `${out}/belt-runway.png` });
 // walk to the westbound end → exit back to Coney
-await pg.evaluate(() => window.__game.teleport(-1845, 0, 12000 - 7, Math.PI / 2, 0)); await pg.waitForTimeout(1800);
+await pg.evaluate(() => window.__game.teleport(305, 0, 12000 - 7, Math.PI / 2, 0)); await pg.waitForTimeout(1800);
 const p = await pg.evaluate(() => window.__ctx.player.position.toArray().map((v) => +v.toFixed(1)));
 ok(p[2] < 0 && Math.abs(p[0] - 404) < 6, 'westbound exit → back on W 8th St', JSON.stringify(p));
 ok(!errs.length, 'no page errors', JSON.stringify(errs));

@@ -66,6 +66,7 @@ export async function init(ctx) {
     },
     damage(amount, from) {
       if (p.dead || !(amount > 0)) return;
+      if (performance.now() < (p.protectUntil || 0)) return;   // spawn protection (3 s after every respawn)
       p.health = Math.max(0, p.health - amount); S.lastDamage = S.time;
       ctx.bus.emit('playerDamaged', { amount, from: from ?? null });
       if (p.health <= 0) die();
@@ -129,6 +130,7 @@ function respawn(silent = false) {
   S.crouchPrev = false; S.sprintPrev = false; S.sprintPop = false; S.hTarget = H_STAND; p.height = H_STAND; p.crouching = false; p.sprinting = false; p.sliding = false; p.mantling = false;
   p.landImpulse = 0; p.sprintBlend = 0; p.slideBlend = 0; p.bob.x = p.bob.y = p.bob.roll = 0; S.roll = 0;
   applyCamera(p, ctx);
+  if (!silent) { p.protectUntil = performance.now() + 3000; ctx.hud?.toast?.('SPAWN PROTECTION · 3 s', 2200); }
   ctx.bus.emit('playerRespawn', { position: p.position.clone() });
   if (wasDead && !silent && ctx.state === 'dead') ctx.setState('playing');
 }

@@ -3,6 +3,7 @@
 // islands south, trees and low Queens rooftops north, Jersey-barrier median, cobra-head lights, overhead signs, traffic), into
 // the airport loop — terminals with gates and parked jets, the control tower, a parking garage, a runway where jets land every
 // ~35 s right over your head — and back out westbound; the "CONEY ISLAND" exit drops you back on W 8th St heading south.
+// About a minute each way at speed (1.2 km of parkway); T skips ahead (to the airport eastbound, home from anywhere else).
 // The parkway is its own zone far south of the map (the real one is 15 km long): W.zones lets players / vehicles live there
 // without widening W.bounds (the AI nav window stays on Coney). Everyone who comes along (passengers) is carried with the driver.
 import * as THREE from 'three';
@@ -10,7 +11,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hangkit as K } from '../hangkit.js';
 
 export const ZONE = { x0: -2000, x1: 3400, z0: 11400, z1: 12700, oz: 12000 };   // world rect of the zone; local z = world z − oz
-const X_W = -1850, X_E = 1500;                                                   // parkway west end (entry / exit) → the airport loop
+const X_W = 300, X_E = 1500;                                                     // parkway west end (entry / exit) → the airport loop
 const C = (x) => 35 * Math.sin(2 * Math.PI * (x - X_W) / (X_E - X_W));          // centreline wiggle (local z), 0 at both ends
 const LANES = 3, LW = 3.6, MED = 0.6, SH = 1.2, ROAD = LANES * LW + SH * 2;      // one carriageway: 3 lanes + shoulders = 13.2 m
 const CW = MED / 2 + ROAD / 2;                                                    // carriageway centre offset from the median = 6.9 m
@@ -97,10 +98,10 @@ export function buildBelt(world) {
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.32), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.12 }));
     panel.position.set(x - side * 0.25, 6.2, (z0 + zm) / 2); panel.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; root.add(panel);
   };
-  gantry(X_W + 120, 1, ['BELT PKWY', 'EAST', 'JFK AIRPORT  3 MI']);
-  gantry(-400, 1, ['EXIT 17', 'CROSS BAY BLVD', 'ROCKAWAYS']);
-  gantry(900, 1, ['JFK AIRPORT', 'ALL TERMINALS', 'NEXT RIGHT']);
-  gantry(1100, -1, ['BELT PKWY', 'WEST', 'CONEY ISLAND  3 MI']);
+  gantry(X_W + 120, 1, ['BELT PKWY', 'EAST', 'JFK AIRPORT  1 MI']);
+  gantry(760, 1, ['EXIT 17', 'CROSS BAY BLVD', 'ROCKAWAYS']);
+  gantry(1200, 1, ['JFK AIRPORT', 'ALL TERMINALS', 'NEXT RIGHT']);
+  gantry(1250, -1, ['BELT PKWY', 'WEST', 'CONEY ISLAND  1 MI']);
   gantry(X_W + 200, -1, ['EXIT 7', 'CONEY ISLAND', 'W 8 ST · OCEAN PKWY']);
 
   // ---- north side: street trees + a strip of low Queens roofs ----------------------------------------------------------------
@@ -168,6 +169,11 @@ function update(dt) {
   for (const L of Z.landing) { L.t += dt; const T = 35; if (L.t < 0) continue; const k = (L.t % T) / T; const R = Z.rwy;
     const x = 5200 - k * (5200 - 1200), td = 2900; const y = x > td ? (x - td) * 0.052 : 0; L.m.visible = true; L.m.position.set(x, y + 1.6, R.z); L.m.rotation.set(0, Math.PI / 2, x > td ? -0.05 : 0); }
   if (!p || p.dead || now - Z.lastTrip < 3) return;
+  // T: skip ahead — eastbound → the airport loop, anywhere else in the zone → back to Coney
+  const here = ctx.vehicles?.mounted ? ctx.vehicles.mounted.pos : p.position;
+  if (inZone(here) && ctx.state === 'playing' && ctx.input?.pressed?.has?.('KeyT')) { ctx.input.pressed.delete('KeyT'); if (here.x < X_E - 50 && here.z - ZONE.oz > C(here.x)) skipToAirport(); else exit(); return; }
+  if (inZone(here) && !Z.hintT) { Z.hintT = 1; ctx.hud?.toast?.('T — skip ahead', 2500); }
+  if (!inZone(here)) Z.hintT = 0;
   // on-ramp: drive through the gantry at the north end of W 8th St
   const v = ctx.vehicles?.mounted;
   if (v && !Z.busy && v.pos.x > RAMP.x0 && v.pos.x < RAMP.x1 && v.pos.z > RAMP.z0 && v.pos.z < RAMP.z1) enter();
@@ -189,6 +195,7 @@ function fade(text, fn) {
   void V;
 }
 function enter() { const sp = Math.max(18, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0)); fade('BELT PARKWAY · EASTBOUND', () => { const off = MED / 2 + SH + LW * 1.5; moveTo(X_W + 25, ZONE.oz + C(X_W + 25) + off, -Math.PI / 2, sp); }); }
+function skipToAirport() { const sp = Math.max(18, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0)); fade('JFK AIRPORT', () => moveTo(X_E + 40, ZONE.oz + CW, -Math.PI / 2, Z.ctx.vehicles?.mounted ? sp : 0)); }
 function exit() { const sp = Math.max(10, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0) * 0.6); fade('EXIT 7 · CONEY ISLAND', () => moveTo(BACK.x, BACK.z, BACK.h, Z.ctx.vehicles?.mounted ? sp : 0)); }
 
 // ---------------------------------------------------------------------------------------------------------------------------

@@ -54,7 +54,7 @@ import * as UI from './netui.js';
 const ALL_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
 const MQTT_LIBS = ['https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.esm.js', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.esm.js'];
 const PROTO = 'zv3';
-const SEND_HZ = 15, HEARTBEAT_MS = 480, TIMEOUT = 10000, BYE_GRACE = 1500, RESPAWN = 4, PROTECT = 2.5;
+const SEND_HZ = 15, HEARTBEAT_MS = 480, TIMEOUT = 10000, BYE_GRACE = 1500, RESPAWN = 4, PROTECT = 3;
 const MAX_MSG = 4096, TELEPORT = 15, EXTRAP_MS = 150, DELAY_MIN = 90, DELAY_MAX = 400, WATCHDOG = 6000;
 const F_DEAD = 1, F_CROUCH = 2, F_ADS = 4, F_AFK = 8;
 const ID_RE = /^[a-z0-9]{8}$/;

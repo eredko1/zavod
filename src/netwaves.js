@@ -32,7 +32,7 @@
 import * as THREE from 'three';
 import { groundLevel } from './net.js';
 
-const SEND_DT = 0.1, HEARTBEAT_DT = 0.5, SHOT_DT = 0.2, HOST_STALE = 1600, BOOT_GRACE = 3500, AFK_RESIGN = 2000, PROTECT_MS = 2500;
+const SEND_DT = 0.1, HEARTBEAT_DT = 0.5, SHOT_DT = 0.2, HOST_STALE = 1600, BOOT_GRACE = 3500, AFK_RESIGN = 2000, PROTECT_MS = 3000;
 const WAVES = [6, 8, 10, 12, 14, 16, 18], TOTAL = WAVES.length;
 const FIRST_DELAY = 20, BREAK = 14, CYCLE_BREAK = 35, MAX_ALIVE = 14, SQUAD_GAP = 4;
 const F_FIRE = 1, F_DEAD = 2, F_CROUCH = 4, F_AIM = 8, F_RUSH = 16;
@@ -213,8 +213,16 @@ function spawnSquad(size) {
   const { ai, ctx } = N;
   // anchor: someone who respawned in the last 25 s (the mercs come for you), else round-robin over the players
   const now = performance.now(); let tgt = null, anchor = null;
+  // … but a respawn point never draws a crowd: several friends respawning at the meet-up (Table Park) bring ONE squad per ~40 m
+  // spot per 20 s, and none while 5+ mercs are already within 60 m of it
+  const near = (p, R) => { let n = 0; for (const s of N.byWid.values()) if (!s.dead && Math.hypot(s.position.x - p.x, s.position.z - p.z) < R) n++; return n; };
+  N.usedSpots = (N.usedSpots || []).filter((u) => now - u.t < 20000);
   const rs = N.respawns.filter((r) => now - r.t < 25000 && N.targets.includes(r.tgt));
-  if (rs.length) { const r = rs[rs.length - 1]; N.respawns.splice(N.respawns.indexOf(r), 1); tgt = r.tgt; anchor = r.pos.clone(); }
+  while (rs.length) {
+    const r = rs.pop(); N.respawns.splice(N.respawns.indexOf(r), 1);
+    if (N.usedSpots.some((u) => Math.hypot(u.x - r.pos.x, u.z - r.pos.z) < 40) || near(r.pos, 60) >= 5) continue;
+    N.usedSpots.push({ x: r.pos.x, z: r.pos.z, t: now }); tgt = r.tgt; anchor = r.pos.clone(); break;
+  }
   if (!tgt) {   // else the player with the fewest mercs on them (round-robin on ties), so nobody is left out while others soak the whole wave
     const outdoor = N.targets.filter((x) => !N.indoor.has(x)); const pool = outdoor.length ? outdoor : N.targets;
     const load = new Map(pool.map((x) => [x, 0])); for (const s of N.byWid.values()) if (!s.dead && load.has(s.tgt)) load.set(s.tgt, load.get(s.tgt) + 1);
@@ -225,11 +233,13 @@ function spawnSquad(size) {
   const doors = ctx.world?.indoorAt?.(anchor, tgt === ctx.player ? ctx.player.mounted : null);
   if (doors?.length) anchor = doors[0].clone();
   const at = findSpawn(anchor); if (!at) return 0;
-  const yaw = Math.atan2(anchor.x - at.x, anchor.z - at.z);
+  // no rigid blobs: members spread 4–12 m apart, and a squad of 3+ splits — the back half comes in from a second spot (a flank)
+  const at2 = size >= 3 ? (findSpawn(anchor) || at) : at;
   const hpMul = 1 + 0.15 * N.cycle, members = [];
   for (let i = 0; i < size; i++) {
-    const a = (i / size) * Math.PI * 2 + ctx.rng(), r = i === 0 ? 0 : 1.4 + ctx.rng();
-    const p = ai.nav.randomFreeNear(at.x + Math.cos(a) * r, at.z + Math.sin(a) * r, 1.5, ctx.rng, at.y) || at.clone();
+    const base = i >= Math.ceil(size / 2) ? at2 : at; const yaw = Math.atan2(anchor.x - base.x, anchor.z - base.z);
+    const a = ctx.rng() * Math.PI * 2, r = i === 0 ? 0 : 4 + ctx.rng() * 8;
+    const p = ai.nav.randomFreeNear(base.x + Math.cos(a) * r, base.z + Math.sin(a) * r, 3, ctx.rng, base.y) || base.clone();
     const rusher = N.wave >= 2 && i === size - 1 && size >= 3;
     members.push({ pos: p, yaw: yaw + (ctx.rng() - 0.5) * 0.4, health: Math.round((rusher ? 80 : 100) * hpMul), archetype: rusher ? 'rusher' : 'rifleman', dmgMul: 1 + 0.1 * N.cycle });
   }
