@@ -21,7 +21,7 @@ ok(!!sam && !!deli, 'deli built', JSON.stringify(deli?.door));
 if (deli) {
   const [dx, , dz] = deli.door; const f = deli.face; { const ox = dx + Math.sin(f) * 12, oz = dz + Math.cos(f) * 12; await tp([ox, 0, oz], Math.atan2(-(dx - ox), -(dz - oz)), 0.08); } await pg.waitForTimeout(2200); await pg.screenshot({ path: `${out}/${map}-deli-out.png` });
   const [cx, , cz] = deli.counter, [sx, , sz] = deli.sammy; await tp([cx, 0, cz], Math.atan2(-(sx - cx), -(sz - cz))); await pg.waitForTimeout(800);
-  await pg.keyboard.press('KeyF'); await pg.waitForTimeout(300); await pg.keyboard.press('Digit1'); await pg.waitForTimeout(300);
+  await pg.keyboard.press('KeyF'); await pg.waitForTimeout(300);
   s = await st(); ok(/anal/i.test(s.dialog?.text || ''), 'Sammy asks first', s.dialog?.text);
   await pg.screenshot({ path: `${out}/${map}-sammy.png` });
   await pg.keyboard.press('Digit3'); await pg.waitForTimeout(250); await pg.keyboard.press('Digit1'); await pg.waitForTimeout(250); await pg.keyboard.press('Digit2'); await pg.waitForTimeout(250);

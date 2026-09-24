@@ -40,10 +40,13 @@ export function buildHangout(world, M) {
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
+  // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
+  const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);
   ctx.bus.on('net:red', (m) => { if (H?.world === world) onRemoteRed(m); });
   ctx.bus.on('net:igor', (m) => ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'Someone'} bought from Igor`, 1800));
-  world.updaters.push(() => { if (H?.world === world) { updateDoors(ctx.time.dt || 0.016); updateRed(); } });
+  world.updaters.push(() => { if (H?.world === world) { wheelSpot(); updateDoors(ctx.time.dt || 0.016); updateRed(); updateWheelRide(ctx.time.dt || 0.016); } });
+  ctx.bus.on('playerDied', () => { if (H?.wheel) H.wheel = null; });
   console.log('[hangout] building 2 at', b2.centre.toArray().map((v) => v.toFixed(0)).join(','), '· igor at', igor.x.toFixed(0), igor.z.toFixed(0), '· towers', towers.length, '· parked cars', (world.parkedCars || []).length, '· deli', H.deli ? H.deli.door.toArray().map((v) => v.toFixed(0)).join(',') : 'none');
 }
 const stealLocal = (i, mine) => K.stealLocal(i, mine);
@@ -54,17 +57,18 @@ function placeDeli(world) {
   const { ctx } = world;
   const clear = (fx, fz, u, n) => { // footprint 8.5 x 12 (+ 2 m of sidewalk in front) must be free of colliders
     for (let a = -4.6; a <= 4.6; a += 0.8) for (let d = -2; d <= 11.6; d += 0.8) { const x = fx + u.x * a + n.x * d, z = fz + u.y * a + n.y * d;
-      if (ctx.colliders.some((b) => x > b.min.x && x < b.max.x && z > b.min.z && z < b.max.z && b.max.y > 0.4 && b.min.y < 3)) return false; }
+      if (ctx.colliders.some((b) => !(b.max.y <= 1.6 && b.max.x - b.min.x < 5.2 && b.max.z - b.min.z < 5.2) && x > b.min.x && x < b.max.x && z > b.min.z && z < b.max.z && b.max.y > 0.4 && b.min.y < 3)) return false; }   // parked cars don't count (they're moved)
     return true; };
-  // west kerb (Luna Park side, the road's west carriageway) first, then the east kerb (the shopping centre side)
-  for (const [ax, az, bx, bz, side] of [[384, -478, 327, -219, -1], [368, -352, 393, -469, 1]]) {
+  // across the street from Luna Park: the east kerb north of Neptune Ave, then the east kerb south of it; the Luna Park side last
+  for (const [ax, az, bx, bz, side] of [[393, -469, 406, -530, 1], [368, -352, 393, -469, 1], [384, -478, 327, -219, -1]]) {
     const A = new THREE.Vector2(ax, az), u = new THREE.Vector2(bx - ax, bz - az).normalize(); const n = new THREE.Vector2(-u.y, u.x); if (Math.sign(n.x) !== side) n.negate();
     const len = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(n.x, n.y);
-    const order = []; for (let s = 20; s < len - 20; s += 6) order.push(s);
+    const order = []; for (let s = 6; s < len - 6; s += 3) order.push(s);
     order.sort((p, q) => Math.abs(A.y + u.y * p + 415) - Math.abs(A.y + u.y * q + 415));   // nearest to z −415 (level with building 2's park) first
     for (const s of order) {
       const fx = A.x + u.x * s + n.x * 8.5, fz = A.y + u.y * s + n.y * 8.5;
       if (!clear(fx, fz, u, n)) continue;
+      for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; const dx = c.x - fx, dz = c.z - fz, a = dx * u.x + dz * u.y, d = dx * n.x + dz * n.y; if (Math.abs(a) < 6 && d > -4 && d < 13) K.stealLocal(i, false); }   // clear the kerb
       const D = buildDeli(world, { x: fx, z: fz, yaw, name: "SAMMY'S DELI & GROCERY" });
       H.deli = D;
       K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY') });
@@ -205,6 +209,28 @@ function onRemoteRed(m) {
     const cs = Math.cos(c.heading), sn = Math.sin(c.heading), hx = Math.abs(cs) * 0.95 + Math.abs(sn) * 2.35, hz = Math.abs(sn) * 0.95 + Math.abs(cs) * 2.35; c.box.min.set(c.pos.x - hx, c.pos.y, c.pos.z - hz); c.box.max.set(c.pos.x + hx, c.pos.y + 1.5, c.pos.z + hz); redHide(false); }
 }
 
+// ---- the Wonder Wheel ride ------------------------------------------------------------------------------------------------
+const _ww = new THREE.Vector3();
+function rideWheel(WW) {
+  let best = 0, by = Infinity; for (let i = 0; i < WW.n; i++) { const y = WW.pos(i, _ww).y; if (y < by) { by = y; best = i; } }   // the cabin at the bottom
+  H.wheel = { WW, i: best, t: 0, promptT: 0 }; H.ctx.player.mounted = { wheel: true };
+  H.ctx.hud?.toast?.('All aboard — F to get off', 1800);
+}
+function updateWheelRide(dt) {
+  const r = H.wheel; if (!r) return; const { ctx } = H; const p = ctx.player;
+  if (p.dead || !p.mounted?.wheel) { H.wheel = null; return; }
+  r.t += dt; r.promptT -= dt;
+  const at = r.WW.pos(r.i, _ww);
+  const off = r.t > 20 && at.y < r.WW.base.y + 1.2;   // came round to the bottom again
+  if (off || (ctx.state === 'playing' && ctx.input?.pressed?.has?.('KeyF'))) {
+    ctx.input?.pressed?.delete?.('KeyF'); H.wheel = null; p.mounted = null; const b = r.WW.base; p.teleport(b.x + 1.5, b.y, b.z - 1.2, p.yaw, 0); return;
+  }
+  if (r.promptT <= 0) { ctx.hud?.toast?.('F — GET OFF THE WHEEL', 900); r.promptT = 3; }
+  p.position.copy(at); p.velocity?.set?.(0, 0, 0);
+  const cam = ctx.camera; cam.position.set(at.x, at.y + 1.55, at.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); p.cameraPosition?.copy?.(cam.position);
+  ctx.interactNear = true;
+}
+
 // ---- Igor -------------------------------------------------------------------------------------------------------------------
 function buyIgor() {
   const { ctx } = H;
@@ -220,5 +246,5 @@ function buyIgor() {
 export const hangoutQA = {
   state: () => { const s = K.state(); return H && s && { ...s, stash: s.inv.length, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()), deli: H.deli && { sammy: H.deli.sammy.toArray(), counter: H.deli.counter.toArray(), door: H.deli.door.toArray(), inside: H.deli.inside.toArray(), face: H.deli.face } }; },
   buy: () => buyIgor(), use: () => K.useItem(), light: () => { K.give('weed'); K.useItem(); }, ride: (dir = 'up', k = 0) => K.callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = K.nearestParked(1e9); if (c) K.steal(c); return !!c; },
-  park: () => K.pickRespawn(), choose: (i) => K.choose(i), close: () => K.closeDialog(), give: (n) => K.earn(n), drop: (n = 30) => { const p = H.ctx.player.position; K.dropCash(p.clone().add(new THREE.Vector3(3, 0, 0)), n); },
+  park: () => K.pickRespawn(), wheel: () => { const WW = H.world.W.wonderWheel; if (WW) rideWheel(WW); return !!WW; }, wheelState: () => H.wheel && { i: H.wheel.i, t: +H.wheel.t.toFixed(1), y: +H.ctx.player.position.y.toFixed(1) }, choose: (i) => K.choose(i), close: () => K.closeDialog(), give: (n) => K.earn(n), drop: (n = 30) => { const p = H.ctx.player.position; K.dropCash(p.clone().add(new THREE.Vector3(3, 0, 0)), n); },
 };

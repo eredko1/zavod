@@ -82,6 +82,9 @@ function wheel(world, M, B) {
   let ang = 0;
   const upd = (dt) => { ang += dt * 0.045; rot.rotation.z = ang; for (let i = 0; i < 24; i++) { const a = ang + i / 24 * Math.PI * 2; p.set(Math.cos(a) * (Rr - 0.2), Math.sin(a) * (Rr - 0.2), (i % 3 === 0 ? 0 : (i % 2 ? 1 : -1) * 0.6)); m4.compose(p, q, one); cabins.setMatrixAt(i, m4); roofs.setMatrixAt(i, m4); } cabins.instanceMatrix.needsUpdate = true; roofs.instanceMatrix.needsUpdate = true; };
   upd(0); world.updaters.push(upd);
+  // ride it (coney/hangout.js): where cabin i's floor is right now, in world space
+  const zoff = (i) => (i % 3 === 0 ? 0 : (i % 2 ? 1 : -1) * 0.6);
+  if (world.W) world.W.wonderWheel = { n: 24, base: new THREE.Vector3(W.x, 0.6, W.z - 7.2), pos: (i, out) => { const a = ang + i / 24 * Math.PI * 2; return out.set(W.x + Math.cos(a) * (Rr - 0.2), hubY + Math.sin(a) * (Rr - 0.2) - 2.62, W.z + zoff(i)); } };
 }
 
 // =========================================================================================================================

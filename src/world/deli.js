@@ -189,20 +189,17 @@ export function sammyTalk(vendorName = 'SAMMY', { cousin = false } = {}) {
   });
   const lines = { ok: `Here. Put it away, put it away. And share with your friends, eh? Don't be stingy.`, broke: `You don't have money? Go take it off those guys shooting up the block, hahaha. Then come back.`, full: `Your hands are full, habibi. Drink first. (B)` };
   const after = (reply) => ({ text: reply, choices: [{ label: 'Something else', go: shop }, { label: 'Thanks, Sammy', go: null }] });
-  return (K, again) => {
-    if (again) return { text: ['My friend is back! So… you tried it yet? Hahaha, I\'m joking, I\'m joking.', 'Ahh, look who it is. Your girlfriend says hi. Hahaha!', 'Again? You drink more than my cousin. OK, OK.'][Math.floor(Math.random() * 3)], choices: [{ label: 'Let me get something', go: shop }, { label: 'Just saying hi', go: null }] };
-    return {
-      text: cousin ? `Ahh, welcome, welcome! My cousin has the store in Coney Island — same family, same prices. Close the door, the cat gets out.` : `Ahh, my friend! Come in, come in. Close the door, the cat gets out.`,
-      choices: [{ label: `What's good, ${vendorName === 'SAMMY' ? 'Sammy' : vendorName}?`, go: {
-        text: `Before I sell you anything, I ask you something serious. Very serious. You and your girlfriend… you do the anal yet?`,
-        choices: [
-          { label: `…What?! Yeah. We do.`, go: { text: `Hahaha! My man! Wallahi, I knew it — you have the face. OK. For you, special price.`, choices: [{ label: 'Uh… thanks?', go: shop }] } },
-          { label: `Nah, she's not into it.`, go: { text: `Patience, habibi. Patience. You buy her something nice, you take her on the boardwalk… inshallah. Now, what you need?`, choices: [{ label: `I'll work on it`, go: shop }] } },
-          { label: `I don't have a girlfriend.`, go: { text: `No girlfriend?! That's why you look so stressed, my friend. OK, OK. Drink, relax, you find one.`, choices: [{ label: 'Wow. OK.', go: shop }] } },
-          { label: `Why do you ask everybody this?`, go: { text: `Twenty-two years behind this counter. Everybody lies about the Lotto — nobody lies to Sammy about this. Hahaha!`, choices: [{ label: 'Fair enough', go: shop }] } },
-        ] } }],
-    };
-  };
+  const question = (lead) => ({
+    text: `${lead}Before I sell you anything, I ask you something serious. Very serious. You and your girlfriend… you do the anal yet?`,
+    choices: [
+      { label: `…What?! Yeah. We do.`, go: { text: `Hahaha! My man! Wallahi, I knew it — you have the face. OK. For you, special price.`, choices: [{ label: 'Uh… thanks?', go: shop }] } },
+      { label: `Nah, she's not into it.`, go: { text: `Patience, habibi. Patience. You buy her something nice, you take her on the boardwalk… then you ask her about the anal. Inshallah. Now, what you need?`, choices: [{ label: `I'll work on it`, go: shop }] } },
+      { label: `I don't have a girlfriend.`, go: { text: `No girlfriend?! No anal, no girlfriend — that's why you look so stressed, my friend. OK, OK. Drink, relax, you find one.`, choices: [{ label: 'Wow. OK.', go: shop }] } },
+      { label: `Why do you ask everybody about anal?`, go: { text: `Twenty-two years behind this counter. Everybody lies about the Lotto — nobody lies to Sammy about the anal. Hahaha!`, choices: [{ label: 'Fair enough', go: shop }] } },
+    ] });
+  return (K, again) => again
+    ? question(['My friend is back! So… you did the anal yet or no? Hahaha. ', 'Ahh, look who it is. So tell me the truth now — the anal, yes? ', 'Again you come! OK, same question, I need to know. '][Math.floor(Math.random() * 3)])
+    : question(cousin ? `Ahh, welcome, welcome! My cousin has the store in Coney Island — same family, same prices, same question. ` : `Ahh, my friend! Come in, come in, close the door, the cat gets out. `);
 }
 
 /** Rasta dealer's talk (wsp / sbu): ten dollars a bag. */

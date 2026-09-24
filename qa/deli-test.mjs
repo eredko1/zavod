@@ -22,8 +22,7 @@ await pg.waitForTimeout(900);
 await pg.keyboard.press('KeyF'); await pg.waitForTimeout(500);
 s = await st(); ok(s.dialog?.name === 'SAMMY', 'F opens Sammy dialogue', JSON.stringify(s.dialog));
 await pg.screenshot({ path: `${out}/deli-talk1.png` });
-await pg.keyboard.press('Digit1'); await pg.waitForTimeout(300); s = await st();
-ok(/anal/i.test(s.dialog?.text || ''), 'Sammy asks his question before selling', s.dialog?.text);
+ok(/anal/i.test(s.dialog?.text || ''), 'Sammy asks his question straight away', s.dialog?.text);
 await pg.screenshot({ path: `${out}/deli-talk2.png` });
 await pg.keyboard.press('Digit2'); await pg.waitForTimeout(300); s = await st(); ok(/patience/i.test(s.dialog?.text || ''), 'answer 2 reply', s.dialog?.text);
 await pg.keyboard.press('Digit1'); await pg.waitForTimeout(300); s = await st(); ok(/Olde English/i.test(s.dialog?.text || ''), 'shop menu', s.dialog?.choices?.join(' | '));
@@ -38,7 +37,7 @@ ok(!(await pg.evaluate(() => !!window.__ctx.player.mounted)), 'player free after
 await pg.keyboard.press('KeyB'); await pg.waitForTimeout(3000); s = await st(); ok(s.drunk > 0.5, 'B drinks the bottle → drowsy', s.drunk);
 await pg.screenshot({ path: `${out}/deli-drunk.png` });
 // second visit: short tease, straight to the shop
-await pg.keyboard.press('KeyF'); await pg.waitForTimeout(400); s = await st(); ok(s.dialog && !/anal yet/i.test(s.dialog.text), 'second visit skips the question', s.dialog?.text);
+await pg.keyboard.press('KeyF'); await pg.waitForTimeout(400); s = await st(); ok(s.dialog && /anal/i.test(s.dialog.text), 'second visit: he asks again', s.dialog?.text);
 await pg.keyboard.press('KeyF'); await pg.waitForTimeout(300);
 // merc cash: a drop next to the player is picked up by walking over it
 await pg.evaluate(() => window.__game.hangout.drop(35)); await pg.waitForTimeout(300);

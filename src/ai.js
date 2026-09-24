@@ -422,7 +422,7 @@ function fireRound(ctx, s, t) {
   const dist = s.playerDist || 20;
   let cone = THREE.MathUtils.lerp(9, 2.8, clamp(s.engageTime / 10, 0, 1));
   if (pl.sprinting || pl.moveState === 'sprint') cone *= 1.6; else if ((pl.speed || 0) > 3) cone *= 1.25;
-  cone *= 1 + dist / 45; if (s.speed > 1.5) cone *= 1.7; if (s.crouch > 0.5) cone *= 0.85; if (s.archetype === 'rusher') cone *= 1.3;
+  cone *= gunOf(s).cone; cone *= 1 + dist / 45; if (s.speed > 1.5) cone *= 1.7; if (s.crouch > 0.5) cone *= 0.85; if (s.archetype === 'rusher') cone *= 1.3;
   const rad = THREE.MathUtils.degToRad(cone) * Math.sqrt(ctx.rng()) * (0.5 + 0.5 * ctx.rng());
   const ang = ctx.rng() * Math.PI * 2;
   const u = _v2.set(0, 1, 0).cross(dir).normalize(), w = _v3.crossVectors(dir, u);
@@ -442,7 +442,8 @@ function fireRound(ctx, s, t) {
   ctx.bus.emit('shot', { origin: origin.clone(), dir: shotDir, weapon: 'ak', who: 'enemy', soldier: s, hit: hitPlayer });
   // remote players (multiplayer proxies) take the hit on their own machine (victim-authoritative); spawn protection for the local player
   if (hitPlayer && (pl.remote || (ctx.state === 'playing' && !(S.protectUntil > performance.now())))) {
-    const dmg = Math.max(1, Math.round((8 + Math.floor(ctx.rng() * 7)) * (s.dmgMul ?? 1)));
+    const g = gunOf(s); let base = irange(ctx, g.dmg); if (g.range && dist > g.range) base *= Math.max(0.25, g.range / dist);   // shotgun / SMG fall off with range
+    const dmg = Math.max(1, Math.round(base * (s.dmgMul ?? 1)));
     try { pl.damage?.(dmg, s.position.clone()); } catch (e) { console.error('[ai] player.damage', e); }
   }
 }
@@ -451,10 +452,48 @@ function updateFire(ctx, s, dt, t) {
   if (s.fireCooldown > 0) s.fireCooldown -= dt;
   if (s.burst > 0) {
     s.nextShot -= dt;
-    if (s.nextShot <= 0 && s.stagger <= 0) { fireRound(ctx, s, t); s.burst--; s.nextShot = 0.1; if (s.burst === 0) s.fireCooldown = 0.5 + ctx.rng() * (s.archetype === 'rusher' ? 0.5 : 1.0); }
-  } else if (s.wantFire && s.fireCooldown <= 0 && s.hasTarget && t >= (s.reactUntil || 0)) { s.burst = 3 + Math.floor(ctx.rng() * 4); s.nextShot = 0.05; }
+    if (s.nextShot <= 0 && s.stagger <= 0) { fireRound(ctx, s, t); s.burst--; s.nextShot = gunOf(s).gap; if (s.burst === 0) s.fireCooldown = 0.5 + ctx.rng() * (s.archetype === 'rusher' ? 0.5 : 1.0) + (gunOf(s).gap > 1 ? 1.2 : 0); }
+  } else if (s.wantFire && s.fireCooldown <= 0 && s.hasTarget && t >= (s.reactUntil || 0)) { s.burst = irange(ctx, gunOf(s).burst); s.nextShot = 0.05; }
   if (!s.wantFire && s.burst > 0 && !s.seesPlayer && t - s.lastSeen > 1.5) s.burst = 0;
 }
+
+// ---------- merc guns: what each merc carries, fires and drops --------------------------------------------------------------
+// Deterministic from the room-wide soldier id online (host + every client agree on the gun a merc drops); random offline.
+const MERC_GUNS = [
+  { id: 'ak74', w: 38, dmg: [8, 14], gap: 0.1, burst: [3, 6], cone: 1, reserve: [45, 90] },
+  { id: 'm4a1', w: 20, dmg: [7, 12], gap: 0.085, burst: [3, 7], cone: 0.9, reserve: [60, 120] },
+  { id: 'mp5', w: 17, dmg: [5, 9], gap: 0.07, burst: [5, 9], cone: 1.2, reserve: [60, 120], range: 40 },
+  { id: 'r870', w: 13, dmg: [18, 30], gap: 0.9, burst: [1, 2], cone: 1.5, reserve: [8, 16], range: 20 },
+  { id: 'm24', w: 12, dmg: [30, 45], gap: 1.8, burst: [1, 1], cone: 0.35, reserve: [10, 20] },
+];
+const GUN_W = MERC_GUNS.reduce((a, g) => a + g.w, 0), EMPTY_GEO = new THREE.BufferGeometry();
+const irange = (ctx, [a, b]) => a + Math.floor(ctx.rng() * (b - a + 1));
+function gunFor(key) { let r = key == null ? Math.random() * GUN_W : ((Math.imul((key | 0) + 7, 2654435761) >>> 0) % 997) / 997 * GUN_W; for (const g of MERC_GUNS) if ((r -= g.w) < 0) return g; return MERC_GUNS[0]; }
+function gunOf(s) { return s.gun || (s.gun = gunFor(s.wid ?? null)); }
+/** put the merc's own gun in his hands (the chest rifle mesh keeps its bones / grips; its AK geometry is swapped for the gun) */
+function dressGun(ctx, s) {
+  const g = gunOf(s), r = s.inst.rifle; s.gunDressed = g.id;
+  if (r.__gunModel) { r.remove(r.__gunModel); r.__gunModel = null; }
+  if (!r.__akGeo) r.__akGeo = r.geometry;
+  r.geometry = r.__akGeo;
+  if (g.id === 'ak74' || !ctx.weapons?.worldModel) return;
+  const m = ctx.weapons.worldModel(g.id); if (!m) return;
+  r.updateWorldMatrix(true, false); const ws = r.getWorldScale(new THREE.Vector3()).x || 1;
+  m.scale.setScalar(1 / ws); m.rotation.y = Math.PI; m.position.set(0, 0, 0.04 / ws); r.add(m); r.__gunModel = m; r.geometry = EMPTY_GEO;
+}
+/** the gun hits the ground as its own copy (the pooled soldier model keeps its rifle), a pickup for ~5 minutes */
+function dropGun(ctx, s, hit) {
+  const g = gunOf(s), r = s.inst.rifle; if (!r.visible) return;
+  r.updateWorldMatrix(true, true);
+  const wp = r.getWorldPosition(new THREE.Vector3()), wq = r.getWorldQuaternion(new THREE.Quaternion()), ws = r.getWorldScale(new THREE.Vector3());
+  const m = r.clone(true); m.position.copy(wp); m.quaternion.copy(wq); m.scale.copy(ws); ctx.scene.add(m); r.visible = false;
+  const av = new THREE.Vector3(ctx.rng() - 0.5, ctx.rng() - 0.5, ctx.rng() - 0.5).multiplyScalar(9);
+  const vel = new THREE.Vector3((s.vel?.x || 0) * 0.5 + (ctx.rng() - 0.5) * 1.5, 1.2 + ctx.rng(), (s.vel?.z || 0) * 0.5 + (ctx.rng() - 0.5) * 1.5);
+  if (hit?.dir) vel.addScaledVector(hit.dir, 1.5);
+  m.userData.pickup = { id: g.id, reserve: irange(ctx, g.reserve) };
+  S.dropped.push({ mesh: m, vel, av, t: 0, landed: false });
+}
+const GUN_NAME = { ak74: 'AK-74M', m4a1: 'M4A1', mp5: 'MP5', r870: 'SHOTGUN', m24: 'M24 SNIPER' };
 
 // ---------- death ----------
 function killSoldier(ctx, s, hit) {
@@ -464,14 +503,7 @@ function killSoldier(ctx, s, hit) {
   claim(s, null);
   for (const h of s.inst.hitboxes) { const i = ctx.raycastTargets.indexOf(h); if (i > -1) ctx.raycastTargets.splice(i, 1); }
   try { s.ragdoll = new Ragdoll(s, S.nav, hit); } catch (e) { console.error('[ai] ragdoll', e); s.ragdoll = null; }
-  // drop the rifle
-  const r = s.inst.rifle; const wp = r.getWorldPosition(new THREE.Vector3()), wq = r.getWorldQuaternion(new THREE.Quaternion());
-  r.parent.remove(r); ctx.scene.add(r); r.position.copy(wp); r.quaternion.copy(wq); r.scale.set(1, 1, 1);
-  const av = new THREE.Vector3(ctx.rng() - 0.5, ctx.rng() - 0.5, ctx.rng() - 0.5).multiplyScalar(9);
-  const vel = new THREE.Vector3(s.vel.x * 0.5 + (ctx.rng() - 0.5) * 1.5, 1.2 + ctx.rng(), s.vel.z * 0.5 + (ctx.rng() - 0.5) * 1.5);
-  if (hit?.dir) vel.addScaledVector(hit.dir, 1.5);
-  r.userData.pickup = { id: 'ak74', reserve: 45 + Math.floor(ctx.rng() * 46) }; // the merc's AK — walk over it and press F
-  S.dropped.push({ mesh: r, vel, av, t: 0, landed: false, soldier: s });
+  dropGun(ctx, s, hit);   // his gun — walk over it for ammo, F to swap
   s.inst.flash.visible = false;
   // blood
   placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6, s.position.y + 0.2);
@@ -612,6 +644,9 @@ export async function init(ctx) {
       else s.flinch(dir, headshot ? 1.5 : 0.8 + Math.min(0.6, amount / 60));
     },
     /** a hittable stand-in for the host's soldier (non-host clients): hitboxes are raycast targets; hits → s.onNetHit(dmg, hs, point) */
+    /** QA: guns on the ground + what the living mercs carry */
+    qaDrops: () => S.dropped.map((d) => ({ id: d.mesh.userData.pickup?.id, reserve: d.mesh.userData.pickup?.reserve, landed: d.landed, t: +d.t.toFixed(1), pos: d.mesh.position.toArray().map((v) => +v.toFixed(2)) })),
+    qaGuns: () => [...S.soldiers, ...S.puppets].filter((s) => !s.dead).map((s) => s.gunDressed || null),
     netPuppet: (look) => {
       const inst = acquireInstance(ctx, look || null); const s = new Soldier(ctx, S.asset, inst, {}); s.netPuppet = true;
       for (const h of inst.hitboxes) { h.userData.soldier = s; if (!ctx.raycastTargets.includes(h)) ctx.raycastTargets.push(h); }
@@ -621,6 +656,7 @@ export async function init(ctx) {
       if (!s || s.dead) return; s.dead = true; s.alive = false; s.state = 'dead'; s.deadT = 0; s.health = 0; s.inst.flash.visible = false; s.inst.flash2.visible = false;
       for (const h of s.inst.hitboxes) { const i = ctx.raycastTargets.indexOf(h); if (i > -1) ctx.raycastTargets.splice(i, 1); }
       try { s.ragdoll = new Ragdoll(s, S.nav, { dir: dir || new THREE.Vector3(0, 0.2, 1), strength: headshot ? 4 : 3.5, headshot: !!headshot }); } catch (e) { s.ragdoll = null; }
+      try { dropGun(ctx, s, { dir }); } catch (e) { console.warn('[ai] puppet drop', e); }
       placeBlood(ctx, s.position.x, s.position.z, 1 + ctx.rng() * 0.6, s.position.y + 0.2);
     },
     netPuppetRelease: (s) => {
@@ -730,15 +766,26 @@ export function update(dt, ctx) {
   for (let i = S.squads.length - 1; i >= 0; i--) if (S.squads[i].members.every(m => m.dead)) S.squads.splice(i, 1);
 
   // ---- dropped rifles ----
-  // ---- weapon pickups from dropped rifles ----
-  if (playing && ctx.player) {
+  // ---- merc gun pickups: walk over the gun you carry = its ammo; any other gun: F swaps (yours drops in its place) ----
+  for (const s of S.soldiers) if (!s.dead && s.gunDressed == null && (s.wid != null || !S.mp)) dressGun(ctx, s);
+  for (const s of S.puppets) if (!s.dead && s.gunDressed == null && s.wid != null) dressGun(ctx, s);
+  if (playing && ctx.player && !ctx.player.dead && !ctx.player.mounted) {
     const pp = ctx.player.position; let near = null, nd = 1.7 * 1.7;
     for (const d of S.dropped) { if (!d.landed || !d.mesh.userData.pickup) continue; const m = d.mesh.position; const dx = m.x - pp.x, dz = m.z - pp.z, dy = m.y - pp.y; const q = dx * dx + dz * dz + dy * dy * 0.25; if (q < nd) { nd = q; near = d; } }
-    if (near !== S.nearPickup) { S.nearPickup = near; if (near) ctx.hud?.toast?.(`F — TAKE ${near.mesh.userData.pickup.id === 'ak74' ? 'AK-74M' : near.mesh.userData.pickup.id.toUpperCase()}${(ctx.weapons?.current?.slot === 0 && ctx.weapons?.current?.id === near.mesh.userData.pickup.id) ? ' AMMO' : ''}`, 2500); }
+    const prim = ctx.weapons?.primary; const take = (d) => { ctx.scene.remove(d.mesh); S.dropped.splice(S.dropped.indexOf(d), 1); if (S.nearPickup === d) S.nearPickup = null; };
+    if (near && prim && near.mesh.userData.pickup.id === prim.id) {   // same gun as yours: its ammo, just by walking over it
+      if (nd < 1.25 * 1.25) { const pk = near.mesh.userData.pickup; if (ctx.weapons.pickup(pk.id, pk.reserve)) { ctx.hud?.toast?.(`+${pk.reserve} ${GUN_NAME[pk.id] || pk.id.toUpperCase()} ammo`, 1400); take(near); } }
+      near = null;
+    }
+    if (near !== S.nearPickup) { S.nearPickup = near; if (near) ctx.hud?.toast?.(`F — SWAP FOR ${GUN_NAME[near.mesh.userData.pickup.id] || near.mesh.userData.pickup.id.toUpperCase()}`, 2500); }
     api.nearPickup = near ? near.mesh.userData.pickup : null;
-    if (near && ctx.input.pressed.has('KeyF')) { ctx.input.pressed.delete('KeyF'); const pk = near.mesh.userData.pickup; if (ctx.weapons?.pickup?.(pk.id, pk.reserve)) { ctx.scene.remove(near.mesh); S.dropped.splice(S.dropped.indexOf(near), 1); S.nearPickup = null; } }
-    // out of ammo entirely: auto-pick when standing on it (helps touch players without an F button)
-    if (near && ctx.weapons?.current && ctx.weapons.current.slot === 0 && ctx.weapons.current.ammo <= 0 && ctx.weapons.current.reserve <= 0 && nd < 0.8 * 0.8) { const pk = near.mesh.userData.pickup; if (ctx.weapons.pickup(pk.id, pk.reserve)) { ctx.scene.remove(near.mesh); S.dropped.splice(S.dropped.indexOf(near), 1); S.nearPickup = null; } }
+    if (near && ctx.input.pressed.has('KeyF')) {
+      ctx.input.pressed.delete('KeyF'); const pk = near.mesh.userData.pickup; const old = ctx.weapons?.primary; const at = near.mesh.position.clone();
+      if (ctx.weapons?.pickup?.(pk.id, pk.reserve)) {
+        take(near); ctx.hud?.toast?.(`Picked up the ${GUN_NAME[pk.id] || pk.id}`, 1400);
+        if (old && ctx.weapons.worldModel) { const m = ctx.weapons.worldModel(old.id); if (m) { const root = new THREE.Group(); root.add(m); root.position.set(at.x + 0.4, at.y, at.z + 0.2); m.rotation.set(0, Math.random() * 6.28, Math.PI / 2); ctx.scene.add(root); root.userData.pickup = { id: old.id, reserve: old.reserve + old.ammo }; S.dropped.push({ mesh: root, vel: new THREE.Vector3(), av: new THREE.Vector3(), t: 0, landed: true, landT: 1 }); } }
+      }
+    }
   }
   for (let i = S.dropped.length - 1; i >= 0; i--) {
     const d = S.dropped[i]; d.t += dt; const m = d.mesh;
@@ -753,7 +800,7 @@ export function update(dt, ctx) {
         d.fromQ = m.quaternion.clone(); d.landT = 0;
       }
     } else if (d.landT < 0.25) { d.landT += dt; m.quaternion.slerpQuaternions(d.fromQ, d.restQ, Math.min(1, d.landT / 0.25)); }
-    if (d.t > 60) { const k = (d.t - 60) / 1.5; if (d.restY === undefined) d.restY = m.position.y; m.position.y = d.restY - k * 0.4; if (k >= 1) { ctx.scene.remove(m); S.dropped.splice(i, 1); } }
+    if (d.t > 300) { const k = (d.t - 300) / 1.5; if (d.restY === undefined) d.restY = m.position.y; m.position.y = d.restY - k * 0.4; if (k >= 1) { ctx.scene.remove(m); S.dropped.splice(i, 1); } }
   }
   // ---- blood fade ----
   for (const b of S.blood) { if (!b.visible) continue; b.userData.t += dt; if (b.userData.t > 40) { b.material.opacity = Math.max(0, 1 - (b.userData.t - 40) / 4); if (b.material.opacity <= 0) b.visible = false; } }

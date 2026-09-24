@@ -9,8 +9,8 @@ import { hideParkedCar } from './carkit.js';
 const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 3, SHARE_R = 4;
 export const ITEMS = {
   weed: { icon: '🌿', name: 'bag of weed' },
-  bottle: { icon: '🍾', name: 'bottle of liquor', drunk: 0.55, dur: 120 },
-  forty: { icon: '🍺', name: '40 of Olde English', drunk: 0.75, dur: 150 },
+  bottle: { icon: '🍾', name: 'bottle of liquor', drunk: 0.8, dur: 150 },
+  forty: { icon: '🍺', name: '40 of Olde English', drunk: 1, dur: 180 },
 };
 
 let V = null;
@@ -22,7 +22,7 @@ export const kit = () => V;
  */
 export function buildKit(world, o = {}) {
   const { ctx } = world;
-  V = { world, ctx, cash: o.cash ?? 20, inv: [], drunk: 0, drunkT: -1, high: 0, highT: -1, smokeT: 0, puffT: 0, puffs: [], riding: null, passenger: null,
+  V = { world, ctx, cash: o.cash ?? 20, startCash: o.cash ?? 20, inv: [], drunk: 0, drunkT: -1, high: 0, highT: -1, smokeT: 0, puffT: 0, puffs: [], riding: null, passenger: null,
     shafts: [], spots: [], vendors: [], drops: [], dialog: null, promptT: 0, lastPrompt: '', respawn: o.respawn || null, respawnPick: false, talked: new Set(), onUpdate: [] };
   buildUI(o); buildPuffs();
   if (!ctx.__hangkitBound) { ctx.__hangkitBound = true; bindOnce(ctx); }
@@ -69,7 +69,11 @@ function bindOnce(ctx) {
   ctx.bus.on('enemyKilled', (d) => { if (V && d?.position && !d.qa) mercCash(d.position); });
   ctx.bus.on('mercKilled', (d) => { if (V && d?.mine && d.position) mercCash(d.position); });
   ctx.bus.on('state', ({ state }) => { if (V && state === 'dead') respawnBtn(); });
-  ctx.bus.on('playerRespawn', () => { if (!V?.respawnPick) return; V.respawnPick = false; toRespawn(); });
+  ctx.bus.on('playerRespawn', () => {
+    if (!V) return;
+    if (V.cash < V.startCash) { V.cash = V.startCash; renderCash(); }   // back on your feet with at least the starting cash (ammo refills in weapons.js)
+    if (!V.respawnPick) return; V.respawnPick = false; toRespawn();
+  });
   addEventListener('keydown', (e) => {
     if (!V) return;
     if (e.code === 'KeyT' && V.ctx.state === 'dead' && V.respawn) { pickRespawn(); return; }
@@ -183,10 +187,12 @@ function updateHigh(dt) {
   if (k <= 0.001 && d <= 0.001) { if (cv.style.filter) { cv.style.filter = ''; cv.style.transform = ''; } return; }
   const t = performance.now() / 1000;
   // weed: soft blur, saturated, slow hue drift + gentle wobble · liquor: heavy-lidded (darker, desaturated), double vision, big slow sway
-  const blur = 2.6 * k + 1.6 * d * (0.6 + 0.4 * Math.sin(t * 0.7));
-  const ghost = d > 0.05 ? ` drop-shadow(${(9 * d * Math.sin(t * 0.9)).toFixed(1)}px ${(3 * d).toFixed(1)}px 0 rgba(255,255,255,${(0.25 * d).toFixed(2)}))` : '';
-  cv.style.filter = `blur(${blur.toFixed(2)}px) saturate(${(1 + 0.45 * k - 0.35 * d).toFixed(2)}) brightness(${(1 - 0.22 * d * (0.7 + 0.3 * Math.sin(t * 0.4))).toFixed(2)}) contrast(${(1 - 0.06 * k).toFixed(3)}) hue-rotate(${(Math.sin(t * 0.3) * 8 * k).toFixed(1)}deg)${ghost}`;
-  cv.style.transform = `rotate(${(Math.sin(t * 0.55) * 0.8 * k + Math.sin(t * 0.33) * 2.4 * d).toFixed(3)}deg) scale(${(1 + 0.025 * k + 0.03 * d + Math.sin(t * 0.9) * 0.006 * (k + d)).toFixed(4)}) translateY(${(Math.sin(t * 0.5) * 6 * d).toFixed(1)}px)`;
+  const blur = 2.6 * k + 3.4 * d * (0.55 + 0.45 * Math.sin(t * 0.7));
+  const ghost = d > 0.05 ? ` drop-shadow(${(22 * d * Math.sin(t * 0.9)).toFixed(1)}px ${(7 * d * Math.cos(t * 0.6)).toFixed(1)}px 0 rgba(255,255,255,${(0.4 * d).toFixed(2)}))` : '';
+  cv.style.filter = `blur(${blur.toFixed(2)}px) saturate(${(1 + 0.45 * k - 0.35 * d).toFixed(2)}) brightness(${(1 - 0.32 * d * (0.7 + 0.3 * Math.sin(t * 0.4))).toFixed(2)}) contrast(${(1 - 0.06 * k).toFixed(3)}) hue-rotate(${(Math.sin(t * 0.3) * 8 * k).toFixed(1)}deg)${ghost}`;
+  cv.style.transform = `rotate(${(Math.sin(t * 0.55) * 0.8 * k + Math.sin(t * 0.33) * 6 * d).toFixed(3)}deg) scale(${(1 + 0.025 * k + 0.07 * d + Math.sin(t * 0.9) * 0.012 * (k + d)).toFixed(4)}) translate(${(Math.sin(t * 0.37) * 14 * d).toFixed(1)}px, ${(Math.sin(t * 0.5) * 12 * d).toFixed(1)}px)`;
+  // drunk: the view drifts on its own and your aim swims — you fight it with the mouse
+  const p = ctx.player; if (d > 0.05 && p && !p.dead && ctx.state === 'playing') { p.yaw += Math.sin(t * 0.62) * 0.35 * d * dt; p.pitch += Math.sin(t * 0.47 + 1.3) * 0.12 * d * dt; }
 }
 function buildPuffs() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(235,235,230,0.55)'); gr.addColorStop(1, 'rgba(235,235,230,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
@@ -247,8 +253,10 @@ export function sell(item, price, vendorName, lines = {}) {
 
 // ---- mercenary cash ---------------------------------------------------------------------------------------------------------------
 function mercCash(at) {
-  if (Math.random() > 0.55) return;   // about half of them carry something
-  dropCash(at, 20 + 5 * Math.floor(Math.random() * 7));   // $20–50
+  const bounty = 5 * (1 + Math.floor(Math.random() * 3));   // every kill pays $5–15 on the spot
+  api.earn(bounty); V.ctx.hud?.toast?.(`+$${bounty} bounty`, 1200);
+  if (Math.random() > 0.6) return;   // and most of them carry a wad: $20–50 on the body, walk over it
+  dropCash(at, 20 + 5 * Math.floor(Math.random() * 7));
 }
 let _cashTex = null;
 function dropCash(at, n) {

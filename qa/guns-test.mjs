@@ -1,0 +1,73 @@
+// Merc guns + pickups + respawn resupply + sniper wheel zoom + Wonder Wheel ride: node qa/guns-test.mjs [outdir]
+import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+const out = process.argv[2] || '/tmp';
+const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio'] });
+let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
+const errs = [];
+const open = async (url) => { const p = await b.newPage({ viewport: { width: 1000, height: 560 } }); p.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); }); await p.goto(url, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 }); return p; };
+// ---- 1. mercs carry different guns and drop them; walk-over ammo; F swap ----
+let pg = await open('http://localhost:8790/?qa=1&map=zavod&time=day');
+await pg.evaluate(() => { const p = window.__ctx.player.position; for (let i = 0; i < 14; i++) window.__ctx.ai.qaSpawnAt(p.x + 8 + (i % 7) * 2.2, p.z - 8 - Math.floor(i / 7) * 2.5, { state: 'cover', health: 30 }); });
+await pg.waitForTimeout(800);
+const guns = await pg.evaluate(() => window.__ctx.ai.qaGuns());
+ok(new Set(guns.filter(Boolean)).size >= 3, 'mercs carry different guns', JSON.stringify(guns));
+await pg.screenshot({ path: `${out}/guns-mercs.png` });
+await pg.evaluate(() => window.__game.killAll()); await pg.waitForTimeout(2500);
+let drops = await pg.evaluate(() => window.__ctx.ai.qaDrops());
+ok(drops.length >= 14 && drops.every((d) => d.landed), 'every merc dropped his gun (landed)', JSON.stringify(drops.map((d) => d.id)));
+await pg.evaluate(() => { window.__ctx.ai.qaStartWave = null; });
+const prim0 = await pg.evaluate(() => window.__ctx.weapons.primary);
+let same = drops.find((d) => d.id === prim0.id);
+if (!same) { await pg.evaluate((id) => window.__ctx.weapons.qaLoadout(id), drops[0].id); same = drops[0]; }
+const r0 = await pg.evaluate(() => window.__ctx.weapons.primary.reserve);
+await pg.evaluate((p) => window.__game.teleport(p[0], 0, p[2], 0, 0), same.pos); await pg.waitForTimeout(700);
+const r1 = await pg.evaluate(() => window.__ctx.weapons.primary.reserve);
+ok(r1 > r0, `walking over a ${same.id} = its ammo`, `${r0} → ${r1}`);
+drops = await pg.evaluate(() => window.__ctx.ai.qaDrops());
+const cur = await pg.evaluate(() => window.__ctx.weapons.primary.id);
+const other = drops.find((d) => d.id !== cur);
+await pg.evaluate((p) => window.__game.teleport(p[0] + 0.6, 0, p[2], 0, -0.6), other.pos); await pg.waitForTimeout(700);
+await pg.screenshot({ path: `${out}/guns-swap-prompt.png` });
+await pg.keyboard.press('KeyF'); await pg.waitForTimeout(800);
+const cur2 = await pg.evaluate(() => window.__ctx.weapons.primary.id);
+ok(cur2 === other.id, `F swaps for the merc's ${other.id}`, `${cur} → ${cur2}`);
+drops = await pg.evaluate(() => window.__ctx.ai.qaDrops());
+ok(drops.some((d) => d.id === cur), 'your old gun lies where his was', JSON.stringify(drops.map((d) => d.id)));
+ok(await pg.evaluate(() => { window.__ctx.ai; return true; }), 'drops last 5 min (timer)', '300 s');
+await pg.close();
+// ---- 2. coney: respawn resupply + sniper wheel zoom + the Wonder Wheel ----
+pg = await open('http://localhost:8790/?qa=1&map=coney&ai=0&time=day');
+await pg.evaluate(() => { const w = window.__ctx.weapons; w.qaLoadout('m24'); });
+await pg.waitForTimeout(500);
+await pg.evaluate(() => window.__ctx.weapons.setAdsForQA(1)); await pg.waitForTimeout(600);
+const f0 = await pg.evaluate(() => window.__ctx.camera.fov);
+await pg.evaluate(() => { window.__ctx.weapons.setAdsForQA(null); window.__ctx.weapons.setAdsForQA(1); });
+await pg.evaluate(() => { const i = window.__ctx.input; i.mouse.wheel = -1; }); await pg.waitForTimeout(80);
+await pg.evaluate(() => { const i = window.__ctx.input; i.mouse.wheel = -1; }); await pg.waitForTimeout(400);
+const f1 = await pg.evaluate(() => window.__ctx.camera.fov);
+ok(f1 < f0 * 0.9, 'wheel zooms the sniper scope in', `${f0.toFixed(2)} → ${f1.toFixed(2)}`);
+await pg.screenshot({ path: `${out}/guns-scope.png` });
+await pg.evaluate(() => window.__ctx.weapons.setAdsForQA(0));
+// empty everything, die, respawn at Table Park → full mags + $20
+await pg.evaluate(() => { const w = window.__ctx.weapons; w.qaLoadout('m4a1'); });
+await pg.waitForTimeout(300);
+await pg.evaluate(() => { window.__game.hangout.give(-20); window.__ctx.player.damage(999, null); }); await pg.waitForTimeout(900);
+await pg.keyboard.press('KeyT'); await pg.waitForTimeout(1200);
+const ammo = await pg.evaluate(() => { const p = window.__ctx.weapons.primary; return [p.ammo, p.reserve, window.__game.hangout.state().cash]; });
+ok(ammo[0] > 0 && ammo[1] > 0 && ammo[2] >= 20, 'respawn: fresh ammo + at least $20', JSON.stringify(ammo));
+// the Wonder Wheel
+const base = await pg.evaluate(() => window.__ctx.world.wonderWheel.base.toArray());
+await pg.evaluate((b) => window.__game.teleport(b[0], b[1], b[2] - 1, Math.PI, 0), base); await pg.waitForTimeout(800);
+await pg.keyboard.press('KeyF'); await pg.waitForTimeout(500);
+const w0 = await pg.evaluate(() => window.__game.hangout.wheelState());
+ok(!!w0, 'F boards the Wonder Wheel', JSON.stringify(w0));
+await pg.evaluate(() => window.__game.timeScale?.(8)); await pg.waitForTimeout(6000); await pg.evaluate(() => window.__game.timeScale?.(1));
+const w1 = await pg.evaluate(() => window.__game.hangout.wheelState());
+ok(w1 && w1.y > 15, 'the cabin carries you up high', JSON.stringify(w1));
+await pg.evaluate(() => { const vm = window.__ctx.camera.getObjectByName('viewmodel'); window.__ctx.player.pitch = -0.25; }); await pg.waitForTimeout(400);
+await pg.screenshot({ path: `${out}/guns-wheel.png` });
+ok(await pg.evaluate(() => !window.__ctx.weapons.stowed && !!window.__ctx.player.mounted?.wheel), 'gun is up on the wheel (snipe from the cabin)');
+await pg.keyboard.press('KeyF'); await pg.waitForTimeout(600);
+ok(await pg.evaluate(() => !window.__game.hangout.wheelState() && window.__ctx.player.position.y < 2), 'F gets you off at the bottom');
+ok(!errs.length, 'no page errors', JSON.stringify(errs));
+await b.close(); console.log(fails ? `\n${fails} FAILED` : '\nALL PASS'); process.exit(fails ? 1 : 0);

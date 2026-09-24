@@ -106,7 +106,8 @@ export async function init(ctx) {
   S._ensureEnv = ensureEnv;
   ctx.bus.on('shot', (d) => { if (d && d.who === 'enemy' && d.origin && d.dir) { const o = d.origin.isVector3 ? d.origin : _v.set(d.origin[0] ?? d.origin.x, d.origin[1] ?? d.origin.y, d.origin[2] ?? d.origin.z); const dir = d.dir.isVector3 ? d.dir : _v2.set(d.dir[0] ?? d.dir.x, d.dir[1] ?? d.dir.y, d.dir[2] ?? d.dir.z); fx.enemyShot(o.clone(), dir.clone()); } });
   ctx.bus.on('playerDied', () => { S.dead = true; cancelActions(); });
-  ctx.bus.on('playerRespawn', () => { S.dead = false; });
+  // respawn = resupplied: full mags + reserve on both guns (a picked-up merc gun stays your primary) and the grenades back
+  ctx.bus.on('playerRespawn', () => { S.dead = false; try { setLoadout(S.loadout || {}, { silent: true }); } catch (e) { console.warn('[weapons] respawn refill', e); } S.grenadeCount = GRENADES; ctx.bus.emit('resupply', {}); });
 
   // initial loadout from the URL (?primary=&secondary=), mirrored into settings
   const qs = ctx.qs || new URLSearchParams(location.search);
@@ -119,6 +120,8 @@ export async function init(ctx) {
     get scoped() { return S.scoped; },
     get reloading() { return !!S.reload; },
     get grenades() { return S.grenadeCount; },
+    /** the primary you carry: { id, ammo, reserve } */
+    get primary() { const w = S.weapons[0]; return w ? { id: w.id, ammo: w.ammo, reserve: w.reserve } : null; },
     get spread() { return currentSpread(); },
     get sprinting() { return S.sprint > 0.5; },
     get arsenal() { return S.arsenal; },
@@ -130,6 +133,13 @@ export async function init(ctx) {
       const cur = S.weapons[0]; if (!REGISTRY[id] || REGISTRY[id].spec.slot !== 0) return false;
       if (cur && cur.id === id) { cur.reserve += reserve; cur.cur.reserve = cur.reserve; if (cur.ammo <= 0 && !S.reload) api.reload?.(); ctx.bus.emit('pickup', { id, ammo: true }); return true; }
       setLoadout({ primary: id, secondary: S.loadout.secondary }); const w = S.weapons[0]; if (w) { w.reserve = reserve; w.cur.reserve = reserve; } ctx.bus.emit('pickup', { id, ammo: false }); return true;
+    },
+    /** a third-person copy of a gun (muzzle toward -z, metres) for the mercs to carry / drop */
+    worldModel: (id) => {
+      const reg = REGISTRY[id]; if (!reg) return null;
+      S.wmProto = S.wmProto || {};
+      if (!S.wmProto[id]) { const w = reg.build(S.mats); const g = w.group; g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); S.wmProto[id] = g; }
+      return S.wmProto[id].clone(true);
     },
     fire: () => { const w = S.weapons[S.cur]; if (w.ammo > 0 && !w.needsAction) fireShot(w); else if (w.ammo <= 0) dryFire(w); },
     qaFire: (n = 1) => { const w = S.weapons[S.cur]; for (let i = 0; i < n; i++) { if (w.ammo <= 0) { w.ammo = w.spec.mag; } w.needsAction = false; w.actionT = 9; fireShot(w, { hold: 0.6 }); } },
@@ -413,7 +423,12 @@ export function update(dt, ctx) {
   } else if (playing && dt > 0 && !S.dead) {
     if (input.consume('Digit1')) startSwap(0);
     if (input.consume('Digit2')) startSwap(1);
-    if (input.mouse.wheel) startSwap(1 - S.cur);
+    if (input.mouse.wheel) {
+      if (S.weapons[S.cur]?.spec?.scope && S.adsTarget) {   // sniper aimed: the wheel steps the scope zoom (x0.5 … x3 of its base magnification)
+        S.zoomMul = clamp((S.zoomMul || 1) * (input.mouse.wheel < 0 ? 1.25 : 0.8), 0.5, 3);
+        const base = 1 / (S.weapons[S.cur].spec.adsFovMul ?? ADS_FOV_MUL); ctx.hud?.toast?.(`${(base * S.zoomMul).toFixed(1)}×`, 600);
+      } else startSwap(1 - S.cur);
+    }
     if (input.consume('KeyR')) startReload();
     if (input.consume('KeyG')) startThrow();
     if ((!ctx.ai?.nearPickup && !ctx.vehicles?.nearBike && !ctx.interactNear && input.consume('KeyF'))) startInspect();   // interactNear: a map interaction (hangout) owns F
@@ -435,7 +450,7 @@ export function update(dt, ctx) {
   const fovBase = ctx.settings.fov || 75; const adsMul = sp.adsFovMul ?? ADS_FOV_MUL;
   // scopes: fov stays normal until the eye reaches the eyepiece, then snaps down through the last 15% of the transition
   const fovK = sp.scope ? sstep((S.ads - 0.8) / 0.2) : sstep(S.adsT); // irons/dots: smoothstep over adsTime — no velocity pop at either end
-  const targetFov = fovBase * lerp(1, adsMul, fovK);
+  const targetFov = Math.max(1.5, fovBase * lerp(1, sp.scope ? adsMul / (S.zoomMul || 1) : adsMul, fovK));
   if (Math.abs(cam.fov - targetFov) > 0.01 || S.lastFov !== targetFov) { cam.fov = targetFov; cam.updateProjectionMatrix(); S.lastFov = targetFov; }
   // viewmodel projection: x/y scale emulates VM_FOV under the world fov. With spec.adsVmFov the gun is drawn at a steady fov while aimed
   // instead of magnifying with the world zoom (on-axis points stay on-axis at any scale, so the sight line is unaffected).
