@@ -71,8 +71,13 @@ addEventListener('keydown', e => { if (e.repeat) return; input.keys.add(e.code);
 addEventListener('keyup', e => input.keys.delete(e.code));
 addEventListener('blur', () => { input.keys.clear(); input.mouse.buttons = 0; });
 addEventListener('mousemove', e => { if (!input.locked && !ctx.qa) return; input.mouse.dx += e.movementX; input.mouse.dy += e.movementY; });
-addEventListener('mousedown', e => { if (input.locked) { input.mouse.buttons |= (1 << e.button); if (e.button === 0) input.pressed.add('Mouse0'); if (e.button === 2) input.pressed.add('Mouse2'); } });
-addEventListener('mouseup', e => { input.mouse.buttons &= ~(1 << e.button); });
+// macOS turns Ctrl+click into a right-click (button 2 + contextmenu). Ctrl is our crouch key, so while crouch-Ctrl is held a
+// "right-click" from the primary button is really a trigger pull: map it back to fire (right-click ADS still works via the real button).
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const btnOf = (e) => (IS_MAC && e.ctrlKey && e.button === 2 && input.keys.has('ControlLeft') && !(e.buttons & 2) ? 0 : e.button);
+addEventListener('mousedown', e => { if (input.locked) { const b = btnOf(e); input.mouse.buttons |= (1 << b); if (b === 0) input.pressed.add('Mouse0'); if (b === 2) input.pressed.add('Mouse2'); } });
+addEventListener('mouseup', e => { const b = btnOf(e); input.mouse.buttons &= ~(1 << b); if (b !== e.button) input.mouse.buttons &= ~(1 << e.button); });
+addEventListener('contextmenu', e => { if (input.locked || ctx.state === 'playing') e.preventDefault(); });   // never let a menu steal the pointer lock mid-fight
 addEventListener('wheel', e => { input.mouse.wheel += Math.sign(e.deltaY); }, { passive: true });
 addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('pointerlockchange', () => { input.locked = document.pointerLockElement === renderer.domElement; ctx.bus.emit('pointerlock', input.locked); if (!input.locked && ctx.state === 'playing') setState('paused'); });
