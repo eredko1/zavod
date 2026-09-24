@@ -68,7 +68,7 @@ function bindOnce(ctx) {
   // mercenary cash: solo / host kills arrive as enemyKilled, an online client's own kills as mercKilled (netwaves)
   ctx.bus.on('enemyKilled', (d) => { if (V && d?.position && !d.qa) mercCash(d.position); });
   ctx.bus.on('mercKilled', (d) => { if (V && d?.mine && d.position) mercCash(d.position); });
-  ctx.bus.on('state', ({ state }) => { if (V && state === 'dead') respawnBtn(); });
+  ctx.bus.on('state', ({ state }) => { if (V && state === 'dead') respawnBtn(); showUI(state === 'playing'); });
   ctx.bus.on('playerRespawn', () => {
     if (!V) return;
     if (V.cash < V.startCash) { V.cash = V.startCash; renderCash(); }   // back on your feet with at least the starting cash (ammo refills in weapons.js)
@@ -411,9 +411,13 @@ function buildUI(o) {
   if (o.help) {
     help = el('hghelp'); help.style.cssText = 'position:fixed;right:14px;top:60px;z-index:44;background:rgba(8,10,14,.78);border-left:2px solid #ffb24a;color:#e8edf2;font:500 13px Barlow,Arial;padding:10px 14px;line-height:1.55;pointer-events:none;max-width:280px';
     help.innerHTML = `<b style="letter-spacing:.14em;font-family:Barlow Condensed">${o.title || 'CONTROLS'} (H)</b><br>${o.help}`;
+    if (V.ctx.isTouch) help.style.display = 'none';   // phones: the on-screen buttons need that corner
     setTimeout(() => { if (help) help.style.display = 'none'; }, 14000);
   }
-  V.ui = { cash, fade, floor, use, help, dlg, dname: dlg.querySelector('.nm'), dtext: dlg.querySelector('.tx'), dch: dlg.querySelector('.chs') }; renderCash();
+  V.ui = { cash, fade, floor, use, help, dlg, dname: dlg.querySelector('.nm'), dtext: dlg.querySelector('.tx'), dch: dlg.querySelector('.chs') }; renderCash(); showUI(V.ctx.state === 'playing');
+}
+function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the menus, pause and death screens
+  if (!V?.ui) return; for (const k of ['cash', 'use', 'help']) { const e = V.ui[k]; if (e) e.style.visibility = on ? '' : 'hidden'; }
 }
 function renderCash() {
   if (!V?.ui) return;

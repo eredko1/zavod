@@ -366,6 +366,7 @@ function onState(H, state, prev) {
   H.ui = state === 'menu' ? L.menu : state === 'paused' ? L.pause : state === 'dead' ? L.dead : state === 'victory' ? L.vic : null;
   if (H.ui) select(H, 0);
   if (state === 'dead' || state === 'victory') fillStats(H, L[state === 'dead' ? 'dead' : 'vic']);
+  if (state === 'dead') { const r = L.dead.querySelector('[data-act="retry"]'); if (r) r.style.display = H.ctx.net?.connected ? 'none' : ''; }
   if (state === 'playing' && prev && prev !== 'paused') { H.c.hpOn = null; }
 }
 const root = (H) => H.root;
@@ -456,6 +457,8 @@ function buildSettings(H) {
   h4('Graphics');
   for (const [key, label] of [['shadows', 'Shadows'], ['rain', 'Rain'], ['motionBlur', 'Motion blur'], ['ssr', 'Reflections (SSR)'], ['ao', 'Ambient occlusion'], ['bloom', 'Bloom'], ['dof', 'Depth of field'], ['filmGrain', 'Film grain']])
     cycle(label, [false, true], () => !!S[key], (v) => { S[key] = v; ctx.bus.emit('setting', { key, value: v }); }, true);
+  const tod = ctx.world?.tod;
+  if (tod) { h4('World'); cycle('Time of day', tod.options, () => tod.get(), (v) => tod.set(v), false); }
   h4('Audio');
   slider('Master volume', 0, 100, 1, () => Math.round(S.masterVolume * 100), (v) => { S.masterVolume = v / 100; ctx.bus.emit('setting', { key: 'masterVolume', value: v / 100 }); }, (v) => `${v}`);
   H.panels.settings.querySelector('.reset').addEventListener('click', () => {
@@ -483,7 +486,15 @@ function buildMaps(H) {
   body.appendChild(grid);
   const curMeta = maps.find(m => m.id === cur); H.panels.maps.querySelector('.curmap').textContent = curMeta ? `Current: ${curMeta.name}` : '';
   // title block reflects the loaded map
-  if (curMeta) { const t = H.root.querySelector('.mainmenu .title'), st = H.root.querySelector('.mainmenu .subtitle'); if (t) t.textContent = curMeta.name; if (st) st.textContent = curMeta.subtitle || ''; }
+  if (curMeta) {
+    const t = H.root.querySelector('.mainmenu .title'); if (t) t.textContent = curMeta.name;
+    for (const st of H.root.querySelectorAll('.mainmenu .subtitle, .pause .subtitle')) st.textContent = curMeta.subtitle || '';
+    if (curMeta.description) for (const b of H.root.querySelectorAll('.mainmenu .brief, .pause .brief')) b.innerHTML = `<b>SITREP</b> — ${curMeta.description}`;
+  }
+  // callsign: your online name when you have one
+  { let nm = ''; try { nm = (new URLSearchParams(location.search).get('name') || localStorage.getItem('zavod.name') || '').replace(/[^\w .-]/g, '').slice(0, 16); } catch {}
+    const tag = H.root.querySelector('.mainmenu .tag-tr'); const room = new URLSearchParams(location.search).get('room');
+    if (tag && (nm || room)) tag.innerHTML = `<i></i>Callsign <b>${(nm || 'REAPER-1').toUpperCase()}</b><br>Status <b>${room ? 'Online · room ' + room.replace(/[^\w-]/g, '').slice(0, 24).toUpperCase() : 'Solo'}</b>`; }
 }
 
 function buildLoadout(H) {
@@ -520,7 +531,7 @@ function buildLoadout(H) {
 
 function buildControls(H) {
   const body = H.panels.controls.querySelector('.body');
-  const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim down sights', 'RMB / E'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
+  const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim', 'RMB / E'], ['Scope zoom', 'WHEEL'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Interact', 'F'], ['Blaze / drink', 'B'], ['Vehicle camera', 'V'], ['Map help card', 'H'], ['Follow a friend', 'J'], ['Respawn at spot', 'T'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
   const grid = document.createElement('div'); grid.className = 'keys';
   for (const [a, k] of keys) { const r = document.createElement('div'); r.className = 'row'; r.innerHTML = `<label>${a}</label><div class="ctl">${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</div>`; grid.appendChild(r); }
   body.appendChild(grid);
@@ -580,7 +591,7 @@ function buildDOM() {
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
       <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
-      <nav class="menu">${mi('friends', 0, 'Play with friends · any map', 'primary')}${mi('coney', 1, 'Coney Island with friends')}${mi('deploy', 2, 'Deploy solo')}${mi('maps', 3, 'Select map')}${mi('loadout', 4, 'Loadout')}${mi('settings', 5, 'Settings')}${mi('controls', 6, 'Controls')}</nav>
+      <nav class="menu">${mi('friends', 0, 'Play with friends', 'primary')}${mi('deploy', 1, 'Play solo')}${mi('maps', 2, 'Select map')}${mi('loadout', 3, 'Loadout')}${mi('settings', 4, 'Settings')}${mi('controls', 5, 'Controls')}</nav>
     </div>
     <div class="tag-tr in" style="--i:2"><i></i>Callsign <b>REAPER-1</b><br>Status <b>Sole operator on site</b></div>
     <div class="tag-bl in up" style="--i:6">Build <b>${VERSION}</b> · three r186 · webgl2<br>Zavod is a non-commercial tech demo · fictional locations, no real people or groups</div>
@@ -595,7 +606,7 @@ function buildDOM() {
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
       <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
-      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Friends · switch map')}${mi('settings', 2, 'Settings')}${mi('menu', 3, 'Quit to menu')}</nav>
+      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('menu', 4, 'Quit to menu')}</nav>
     </div>
     <div class="tag-br in up" style="--i:6"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Resume</span></div>
   </div>

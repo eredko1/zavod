@@ -736,16 +736,12 @@ export function phaseAt(ms) { const t = (ms / 1000) % CYCLE; if (t < RUN) return
 // time-of-day chooser (bottom-right): Day / Dusk / Night / Cycle, remembered per device; default Day (night was too dark to play)
 const TOD = { day: 0, dusk: 0.5, night: 1, cycle: null };
 function pickFixed() { let v = 'day'; try { v = localStorage.getItem('zavod.tod') || 'day'; } catch {} return v in TOD ? TOD[v] : 0; }
-function todUI() {
-  if (document.querySelector('.zvtod')) return;
-  const d = document.createElement('div'); d.className = 'zvtod';
-  d.style.cssText = 'position:fixed;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:44;display:flex;gap:4px;font:700 11px Barlow Condensed,Arial;letter-spacing:.1em';
+function todUI(world) {   // lives in Settings → World → Time of day (hud.js reads world.W.tod)
   const cur = () => { try { return localStorage.getItem('zavod.tod') || 'day'; } catch { return 'day'; } };
-  const draw = () => { d.innerHTML = ''; for (const k of Object.keys(TOD)) { const b = document.createElement('button'); b.textContent = k.toUpperCase(); b.style.cssText = `padding:5px 8px;min-height:28px;border:1px solid rgba(255,255,255,.25);color:#fff;background:${cur() === k ? 'rgba(255,190,80,.7)' : 'rgba(0,0,0,.45)'};cursor:pointer`; b.onclick = (e) => { e.stopPropagation(); try { localStorage.setItem('zavod.tod', k); } catch {} draw(); }; d.appendChild(b); } };
-  draw(); document.body.appendChild(d);
+  world.W.tod = { options: Object.keys(TOD), get: cur, set: (k) => { try { localStorage.setItem('zavod.tod', k); } catch {} } };
 }
 function buildCycle(world, fw) {
-  todUI();
+  todUI(world);
   const { ctx, scene } = world; const M = world.mats || {};
   const q = ctx.qs?.get?.('time'); const FIX = { golden: 0, sunset: 0.3, dusk: 0.5, blue: 0.72, night: 1 };
   const fixed = q == null ? null : (q in FIX ? FIX[q] : (isFinite(+q) ? Math.max(0, Math.min(1, +q)) : null));

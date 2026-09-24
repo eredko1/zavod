@@ -340,6 +340,14 @@
   #hud .wrow .nm { font-size: 15px; }
 }
 
+/* phones / short screens: the main + pause menus fit without scrolling */
+@media (max-height: 560px) {
+  #hud .title { font-size: calc(78px * var(--hs)); }
+  #hud .title.sm { font-size: calc(56px * var(--hs)); }
+  #hud .mainmenu .eyebrow, #hud .mainmenu .loadsum, #hud .pause .eyebrow, #hud .pause .brief, #hud .tag-bl, #hud .tag-br { display: none; }
+  #hud .mi { height: calc(38px * var(--hs)); font-size: calc(22px * var(--hs)); }
+}
+
 /* sniper scope view: the scope overlay owns the reticle */
 #hud.scoped .xh, #hud.scoped .compass, #hud.scoped .obj { opacity: 0 !important; }
 
