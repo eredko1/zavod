@@ -17,7 +17,7 @@ export function buildFigure(o = {}) {
   const add = (parent, geo, m, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => { const e = new THREE.Mesh(geo, m); e.position.set(x, y, z); e.scale.set(sx, sy, sz); e.rotation.set(rx, 0, rz); e.castShadow = true; parent.add(e); return e; };
   const hipY = sit ? 0.5 : 0.92;
   const body = new THREE.Group(); body.position.y = hipY; g.add(body);
-  add(body, new THREE.CapsuleGeometry(0.19, 0.36, 4, 12), shirt, 0, 0.36, 0, 1.15 + belly * 0.25, 1, 0.9 + belly * 0.35);          // torso
+  add(body, new THREE.CapsuleGeometry(0.19, 0.36, 4, 12), shirt, 0, 0.36, 0, (o.slim ? 0.92 : 1.15) + belly * 0.25, 1, (o.slim ? 0.72 : 0.9) + belly * 0.35);          // torso
   if (belly > 0.2) add(body, new THREE.SphereGeometry(0.2, 12, 10), shirt, 0, 0.22, 0.08, 1.1, 0.9, 0.6 + belly * 0.6);             // belly
   add(body, new THREE.CylinderGeometry(0.06, 0.07, 0.1, 10), skin, 0, 0.72, 0);                                                       // neck
   const head = new THREE.Group(); head.position.set(0, 0.86, 0.01); body.add(head);
@@ -36,7 +36,7 @@ export function buildFigure(o = {}) {
   // arms (pivot at the shoulder) and legs (pivot at the hip)
   const limbs = { arms: [], legs: [] };
   for (const s of [-1, 1]) {
-    const sh = new THREE.Group(); sh.position.set(s * (0.25 + belly * 0.04), 0.62, 0); body.add(sh);
+    const sh = new THREE.Group(); sh.position.set(s * ((o.slim ? 0.21 : 0.25) + belly * 0.04), 0.62, 0); body.add(sh);
     add(sh, new THREE.CapsuleGeometry(0.06, 0.24, 4, 8), shirt, 0, -0.14, 0);
     const fore = new THREE.Group(); fore.position.y = -0.3; sh.add(fore);
     add(fore, new THREE.CapsuleGeometry(0.05, 0.2, 4, 8), o.shortSleeve === false ? shirt : skin, 0, -0.12, 0); add(fore, new THREE.SphereGeometry(0.048, 8, 6), skin, 0, -0.27, 0);
@@ -158,7 +158,7 @@ export function buildDeli(world, o) {
     for (let s = 0; s < 5; s++) for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 7), PAL[(d + s + k) % 3 === 0 ? 3 : (d + k) % 8]); b.position.set(x0 + 0.1 + k * 0.155, 0.28 + s * 0.42, D - 0.66); root.add(b); } }
   for (let d = 0; d <= 7; d++) box(M.frame, -hx + 0.26 + d * 1.06, 0.1, D - 0.69, -hx + 0.3 + d * 1.06, 2.28, D - 0.66);
   // Sammy on his stool behind the counter, facing the aisle; the bodega cat asleep on the counter
-  const sammy = buildFigure({ pose: 'sit', skin: 0xb88760, hair: 0x221c18, beard: true, beardColor: 0x3a3632, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0.55, glasses: !!o.glasses, shortSleeve: false });
+  const sammy = buildFigure({ pose: 'sit', skin: 0xb88760, hair: 0x221c18, beard: false, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0, slim: true, glasses: !!o.glasses, shortSleeve: false });   // thin, clean-shaven
   sammy.group.position.set(3.25, 0.32, 2.6); sammy.group.rotation.y = -Math.PI / 2; root.add(sammy.group);   // on a tall stool: head clears the counter
   box(M.frame, 3.12, 0, 2.47, 3.38, 0.82, 2.73);   // stool
   const tag = nameTag(o.vendorName || 'SAMMY'); tag.position.set(0, 1.85, 0); sammy.group.add(tag);

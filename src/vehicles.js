@@ -293,7 +293,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
   // suspension spring, excited by throttle/brake + surface rumble
   const kS = 90, cS = 9;
   v.suspV += (-kS * v.susp - cS * v.suspV) * dt - (thr - brk - (hard ? 1.4 : 0)) * 0.5 * dt * Math.min(1, Math.abs(fsN) / 6 + 0.3);
-  if (sf.rumble && Math.abs(fsN) > 1) v.suspV += (Math.random() - 0.5) * sf.rumble * Math.min(1, Math.abs(fsN) / 8) * 30 * dt;
+  if (sf.rumble && Math.abs(fsN) > 1) { v.rumbleN = damp(v.rumbleN || 0, Math.random() - 0.5, 7, dt); v.suspV += v.rumbleN * sf.rumble * Math.min(1, Math.abs(fsN) / 8) * 30 * dt; }   // low-passed: rough ground rolls, it doesn't buzz
   v.susp += v.suspV * dt; v.susp = clamp(v.susp, -0.09, 0.06);
   v.spin += fsN / WHEEL_R * dt;
   v.hitT = Math.max(0, v.hitT - dt);
@@ -371,8 +371,9 @@ function applyView(dt) {
   showViewmodel(!S.chase);
   if (S.chase) return applyChase(bike, dt);
   const eyeH = bike.pos.y + sp.eyeH + bike.susp * 1.2;
-  const rpm = 8 + Math.abs(bike.fwdSpeed) * 2.2 + bike.throttle * 6; S.vib += (dt || 0) * rpm * 2.4;
-  const vibA = (sp.car ? 0.4 : 1) * (0.0035 + bike.throttle * 0.006 + Math.min(1, Math.abs(bike.fwdSpeed) / 12) * 0.004) + bike.hitT * 0.05 + (bike.surf?.rumble || 0) * 0.004;
+  // engine buzz: frequency capped ~10 Hz — the old rpm-linear phase hit 35+ Hz at speed, aliased at 60 fps into random jolts ("the bike is bumpy")
+  const rpm = 8 + Math.abs(bike.fwdSpeed) * 2.2 + bike.throttle * 6; S.vib += (dt || 0) * Math.min(rpm, 30) * 1.2;
+  const vibA = (sp.car ? 0.4 : 1) * (0.0012 + bike.throttle * 0.0018 + Math.min(1, Math.abs(bike.fwdSpeed) / 12) * 0.0012) + bike.hitT * 0.035 + (bike.surf?.rumble || 0) * 0.002;
   const vx = Math.sin(S.vib * 1.7) * vibA, vy = Math.sin(S.vib) * vibA * 0.8;
   const H = sp.eyeH;
   _v.set(bike.pos.x, eyeH, bike.pos.z).addScaledVector(_f, -sp.eyeBack).addScaledVector(_r, leanS * H * 0.85 + vx + sp.eyeSide);

@@ -169,13 +169,17 @@ function lightUp() {
 function updateJoint(dt) {
   if (V.smokeT <= 0) return; const { ctx } = V;
   V.smokeT -= dt; V.puffT -= dt;
-  if (V.joint) V.joint.ember.material.color.setHSL(0.05, 1, 0.45 + 0.15 * Math.sin(performance.now() / 180));
+  if (V.joint) { V.joint.ember.material.color.setHSL(0.05, 1, 0.45 + 0.15 * Math.sin(performance.now() / 180)); V.joint.g.visible = !ctx.vehicles?.mounted; }   // driving: no floating joint in the chase view
   if (V.puffT <= 0) {
     V.puffT = 1.6 + Math.random() * 0.8;
     const cam = ctx.camera; const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()));
-    const at = cam.getWorldPosition(new THREE.Vector3()).addScaledVector(fwd, 0.45).add(new THREE.Vector3(0, -0.08, 0));
+    let at = cam.getWorldPosition(new THREE.Vector3()).addScaledVector(fwd, 0.45).add(new THREE.Vector3(0, -0.08, 0));
+    const car = ctx.vehicles?.mounted; let hotbox = false;
+    if (car) {   // in the whip: the smoke rolls out of the driver's window (not off the chase camera) and the car hotboxes
+      const h = car.heading; at = car.pos.clone().add(new THREE.Vector3(-Math.cos(h) * 0.95 - Math.sin(h) * 0.2, car.spec?.car ? 1.25 : 1.5, Math.sin(h) * 0.95 - Math.cos(h) * 0.2)); hotbox = !!car.spec?.car;
+    }
     puff(at); ctx.net?.send?.('smoke', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)] });
-    V.high = Math.min(1, V.high + 0.22); V.highT = 150;
+    V.high = Math.min(1, V.high + (hotbox ? 0.3 : 0.22)); V.highT = 150;
   }
   if (V.smokeT <= 0) { if (V.joint) V.joint.g.visible = false; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = true; ctx.hud?.toast?.('…everything is glowing.', 2400); }
 }
