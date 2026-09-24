@@ -42,6 +42,7 @@ export function buildHangout(world, M) {
   ctx.bus.on('net:drink', (m) => { if (!Array.isArray(m.p)) return; const me = ctx.player?.position; if (me && !me.dead && new THREE.Vector3(...m.p).distanceTo(me) < 4) { drink(false); ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'A friend'} passed you the bottle`, 1800); } });
   ctx.bus.on('net:igor', (m) => ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'Someone'} bought from Igor`, 1800));
   ctx.bus.on('playerDied', () => { endRide(true); leavePassenger(); });
+  buildParkRespawn();
   world.updaters.push((dt) => update(dt));
   console.log('[hangout] building 2 at', b2.centre.toArray().map((v) => v.toFixed(0)).join(','), '· igor at', igor.x.toFixed(0), igor.z.toFixed(0), '· towers', towers.length, '· parked cars', (world.parkedCars || []).length);
 }
@@ -392,7 +393,35 @@ function buildUI() {
 function renderCash() { if (!H?.ui) return; H.ui.cash.textContent = `$${H.cash}${H.item === 'weed' ? '  ·  🌿 (B)' : H.item === 'bottle' ? '  ·  🍾 (B)' : ''}`; if (H.ui.use) H.ui.use.style.display = H.item ? 'block' : 'none'; }
 
 /** QA hooks (window.__game.hangout) */
+// ---- death screen: "Respawn at Table Park" (button or T). Solo: respawn right now at Igor's gate. Online: net.js keeps its
+// countdown (fair to the killer); the choice is remembered and the respawn is moved to the park when it fires.
+function buildParkRespawn() {
+  const ctx = H.ctx;
+  if (!buildParkRespawn.keyed) { buildParkRespawn.keyed = true; addEventListener('keydown', (e) => { if (e.code === 'KeyT' && H?.ctx.state === 'dead') pickPark(); }); }
+  ctx.bus.on('state', ({ state }) => { if (state === 'dead') parkBtn(); });   // the HUD is built after the world: add the button lazily
+  ctx.bus.on('playerRespawn', () => { if (!H.parkRsp) return; H.parkRsp = false; toPark(); });
+}
+function parkBtn() {
+  const btns = document.querySelector('#hud .dead .btns'); if (!btns) return;
+  let b = btns.querySelector('.park-rsp');
+  if (!b) { b = document.createElement('button'); b.className = 'btn primary park-rsp'; b.addEventListener('click', (e) => { e.stopPropagation(); pickPark(); }); btns.prepend(b); }
+  b.textContent = 'Respawn at Table Park [T]'; b.disabled = false; H.parkBtn = b;
+}
+function pickPark() {
+  const ctx = H?.ctx; if (!ctx || ctx.state !== 'dead') return;
+  H.parkRsp = true;
+  if (ctx.net?.connected) { if (H.parkBtn) { H.parkBtn.textContent = 'Table Park ✓ — respawning…'; H.parkBtn.disabled = true; } return; }
+  ctx.player.respawn();   // emits playerRespawn → toPark()
+}
+function toPark() {
+  const s = H.world.W.onlineStart; if (!s) return; const p = H.ctx.player;
+  const cols = H.ctx.colliders, blocked = (x, z) => cols.some((b) => x > b.min.x - 0.4 && x < b.max.x + 0.4 && z > b.min.z - 0.4 && z < b.max.z + 0.4 && b.max.y > 0.3 && b.min.y < 1.8);
+  let x = s[0], z = s[2];
+  for (let k = 0; k < 10; k++) { const a = Math.random() * Math.PI * 2, r = 1 + Math.random() * 2, tx = s[0] + Math.cos(a) * r, tz = s[2] + Math.sin(a) * r; if (!blocked(tx, tz)) { x = tx; z = tz; break; } }   // spread so friends don't stack
+  p.teleport(x, s[1], z, s[3], 0);
+}
+
 export const hangoutQA = {
   state: () => H && { cash: H.cash, stash: H.stash, item: H.item, drunk: +(H.drunk || 0).toFixed(2), high: +H.high.toFixed(2), riding: !!H.riding, passenger: !!H.passenger, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()) },
-  buy: () => buyIgor(), use: () => useItem(), light: () => lightUp(), ride: (dir = 'up', k = 0) => callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; },
+  buy: () => buyIgor(), use: () => useItem(), light: () => lightUp(), ride: (dir = 'up', k = 0) => callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; }, park: () => pickPark(),
 };
