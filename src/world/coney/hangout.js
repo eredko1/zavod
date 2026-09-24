@@ -30,14 +30,16 @@ export function buildHangout(world, M) {
   let igor = null, bd = 260;
   for (const p of OSM.pk) { const [x, z] = cen(p); const d = Math.hypot(x - b2.centre.x, z - b2.centre.z); if (d < bd && pip(x, z, p)) { const v = new THREE.Vector3(x, 0, z); if (free(v)) { bd = d; igor = v; } } }
   if (!igor) igor = out.clone().addScaledVector(door.outside.clone().sub(door.inside).setY(0).normalize(), 12);
-  H = { world, ctx, towers, b2, igor, cash: START_CASH, stash: 0, riding: null, high: 0, highT: -1, joint: null, puffs: [], passenger: null, promptT: 0, lastPrompt: '', smokeT: 0, ui: null };
+  H = { world, ctx, towers, b2, igor, cash: START_CASH, stash: 0, item: null, buys: 0, drunk: 0, drunkT: -1, riding: null, high: 0, highT: -1, joint: null, puffs: [], passenger: null, promptT: 0, lastPrompt: '', smokeT: 0, ui: null };
   H.igor = buildIgor(world, M, igor);   // the interaction point is Igor's bench, not the park centre
+  if (H.gate) { const g = H.gate, dx = H.igor.x - g.x, dz = H.igor.z - g.z; W.onlineStart = [g.x, 0, g.z, Math.atan2(-dx, -dz)]; }   // friends spawn at Igor's gate
   buildDoors(world);
   buildUI(); buildPuffs(world);
   ctx.bus.on('net:elev', (m) => onRemoteElev(m));
   ctx.bus.on('net:steal', (m) => stealLocal(m.i, false));
   ctx.bus.on('net:red', (m) => onRemoteRed(m));
-  ctx.bus.on('net:smoke', (m) => { if (!Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = ctx.player?.position; if (me && !me.dead && at.distanceTo(me) < 5) { H.high = Math.min(1, H.high + 0.18); H.highT = Math.max(H.highT, 150); } });   // passing it around: friends within 5 m get lifted too
+  ctx.bus.on('net:smoke', (m) => { if (!Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = ctx.player?.position; if (me && !me.dead && at.distanceTo(me) < 4) { H.high = Math.min(1, H.high + 0.18); H.highT = Math.max(H.highT, 150); } });   // passing it around: friends within 5 m get lifted too
+  ctx.bus.on('net:drink', (m) => { if (!Array.isArray(m.p)) return; const me = ctx.player?.position; if (me && !me.dead && new THREE.Vector3(...m.p).distanceTo(me) < 4) { drink(false); ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'A friend'} passed you the bottle`, 1800); } });
   ctx.bus.on('net:igor', (m) => ctx.hud?.toast?.(`${ctx.net?.peer?.(m.f)?.name || 'Someone'} bought from Igor`, 1800));
   ctx.bus.on('playerDied', () => { endRide(true); leavePassenger(); });
   world.updaters.push((dt) => update(dt));
@@ -69,6 +71,7 @@ function buildIgor(world, M, pos) {
   const hx = Wd / 2, hz = Dd / 2;
   fence(-hx, -hz, hx, -hz); fence(-hx, -hz, -hx, hz); fence(hx, -hz, hx, hz); fence(-hx, hz, -1.3, hz); fence(1.3, hz, hx, hz);
   for (const x of [-1.3, 1.3]) add(new THREE.BoxGeometry(0.08, 1.5, 0.08), iron, x, 0.75, hz);
+  H.gate = new THREE.Vector3(0, 0, hz + 3).applyAxisAngle(new THREE.Vector3(0, 1, 0), toB2).add(pos);   // just outside the gate
   // rundown picnic tables: faded slats, one missing plank, one knocked askew
   const table = (x, z, ry, broken) => { const g = new THREE.Group(); g.position.set(x, 0.1, z); g.rotation.y = ry; park.add(g);
     const slats = broken ? [0, 1, 3, 4] : [0, 1, 2, 3, 4];
@@ -124,11 +127,12 @@ function update(dt) {
   const playing = ctx.state === 'playing' && !p.dead;
   // effects run regardless
   updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDoors(dt); updateRed();
+  if (playing && ctx.input?.pressed?.has?.('KeyB') && (H.riding || H.passenger || ctx.vehicles?.mounted)) { ctx.input.pressed.delete('KeyB'); useItem(); }
   if (H.riding) return updateRide(dt);
   if (H.passenger) return updatePassenger(dt);
   if (!playing) return;
   const F = ctx.input?.pressed?.has?.('KeyF');
-  if (H.stash && ctx.input?.pressed?.has?.('KeyS') && !ctx.vehicles?.mounted && H.towers.some((t) => Math.abs(p.position.y - t.yF) < 1.5)) { lightUp(); }   // S = smoke (up top)
+  if (ctx.input?.pressed?.has?.('KeyB')) { ctx.input.pressed.delete('KeyB'); useItem(); }   // B = blaze / drink, anywhere (also while riding)
   const pos = p.position; const near = (v, r, dy = 1.2) => Math.hypot(v.x - pos.x, v.z - pos.z) < r && Math.abs(v.y - pos.y) < dy;
   const mounted = !!ctx.vehicles?.mounted;
   let prompt = null, act = null;
@@ -138,7 +142,6 @@ function update(dt) {
       const t = H.towers[ti];
       t.lobby.cars.forEach((c, k) => { if (!act && near(c.pos, 1.4)) { prompt = 'F — ELEVATOR ▲ 19'; act = () => callElevator(ti, k, 'up'); } });
       t.top.forEach((side, si) => side.cars.forEach((c, k) => { if (!act && near(c.pos, 1.4)) { prompt = 'F — ELEVATOR ▼ LOBBY'; act = () => callElevator(ti, k, 'down', si); } }));
-      if (!act && H.stash && Math.abs(pos.y - t.yF) < 1.2 && t.centre.distanceTo(new THREE.Vector3(pos.x, 0, pos.z)) < 40) { prompt = 'S / F — SMOKE'; act = lightUp; }
     }
     if (!act) { const c = nearestParked(3.0); if (c) { prompt = 'F — STEAL CAR'; act = () => steal(c); } }
     if (!act) { const f = nearestFriendCar(3.8); if (f) { prompt = `F — HOP IN WITH ${f.name}`; act = () => enterPassenger(f.id); } }
@@ -210,11 +213,32 @@ function onRemoteRed(m) {
 // ---- Igor -------------------------------------------------------------------------------------------------------------------
 function buyIgor() {
   const { ctx } = H;
+  if (H.item) { ctx.hud?.toast?.(`IGOR: "Finish what you got first." (B to use)`, 2200); return; }
   if (H.cash < PRICE) { ctx.hud?.toast?.('IGOR: "No money, no honey."', 2200); return; }
-  H.cash -= PRICE; H.stash = 1; renderCash();
-  ctx.hud?.toast?.('IGOR: "Ten bucks. Go up top, the view is crazy."', 2600);
+  H.cash -= PRICE; H.item = (H.buys++ % 2 === 0) ? 'weed' : 'bottle'; H.stash = 1; renderCash();
+  ctx.hud?.toast?.(H.item === 'weed' ? 'IGOR: "Ten bucks. B to blaze — pass it around."' : 'IGOR: "Here, a bottle. B to drink — share with the boys."', 2800);
   try { ctx.audio?.play?.('ui_click'); } catch {}
   ctx.net?.send?.('igor');
+}
+
+/** B: use what you hold, anywhere. Weed = lifted/blurry (~2.5 min), bottle = drowsy/heavy (~2 min); friends within a few metres share it. */
+function useItem() {
+  const { ctx } = H; if (!H.item) { ctx.hud?.toast?.('Nothing on you — see Igor ($10)', 1600); return; }
+  const it = H.item; H.item = null; H.stash = 0; renderCash();
+  if (it === 'weed') return lightUp();
+  drink(true);
+}
+function drink(mine) {
+  const { ctx } = H; H.drunk = Math.min(1, (H.drunk || 0) + 0.55); H.drunkT = 120;
+  if (mine) {
+    const p = ctx.player.position; ctx.net?.send?.('drink', { p: [+p.x.toFixed(2), +(p.y + 1.5).toFixed(2), +p.z.toFixed(2)] });
+    ctx.hud?.toast?.('*glug glug*', 1400);
+    if (!H.bottle) { const g = new THREE.Group(); const glass = new THREE.MeshPhysicalMaterial({ color: 0x5a3a12, roughness: 0.1, transparent: true, opacity: 0.8 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 12), glass); g.add(body); const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.016, 0.07, 10), glass); neck.position.y = 0.1; g.add(neck);
+      const label = new THREE.Mesh(new THREE.CylinderGeometry(0.0305, 0.0305, 0.05, 12), new THREE.MeshStandardMaterial({ color: 0xe8dcc0 })); g.add(label); g.position.set(0.1, -0.12, -0.3); g.rotation.set(0.9, 0, -0.3); H.bottle = g; }
+    ctx.camera.add(H.bottle); H.bottle.visible = true; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = false;
+    clearTimeout(H.bottleT); H.bottleT = setTimeout(() => { H.bottle.visible = false; if (ctx.weapons?.viewmodel && H.smokeT <= 0) ctx.weapons.viewmodel.visible = true; }, 2600);
+  }
 }
 
 // ---- elevators ----------------------------------------------------------------------------------------------------------------
@@ -278,11 +302,15 @@ function updateJoint(dt) {
 function updateHigh(dt) {
   const { ctx } = H; const cv = ctx.canvas; if (!cv) return;
   if (H.highT > 0) { H.highT -= dt; if (H.highT < 40) H.high = Math.max(0, H.high - dt / 40); }
-  const k = H.high;
-  if (k <= 0.001) { if (cv.style.filter) { cv.style.filter = ''; cv.style.transform = ''; } return; }
+  if (H.drunkT > 0) { H.drunkT -= dt; if (H.drunkT < 30) H.drunk = Math.max(0, H.drunk - dt / 30); } else H.drunk = 0;
+  const k = H.high, d = H.drunk || 0;
+  if (k <= 0.001 && d <= 0.001) { if (cv.style.filter) { cv.style.filter = ''; cv.style.transform = ''; } return; }
   const t = performance.now() / 1000;
-  cv.style.filter = `blur(${(2.6 * k).toFixed(2)}px) saturate(${(1 + 0.45 * k).toFixed(2)}) contrast(${(1 - 0.06 * k).toFixed(3)}) hue-rotate(${(Math.sin(t * 0.3) * 8 * k).toFixed(1)}deg)`;
-  cv.style.transform = `rotate(${(Math.sin(t * 0.55) * 0.8 * k).toFixed(3)}deg) scale(${(1 + 0.025 * k + Math.sin(t * 0.9) * 0.006 * k).toFixed(4)})`;
+  // weed: soft blur, saturated, slow hue drift + gentle wobble · bottle: heavy-lidded (darker, desaturated), double vision, big slow sway
+  const blur = 2.6 * k + 1.6 * d * (0.6 + 0.4 * Math.sin(t * 0.7));
+  const ghost = d > 0.05 ? ` drop-shadow(${(9 * d * Math.sin(t * 0.9)).toFixed(1)}px ${(3 * d).toFixed(1)}px 0 rgba(255,255,255,${(0.25 * d).toFixed(2)}))` : '';
+  cv.style.filter = `blur(${blur.toFixed(2)}px) saturate(${(1 + 0.45 * k - 0.35 * d).toFixed(2)}) brightness(${(1 - 0.22 * d * (0.7 + 0.3 * Math.sin(t * 0.4))).toFixed(2)}) contrast(${(1 - 0.06 * k).toFixed(3)}) hue-rotate(${(Math.sin(t * 0.3) * 8 * k).toFixed(1)}deg)${ghost}`;
+  cv.style.transform = `rotate(${(Math.sin(t * 0.55) * 0.8 * k + Math.sin(t * 0.33) * 2.4 * d).toFixed(3)}deg) scale(${(1 + 0.025 * k + 0.03 * d + Math.sin(t * 0.9) * 0.006 * (k + d)).toFixed(4)}) translateY(${(Math.sin(t * 0.5) * 6 * d).toFixed(1)}px)`;
 }
 function buildPuffs(world) {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(235,235,230,0.55)'); gr.addColorStop(1, 'rgba(235,235,230,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
@@ -352,12 +380,19 @@ function buildUI() {
   const cash = document.createElement('div'); cash.className = 'hgcash'; document.body.appendChild(cash);
   const fade = document.createElement('div'); fade.className = 'hgfade'; document.body.appendChild(fade);
   const floor = document.createElement('div'); floor.className = 'hgfloor'; document.body.appendChild(floor);
-  H.ui = { cash, fade, floor }; renderCash();
+  const use = document.createElement('button'); use.textContent = 'USE'; use.style.cssText = 'position:fixed;left:18px;bottom:130px;z-index:46;display:none;padding:12px 18px;font:700 16px Barlow Condensed,Arial;letter-spacing:.12em;color:#fff;background:rgba(40,120,60,.8);border:1px solid rgba(255,255,255,.4);border-radius:6px';
+  use.addEventListener('touchstart', (e) => { e.preventDefault(); useItem(); }, { passive: false }); use.addEventListener('click', (e) => { e.stopPropagation(); useItem(); }); document.body.appendChild(use);
+  // controls card: shown for 14 s on first spawn, H toggles
+  const help = document.createElement('div'); help.style.cssText = 'position:fixed;right:14px;top:60px;z-index:44;background:rgba(8,10,14,.78);border-left:2px solid #ffb24a;color:#e8edf2;font:500 13px Barlow,Arial;padding:10px 14px;line-height:1.55;pointer-events:none;max-width:260px';
+  help.innerHTML = '<b style="letter-spacing:.14em;font-family:Barlow Condensed">CONEY — CONTROLS (H)</b><br>F · talk to Igor / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>V · car/bike camera · Space · handbrake<br>Tab · scoreboard · Esc · menu<br>Roof: stairs at the end of the 19th-floor lobby';
+  document.body.appendChild(help); setTimeout(() => { help.style.display = 'none'; }, 14000);
+  addEventListener('keydown', (e) => { if (e.code === 'KeyH' && !e.repeat) help.style.display = help.style.display === 'none' ? 'block' : 'none'; });
+  H.ui = { cash, fade, floor, use, help }; renderCash();
 }
-function renderCash() { if (H?.ui) H.ui.cash.textContent = `$${H.cash}${H.stash ? '  ·  🌿' : ''}`; }
+function renderCash() { if (!H?.ui) return; H.ui.cash.textContent = `$${H.cash}${H.item === 'weed' ? '  ·  🌿 (B)' : H.item === 'bottle' ? '  ·  🍾 (B)' : ''}`; if (H.ui.use) H.ui.use.style.display = H.item ? 'block' : 'none'; }
 
 /** QA hooks (window.__game.hangout) */
 export const hangoutQA = {
-  state: () => H && { cash: H.cash, stash: H.stash, high: +H.high.toFixed(2), riding: !!H.riding, passenger: !!H.passenger, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()) },
-  buy: () => buyIgor(), light: () => lightUp(), ride: (dir = 'up', k = 0) => callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; },
+  state: () => H && { cash: H.cash, stash: H.stash, item: H.item, drunk: +(H.drunk || 0).toFixed(2), high: +H.high.toFixed(2), riding: !!H.riding, passenger: !!H.passenger, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()) },
+  buy: () => buyIgor(), use: () => useItem(), light: () => lightUp(), ride: (dir = 'up', k = 0) => callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; },
 };
