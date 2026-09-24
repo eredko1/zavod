@@ -14,20 +14,26 @@ import { placeCars } from '../carkit.js';
 export function buildCity(world, M) {
   const { scene, ctx, R } = world;
   const G = new Batch(world, M, 'cityGround'), S = new Batch(world, M, 'city'), F = new Batch(world, M, 'cityFar');
+  // ground layers sit mm apart (visual only; the walk collider is the base slab). From the 19th floor (~50 m up, near 0.03)
+  // the depth buffer can't resolve 5 mm at 100 m+ and roads/curbs/lots z-fought — "pulsating" streets as the camera swayed.
+  // Each layer gets its own merged mesh and a per-draw polygon offset rank (higher = drawn on top) instead of relying on y.
+  const L = [1, 2, 3, 4, 5, 6, 7].map((r) => Object.assign(new Batch(world, M, 'cityGround' + r), { rank: r }));
+  const [Lpark, Llot, Lpitch, Lcurb, Lroad, Lpath, Lpaint] = L;
   // ---- base ground north of the boardwalk: concrete sidewalk everywhere, streets and plots on top -----------------------
   G.add('concretePav', boxGeo([-1000, -0.2, -1000], [900, 0.0, BW.z0]), { uvScale: 1 / 3 });
   world.box([-1000, -1, -1000], [900, 0, BW.z0]);
-  for (const p of OSM.pk) G.poly('grass', p, 0.015);
-  for (const p of OSM.l) G.poly('asphalt', p, 0.02);
-  for (const o of OSM.pt) { G.poly(/baseball|softball/.test(o.sport) ? 'grass' : /basketball|handball|tennis/.test(o.sport) ? 'asphalt' : 'grass', o.p, 0.025); }
+  for (const p of OSM.pk) Lpark.poly('grass', p, 0.015);
+  for (const p of OSM.l) Llot.poly('asphalt', p, 0.02);
+  for (const o of OSM.pt) { Lpitch.poly(/baseball|softball/.test(o.sport) ? 'grass' : /basketball|handball|tennis/.test(o.sport) ? 'asphalt' : 'grass', o.p, 0.025); }
   for (const r of OSM.r) {
-    const a = ribbon(r.p, r.w, 0.035); if (a) G.add('asphalt', a, { uvScale: 1 / 6 });
-    const c = ribbon(r.p, r.w + 0.5, 0.03); if (c) G.add('curb', c, { uvScale: 0.5 });
-    if (r.w >= 14) { const y1 = ribbonOffset(r.p, -0.18, 0.18, 0.04), y2 = ribbonOffset(r.p, 0.18, 0.18, 0.04); if (y1) G.add('paintY', y1, { uv: false }); if (y2) G.add('paintY', y2, { uv: false }); }
-    else if (r.w >= 9) walk(r.p, 6, (x, z, dx, dz) => { const d = boxGeo([-0.06, 0.04, -1.5], [0.06, 0.045, 1.5]); d.rotateY(Math.atan2(dx, dz)); d.translate(x, 0, z); G.add('paint', d, { uv: false }); });
+    const a = ribbon(r.p, r.w, 0.035); if (a) Lroad.add('asphalt', a, { uvScale: 1 / 6 });
+    const c = ribbon(r.p, r.w + 0.5, 0.03); if (c) Lcurb.add('curb', c, { uvScale: 0.5 });
+    if (r.w >= 14) { const y1 = ribbonOffset(r.p, -0.18, 0.18, 0.04), y2 = ribbonOffset(r.p, 0.18, 0.18, 0.04); if (y1) Lpaint.add('paintY', y1, { uv: false }); if (y2) Lpaint.add('paintY', y2, { uv: false }); }
+    else if (r.w >= 9) walk(r.p, 6, (x, z, dx, dz) => { const d = boxGeo([-0.06, 0.04, -1.5], [0.06, 0.045, 1.5]); d.rotateY(Math.atan2(dx, dz)); d.translate(x, 0, z); Lpaint.add('paint', d, { uv: false }); });
   }
-  for (const w of OSM.w) { const g = ribbon(w.p, w.w, 0.045); if (g) G.add(w.s ? 'concreteGrey' : 'concretePav', g, { uvScale: 1 / 3 }); }
+  for (const w of OSM.w) { const g = ribbon(w.p, w.w, 0.045); if (g) Lpath.add(w.s ? 'concreteGrey' : 'concretePav', g, { uvScale: 1 / 3 }); }
   G.flush({ shadow: false });
+  for (const B of L) for (const m of B.flush({ shadow: false })) groundBias(m, B.rank);
 
   // ---- buildings ----------------------------------------------------------------------------------------------------
   const inPlay = (b) => b.play;
@@ -267,7 +273,7 @@ function streetKit(world, M) {
     const bk = boxGeo([-0.23, 2.22, 0.02], [0.23, 2.68, 0.03]); bk.rotateY(a); bk.translate(x, 0, z); K.add('galv', bk, { uv: false });
     world.box([x - 0.06, 0, z - 0.06], [x + 0.06, 2.9, z + 0.06]);
   });
-  K.flush({ shadow: true });
+  for (const m of K.flush({ shadow: true })) if (m.name === 'surfKit:paint') groundBias(m, 8);
 }
 
 /** Elevated subway: bents (two columns + cap girder) every 12 m, plate girders, two stringers, floor beams every 3 m (in play),
@@ -297,4 +303,12 @@ function viaducts(world, M) {
     }
   }
   V.flush({ shadow: true });
+}
+
+// Per-draw polygon offset for stacked ground layers: materials are shared (day/night + wetness tweak them), so the offset is
+// set just before this mesh draws and restored after instead of cloning. rank 1..n pulls the layer toward the camera.
+export function groundBias(mesh, rank) {
+  let prev = null;
+  mesh.onBeforeRender = (_r, _s, _c, _g, m) => { prev = [m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits]; m.polygonOffset = true; m.polygonOffsetFactor = -rank; m.polygonOffsetUnits = -2 * rank; };
+  mesh.onAfterRender = (_r, _s, _c, _g, m) => { if (prev) [m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits] = prev; };
 }
