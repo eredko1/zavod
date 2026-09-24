@@ -18,6 +18,7 @@ let H = null;
 export function buildHangout(world, M) {
   const { ctx, W } = world; const towers = world.lunaTowers || [];
   if (!towers.length) return;
+  W.lunaTowers = towers;   // exposed on ctx.world for QA / other modules
   // building 2 = the complex nearest the OSM centroid of "Luna Park Houses 2"
   let b2 = towers[0]; for (const t of towers) if (t.centre.distanceTo(B2) < b2.centre.distanceTo(B2)) b2 = t;
   const free = (v) => !ctx.colliders.some((b) => v.x > b.min.x - 0.4 && v.x < b.max.x + 0.4 && v.z > b.min.z - 0.4 && v.z < b.max.z + 0.4 && b.max.y > 0.3 && b.min.y < 1.8);

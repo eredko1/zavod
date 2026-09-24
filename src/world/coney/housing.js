@@ -275,7 +275,7 @@ class Local {
     this.quad(key, [c[0] - rx, y0, c[2] - rz], [c[0] + rx, y0, c[2] + rz], [c[0] + rx, y1, c[2] + rz], [c[0] - rx, y1, c[2] - rz], [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]);
   }
   box(key, min, max, { uvScale = null, collide = true } = {}) { this.boxes.push([key, min, max, uvScale]); if (collide) this.cols.push([min, max]); }
-  collide(min, max) { this.cols.push([min, max]); }
+  collide(min, max, cell) { this.cols.push([min, max, cell]); }   // cell: optional finer split (rotated towers: tight AABBs around narrow openings)
   emit(B, M, m, world, cell = 4) {
     for (const [key, A] of this.q) {
       if (!A.p.length) continue;
@@ -284,8 +284,8 @@ class Local {
     }
     for (const [key, min, max, s] of this.boxes) { const g = boxGeo(min, max); worldUV(g, s ?? (M.uvScale[key] ?? 0.5)); g.applyMatrix4(m); B.add(key, g, { uv: false }); }
     const v = new THREE.Vector3();
-    for (const [mn, mx] of this.cols) {
-      const nx = Math.max(1, Math.ceil((mx[0] - mn[0]) / cell)), nz = Math.max(1, Math.ceil((mx[2] - mn[2]) / cell));
+    for (const [mn, mx, cc] of this.cols) {
+      const ce = cc || cell; const nx = Math.max(1, Math.ceil((mx[0] - mn[0]) / ce)), nz = Math.max(1, Math.ceil((mx[2] - mn[2]) / ce));
       const sx = (mx[0] - mn[0]) / nx, sz = (mx[2] - mn[2]) / nz;
       for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
         let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
@@ -511,7 +511,7 @@ function buildTower(L, parts, R, acs, m) {
       }
     }
     // roof: deck, dark coping, guard railing (skipping edges against taller neighbours), bulkheads
-    L.box('hRoof', [p.x0, Ht - 0.12, p.z0], [p.x1, Ht - 0.02, p.z1], { collide: false });
+    if (p.kind !== 'core') L.box('hRoof', [p.x0, Ht - 0.12, p.z0], [p.x1, Ht - 0.02, p.z1], { collide: false });   // the core's deck has the stair opening (coreInterior)
     if (p.kind === 'core') core = coreInterior(L, p, Ht); else L.collide([p.x0, 0, p.z0], [p.x1, Ht, p.z1]);
     const cp = 0.07;
     for (const [mn, mx] of [[[p.x0 - cp, Ht - 0.22, p.z0 - cp], [p.x1 + cp, Ht, p.z0 + 0.25]], [[p.x0 - cp, Ht - 0.22, p.z1 - 0.25], [p.x1 + cp, Ht, p.z1 + cp]], [[p.x0 - cp, Ht - 0.22, p.z0], [p.x0 + 0.25, Ht, p.z1]], [[p.x1 - 0.25, Ht - 0.22, p.z0], [p.x1 + cp, Ht, p.z1]]]) L.box('hRail', mn, mx, { collide: false });
@@ -664,12 +664,32 @@ function coreInterior(L, p, Ht) {
   const P3 = (a, y, c) => ax ? [a, y, c] : [c, y, a];
   const bx = (a0, y0, c0, a1, y1, c1) => { const q0 = P3(Math.min(a0, a1), y0, Math.min(c0, c1)), q1 = P3(Math.max(a0, a1), y1, Math.max(c0, c1)); return [[Math.min(q0[0], q1[0]), y0, Math.min(q0[2], q1[2])], [Math.max(q0[0], q1[0]), y1, Math.max(q0[2], q1[2])]]; };
   const col = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx); };
+  const colF = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.5); };   // fine cells next to narrow openings
   const vis = (key, ...v) => { const [mn, mx] = bx(...v); L.box(key, mn, mx, { collide: false }); };
   const mid = (A[0] + A[1]) / 2, i0 = C[0] + GAL, i1 = C[1] - GAL;
   const yF = (Math.min(19, p.floors) - 1) * ST, CEIL = 2.55;
   // solids: everything above the ground floor except the 19th-floor elevator lobby, and the ground floor beyond the lobby
-  col(A[0], ST, i0, A[1], yF, i1); col(A[0], yF + CEIL, i0, A[1], Ht, i1);
-  col(A[0], yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); col(mid + LOBBY_HALF, yF, i0, A[1], yF + CEIL, i1);
+  // roof stair: from the 19th-floor lobby's far end straight up through the core to a brick bulkhead on the roof
+  const cm = (i0 + i1) / 2, SW = 0.75, sc0 = cm - SW, sc1 = cm + SW, nSt = Math.max(2, Math.ceil((Ht - yF) / 0.27)), rise = (Ht - yF) / nSt, tread = 0.3;   // rise <= 0.27 m: comfortably under the player step-up (0.45)
+  const sa0 = mid + LOBBY_HALF, sf = sa0 + 0.9, sa1 = sf + nSt * tread + 0.9;   // door landing, flight, top landing   // + a top landing
+  col(A[0], ST, i0, A[1], yF, i1);
+  col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sa1, yF, i0, A[1], Ht, i1); colF(sa0, yF, i0, sa1, Ht, sc0); colF(sa0, yF, sc1, sa1, Ht, i1);
+  colF(sa0, yF + 2.2, sc0, sa0 + 0.3, Ht, sc1);   // lobby-side header over the stair door
+  col(A[0], yF, i0, mid - LOBBY_HALF, yF + CEIL, i1);
+  for (let k = 0; k < nSt; k++) colF(sf + k * tread, yF, sc0, sa1, yF + (k + 1) * rise, sc1);
+  // roof deck (visual + a full-footprint collider around the stair opening) and a 2 m guard inside the parapet rail
+  for (const [a0, a1, c0, c1] of [[A[0], sa0, C[0], C[1]], [sa1, A[1], C[0], C[1]], [sa0, sa1, C[0], sc0 - 0.2], [sa0, sa1, sc1 + 0.2, C[1]]]) { colF(a0, Ht - 0.3, c0, a1, Ht, c1); vis("hRoof", a0, Ht - 0.12, c0, a1, Ht - 0.02, c1); }
+  for (const [a0, a1, c0, c1] of [[A[0], A[1], C[0], C[0] + 0.4], [A[0], A[1], C[1] - 0.4, C[1]], [A[0], A[0] + 0.4, C[0], C[1]], [A[1] - 0.4, A[1], C[0], C[1]]]) col(a0, Ht, c0, a1, Ht + 2.0, c1);
+  // stair: terrazzo treads, tile side walls, the bulkhead (walls, roof, door frame facing +a) with a ceiling light
+  for (let k = 0; k < nSt; k++) vis('hTerrazzo', sf + k * tread, yF + k * rise, sc0, sa1, yF + (k + 1) * rise, sc1);
+  for (const c of [sc0, sc1]) vis('hLobbyWall', sa0, yF, c - 0.03, sa1, Ht, c + 0.03);
+  vis('hLobbyWall', sa0, yF + 2.2, sc0, sa0 + 0.3, Ht, sc1);
+  { const BH = 2.5; colF(sa0 - 0.25, Ht, sc0 - 0.25, sa1, Ht + BH, sc0); colF(sa0 - 0.25, Ht, sc1, sa1, Ht + BH, sc1 + 0.25); colF(sa0 - 0.25, Ht, sc0, sa0, Ht + BH, sc1);
+    vis('hBrickPlain', sa0 - 0.25, Ht - 0.02, sc0 - 0.25, sa1, Ht + BH, sc0); vis('hBrickPlain', sa0 - 0.25, Ht - 0.02, sc1, sa1, Ht + BH, sc1 + 0.25); vis('hBrickPlain', sa0 - 0.25, Ht - 0.02, sc0, sa0, Ht + BH, sc1);
+    vis('hRail', sa0 - 0.35, Ht + BH, sc0 - 0.35, sa1 + 0.1, Ht + BH + 0.15, sc1 + 0.35); colF(sa0 - 0.25, Ht + BH, sc0 - 0.25, sa1, Ht + BH + 0.15, sc1 + 0.25);
+    vis('hBrickPlain', sa1 - 0.1, Ht + 2.2, sc0, sa1, Ht + BH, sc1);   // door head
+    for (const c of [sc0 + 0.04, sc1 - 0.04]) vis('hRail', sa1 - 0.08, Ht, c - 0.04, sa1, Ht + 2.2, c + 0.04);
+    vis('hLobbyCeil', sa0 + 1.2, Ht + BH - 0.06, cm - 0.25, sa0 + 1.8, Ht + BH - 0.02, cm + 0.25); vis('hLobbyCeil', sa0 + 1.4, yF + CEIL - 0.05, cm - 0.2, sa0 + 1.9, yF + CEIL - 0.02, cm + 0.2); }
   col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1); col(mid + LOBBY_HALF, 0, i0, A[1], ST, i1);
   // lobby glass walls (colliders) with the entrance gaps
   for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + LOBBY_HALF, ST, c + 0.06); }
@@ -703,9 +723,10 @@ function coreInterior(L, p, Ht) {
   vis('hLobbyFloor', mid - LOBBY_HALF, yF, i0, mid + LOBBY_HALF, yF + 0.03, i1);
   vis('hLobbyCeiling', mid - LOBBY_HALF, yF + CEIL - 0.02, i0, mid + LOBBY_HALF, yF + CEIL, i1);
   for (let a = mid - LOBBY_HALF + 1.6; a < mid + LOBBY_HALF - 1; a += 2.8) vis('hLobbyCeil', a - 0.6, yF + CEIL - 0.05, (i0 + i1) / 2 - 0.3, a + 0.6, yF + CEIL - 0.02, (i0 + i1) / 2 + 0.3);
-  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
+  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF, sc1, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
+  for (const c of [sc0, sc1]) vis('hRail', mid + LOBBY_HALF - 0.04, yF, c - 0.05, mid + LOBBY_HALF + 0.06, yF + 2.2, c + 0.05); vis('hRail', mid + LOBBY_HALF - 0.04, yF + 2.15, sc0, mid + LOBBY_HALF + 0.06, yF + 2.22, sc1);   // stair door frame
   bank(yF);
-  L.sign('hFloor19', P3(mid + LOBBY_HALF - 0.02, yF + 1.55, (i0 + i1) / 2), nrmA(-1), 1.1, 1.1);                  // "19" on the far end wall
+  L.sign('hFloor19', P3(mid + LOBBY_HALF - 0.02, yF + 1.55, (sc1 + i1) / 2), nrmA(-1), 0.8, 0.8);                  // "19" on the far end wall, beside the roof stair
   vis('hDoor', mid + LOBBY_HALF - 0.04, yF + 0.03, i0 + 0.35, mid + LOBBY_HALF, yF + 1.3, i0 + 0.95);             // compactor-chute hatch
   const walks = [];
   for (const [cOut, cIn, sg] of [[C[0], i0, 1], [C[1], i1, -1]]) {
@@ -737,7 +758,7 @@ function coreInterior(L, p, Ht) {
     walks.push({ cOut, cIn, sg });
   }
   const topCars = cars.map((cc) => ({ a: mid - LOBBY_HALF + 1.1, c: cc }));
-  return { ax, A, C, mid, i0, i1, cars, topCars, yF, walks, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF, open: OPEN };
+  return { ax, A, C, mid, i0, i1, cars, topCars, yF, walks, roof: { y: Ht, a: sa1 + 1.2, c: cm }, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF, open: OPEN };
 }
 
 /** World-space registry entry for one complex (used by coney/hangout.js). */
@@ -759,5 +780,7 @@ function towerInfo(core, m, centre) {
     view: { pos: toWorld(core.mid, core.yF, w.cOut + w.sg * 0.6), yaw: yawOf(ec.clone().multiplyScalar(-w.sg)) },
     walk: { a0: toWorld(core.mid - core.walkHalf + 0.6, core.yF, w.cOut + w.sg * 0.85), a1: toWorld(core.mid + core.walkHalf - 0.6, core.yF, w.cOut + w.sg * 0.85) },
   }));
-  return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, toWorld, core };
+  // roof: the stair foot in the 19th-floor lobby (facing up the flight) and the roof spot outside the bulkhead door
+  const roof = { foot: { pos: toWorld(core.mid + core.lobbyHalf - 0.8, core.yF, core.roof.c), yaw: yawOf(ea.clone()) }, top: { pos: toWorld(core.roof.a, core.roof.y, core.roof.c), yaw: yawOf(ea.clone()) } };
+  return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, roof, toWorld, core };
 }
