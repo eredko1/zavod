@@ -6,6 +6,7 @@ import { loadedTextures } from '../wsp/textures.js';
 import { buildSky } from '../wsp/sky.js';
 import { buildGround, groundHeight } from '../wsp/ground.js';
 import { buildArch } from '../wsp/arch.js';
+import { buildWspHangout } from '../wsp/hangout.js';
 import { buildBuildings } from '../wsp/buildings.js';
 import { buildFurniture } from '../wsp/furniture.js';
 import { buildTrees } from '../wsp/trees.js';
@@ -65,6 +66,7 @@ export function build(world) {
   ];
   // online: meet on the fountain plaza's south rim (arch straight ahead); big open park — default wave ring
   W.onlineStart = [-8, 0, 22, -0.3];
+  try { buildWspHangout(world); } catch (e) { console.warn('[wsp] hangout', e); }
   W.waveTuning = { near: 26, far: 72, gap: 20, size: 1, maxAlive: 14, respawnMax: 170 };
   W.poses = {
     spawn: [-13, 0, 80, 0.05, 0.0],

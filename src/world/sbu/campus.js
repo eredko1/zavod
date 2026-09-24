@@ -80,7 +80,8 @@ export function buildCampus(world, M) {
   }
   const nearCam = cars.filter((c) => c.x > PLAY.x0 - 60 && c.x < PLAY.x1 + 60 && c.z > PLAY.z0 - 60 && c.z < PLAY.z1 + 60);
   placeCars(world, cars, { raycast: false });
-  for (const c of nearCam) { const ax = Math.abs(Math.sin(c.ry)) > 0.5; const hx = ax ? 2.4 : 1.0, hz = ax ? 1.0 : 2.4; world.box([c.x - hx, 0, c.z - hz], [c.x + hx, 1.5, c.z + hz]); if (R() < 0.15) world.cover(c.x + (ax ? 0 : 1.6), c.z + (ax ? 1.6 : 0), ax ? 0 : 1, ax ? 1 : 0); }
+  // c.box: stealing a car removes its collider
+  for (const c of nearCam) { const ax = Math.abs(Math.sin(c.ry)) > 0.5; const hx = ax ? 2.4 : 1.0, hz = ax ? 1.0 : 2.4; c.box = world.box([c.x - hx, 0, c.z - hz], [c.x + hx, 1.5, c.z + hz]); if (R() < 0.15) world.cover(c.x + (ax ? 0 : 1.6), c.z + (ax ? 1.6 : 0), ax ? 0 : 1, ax ? 1 : 0); }
 
   // ---- buildings ----------------------------------------------------------------------------------------------------
   let nBld = 0;

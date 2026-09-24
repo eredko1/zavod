@@ -47,10 +47,14 @@ const api = {
   useItem: () => useItem(), callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
   nearestParked: (r) => nearestParked(r), endRide: (f) => endRide(f), leavePassenger: () => leavePassenger(), pickRespawn: () => pickRespawn(),
   openDialog: (name, node) => openDialog(name, node), closeDialog: () => closeDialog(), choose: (i) => choose(i), dropCash: (at, n) => dropCash(at, n),
+  /** QA: where the interaction points are */
+  points: () => V && { shafts: V.shafts.map((t) => ({ kind: t.kind, label: t.label, lobby: t.lobby.cars.map((c) => c.pos.toArray()), top: t.tops[0].cars.map((c) => c.pos.toArray()) })), vendors: V.vendors.map((v) => ({ name: v.name, pos: v.pos.toArray() })), cars: (V.world.parkedCars || []).filter((c) => !c.gone).length, start: V.world.W?.onlineStart },
   state: () => V && { cash: V.cash, inv: V.inv.slice(), item: V.inv[V.inv.length - 1] || null, drunk: +(V.drunk || 0).toFixed(2), high: +V.high.toFixed(2), riding: !!V.riding, passenger: !!V.passenger,
     dialog: V.dialog ? { name: V.dialog.name, text: V.dialog.node.text, choices: (V.dialog.node.choices || []).map((c) => c.label) } : null, drops: V.drops.map((d) => [+d.pos.x.toFixed(1), +d.pos.y.toFixed(1), +d.pos.z.toFixed(1), d.n]) },
 };
 export const hangkit = api;
+/** generic QA hook for maps without their own (window.__game.hangout) */
+export const kitQA = { state: () => ({ ...api.state(), ...api.points() }), ride: (i, dir = 'up', k = 0) => callElevator(i, k, dir), choose: (i) => choose(i), close: () => closeDialog(), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; }, give: (n) => api.earn(n), use: () => useItem() };
 
 // bus handlers live for the page (the world may be rebuilt); they always act on the current V
 function bindOnce(ctx) {

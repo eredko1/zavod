@@ -215,3 +215,67 @@ export function rastaTalk(vendorName = 'RAS') {
     ],
   });
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
+/** First free 8.5 × 13 m footprint (storefront + 2 m of sidewalk) near any candidate { x, z, yaw } (local +z = into the store),
+ *  searching outward up to `reach` m along the frontage and back from it; on maps with a ground mask (world.maskSample) the
+ *  store must stand on sidewalk / paving (never road or lawn) with a road just outside its door. Falls back to scanning the
+ *  whole playable area. Returns { x, z, yaw } or null. */
+export function findDeliSpot(world, candidates, reach = 40, { exclude = [] } = {}) {
+  const cols = world.ctx.colliders.filter((b) => !(b.max.y <= 1.6 && b.max.x - b.min.x < 5.2 && b.max.z - b.min.z < 5.2));   // parked cars move out of the way
+  const V = world.maskSample;
+  const out = (x, z) => exclude.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+  const clear = (fx, fz, yaw) => { const s = Math.sin(yaw), c = Math.cos(yaw);   // local x → (c, -s), local z → (s, c)
+    for (const [a, d] of [[-4.6, -2], [4.6, -2], [-4.6, 11.6], [4.6, 11.6], [0, 5]]) if (out(fx + c * a + s * d, fz - s * a + c * d)) return false;
+    if (V) {   // cheap mask pass first: a road right outside the door, sidewalk / paving under the whole store
+      let road = 0; for (let a = -3; a <= 3; a += 1.5) if (V(fx + c * a - s * 6, fz - s * a - c * 6) === 'asphalt') road++; if (road < 3) return false;
+      for (let a = -4.6; a <= 4.6; a += 1.15) for (let d = 0; d <= 11.6; d += 1.15) { const m = V(fx + c * a + s * d, fz - s * a + c * d); if (m === 'asphalt' || m === 'lawn') return false; }
+    }
+    for (let a = -4.6; a <= 4.6; a += 0.8) for (let d = -2.2; d <= 11.6; d += 0.8) { const x = fx + c * a + s * d, z = fz - s * a + c * d;
+      if (cols.some((b) => x > b.min.x && x < b.max.x && z > b.min.z && z < b.max.z && b.max.y > 0.4 && b.min.y < 3)) return false;
+      const g = world.groundHeight ? world.groundHeight(x, z) : 0; if (Number.isFinite(g) && Math.abs(g) > 0.35) return false; }
+    return true; };
+  const bump = (x, z, yaw) => {   // parked cars on the footprint / in front of the door go
+    const s = Math.sin(yaw), c = Math.cos(yaw);
+    for (const car of world.parkedCars || []) { if (car.gone) continue; const dx = car.x - x, dz = car.z - z, la = dx * c - dz * s, ld = dx * s + dz * c; if (Math.abs(la) < 6 && ld > -4 && ld < 13) { hideCar(world, car); } } };
+  for (const cand of candidates) {
+    const s = Math.sin(cand.yaw), c = Math.cos(cand.yaw);
+    for (let r = 0; r <= reach; r += 2) for (const sgn of r ? [1, -1] : [1]) for (const back of [0, 3, -3, 6]) {
+      const x = cand.x + c * r * sgn + s * back, z = cand.z - s * r * sgn + c * back;
+      if (clear(x, z, cand.yaw)) { bump(x, z, cand.yaw); return { x, z, yaw: cand.yaw }; }
+    }
+  }
+  // fallback: every valid frontage on the map, nearest to where friends meet wins
+  const B = world.W?.bounds; if (!B) return null; const [mx, , mz] = world.W.onlineStart || [0, 0, 0]; let best = null, bd = Infinity;
+  for (const yaw of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) for (let x = B.min.x + 10; x < B.max.x - 10; x += 2) for (let z = B.min.z + 10; z < B.max.z - 10; z += 2) {
+    const d = Math.hypot(x - mx, z - mz); if (d < bd && clear(x, z, yaw)) { bd = d; best = { x, z, yaw }; } }
+  if (best) bump(best.x, best.z, best.yaw);
+  return best;
+}
+function hideCar(world, car) { car.gone = true; for (const { im, i } of car.refs || []) { im.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0)); im.instanceMatrix.needsUpdate = true; } if (car.box) { const k = world.ctx.colliders.indexOf(car.box); if (k > -1) world.ctx.colliders.splice(k, 1); } }
+
+/** A vendor who walks a loop of waypoints (stops and turns to face anyone who comes close). Registers with the hangkit. */
+export function buildWalker(world, K, o) {
+  const f = buildFigure({ skin: o.skin ?? 0x5a3a28, hair: 0x1a120c, beard: true, beardColor: 0x1a120c, tam: !!o.tam, shirt: o.shirt ?? 0x6b7a3a, pants: o.pants ?? 0x4a4236, shoe: 0x6a5238, belly: 0.1, shortSleeve: true });
+  const tag = nameTag(o.name); tag.position.set(0, 2.15, 0); f.group.add(tag);
+  world.scene.add(f.group);
+  const path = o.path.map(([x, z]) => new THREE.Vector3(x, 0, z)); let i = 0, seg = 1;
+  const pos = path[0].clone(); f.group.position.copy(pos);
+  const vendor = K.vendor({ name: o.name, pos, r: 2.4, talk: o.talk });
+  const gy = (x, z) => { const g = world.groundHeight ? world.groundHeight(x, z) : 0; return Number.isFinite(g) ? g : 0; };
+  let wait = 0, yaw = 0;
+  K.onUpdate((dt) => {
+    const ctx = world.ctx; const me = ctx.player?.position; let near = me && Math.hypot(me.x - pos.x, me.z - pos.z) < 4 ? me : null;
+    if (!near && ctx.net?.list) for (const id of ctx.net.list()) { const q = ctx.net.peer(id); if (q?.pos && Math.hypot(q.pos.x - pos.x, q.pos.z - pos.z) < 3.5) { near = q.pos; break; } }
+    let speed = 0;
+    if (near) { const want = Math.atan2(near.x - pos.x, near.z - pos.z); let d = want - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); yaw += d * Math.min(1, dt * 5); }
+    else if (wait > 0) wait -= dt;
+    else {
+      const tgt = path[i]; const dx = tgt.x - pos.x, dz = tgt.z - pos.z, L = Math.hypot(dx, dz);
+      if (L < 0.4) { i += seg; if (i >= path.length || i < 0) { seg = -seg; i += 2 * seg; } if (Math.random() < 0.35) wait = 2 + Math.random() * 4; }
+      else { speed = o.speed ?? 1.05; const k = Math.min(L, speed * dt) / L; pos.x += dx * k; pos.z += dz * k; const want = Math.atan2(dx, dz); let d = want - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); yaw += d * Math.min(1, dt * 6); }
+    }
+    pos.y = gy(pos.x, pos.z); f.group.position.copy(pos); f.group.rotation.y = yaw; f.update(dt, speed);
+  });
+  return vendor;
+}
