@@ -63,14 +63,21 @@ export function install(ctx, opts) {
   if (ctx.isTouch) document.body.classList.add('zvtouch');
   U = { ctx, opts, badge: null, board: null, room: null, over: null, act: null, boardShown: false, boardHtml: '', lastStatus: '' };
   // "Play online" in the main menu → our overlay (hud has no case for it; it only emits the ui event)
-  ctx.bus.on('ui', (e) => { if (e?.action === 'online') openOnline(); });
+  ctx.bus.on('ui', (e) => { if (e?.action === 'online' || e?.action === 'friends') openOnline(); });
+  // switching map from the Select-map panel while in a room: the room + name ride along in the URL; tell the others
+  ctx.bus.on('ui', (e) => { const m = typeof e?.action === 'string' && e.action.startsWith('map:') ? e.action.slice(4) : null; if (m && netInfo() && m !== curMap()) announceGoto(m); });
+  // a friend switched maps → offer to follow (J or tap) for 30 s
+  ctx.bus.on('net:goto', (m) => { const id = String(m?.m || ''); if (!mapList().some((x) => x.id === id) || id === curMap()) return; const who = ctx.net?.peer?.(m.f)?.name || 'A friend'; showFollow(who, id); });
+  addEventListener('keydown', (e) => { if (e.code === 'KeyJ' && U?.follow?.id && !U.over?.classList.contains('on')) { e.preventDefault(); followNow(); } });
   // the one-tap friends button: shared room 'lunapark' on Coney; asks for a name only the first time on this device
   ctx.bus.on('ui', (e) => {
     if (e?.action !== 'coney') return;
     let name = ''; try { name = cleanName(localStorage.getItem('zavod.name')); } catch {}
     if (!name) { U.forceMap = 'coney'; openOnline(); if (U.f) { U.f.room.value = 'lunapark'; U.f.upd(); } return; }
     const info = netInfo(); if (info && info.room === 'lunapark' && curMap() === 'coney') { if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
-    const u = new URL(location.href); u.search = ''; u.searchParams.set('map', 'coney'); u.searchParams.set('room', 'lunapark'); u.searchParams.set('name', name); location.href = u.toString();
+    const u = new URL(location.href); u.search = ''; u.searchParams.set('map', 'coney'); u.searchParams.set('room', 'lunapark'); u.searchParams.set('name', name);
+    if (info && curMap() !== 'coney') { announceGoto('coney'); setTimeout(() => { location.href = u.toString(); }, 400); return; }
+    location.href = u.toString();
   });
   ctx.bus.on('state', () => refresh());
   // phones: hangout F-prompts ("F — TALK TO IGOR") get a tappable button
@@ -156,14 +163,14 @@ function pickMap(id, quiet = false) {
 function buildOverlay() {
   const o = document.createElement('div'); o.className = 'zvon';
   o.innerHTML = `<div class="card wide" role="dialog" aria-label="Play online">
-    <h2>Play online</h2><div class="sub">Free-for-all + co-op waves with friends · map <b class="mp"></b></div>
+    <h2>Play with friends</h2><div class="sub">Tap a map, then Go — everyone in the same room + map plays together · <b class="mp"></b></div>
     <label>Map</label><div class="maps" role="radiogroup" aria-label="Map"></div><div class="mapd"></div>
     <label for="zv-room">Room</label><input id="zv-room" class="room" maxlength="24" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="e.g. coney-night">
     <label for="zv-name">Your name</label><input id="zv-name" class="name" maxlength="16" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="go" placeholder="callsign">
-    <div class="hint">Everyone picks the same map + room (or just opens your invite link). Letters, numbers, - and _ only.</div>
+    <div class="hint">Keep the room as <b>lunapark</b> and your friends just pick the same map — or send them the invite link. Switching maps later? Friends in your room get a “follow” button.</div>
     <div class="link"><code class="url"></code><button class="copy">Copy</button></div><div class="copied"></div>
     <div class="who"></div>
-    <div class="btns"><button class="primary join">Join room</button><button class="back">Back</button><button class="leave" style="display:none">Leave room</button></div>
+    <div class="btns"><button class="primary join">Go</button><button class="back">Back</button><button class="leave" style="display:none">Leave room</button></div>
   </div>`;
   document.body.appendChild(o);
   const q = (s) => o.querySelector(s);
@@ -194,11 +201,11 @@ export function openOnline() {
   let lastMap = ''; try { lastMap = localStorage.getItem('zavod.onlineMap') || ''; } catch {}
   const ids = mapList().map((m) => m.id);
   U.sel = U.forceMap || (info ? curMap() : ids.includes(lastMap) ? lastMap : curMap()); U.forceMap = null;
-  U.f.room.value = info?.room || lastRoom || randomRoom(U.sel);
+  U.f.room.value = info?.room || lastRoom || 'lunapark';   // one shared room by default: friends who pick the same map meet without typing anything
   U.f.name.value = info?.name || lastName || '';
   pickMap(U.sel, true);
   U.f.leave.style.display = info ? '' : 'none';
-  U.over.querySelector('.join').textContent = info ? 'Apply' : 'Join room';
+  U.over.querySelector('.join').textContent = info ? 'Go' : 'Go — play';
   U.f.copied.textContent = ''; U.f.upd(); fillWho();
   U.over.classList.add('on');
   if (document.pointerLockElement) try { document.exitPointerLock(); } catch {}
@@ -217,6 +224,24 @@ function join() {
   if (info && info.room === room && map === curMap() && (!name || name === info.name)) { closeOnline(); if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
   const u = new URL(location.href); u.searchParams.set('map', map); u.searchParams.set('room', room); u.searchParams.delete('mp'); u.searchParams.delete('pose');
   if (name) u.searchParams.set('name', name); else u.searchParams.delete('name');
+  if (info && info.room === room && map !== curMap()) { announceGoto(map); setTimeout(() => { location.href = u.toString(); }, 400); return; }
+  location.href = u.toString();
+}
+function announceGoto(map) { try { U.ctx.net?.send?.('goto', { m: map }); } catch {} }
+// ---------- follow a friend to another map ----------
+function showFollow(who, id) {
+  if (!U.followEl) {
+    const b = document.createElement('div'); b.className = 'zvfollow';
+    b.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 64px);transform:translateX(-50%);z-index:58;display:none;align-items:center;gap:10px;padding:10px 16px;background:rgba(10,14,20,.88);border:1px solid rgba(233,162,59,.7);border-left:4px solid #e9a23b;color:#fff;font:600 15px Barlow,Arial,sans-serif;letter-spacing:.04em;cursor:pointer;max-width:92vw';
+    b.addEventListener('click', (e) => { e.stopPropagation(); followNow(); }); b.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); followNow(); }, { passive: false });
+    document.body.appendChild(b); U.followEl = b;
+  }
+  U.follow = { id }; U.followEl.innerHTML = `${esc(who)} went to <b style="color:#ffd27a">${esc(mapName(id))}</b> — <b>${U.ctx.isTouch ? 'TAP' : 'J'}</b> to follow`;
+  U.followEl.style.display = 'flex'; clearTimeout(U.followT); U.followT = setTimeout(() => { U.followEl.style.display = 'none'; U.follow = null; }, 30000);
+}
+function followNow() {
+  const id = U?.follow?.id; const info = netInfo(); if (!id) return;
+  const u = new URL(location.href); u.searchParams.set('map', id); if (info?.room) u.searchParams.set('room', info.room); if (info?.name) u.searchParams.set('name', info.name); u.searchParams.delete('pose'); u.searchParams.delete('mp');
   location.href = u.toString();
 }
 async function share(btn) {
