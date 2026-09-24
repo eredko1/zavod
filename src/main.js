@@ -35,7 +35,13 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = ctx.settings.shadows !== false;
+// Settings → Shadows: the whole shadow pass on/off (renderer + every shadow-casting light; materials recompile once)
+function applyShadows(on) {
+  if (renderer.shadowMap.enabled === on) return; renderer.shadowMap.enabled = on;
+  scene.traverse((o) => { if (o.isLight && o.shadow) { if (o.userData.castShadow0 === undefined) o.userData.castShadow0 = o.castShadow; o.castShadow = on && o.userData.castShadow0; } if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; });
+}
+ctx.bus?.on?.('setting', (e) => { if (e?.key === 'shadows') applyShadows(!!e.value); });
 renderer.shadowMap.type = THREE.PCFShadowMap;
 app.appendChild(renderer.domElement);
 ctx.renderer = renderer; ctx.canvas = renderer.domElement;
@@ -57,7 +63,7 @@ const input = {
   consume(code) { const h = this.pressed.has(code); this.pressed.delete(code); return h; },
   // named actions
   get fire() { return (this.mouse.buttons & 1) !== 0 || this.touch.fire; },
-  get ads() { return (this.mouse.buttons & 2) !== 0 || this.down('KeyE') || this.touch.ads; }, // RMB, hold E, or touch
+  get ads() { return (this.mouse.buttons & 4) !== 0 || this.down('KeyE') || this.touch.ads; }, // RMB (bit 1 << 2), hold E, or touch — was & 2 (the middle button), so right-click never aimed
   get forward() { return this.down('KeyW') || this.down('ArrowUp') || this.touch.axis.y < -0.3; },
   get back() { return this.down('KeyS') || this.down('ArrowDown') || this.touch.axis.y > 0.3; },
   get left() { return this.down('KeyA') || this.down('ArrowLeft') || this.touch.axis.x < -0.3; },

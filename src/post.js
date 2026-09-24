@@ -293,6 +293,9 @@ function render(S, dt, ctx) {
       if (S.lowFpsT > 3) {
         const i = TIERS.indexOf(S.quality);
         if (i < TIERS.length - 1) { const nq = TIERS[i + 1]; setQuality(S, nq); ctx.bus.emit('quality', nq); }
+        // already on low and still slow (phones): drop the shadow pass, then render fewer pixels (down to 60 %)
+        else if (ctx.settings.shadows) { ctx.settings.shadows = false; ctx.bus.emit('setting', { key: 'shadows', value: false }); }
+        else { const r = ctx.renderer, pr = r.getPixelRatio(); if (pr > 0.62) { r.setPixelRatio(Math.max(0.6, pr * 0.85)); ctx.bus.emit('resize'); dispatchEvent(new Event('resize')); } }
         S.lowFpsT = 0; S.cooldown = 6;
       }
     } else S.lowFpsT = 0;

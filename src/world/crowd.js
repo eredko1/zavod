@@ -324,7 +324,8 @@ function dress(R, s, kind) {
 }
 
 export function buildCrowd(world, spots, opts = {}) {
-  const { scene, R } = world; if (!spots.length) return;
+  const { scene, R } = world; if (world.ctx?.isTouch && !opts.keepAll) spots = spots.filter((_, i) => i % 2 === 0);   // phones: half the people (instanced, but ~700k tris on coney)
+  if (!spots.length) return;
   const M = mats(), G = geos();
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
   const spotM = (s) => { q.setFromAxisAngle(up, s.ry || 0); p.set(s.x, s.y || 0, s.z); const k = s.s * (s.o.fem ? 0.945 : 1); sc.set(k * s.wide, k, k * s.wide); return new THREE.Matrix4().compose(p, q, sc); };
