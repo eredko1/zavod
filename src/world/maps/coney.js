@@ -187,6 +187,8 @@ function placeSpawnsBikesCover(world, M, piers) {
   nearSpot(12, BW.z0 + 2.5, E, 'boardwalk');              // boardwalk at the foot of the side street (inland edge)
   nearSpot(-178, BW.z1 - 4.5, WEST, 'boardwalk');         // beside the beach stairs head
   W.vehicleSpots = bikes.map(({ x, y, z, yaw }) => ({ x, y, z, yaw })); W.vehicleMax = bikes.length;
+  // online (hangout start is set by coney/hangout.js): default wave ring; a respawn stays within reach of the nearest friend (the strip is 1 km long)
+  W.waveTuning = { respawnMax: 200 };
 
   // ---- spawns ------------------------------------------------------------------------------------------------------------
   const cover = W.coverPoints, cgrid = new Map();   // cover points bucketed by 12 m cell

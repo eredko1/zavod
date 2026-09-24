@@ -62,7 +62,7 @@ export class NavGrid {
     const cand = new Float32Array(n * K); const candN = new Uint8Array(n); const candW = new Uint8Array(n * K); // candW: 1 = from a registered walkable
     for (let i = 0; i < n; i++) { cand[i * K] = base[i]; candN[i] = 1; }
     const walk = new Set(ctx.world?.walkables || []);
-    const cols = []; const seen = new Set();
+    const cols = []; const seen = new Set(this.vehicleBoxes());   // vehicles move: never baked into the grid (and parking one must not trigger a rebuild)
     for (const src of [ctx.colliders || [], ctx.world?.walkables || []]) for (const box of src) { if (!box || !box.min || seen.has(box)) continue; if (!(box.max.x > box.min.x && box.max.z > box.min.z && box.max.y >= box.min.y)) continue; if (!isFinite(box.min.x + box.max.x + box.min.y + box.max.y + box.min.z + box.max.z)) continue; seen.add(box); cols.push(box); }
     this.solids = cols;
     const slabs = this.slabs = new Set(); // map-wide thin non-walkable boxes = terrain slabs (ground colliders that also span sunken pits): never floors, never walls
@@ -142,6 +142,16 @@ export class NavGrid {
       walkable += tmp.length; if (tmp.length > 1) multi++;
     }
     this.walkableCount = walkable; this.multiCount = multi;
+    // ---- 4b. headroom per node: the lowest solid bottom above the floor in that cell (incl. terrain slabs). A hop DOWN into a
+    //          node is only possible if nothing lies between its floor and the ledge (a street slab over a passage, a
+    //          mezzanine over a concourse: you can't drop through them, even where a post or kiosk blocks the floor above) ----
+    const ceil = this.ceil = (this.ceil && this.ceil.length === n * L) ? this.ceil : new Float32Array(n * L); ceil.fill(Infinity);
+    for (const box of cols) {
+      const x0 = Math.max(0, Math.ceil((box.min.x - minX) / cell - 0.5)), x1 = Math.min(w - 1, Math.floor((box.max.x - minX) / cell - 0.5));
+      const z0 = Math.max(0, Math.ceil((box.min.z - minZ) / cell - 0.5)), z1 = Math.min(h - 1, Math.floor((box.max.z - minZ) / cell - 0.5));
+      if (x1 < x0 || z1 < z0) continue; const lo = box.min.y;
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { const i = z * w + x, c = nl[i]; for (let j = 0; j < c; j++) { const s = i * L + j; if (lo > floor[s] + 0.1 && lo < ceil[s]) ceil[s] = lo; } }
+    }
     // A* scratch
     if (!this.g || this.g.length !== n * L) { this.g = new Float32Array(n * L); this.parent = new Int32Array(n * L); this.seen = new Uint16Array(n * L); this.closed = new Uint16Array(n * L); this.region = new Int32Array(n * L); }
     this.stamp = 1; this.seen.fill(0); this.closed.fill(0);
@@ -155,23 +165,26 @@ export class NavGrid {
         for (let k = 0; k < 8; k++) {
           const nx = x + DX[k], nz = z + DZ[k]; if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
           const ni = nz * w + nx, c = nl[ni];
-          for (let j = 0; j < c; j++) { const s2 = ni * L + j; if (region[s2] !== -1) continue; const d = Math.abs(floor[s2] - f); if (d <= STEP || (k < 4 && d <= DROP_MAX)) { region[s2] = rid; rq[tail++] = s2; } }
+          let flat = false; for (let j = 0; j < c; j++) if (Math.abs(floor[ni * L + j] - f) <= STEP) { flat = true; break; }   // a floor to walk onto here: no hop through it to the level below
+          for (let j = 0; j < c; j++) { const s2 = ni * L + j; if (region[s2] !== -1) continue; const d = Math.abs(floor[s2] - f); if (d <= STEP || (!flat && k < 4 && d <= DROP_MAX && this.canHop(f, s2, s))) { region[s2] = rid; rq[tail++] = s2; } }
           if (k < 4 && c === 0) { // drop across a blocked ring (container edge): 2 cells out, cardinal
             const mx = x + DX[k] * 2, mz = z + DZ[k] * 2; if (mx < 0 || mz < 0 || mx >= w || mz >= h) continue;
             const mi = mz * w + mx, mc = nl[mi];
             const mxw = this.wx(x + DX[k]), mzw = this.wz(z + DZ[k]);
-            for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (region[s2] !== -1) continue; const d = Math.abs(floor[s2] - f); if (d <= DROP_MAX && this.ledgeClear(mxw, mzw, Math.max(f, floor[s2]))) { region[s2] = rid; rq[tail++] = s2; } }
+            for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (region[s2] !== -1) continue; const d = Math.abs(floor[s2] - f); if (d <= DROP_MAX && this.canHop(f, s2, s) && this.ledgeClear(mxw, mzw, Math.max(f, floor[s2]))) { region[s2] = rid; rq[tail++] = s2; } }
           }
         }
       }
       rid++;
     }
     this.regionCount = rid;
-    this.colliderCount = (ctx.colliders || []).length;
+    this.colliderCount = this.staticCount();
     this.buildMs = performance.now() - t0; this.builds++;
     this.levels = this.countLevels();
   }
 
+  /** a hop between floor f (node a) and node b ≥ STEP apart: the lower node's column must be open up to the upper floor */
+  canHop(f, b, a) { const fb = this.floor[b]; if (fb < f) return this.ceil[b] >= f - 0.05; return this.ceil[a] >= fb - 0.05; }
   /** solids within 0.6 m of the 4 m bucket containing (x,z) */
   boxesNear(x, z) { const l = this.hash.get(Math.floor(x / this.hashCell) * 65536 + Math.floor(z / this.hashCell)); return l || EMPTY; }
   /** true when nothing but the ledge occupies the standing band above floor f at world (x,z) — used for 2-cell hops across an inflated ring */
@@ -179,7 +192,11 @@ export class NavGrid {
 
   countLevels() { const set = new Set(); const f = this.floor, nl = this.nl; for (let i = 0; i < this.n; i++) for (let j = 0; j < nl[i]; j++) set.add(Math.round(f[i * L + j] * 2) / 2); return set.size; }
 
-  maybeRebuild() { const c = this.ctx.colliders?.length ?? 0; if (c !== this.colliderCount) { this.build(); return true; } return false; }
+  maybeRebuild() { const c = this.staticCount(); if (c !== this.colliderCount) { this.build(); return true; } return false; }
+  /** collider boxes owned by vehicles (bikes / cars: parked boxes follow them) */
+  vehicleBoxes() { const out = []; for (const v of this.ctx.vehicles?.list || []) if (v?.box) out.push(v.box); return out; }
+  /** colliders that are not vehicles — a respawn bike (online: one per respawn) no longer costs a full rebuild (0.4 s on the campus) */
+  staticCount() { const cols = this.ctx.colliders || []; const vb = this.vehicleBoxes(); if (!vb.length) return cols.length; const set = new Set(vb); let n = 0; for (let i = 0; i < cols.length; i++) if (!set.has(cols[i])) n++; return n; }
 
   debugStats() { return { cell: this.cell, w: this.w, h: this.h, cells: this.n, walkable: this.walkableCount, multiLayerCells: this.multiCount, levels: this.levels, regions: this.regionCount, solids: this.solids.length, buildMs: +this.buildMs.toFixed(1), builds: this.builds }; }
 
@@ -295,11 +312,13 @@ export class NavGrid {
         const ni = nz * w + nx; const c = nl[ni];
         const diag = k >= 4;
         if (diag && (this.layerNear(z * w + nx, f) < 0 || this.layerNear(nz * w + x, f) < 0)) continue;
-        let walked = false;
+        let walked = false, flat = false;
+        for (let j = 0; j < c; j++) if (Math.abs(floor[ni * L + j] - f) <= STEP) { flat = true; break; }   // the neighbour continues our floor: never hop / mantle through it onto another of its layers (a slab over a stairwell, a mezzanine over the concourse)
         for (let j = 0; j < c; j++) {
           const s2 = ni * L + j; if (closed[s2] === stamp) continue;
           const d = floor[s2] - f; let cost;
           if (Math.abs(d) <= STEP) { cost = diag ? Math.SQRT2 : 1; walked = true; }
+          else if (flat || !this.canHop(f, s2, s)) continue;
           else if (!diag && d < 0 && -d <= DROP_MAX) cost = 1 + 2 + -d * 0.5; // hop down: penalised so it's a shortcut, not a habit
           else if (!diag && d > 0 && d <= CLIMB_MAX) cost = 1 + 5 + d * 2;     // mantle up: expensive, used only when there is no stair
           else continue;
@@ -309,7 +328,7 @@ export class NavGrid {
         if (!diag && c === 0 && !walked) { // drop over a blocked ring (e.g. a container edge): 2 cells out
           const mx = x + DX[k] * 2, mz = z + DZ[k] * 2; if (mx < 0 || mz < 0 || mx >= w || mz >= h) continue;
           const mi = mz * w + mx, mc = nl[mi]; const mxw = this.wx(nx), mzw = this.wz(nz);
-          for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (closed[s2] === stamp) continue; const d = floor[s2] - f; if (!this.ledgeClear(mxw, mzw, Math.max(f, floor[s2]))) continue; let cost; if (d < -STEP && -d <= DROP_MAX) cost = 2 + 3 + -d * 0.5; else if (d > STEP && d <= CLIMB_MAX) cost = 2 + 6 + d * 2; else continue; const ng = gs + cost; if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(mi) * 1.001); } }
+          for (let j = 0; j < mc; j++) { const s2 = mi * L + j; if (closed[s2] === stamp) continue; const d = floor[s2] - f; if (!this.canHop(f, s2, s) || !this.ledgeClear(mxw, mzw, Math.max(f, floor[s2]))) continue; let cost; if (d < -STEP && -d <= DROP_MAX) cost = 2 + 3 + -d * 0.5; else if (d > STEP && d <= CLIMB_MAX) cost = 2 + 6 + d * 2; else continue; const ng = gs + cost; if (seen[s2] !== stamp || ng < g[s2]) { seen[s2] = stamp; g[s2] = ng; parent[s2] = s; heap.push(s2, ng + H(mi) * 1.001); } }
         }
       }
     }

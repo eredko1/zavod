@@ -63,6 +63,9 @@ export function build(world) {
     v(60, 7.2, -124), v(-125, 10, -142),                                                       // roofs (Mews / Alley studios)
     v(100, 0.9, 86),                                                                           // library plaza
   ];
+  // online: meet on the fountain plaza's south rim (arch straight ahead); big open park — default wave ring
+  W.onlineStart = [-8, 0, 22, -0.3];
+  W.waveTuning = { near: 26, far: 72, gap: 20, size: 1, maxAlive: 14, respawnMax: 170 };
   W.poses = {
     spawn: [-13, 0, 80, 0.05, 0.0],
     hero: [-17, 0, 15, -0.24, 0.05],            // from the S rim of the fountain plaza: basin + jets, arch behind, the tower through it

@@ -105,7 +105,7 @@ export class Soldier {
   moveStep(dt, nav, others, player) {
     const t = this.ctx.time.elapsed;
     const desired = _v.set(0, 0, 0);
-    const px0 = this.position.x, pz0 = this.position.z; let vault = false;
+    const px0 = this.position.x, pz0 = this.position.z; let vault = false, descend = false;
     if (this.moveGoal && !this.arrived) {
       if (!this.path && t - this.pathT > 0.35 && nav.budget > 0) {
         nav.budget--; this.pathT = t;
@@ -123,6 +123,7 @@ export class Soldier {
         while (wp && near2(wp) < (this.pathIdx === this.path.length - 1 ? 0.16 : 0.36) && Math.abs(wp.y - this.position.y) < 1.2) { this.pathIdx++; wp = this.path[this.pathIdx]; }
         if (!wp) { this.arrived = true; this.path = null; }
         else {
+          descend = wp.y < this.position.y - 0.3;   // the path goes down (stairs under a slab / a covered stairwell): track the lower layer
           desired.subVectors(wp, this.position); desired.y = 0; const d = desired.length();
           if (d > 1e-4) desired.multiplyScalar(1 / d);
           let sp = this.gait === 'walk' ? SPEED.walk : (this.maxSpeed || SPEED.run);   // maxSpeed: chase mode (cops sprint, crew bikers ride)
@@ -155,7 +156,9 @@ export class Soldier {
     // chase mode: never step into a no-go zone (building lobbies, interiors) — even on a straight-line fallback path
     if (this.noGo && this.noGo(this.position.x, this.position.z, this.position.y) && !this.noGo(px0, pz0, this.position.y)) { this.position.x = px0; this.position.z = pz0; this.vel.x = 0; this.vel.z = 0; }
     // ---- vertical: feet follow the nav floor of the layer we are on; stairs are smoothed, drops use gravity ----
-    const f = nav.floorAt(this.position.x, this.position.z, this.position.y + (this.airborne ? 0 : 0.3));
+    // (going down: a stair that runs under a street / mezzanine slab has both floors in the same columns near its top — follow the
+    //  lower one, or the soldier walks on over the slab while its path descends below it and stalls there, "walking on the ceiling")
+    const f = nav.floorAt(this.position.x, this.position.z, this.position.y + (this.airborne ? 0 : descend ? -0.25 : 0.3));
     if (vault) { if (Number.isFinite(f) && f > this.position.y) this.position.y = f; }
     else if (Number.isFinite(f)) {
       this.floorY = f; const dy = f - this.position.y;

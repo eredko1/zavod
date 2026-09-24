@@ -50,6 +50,9 @@ export function build(world) {
   // (cover points are pushed by the builders; top up along open lanes)
   for (const z of [-20, 0, 20, 40]) { world.cover(TRACK_X[3] - 1.7, z, -1, 0); world.cover(TRACK_X[3] + 1.7, z, 1, 0); }
 
+  // online: meet in the signal-box forecourt (stair up to the office); mid-size yard, mid-range waves
+  W.onlineStart = [-36, 0, 31, 0.15];
+  W.waveTuning = { near: 24, far: 56, gap: 18, size: 0.9, maxAlive: 12 };
   W.poses = {
     spawn: [-7.5, 0, 58, 0.06, 0.0],
     hero: [-10.5, 0, 34, 0.02, 0.01],                 // down the open lane: boxcars left, flatcars right, gantry + overpass ahead

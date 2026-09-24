@@ -69,6 +69,10 @@ export function build(world) {
   W.playerSpawns = [v(-36, 0, 0), v(-34, 0, 8), v(-34, 0, -8), v(-38, 0, 12), v(-30, -12, isl1), v(-40, 0, 53)];
   W.enemySpawns = [v(36, 0, 0), v(34, 0, 10), v(34, 0, -10), v(20, 0, 14), v(20, 0, -14), v(0, 0, -15), v(-8, 0, 15), v(14, 0, 4), v(14, 0, -4), v(26, 0, 0), v(6, 0, -12), v(6, 0, 12), v(-14, 0, -15), v(30, 0, 16),
     v(30, -12, isl1), v(-6, -12, isl1), v(34, -12, isl2), v(-30, -12, isl2), v(6, -12, isl2), v(0, -6, 70), v(16, -6, 60), v(0, -6, 24.5), v(10, -6, 40), v(30, 0, 62), v(-20, 0, 66)];
+  // online: meet at the information booth. Waves: short sight lines indoors — spawn close, on the three floor levels only
+  // (concourse + street 0, dining concourse −6, subway −12; never on the balconies / ramps / stairs)
+  W.onlineStart = [-9, 0, 0, -Math.PI / 2];
+  W.waveTuning = { near: 18, far: 48, gap: 14, size: 0.8, maxAlive: 10, levels: [0, -6, -12] };
   W.objectives = [{ name: 'SUBWAY', position: v(0, -12, isl1) }];
   if (W.coverPoints.length < 40) {
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; world.cover(Math.cos(a) * 4.2, Math.sin(a) * 4.2, Math.cos(a), Math.sin(a)); }   // info booth ring

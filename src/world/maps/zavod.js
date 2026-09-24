@@ -48,6 +48,9 @@ export function build(world) {
     v(-40, -10), v(-30, -30), v(-50, 5), v(-20, -45), v(14, -44), v(40, -42), v(52, -20), v(52, 10), v(46, 34), v(30, 42),
     v(20, -8), v(34, 8), v(-8, -40), v(2, -46), v(44, -8), v(-36, 30), v(-48, 40), v(24, 26),
   ];
+  // online: meet at the yard gate; waves close in fast on this small yard
+  W.onlineStart = [8, 0, 50, 0.15];
+  W.waveTuning = { near: 22, far: 52, gap: 16, size: 0.85, maxAlive: 12 };
   W.poses = {
     spawn: [-4, 0, 46, 0.05, 0.0],
     hero: [15.4, 0, 39, 0.12, 0.0],

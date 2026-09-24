@@ -90,8 +90,18 @@ export async function init(ctx) {
   // online = free-for-all: no AI waves, and every spawn point on the map is fair game
   if (qs.get('ai') !== '1') { try { ctx.ai?.qaSetEnabled?.(false); ctx.ai?.qaKillAll?.(); } catch {} }
   const W = ctx.world; if (W?.enemySpawns?.length) W.playerSpawns = [...(W.playerSpawns || []), ...W.enemySpawns];
-  // maps may define where an online session starts (coney: outside Luna Park building 2) — jittered so friends don't stack
-  if (W?.onlineStart) { const [x, y, z, yaw] = W.onlineStart; const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.2; try { ctx.player.teleport(x + Math.cos(a) * r, y, z + Math.sin(a) * r, yaw, 0); } catch {} }
+  S.spawnPool = onlineSpawns(ctx); if (S.spawnPool.length >= 3) W.playerSpawns = S.spawnPool;
+  // every map defines where an online session starts (the meet-up: coney = Igor's gate, terminal = the info booth, …) — jittered
+  // so friends don't stack, and snapped onto a free nav floor on the start's own level (never inside the booth / a bench)
+  if (W?.onlineStart) {
+    const [x, y, z, yaw] = W.onlineStart; const nav = ctx.ai?.nav; let at = [x, y, z];
+    for (let k = 0; k < 6; k++) {
+      const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+      if (!nav) { at = [px, y, pz]; break; }
+      if (nav.isFree(px, pz, y) && Math.abs(nav.floorAt(px, pz, y) - y) < 0.5) { at = [px, nav.floorAt(px, pz, y), pz]; break; }
+    }
+    try { ctx.player.teleport(at[0], at[1], at[2], yaw, 0); } catch {}
+  }
   ctx.bus.on('shot', (e) => { if (!e || e.who !== 'player') return; const o = e.muzzle || e.origin; if (!o || !e.dir) return; send({ t: 'shot', o: v3(o), d: v3(e.dir), w: String(e.id || '').slice(0, 12) }); });
   ctx.bus.on('playerDied', () => { const a = S.lastAttacker && performance.now() - S.lastAttacker.at < 8000 ? S.lastAttacker : null; send({ t: 'kill', k: a?.id || null, v: S.id, hs: !!a?.hs }, true); onKill(a?.id || null, S.id, !!a?.hs); S.respawnT = RESPAWN; });
   ctx.bus.on('explosion', (e) => { if (e && !e.remote && e.position) send({ t: 'boom', p: v3(e.position), r: Math.min(12, e.radius || 6) }); });
@@ -392,6 +402,42 @@ function onKill(killer, victim, hs) {
 }
 const isAfk = () => document.hidden || S.ctx.state === 'menu' || S.ctx.state === 'paused';
 
+// ---------- spawns ----------
+/** a standing spot on one of the map's ground levels (not a roof / balcony / deck): W.waveTuning.levels if the map lists them
+ *  (multi-level interiors like the terminal: concourse 0, dining −6, subway −12), else within 1.5 m of W.groundHeight */
+export function groundLevel(W, q) {
+  const L = W?.waveTuning?.levels; if (Array.isArray(L) && L.length) return L.some((l) => Math.abs(q.y - l) < 0.6);
+  if (!W?.groundHeight) return q.y < 1.5; const g = W.groundHeight(q.x, q.z); return !Number.isFinite(g) || Math.abs(q.y - g) < 1.5;
+}
+/** online respawn pool: every player + enemy spawn that is a free nav floor on its own level, outside no-go zones / lobbies */
+function onlineSpawns(ctx) {
+  const W = ctx.world || {}, nav = ctx.ai?.nav, out = [], seen = new Set();
+  for (const v of W.playerSpawns || []) {
+    if (!v || !Number.isFinite(v.x) || !Number.isFinite(v.z)) continue;
+    const y = Number.isFinite(v.y) ? v.y : 0; const key = `${Math.round(v.x)},${Math.round(y)},${Math.round(v.z)}`; if (seen.has(key)) continue; seen.add(key);
+    let q = new THREE.Vector3(v.x, y, v.z);
+    if (nav) { if (!nav.isFree(v.x, v.z, y) || Math.abs(nav.floorAt(v.x, v.z, y) - y) > 0.6) { q = nav.nearestFree(v.x, v.z, 2, y); if (!q || Math.abs(q.y - y) > 0.6) continue; } else q.y = nav.floorAt(v.x, v.z, y); }
+    if (W.chaseNoGo?.(q.x, q.z, q.y) || W.indoorAt?.(q, null)) continue;
+    out.push(q);
+  }
+  return out;
+}
+/** FFA respawn: the player module's pick (away from enemies, never the same spot twice), restricted to spots ≥ 25 m from every
+ *  live peer — and on huge maps (W.waveTuning.respawnMax) not absurdly far from the nearest one, so friends can regroup */
+function respawnAway(ctx) {
+  const W = ctx.world, me = ctx.player, pool = S.spawnPool?.length >= 3 ? S.spawnPool : (W.playerSpawns || []);
+  const others = [...S.peers.values()].filter((p) => !p.dead && !p.afk).map((p) => (p.vehObj || p.inst.group).position);
+  let pick = pool;
+  if (others.length && pool.length) {
+    const maxR = W.waveTuning?.respawnMax ?? Infinity;
+    const nd = (v) => { let d = Infinity; for (const o of others) d = Math.min(d, Math.hypot(v.x - o.x, v.z - o.z, (v.y - o.y) * 2)); return d; };
+    const far = pool.filter((v) => { const d = nd(v); return d > 25 && d < maxR; }), far2 = pool.filter((v) => nd(v) > 25);
+    pick = far.length >= 2 ? far : far2.length >= 2 ? far2 : pool;
+  }
+  const keep = W.playerSpawns; W.playerSpawns = pick;
+  try { me.respawn(); } finally { W.playerSpawns = keep; }
+}
+
 // ---------- outbound state ----------
 function sendState(now, force = false) {
   if (!S || (!force && !anyUp())) return; const ctx = S.ctx, me = ctx.player; if (!me?.position) return;
@@ -410,7 +456,7 @@ export function update(dt, ctx) {
   const now = performance.now(), rdt = Math.min(0.1, ctx.time?.realDt ?? dt), me = ctx.player;
   if (S.protectT > 0) S.protectT -= dt;
   if (S.respawnT > 0) UI.setRespawn(Math.ceil(S.respawnT));
-  if (S.respawnT > 0 && (S.respawnT -= dt) <= 0) { S.respawnT = -1; UI.setRespawn(0); try { me.respawn(); } catch (e) { console.warn('[net] respawn', e); } }
+  if (S.respawnT > 0 && (S.respawnT -= dt) <= 0) { S.respawnT = -1; UI.setRespawn(0); try { respawnAway(ctx); } catch (e) { console.warn('[net] respawn', e); } }
   // state goes out on real time — menu / pause (simDt = 0) must not silence us, or friends time us out
   if (me?.position && now - S.lastSend >= 1000 / SEND_HZ - 3) sendState(now);
   for (const [pid, p] of S.peers) {

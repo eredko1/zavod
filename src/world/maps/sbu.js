@@ -51,6 +51,9 @@ export function build(world) {
   for (let z = -120; z < -70; z += 12) world.cover(LIB.x1 + 1.2, z, 1, 0);                                     // library east face (terrace top)
   for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) world.cover(FOUNTAIN.x + Math.cos(a) * (FOUNTAIN.ring + 1), FOUNTAIN.z + Math.sin(a) * (FOUNTAIN.ring + 1), Math.cos(a), Math.sin(a));
 
+  // online: meet on the SAC plaza. ~1 km campus: waves spawn farther out and more of them; respawns stay within reach of a friend
+  W.onlineStart = [-96, 0, 24, -1.5];
+  W.waveTuning = { near: 34, far: 95, gap: 26, size: 1.15, maxAlive: 16, respawnMax: 220 };
   W.poses = {
     spawn: [-104, 0, 24, -1.5, 0.0],                       // SAC plaza, looking east along the mall
     hero: [-62, 0, 3, -1.32, 0.06],                        // the mall: library on the left, SAC drum on the right, fountain far ahead

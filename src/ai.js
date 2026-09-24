@@ -354,12 +354,14 @@ function think(ctx, s, t) {
 
 // ---------- multiplayer targeting (netwaves host) ----------
 const tgtPos = (x) => x.position;
+/** distance that respects floors: a player one level up/down is a stair detour away, not the 6 m straight through the slab */
+const levelDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z) + Math.abs(a.y - b.y) * 3;
 /** pick who this soldier fights: keep the current target unless it is gone/dead, or someone else is much closer, or the current
  *  one has been out of sight a while and the nearest other player is in plain view (one LOS ray, only then) */
 function chooseTarget(ctx, s, t) {
   const list = S.mp.targets(); if (!list.length) { s.tgt = null; return; }
   let near = null, nd = 1e9, cd = 1e9;
-  for (const x of list) { const d = tgtPos(x).distanceTo(s.position) + (S.mp.indoor?.(x) ? 40 : 0); if (d < nd) { nd = d; near = x; } if (x === s.tgt) cd = d; }   // indoor players (safe spots) rank 40 m further away
+  for (const x of list) { const d = levelDist(tgtPos(x), s.position) + (S.mp.indoor?.(x) ? 40 : 0); if (d < nd) { nd = d; near = x; } if (x === s.tgt) cd = d; }   // indoor players (safe spots) rank 40 m further away
   const cur = list.includes(s.tgt) ? s.tgt : null;
   let pick = cur;
   if (!cur) pick = near;

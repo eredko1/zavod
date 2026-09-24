@@ -34,6 +34,19 @@ const CSS = `
 .zvon .who{margin-top:14px;font-size:14px}.zvon .who b{font:600 11px Barlow;letter-spacing:.16em;opacity:.7;display:block;margin-bottom:4px}
 .zvon .who span{display:inline-block;margin:2px 6px 2px 0;padding:3px 8px;background:rgba(255,255,255,.07);border-radius:10px}.zvon .who span.me{color:#ffd27a}
 .zvon .copied{color:#5fd37a;font-size:12px;height:14px;margin-top:4px}
+.zvon .card.wide{width:min(620px,100%)}
+.zvon .maps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 2px}
+.zvon .mapt{position:relative;display:block;padding:0;min-height:0;border:1px solid rgba(255,255,255,.16);border-radius:3px;overflow:hidden;background:linear-gradient(160deg,#9fb3c8,#5d6b7a 55%,#c9a97a);cursor:pointer;text-align:left;aspect-ratio:16/10}
+.zvon .mapt.night{background:linear-gradient(160deg,#1b2431,#0a0e15 60%,#2a1f12)}
+.zvon .mapt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.85)}
+.zvon .mapt span{position:absolute;left:0;right:0;bottom:0;padding:14px 7px 5px;font:700 12.5px 'Barlow Condensed',Arial;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.78));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zvon .mapt i{position:absolute;right:5px;top:5px;font:700 10px Barlow,Arial;font-style:normal;letter-spacing:.12em;padding:3px 5px;background:rgba(0,0,0,.55);color:#cfe3ff;border-radius:2px}
+.zvon .mapt.sel{border-color:#e9a23b;box-shadow:0 0 0 2px #e9a23b inset}
+.zvon .mapt.sel span{color:#ffd27a}
+.zvon .mapt:hover{border-color:rgba(255,255,255,.4)}
+.zvon .mapd{font-size:12.5px;opacity:.65;min-height:16px;margin-top:6px;line-height:1.35}
+@media (max-width:520px){.zvon .maps{grid-template-columns:repeat(2,1fr);gap:6px}.zvon .card{padding:14px 14px}.zvon h2{font-size:22px}.zvon .mapd{display:none}}
+@media (max-height:480px){.zvon .maps{grid-template-columns:repeat(6,1fr);gap:5px}.zvon .mapt{aspect-ratio:4/3}.zvon .mapt span{font-size:10.5px;padding:10px 4px 3px}.zvon .mapt i{display:none}.zvon .mapd{display:none}.zvon .card.wide{width:min(760px,100%)}}
 .zvroom{position:fixed;right:calc(env(safe-area-inset-right,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 64px);z-index:45;width:260px;display:none;background:rgba(8,10,14,.8);border:1px solid rgba(255,255,255,.12);border-top:2px solid #5fd37a;color:#e8edf2;font:500 14px Barlow,Arial,sans-serif}
 .zvroom.on{display:block}
 .zvroom h4{margin:0;padding:8px 12px;font:700 12px 'Barlow Condensed',Arial;letter-spacing:.18em;background:rgba(95,211,122,.12);display:flex;justify-content:space-between}
@@ -55,7 +68,7 @@ export function install(ctx, opts) {
   ctx.bus.on('ui', (e) => {
     if (e?.action !== 'coney') return;
     let name = ''; try { name = cleanName(localStorage.getItem('zavod.name')); } catch {}
-    if (!name) { U.forceMap = 'coney'; openOnline(); if (U.f) { U.f.room.value = 'lunapark'; } return; }
+    if (!name) { U.forceMap = 'coney'; openOnline(); if (U.f) { U.f.room.value = 'lunapark'; U.f.upd(); } return; }
     const info = netInfo(); if (info && info.room === 'lunapark' && curMap() === 'coney') { if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
     const u = new URL(location.href); u.search = ''; u.searchParams.set('map', 'coney'); u.searchParams.set('room', 'lunapark'); u.searchParams.set('name', name); location.href = u.toString();
   });
@@ -128,22 +141,42 @@ export function frame(show) {
 const randomRoom = (map) => `${map}-${Math.random().toString(36).slice(2, 6)}`;
 function shareUrl(map, room) { const u = new URL(location.origin + location.pathname); u.searchParams.set('map', map); u.searchParams.set('room', room); return u.toString(); }
 function curMap() { return netInfo()?.map || U.ctx.world?.mapId || U.opts.map || 'zavod'; }
+function selMap() { return U.sel || curMap(); }
+function mapList() { const l = U.ctx.world?.maps; return Array.isArray(l) && l.length ? l.filter((m) => m?.id) : [{ id: curMap(), name: curMap().toUpperCase() }]; }
+function mapName(id) { return (mapList().find((m) => m.id === id)?.name || id).toUpperCase(); }
+/** select a map in the overlay; an auto-named room (<map>-xxxx) follows the map so the invite reads right */
+function pickMap(id, quiet = false) {
+  const prev = U.sel; U.sel = id; if (!U.f) return;
+  for (const b of U.f.maps.children) { const on = b.dataset.id === id; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  const m = mapList().find((x) => x.id === id); U.f.mapd.textContent = m ? `${m.subtitle || ''}${m.subtitle && m.description ? ' — ' : ''}${m.description || ''}` : '';
+  if (!quiet && prev && prev !== id) { const r = cleanRoom(U.f.room.value); if (!r || r.startsWith(prev + '-')) U.f.room.value = randomRoom(id); }
+  U.f.upd();
+}
 
 function buildOverlay() {
   const o = document.createElement('div'); o.className = 'zvon';
-  o.innerHTML = `<div class="card" role="dialog" aria-label="Play online">
-    <h2>Play online</h2><div class="sub">Free-for-all with friends · map <b class="mp"></b></div>
+  o.innerHTML = `<div class="card wide" role="dialog" aria-label="Play online">
+    <h2>Play online</h2><div class="sub">Free-for-all + co-op waves with friends · map <b class="mp"></b></div>
+    <label>Map</label><div class="maps" role="radiogroup" aria-label="Map"></div><div class="mapd"></div>
     <label for="zv-room">Room</label><input id="zv-room" class="room" maxlength="24" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="e.g. coney-night">
     <label for="zv-name">Your name</label><input id="zv-name" class="name" maxlength="16" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="go" placeholder="callsign">
-    <div class="hint">Friends join by opening the invite link (same map + room). Letters, numbers, - and _ only.</div>
+    <div class="hint">Everyone picks the same map + room (or just opens your invite link). Letters, numbers, - and _ only.</div>
     <div class="link"><code class="url"></code><button class="copy">Copy</button></div><div class="copied"></div>
     <div class="who"></div>
     <div class="btns"><button class="primary join">Join room</button><button class="back">Back</button><button class="leave" style="display:none">Leave room</button></div>
   </div>`;
   document.body.appendChild(o);
   const q = (s) => o.querySelector(s);
-  U.over = o; U.f = { room: q('.room'), name: q('.name'), url: q('.url'), mp: q('.mp'), who: q('.who'), copied: q('.copied'), leave: q('.leave') };
-  const upd = () => { const r = cleanRoom(U.f.room.value) || '…'; U.f.url.textContent = shareUrl(curMap(), r); };
+  U.over = o; U.f = { room: q('.room'), name: q('.name'), url: q('.url'), mp: q('.mp'), who: q('.who'), copied: q('.copied'), leave: q('.leave'), maps: q('.maps'), mapd: q('.mapd') };
+  const upd = () => { const r = cleanRoom(U.f.room.value) || '…'; U.f.url.textContent = shareUrl(selMap(), r); U.f.mp.textContent = mapName(selMap()); };
+  // map picker: every registered map, thumbnail from assets/thumbs/<id>.jpg (gradient + name if there is none)
+  for (const m of mapList()) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'mapt' + (m.time === 'night' ? ' night' : ''); b.dataset.id = m.id; b.setAttribute('role', 'radio'); b.title = m.description || m.name;
+    b.innerHTML = `<img alt="" loading="lazy" src="./assets/thumbs/${esc(m.id)}.jpg"><span>${esc(m.name || m.id)}</span>${m.id === curMap() ? '<i>HERE</i>' : ''}`;
+    b.querySelector('img').addEventListener('error', (e) => e.target.remove());
+    b.addEventListener('click', (e) => { e.stopPropagation(); pickMap(m.id); });
+    U.f.maps.appendChild(b);
+  }
   U.f.room.addEventListener('input', () => { const c = cleanRoom(U.f.room.value); if (c !== U.f.room.value) U.f.room.value = c; upd(); });
   U.f.upd = upd;
   q('.copy').addEventListener('click', (e) => { e.stopPropagation(); share(q('.copy')); });
@@ -158,9 +191,12 @@ export function openOnline() {
   if (!U) return; if (!U.over) buildOverlay();
   const info = netInfo(); let lastRoom = '', lastName = '';
   try { lastRoom = cleanRoom(localStorage.getItem('zavod.room')); lastName = cleanName(localStorage.getItem('zavod.name')); } catch {}
-  U.f.room.value = info?.room || lastRoom || randomRoom(curMap());
+  let lastMap = ''; try { lastMap = localStorage.getItem('zavod.onlineMap') || ''; } catch {}
+  const ids = mapList().map((m) => m.id);
+  U.sel = U.forceMap || (info ? curMap() : ids.includes(lastMap) ? lastMap : curMap()); U.forceMap = null;
+  U.f.room.value = info?.room || lastRoom || randomRoom(U.sel);
   U.f.name.value = info?.name || lastName || '';
-  U.f.mp.textContent = curMap().toUpperCase();
+  pickMap(U.sel, true);
   U.f.leave.style.display = info ? '' : 'none';
   U.over.querySelector('.join').textContent = info ? 'Apply' : 'Join room';
   U.f.copied.textContent = ''; U.f.upd(); fillWho();
@@ -175,17 +211,17 @@ function fillWho() {
   U.f.who.innerHTML = `<b>IN ROOM ${esc(info.room.toUpperCase())} · ${esc(info.status.text)}</b>` + rows.map((r) => `<span class="${r.me ? 'me' : ''}">${esc(r.name)}${r.afk ? ' · afk' : ''}</span>`).join('');
 }
 function join() {
-  const room = cleanRoom(U.f.room.value) || randomRoom(curMap()); const name = cleanName(U.f.name.value);
-  try { localStorage.setItem('zavod.room', room); if (name) localStorage.setItem('zavod.name', name); } catch {}
+  const map = selMap(); const room = cleanRoom(U.f.room.value) || randomRoom(map); const name = cleanName(U.f.name.value);
+  try { localStorage.setItem('zavod.room', room); localStorage.setItem('zavod.onlineMap', map); if (name) localStorage.setItem('zavod.name', name); } catch {}
   const info = netInfo();
-  if (info && info.room === room && (!name || name === info.name)) { closeOnline(); if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
-  const u = new URL(location.href); u.searchParams.set('map', U.forceMap || curMap()); u.searchParams.set('room', room); u.searchParams.delete('mp');
+  if (info && info.room === room && map === curMap() && (!name || name === info.name)) { closeOnline(); if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
+  const u = new URL(location.href); u.searchParams.set('map', map); u.searchParams.set('room', room); u.searchParams.delete('mp'); u.searchParams.delete('pose');
   if (name) u.searchParams.set('name', name); else u.searchParams.delete('name');
   location.href = u.toString();
 }
 async function share(btn) {
   const room = U.f ? (cleanRoom(U.f.room.value) || netInfo()?.room) : netInfo()?.room; if (!room) return;
-  const url = shareUrl(curMap(), room); let ok = false;
+  const url = shareUrl(U.over?.classList.contains('on') ? selMap() : curMap(), room); let ok = false;
   if (U.ctx.isTouch && navigator.share) { try { await navigator.share({ title: 'ZAVOD — join my room', text: `Join me in ZAVOD (room ${room})`, url }); return; } catch (e) { if (e?.name === 'AbortError') return; } }
   try { await navigator.clipboard.writeText(url); ok = true; } catch {}
   if (!ok) { try { const t = document.createElement('textarea'); t.value = url; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); ok = document.execCommand('copy'); t.remove(); } catch {} }

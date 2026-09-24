@@ -26,8 +26,11 @@
 // player's sight, ≥ 20 m from everyone, on open ground (never on roofs / in buildings; coney: never in a Luna Park lobby).
 // Players inside a building (coney/chase.js world.indoorAt: lobbies, elevators, the 19th floor) are staked out at the doors.
 // RESPAWN BIKE. After every respawn a rideable motorcycle is placed within ~15 m (unless one is already there).
+// PER MAP. W.waveTuning = { near, far (spawn ring around the anchor, m), gap (min distance to every player), size (wave size ×),
+// maxAlive, levels (multi-level interiors: the floor heights squads may spawn on) } — small maps closer + fewer, the campus wider.
 // Opt out: ?waves=0 (also off with ?ai=0; ?ai=1 keeps the old per-client AI).
 import * as THREE from 'three';
+import { groundLevel } from './net.js';
 
 const SEND_DT = 0.1, HEARTBEAT_DT = 0.5, SHOT_DT = 0.2, HOST_STALE = 1600, BOOT_GRACE = 3500, AFK_RESIGN = 2000, PROTECT_MS = 2500;
 const WAVES = [6, 8, 10, 12, 14, 16, 18], TOTAL = WAVES.length;
@@ -52,6 +55,7 @@ export async function init(ctx) {
     byWid: new Map(), puppets: new Map(), proxies: new Map(), targets: [], indoor: new Set(), peerDead: new Map(), respawns: [],
     outShots: new Map(), sendT: 0, beatT: 0, shotT: 0, checkT: 0, waveKey: '', killsSeen: new Set(), killLog: [], shotsTaken: 0, dmgTaken: 0,
     protUntil: 0, myBikes: [], lastWv: 0,
+    tune: tuning(ctx.world),
   };
   ai.setMirror({ get wave() { return N.wave; }, alive: () => aliveCount() });
   const bus = ctx.bus;
@@ -77,6 +81,12 @@ export async function init(ctx) {
   if (typeof window !== 'undefined' && window.__game) window.__game.waves = QA;
   console.log('[netwaves] online co-op waves on', net.id);
   return api;
+}
+
+function tuning(W) {
+  const T = W?.waveTuning || {}; const n = (v, d, lo, hi) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
+  const near = n(T.near, 26, 8, 200), far = Math.max(near + 12, n(T.far, 70, 20, 300));
+  return { near, far, gap: n(T.gap, 20, 6, 100), size: n(T.size, 1, 0.3, 3), maxAlive: Math.round(n(T.maxAlive, MAX_ALIVE, 4, 24)) };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -160,7 +170,7 @@ function buildTargets() {
   }
   for (const id of N.proxies.keys()) if (!ids.includes(id)) { N.proxies.delete(id); N.peerDead.delete(id); }
 }
-function nearestTarget(pos) { let best = null, bd = 1e9; for (const x of N.targets) { const d = x.position.distanceTo(pos) + (N.indoor.has(x) ? 40 : 0); if (d < bd) { bd = d; best = x; } } return best; }
+function nearestTarget(pos) { let best = null, bd = 1e9; for (const x of N.targets) { const d = Math.hypot(x.position.x - pos.x, x.position.z - pos.z) + Math.abs(x.position.y - pos.y) * 3 + (N.indoor.has(x) ? 40 : 0); if (d < bd) { bd = d; best = x; } } return best; }
 /** someone respawned: remember it (the next squads spawn around them) and radio their new position to the soldiers after them */
 function noteRespawn(tgt, pos) {
   N.respawns.push({ tgt, pos: pos.clone(), t: performance.now() }); if (N.respawns.length > 6) N.respawns.shift();
@@ -175,7 +185,7 @@ function splitSquads(n) { const out = []; while (n > 0) { if (n === 5 || n === 6
 function startWave(n) {
   if (n > TOTAL) { n = 1; N.cycle++; }
   N.wave = n; N.phase = 'active'; N.clock = 0;
-  const count = Math.max(4, Math.round(WAVES[n - 1] * playerScale())); N.enemies = count;
+  const count = Math.max(3, Math.round(WAVES[n - 1] * playerScale() * N.tune.size)); N.enemies = count;
   N.pending = splitSquads(count).map((size, i) => ({ size, at: i * SQUAD_GAP }));
   N.waveKey = `${N.cycle}:${n}`;
   N.ctx.bus.emit('wave', { n, total: TOTAL, enemies: count });
@@ -188,7 +198,7 @@ function hostTick(dt) {
   let alive = aliveCount();
   for (let i = 0; i < N.pending.length; i++) {
     const p = N.pending[i]; if (N.clock < p.at) continue;
-    if (alive + p.size > MAX_ALIVE && alive > 0) { p.at = N.clock + 1.5; continue; }
+    if (alive + p.size > N.tune.maxAlive && alive > 0) { p.at = N.clock + 1.5; continue; }
     if (!N.targets.length) { p.at = N.clock + 2; continue; }
     const got = spawnSquad(p.size); if (!got) { p.at = N.clock + 2; continue; }
     N.pending.splice(i--, 1); alive += got;
@@ -205,7 +215,13 @@ function spawnSquad(size) {
   const now = performance.now(); let tgt = null, anchor = null;
   const rs = N.respawns.filter((r) => now - r.t < 25000 && N.targets.includes(r.tgt));
   if (rs.length) { const r = rs[rs.length - 1]; N.respawns.splice(N.respawns.indexOf(r), 1); tgt = r.tgt; anchor = r.pos.clone(); }
-  if (!tgt) { const outdoor = N.targets.filter((x) => !N.indoor.has(x)); const pool = outdoor.length ? outdoor : N.targets; tgt = pool[N.anchorI++ % pool.length]; anchor = tgt.position.clone(); }
+  if (!tgt) {   // else the player with the fewest mercs on them (round-robin on ties), so nobody is left out while others soak the whole wave
+    const outdoor = N.targets.filter((x) => !N.indoor.has(x)); const pool = outdoor.length ? outdoor : N.targets;
+    const load = new Map(pool.map((x) => [x, 0])); for (const s of N.byWid.values()) if (!s.dead && load.has(s.tgt)) load.set(s.tgt, load.get(s.tgt) + 1);
+    const k0 = N.anchorI++; let best = Infinity;
+    for (let k = 0; k < pool.length; k++) { const x = pool[(k0 + k) % pool.length]; if (load.get(x) < best) { best = load.get(x); tgt = x; } }
+    anchor = tgt.position.clone();
+  }
   const doors = ctx.world?.indoorAt?.(anchor, tgt === ctx.player ? ctx.player.mounted : null);
   if (doors?.length) anchor = doors[0].clone();
   const at = findSpawn(anchor); if (!at) return 0;
@@ -221,27 +237,49 @@ function spawnSquad(size) {
   for (const s of ss) { s.wid = N.nextWid++; N.byWid.set(s.wid, s); }
   return ss.length;
 }
-/** open ground 26–70 m from the anchor, ≥ 20 m from every player, same nav region, hidden from every player if possible */
+/** open ground near..far m from the anchor (W.waveTuning; default 26–70), ≥ gap m from every player, on a ground level (never
+ *  roofs / balconies; multi-level maps list their floor levels), same nav region, hidden from every player if possible.
+ *  Multi-level: the distance counts height ×2 (a squad one floor down is farther than it looks on the plan), and candidates
+ *  are sampled on the anchor's own level first, then on the map's other levels so a player on a balcony still gets company. */
 function findSpawn(anchor) {
-  const { ctx, ai } = N; const nav = ai.nav, W = ctx.world || {}, rng = ctx.rng;
+  const { ctx, ai } = N; const nav = ai.nav, W = ctx.world || {}, rng = ctx.rng, T = N.tune;
   const players = N.targets.map((x) => x.position);
   const reg = nav.regionAt(anchor.x, anchor.z, anchor.y);
+  const dist = (q, p) => Math.hypot(q.x - p.x, q.z - p.z, (q.y - p.y) * 2);
   const ok = (q) => {
     if (!q || !Number.isFinite(q.y)) return false;
-    if (W.groundHeight && Math.abs(q.y - W.groundHeight(q.x, q.z)) > 1.5) return false;   // roofs, balconies, upper floors
+    if (!groundLevel(W, q)) return false;                                                 // roofs, balconies, upper floors, stairs
     if (W.chaseNoGo?.(q.x, q.z, q.y) || W.indoorAt?.(q, null)) return false;
     if (reg !== -1 && nav.regionAt(q.x, q.z, q.y) !== reg) return false;
-    const d = Math.hypot(q.x - anchor.x, q.z - anchor.z); if (d < 26 || d > 70) return false;
-    for (const p of players) if (Math.hypot(q.x - p.x, q.z - p.z) < 20) return false;
+    const d = dist(q, anchor); if (d < T.near || d > T.far) return false;
+    for (const p of players) if (dist(q, p) < T.gap) return false;
     return true;
   };
   const cands = [];
-  for (const v of [...(W.enemySpawns || []), ...(W.playerSpawns || [])]) { if (!v) continue; const d = Math.hypot(v.x - anchor.x, v.z - anchor.z); if (d < 26 || d > 70) continue; const q = nav.nearestFree(v.x, v.z, 3, v.y || 0); if (ok(q)) cands.push(q); }
-  for (let k = 0; k < 28 && cands.length < 16; k++) { const a = rng() * Math.PI * 2, d = 30 + rng() * 35; const q = nav.nearestFree(anchor.x + Math.cos(a) * d, anchor.z + Math.sin(a) * d, 4, anchor.y); if (ok(q)) cands.push(q); }
-  if (!cands.length) { for (let k = 0; k < 12; k++) { const q = nav.randomFreeNear(anchor.x, anchor.z, 60, rng, anchor.y); if (q && !W.chaseNoGo?.(q.x, q.z, q.y) && players.every((p) => Math.hypot(q.x - p.x, q.z - p.z) > 15)) return q; } return null; }
+  for (const v of [...(W.enemySpawns || []), ...(W.playerSpawns || [])]) { if (!v) continue; const d = Math.hypot(v.x - anchor.x, v.z - anchor.z); if (d > T.far) continue; const q = nav.nearestFree(v.x, v.z, 3, v.y || 0); if (ok(q)) cands.push(q); }
+  const levels = Array.isArray(W.waveTuning?.levels) ? W.waveTuning.levels : null;
+  for (let k = 0; k < 28 && cands.length < 16; k++) {
+    const a = rng() * Math.PI * 2, d = T.near + 3 + rng() * (T.far - T.near - 6);
+    const y = levels && k % 2 ? levels[(k >> 1) % levels.length] : anchor.y;
+    const q = nav.nearestFree(anchor.x + Math.cos(a) * d, anchor.z + Math.sin(a) * d, 4, y); if (ok(q)) cands.push(q);
+  }
+  if (!cands.length) { for (let k = 0; k < 12; k++) { const q = nav.randomFreeNear(anchor.x, anchor.z, T.far - 5, rng, anchor.y); if (q && groundLevel(W, q) && !W.chaseNoGo?.(q.x, q.z, q.y) && (reg === -1 || nav.regionAt(q.x, q.z, q.y) === reg) && players.every((p) => dist(q, p) > T.gap * 0.75)) return q; } return null; }
   for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [cands[i], cands[j]] = [cands[j], cands[i]]; }
-  for (const q of cands.slice(0, 8)) if (hiddenFromAll(q)) return q;
-  return cands[0];
+  // the anchor's own floor first (a squad on the street above a subway platform has a 150 m walk round to it), then hidden,
+  // then a real walk that isn't absurd (≤ 2.2 × far): at most 3 A* runs per squad
+  // … and spots where the anchor is the nearest player (else the squad peels off to whoever is closer and its player is left alone)
+  const others = players.filter((p) => dist(p, anchor) > 3);
+  const rank = (q) => (Math.abs(q.y - anchor.y) > 1 ? 2 : 0) + (others.some((p) => dist(q, p) < dist(q, anchor)) ? 1 : 0);
+  cands.sort((a, b) => rank(a) - rank(b));
+  const hidden = cands.slice(0, 10).filter((q) => hiddenFromAll(q)), pool = hidden.length ? hidden : cands.slice(0, 4);
+  for (const q of pool.slice(0, 3)) { const L = walkLen(q, anchor); if (L !== null && L <= T.far * 2.2) return q; }
+  return pool[0];
+}
+/** walking distance along the nav path (null = no complete path within the search budget) */
+function walkLen(a, b) {
+  let p = null; try { p = N.ai.nav.findPath(a, b, { maxExpand: 25000 }); } catch {}
+  if (!p || !p.complete) return null;
+  let L = 0, prev = a; for (const w of p) { L += Math.hypot(w.x - prev.x, w.z - prev.z, w.y - prev.y); prev = w; } return L;
 }
 function hiddenFromAll(q) {
   const targets = N.ctx.raycastTargets || [];
@@ -413,14 +451,19 @@ function updatePuppets(dt, now, ctx) {
 function ensureBike() {
   const { ctx } = N; const V = ctx.vehicles, me = ctx.player; if (!V?.qaSpawn || !me || me.dead) return 'none';
   const p = me.position;
-  for (const b of V.list || []) { if (b.spec?.car || b === V.mounted || !b.pos) continue; if (Math.hypot(b.pos.x - p.x, b.pos.z - p.z) < 15 && Math.abs(b.pos.y - p.y) < 2) return 'near'; }
   const nav = ctx.ai?.nav, W = ctx.world || {}; const yaw = me.yaw || 0; let spot = null;
+  if (!groundLevel(W, p)) return 'offground';   // respawned on a roof / deck / balcony: no bike up there
+  for (const b of V.list || []) { if (b.spec?.car || b === V.mounted || !b.pos) continue; if (Math.hypot(b.pos.x - p.x, b.pos.z - p.z) < 15 && Math.abs(b.pos.y - p.y) < 1 && groundLevel(W, b.pos)) return 'near'; }
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = -fz, rz = fx;
   for (const [a, b] of [[3.5, 2.2], [3.5, -2.2], [5, 0], [2, 3], [2, -3], [-3, 2.5], [-3, -2.5], [7, 3], [7, -3], [9, 0]]) {
     const x = p.x + fx * a + rx * b, z = p.z + fz * a + rz * b;
     const q = nav ? nav.nearestFree(x, z, 2.5, p.y) : new THREE.Vector3(x, p.y, z);
     if (!q || Math.abs(q.y - p.y) > 1 || Math.hypot(q.x - p.x, q.z - p.z) > 12 || Math.hypot(q.x - p.x, q.z - p.z) < 1.6) continue;
-    if (W.chaseNoGo?.(q.x, q.z, q.y) || W.indoorAt?.(q, null)) continue;
+    if (W.chaseNoGo?.(q.x, q.z, q.y) || W.indoorAt?.(q, null) || !groundLevel(W, q)) continue;
+    // the whole bike (±1.1 m along its heading yaw + 90°, ±0.4 m across) must stand on the same free floor
+    if (nav) { const h = yaw + Math.PI / 2, ax = Math.sin(h), az = Math.cos(h); let fit = true;
+      for (const [u, v] of [[1.1, 0], [-1.1, 0], [0.55, 0.4], [0.55, -0.4], [-0.55, 0.4], [-0.55, -0.4]]) { const x = q.x + ax * u + az * v, z = q.z + az * u - ax * v; if (!nav.isFree(x, z, q.y) || Math.abs(nav.floorAt(x, z, q.y) - q.y) > 0.3) { fit = false; break; } }
+      if (!fit) continue; }
     spot = q; break;
   }
   if (!spot) return 'nospot';
@@ -449,13 +492,14 @@ const QA = {
     id: N.net.id, host: N.host, hostId: N.host ? N.net.id : N.hostId, wave: N.wave, cycle: N.cycle, phase: N.phase, phaseT: +(+N.phaseT).toFixed(1), alive: aliveCount(),
     soldiers: N.host ? [...N.byWid].map(([id, s]) => ({ id, pos: s.position.toArray().map((v) => +v.toFixed(2)), dead: !!s.dead, hp: Math.round(s.health), tgt: s.tgt ? (s.tgt.id || N.net.id) : null }))
       : [...N.puppets].map(([id, q]) => ({ id, pos: q.s.position.toArray().map((v) => +v.toFixed(2)), dead: !!q.s.dead, hp: q.cur?.hp ?? 0, missing: !!q.missing })),
+    pending: N.host ? N.pending.reduce((a, p) => a + p.size, 0) : (N.pendingN || 0),
     kills: N.killLog.slice(), shotsTaken: N.shotsTaken, dmgTaken: N.dmgTaken, targets: N.targets.length, bikes: N.myBikes.length,
   },
   /** host: start wave n now */
   start: (n = 1) => { if (!N?.host) return false; startWave(n); return true; },
   /** host: a squad of `size` right here (x, z), fighting the nearest player */
-  spawnAt: (x, z, size = 1) => {
-    if (!N?.host) return 0; buildTargets(); const at = N.ai.nav.nearestFree(x, z, 6, 0); if (!at) return 0;
+  spawnAt: (x, z, size = 1, y = 0) => {
+    if (!N?.host) return 0; buildTargets(); const at = N.ai.nav.nearestFree(x, z, 6, y); if (!at) return 0;
     const tgt = nearestTarget(at); const members = []; for (let i = 0; i < size; i++) members.push({ pos: i ? (N.ai.nav.randomFreeNear(at.x, at.z, 2, N.ctx.rng, at.y) || at.clone()) : at.clone(), yaw: 0, health: 100 });
     const ss = N.ai.mpSpawnSquad(members, tgt); for (const s of ss) { s.wid = N.nextWid++; N.byWid.set(s.wid, s); }
     if (N.phase !== 'active') { N.phase = 'active'; N.wave = Math.max(1, N.wave); N.clock = 0; N.pending = []; N.enemies = ss.length; }
