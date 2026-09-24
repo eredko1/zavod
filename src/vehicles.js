@@ -61,7 +61,9 @@ function floorAt(x, z, yRef, skip = null, stepUp = 0.5) {
   for (let i = 0; i < boxes.length; i++) { const b = boxes[i]; if (b === skip) continue; if (b.min.x > x + 0.3 || b.max.x < x - 0.3 || b.min.z > z + 0.3 || b.max.z < z - 0.3) continue; const t = b.max.y; if (t <= yRef + stepUp && t > best && b.min.y < t) best = t; }
   return best === -Infinity ? yRef : best;
 }
-function inBounds(x, z, pad = 1) { const b = C.world?.bounds; return !b || (x > b.min.x + pad && x < b.max.x - pad && z > b.min.z + pad && z < b.max.z - pad); }
+/** the bounds that apply at (x, z): an extra zone's rect (coney's Belt Parkway) when inside one, else the map's */
+function boundsAt(x, z) { const zn = C.world?.zones?.find((r) => x > r.x0 - 2 && x < r.x1 + 2 && z > r.z0 - 2 && z < r.z1 + 2); return zn ? { min: { x: zn.x0, z: zn.z0 }, max: { x: zn.x1, z: zn.z1 } } : C.world?.bounds; }
+function inBounds(x, z, pad = 1) { const b = boundsAt(x, z); return !b || (x > b.min.x + pad && x < b.max.x - pad && z > b.min.z + pad && z < b.max.z - pad); }
 
 function baseState(x, z, yaw, yRef) {
   const y = floorAt(x, z, yRef);
@@ -266,7 +268,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
       const away = Math.atan2(-hitN.nx, -hitN.nz); v.heading += wrap(away - v.heading) * 0.15 * severity * (sp.car ? 0.4 : 1);
     }
   }
-  const b = C.world?.bounds;
+  const b = boundsAt(px, pz);
   if (b) {
     if (px < b.min.x + 1.2) { px = b.min.x + 1.2; if (vel.x < 0) { vel.x = -vel.x * BOUNCE; vel.z *= 0.6; } }
     if (px > b.max.x - 1.2) { px = b.max.x - 1.2; if (vel.x > 0) { vel.x = -vel.x * BOUNCE; vel.z *= 0.6; } }

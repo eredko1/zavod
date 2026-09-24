@@ -13,6 +13,7 @@ import { buildBeachLife } from '../coney/life.js';
 import { buildPark } from '../coney/park.js';
 import { buildHangout, hangoutQA } from '../coney/hangout.js';
 import { buildChase } from '../coney/chase.js';
+import { buildBelt } from '../coney/belt.js';
 import { OSM, PLAY } from '../coney/osm.js';
 import { bbox, segDist, pip } from '../osmkit.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
@@ -40,6 +41,7 @@ export function build(world) {
   try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level: cops + Luna Park crews (coney/chase.js)
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
+  try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }   // the Belt Parkway run to JFK (its own zone, coney/belt.js)
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);
 
