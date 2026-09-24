@@ -19,9 +19,9 @@ for (const [i, p] of P.entries()) await p.evaluate((i) => { const [x, y, z] = wi
 await P[0].waitForTimeout(1200); await P[0].keyboard.press('KeyF'); await P[0].waitForTimeout(9000);
 s = await hs(); ok(s.every((x) => x.pos[1] > 40), 'all 3 rode up together ' + JSON.stringify(s.map((x) => x.pos[1])));
 await P[0].screenshot({ path: `${out}/fr-top.png` });
-// 4) everyone smokes with S
-for (const p of P) { await p.keyboard.press('KeyS'); } await P[0].waitForTimeout(5000);
-s = await hs(); ok(s.every((x) => x.high > 0.3), 'all 3 lit up with S ' + JSON.stringify(s.map((x) => x.high)));
+// 4) everyone smokes with B
+for (const p of P) { await p.keyboard.press('KeyB'); } await P[0].waitForTimeout(5000);
+s = await hs(); ok(s.every((x) => x.high > 0.3), 'all 3 lit up with B ' + JSON.stringify(s.map((x) => x.high)));
 await P[1].screenshot({ path: `${out}/fr-high.png` });
 // 5) ride down together
 await P[1].evaluate(() => window.__game.hangout.ride('down', 0)); await P[1].waitForTimeout(500);

@@ -25,7 +25,7 @@ export const meta = {
 
 export function build(world) {
   const { ctx, W } = world;
-  W.bounds.set(new THREE.Vector3(PLAY.x0, -6, Math.min(PLAY.z0, -560)), new THREE.Vector3(PLAY.x1, 90, PLAY.z1));   // z extended north to take in Luna Park Houses 2 (hangout start)
+  W.bounds.set(new THREE.Vector3(PLAY.x0, -6, Math.min(PLAY.z0, -560)), new THREE.Vector3(Math.max(PLAY.x1, 420), 90, PLAY.z1));   // z extended north to take in Luna Park Houses 2 (hangout start), x east to W 8th St (Sammy's deli)
   const piers = OSM.pi.map((p) => bbox(p.p)).filter((q) => q.z1 > BW.z1 + 40 && q.z0 < BW.z1 + 20).map((q) => ({ x0: (q.x0 + q.x1) / 2 - 5.5, x1: (q.x0 + q.x1) / 2 + 5.5, z1: q.z1 }));
   W.groundHeight = (x, z) => {
     if (z <= BW.z1) return 0;
