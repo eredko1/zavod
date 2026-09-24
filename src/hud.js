@@ -531,7 +531,7 @@ function buildLoadout(H) {
 
 function buildControls(H) {
   const body = H.panels.controls.querySelector('.body');
-  const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim', 'RMB / E'], ['Scope zoom', 'WHEEL'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Interact', 'F'], ['Blaze / drink', 'B'], ['Vehicle camera', 'V'], ['Map help card', 'H'], ['Follow a friend', 'J'], ['Respawn at spot', 'T'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
+  const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim', 'RMB / E'], ['Scope zoom', 'WHEEL'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Interact', 'F'], ['Blaze / drink', 'B'], ['Vehicle camera', 'V'], ['Nitro (driving)', 'SHIFT'], ['Horn', 'Q'], ['Give a friend $10', 'N'], ['Map help card', 'H'], ['Follow a friend', 'J'], ['Respawn at spot', 'T'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
   const grid = document.createElement('div'); grid.className = 'keys';
   for (const [a, k] of keys) { const r = document.createElement('div'); r.className = 'row'; r.innerHTML = `<label>${a}</label><div class="ctl">${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</div>`; grid.appendChild(r); }
   body.appendChild(grid);

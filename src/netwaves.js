@@ -395,7 +395,7 @@ function onKill(m) {
   const k = ID_RE.test(m.k) ? m.k : null, hs = !!m.hs, ctx = N.ctx, me = N.net.id;
   N.killLog.push({ id: wid, k, hs }); if (N.killLog.length > 60) N.killLog.shift();
   const q = N.puppets.get(wid); if (q && !q.s.dead) killPuppet(q, hs);
-  if (q) ctx.bus.emit('mercKilled', { by: k, mine: k === me, position: q.s.position.clone(), soldier: q.s });   // hangkit: cash off the body
+  if (q) ctx.bus.emit('mercKilled', { by: k, mine: k === me, hs, position: q.s.position.clone(), soldier: q.s });   // hangkit: cash off the body
   const name = (id) => id === me ? 'YOU' : (N.net.peer(id)?.name || N.net.scores?.().find((s) => s.id === id)?.name || '?');
   ctx.hud?.killfeed?.(`${k ? name(k) : 'WORLD'} → ${hs ? '⊕ ' : ''}MERCENARY`);
   if (k === me) { ctx.hud?.hitmarker?.(hs, true); ctx.hud?.scorePopup?.(hs ? 'HEADSHOT KILL' : 'KILL', hs); }

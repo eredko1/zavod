@@ -34,7 +34,7 @@ export function buildHangout(world, M) {
   H.igor = buildIgor(world, M, igor);   // the interaction point is Igor's bench, not the park centre
   if (H.gate) { const g = H.gate, dx = H.igor.x - g.x, dz = H.igor.z - g.z; W.onlineStart = [g.x, 0, g.z, Math.atan2(-dx, -dz)]; }   // friends spawn at Igor's gate
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
-    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>Mercs drop cash — walk over it<br>V · car/bike camera · Space · handbrake<br>Tab · scoreboard · Esc · menu<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
+    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
   K.spot({ pos: H.igor, r: 2.4, prompt: `F — TALK TO IGOR ($${PRICE})`, act: buyIgor });
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)

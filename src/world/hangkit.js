@@ -66,8 +66,8 @@ function bindOnce(ctx) {
   ctx.bus.on('net:buy', (m) => V && V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Someone'} bought ${ITEMS[m.k]?.name ? 'a ' + ITEMS[m.k].name : 'something'} from ${String(m.v || 'the man').slice(0, 16)}`, 1800));
   ctx.bus.on('playerDied', () => { if (!V) return; endRide(true); leavePassenger(); closeDialog(); });
   // mercenary cash: solo / host kills arrive as enemyKilled, an online client's own kills as mercKilled (netwaves)
-  ctx.bus.on('enemyKilled', (d) => { if (V && d?.position && !d.qa) mercCash(d.position); });
-  ctx.bus.on('mercKilled', (d) => { if (V && d?.mine && d.position) mercCash(d.position); });
+  ctx.bus.on('enemyKilled', (d) => { if (V && d?.position && !d.qa) mercCash(d.position, !!d.headshot); });
+  ctx.bus.on('mercKilled', (d) => { if (V && d?.mine && d.position) mercCash(d.position, !!d.hs); });
   ctx.bus.on('state', ({ state }) => { if (V && state === 'dead') respawnBtn(); showUI(state === 'playing'); });
   ctx.bus.on('playerRespawn', () => {
     if (!V) return;
@@ -84,6 +84,16 @@ function bindOnce(ctx) {
     else if (e.code === 'KeyF' || e.code === 'Digit0') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) closeDialog(); }
   }, { capture: true });
   addEventListener('keydown', (e) => { if (V?.ui?.help && e.code === 'KeyH' && !e.repeat) V.ui.help.style.display = V.ui.help.style.display === 'none' ? 'block' : 'none'; });
+  // Q: horn (in a car — friends hear it) · N: give $10 to the closest friend within 3 m
+  addEventListener('keydown', (e) => {
+    if (!V || e.repeat || V.ctx.state !== 'playing' || V.dialog) return;
+    if (e.code === 'KeyQ' && V.ctx.vehicles?.mounted?.spec?.car) { const p = V.ctx.vehicles.mounted.pos; horn(1); V.ctx.net?.send?.('horn', { p: [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); }
+    if (e.code === 'KeyN') giveCash();
+  });
+  ctx.bus.on('net:horn', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player.position; const d = Math.hypot(me.x - m.p[0], me.z - m.p[2]); if (d < 160) horn(Math.max(0.08, 1 - d / 160)); });
+  ctx.bus.on('net:cash', (m) => { if (!V || m.to !== V.ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 50)) return; api.earn(n); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} gave you $${n}`, 2000); });
+  // bonus cash: every wave you get through pays everyone $15
+  ctx.bus.on('wave', (w) => { if (!V || !(w?.n > 1) || w.n === V.lastWave) return; const was = V.lastWave; V.lastWave = w.n; if (was) { api.earn(15); V.ctx.hud?.toast?.('Wave survived · +$15', 1800); } });
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -256,11 +266,24 @@ export function sell(item, price, vendorName, lines = {}) {
 }
 
 // ---- mercenary cash ---------------------------------------------------------------------------------------------------------------
-function mercCash(at) {
-  const bounty = 5 * (1 + Math.floor(Math.random() * 3));   // every kill pays $5–15 on the spot
-  api.earn(bounty); V.ctx.hud?.toast?.(`+$${bounty} bounty`, 1200);
+function mercCash(at, hs = false) {
+  const bounty = 5 * (1 + Math.floor(Math.random() * 3)) + (hs ? 10 : 0);   // every kill pays $5–15 on the spot, headshots +$10
+  api.earn(bounty); V.ctx.hud?.toast?.(`+$${bounty} ${hs ? 'headshot ' : ''}bounty`, 1200);
   if (Math.random() > 0.6) return;   // and most of them carry a wad: $20–50 on the body, walk over it
   dropCash(at, 20 + 5 * Math.floor(Math.random() * 7));
+}
+let _ac = null;
+/** a two-tone car horn (synth: no asset), volume by distance */
+function horn(vol) {
+  try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); const t = _ac.currentTime, g = _ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18 * vol, t + 0.02); g.gain.setValueAtTime(0.18 * vol, t + 0.42); g.gain.linearRampToValueAtTime(0, t + 0.5); g.connect(_ac.destination);
+    for (const f of [415, 523]) { const o = _ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const lp = _ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800; o.connect(lp); lp.connect(g); o.start(t); o.stop(t + 0.52); } } catch {}
+}
+function giveCash() {
+  const net = V.ctx.net; if (!net?.list) return; const me = V.ctx.player.position; let best = null, bd = 3;
+  for (const id of net.list()) { const q = net.peer(id); if (!q?.pos || q.dead) continue; const d = Math.hypot(q.pos.x - me.x, q.pos.z - me.z); if (d < bd) { bd = d; best = { id, name: q.name }; } }
+  if (!best) { V.ctx.hud?.toast?.('Get closer to a friend to give cash (N)', 1600); return; }
+  if (!api.pay(10)) { V.ctx.hud?.toast?.('You need $10', 1400); return; }
+  net.send('cash', { to: best.id, n: 10 }); V.ctx.hud?.toast?.(`Gave ${best.name || 'your friend'} $10`, 1600);
 }
 let _cashTex = null;
 function dropCash(at, n) {

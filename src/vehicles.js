@@ -111,6 +111,12 @@ function parkBox(v) {
 }
 function unparkBox(v) { v.box.min.set(0, -9999, 0); v.box.max.set(0.001, -9998, 0.001); rebuildGrids(); }
 function rebuildGrids() { S.grid.build(C.colliders); try { C.player?.rebuildColliders?.(); } catch {} }
+let _nb = null;
+/** small nitro gauge above the ammo counter while driving */
+function nitroBar(f, on) {
+  if (!_nb) { _nb = document.createElement('div'); _nb.style.cssText = 'position:fixed;right:24px;bottom:120px;width:120px;height:6px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);z-index:40;pointer-events:none'; _nb.innerHTML = '<i style="display:block;height:100%;background:#4fc3ff"></i><b style="position:absolute;right:0;top:-15px;font:700 10px Barlow Condensed,Arial;letter-spacing:.2em;color:#cfe3ff">NITRO</b>'; document.body.appendChild(_nb); }
+  _nb.style.display = S.mounted ? 'block' : 'none'; const i = _nb.firstChild; i.style.width = `${Math.round(f * 100)}%`; i.style.background = on > 0.3 ? '#ffb24a' : '#4fc3ff';
+}
 function fwdOf(h, out) { return out.set(-Math.sin(h), 0, -Math.cos(h)); }
 
 // ---------- placement ----------
@@ -166,6 +172,7 @@ function mount(bike) {
   return true;
 }
 function dismount() {
+  if (_nb) _nb.style.display = 'none';
   const bike = S.mounted, p = C.player; if (!bike || !p) return false;
   const sp = bike.spec;
   fwdOf(bike.heading, _f); _r.set(-_f.z, 0, _f.x);
@@ -219,10 +226,10 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
   const p = v.pos, vel = v.vel, sp = v.spec, sf = v.surf || SURF.hard;
   fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x);
   let fs = vel.x * _f.x + vel.z * _f.z, ls = vel.x * _r.x + vel.z * _r.z;
-  const fs0 = fs, max = sp.max * sf.max, grounded = !v.air;
+  const nb = v.boost || 0, fs0 = fs, max = sp.max * sf.max * (1 + 0.45 * nb), grounded = !v.air;   // nitro: +45 % top speed, +80 % pull
   v.throttle = damp(v.throttle, thr, 10, dt);
   if (grounded) {
-    if (thr > 0 && fs >= -0.5) { const k = clamp(fs / max, 0, 1); fs += sp.accel * sf.accel * thr * (1 - k * k) * dt; }
+    if (thr > 0 && fs >= -0.5) { const k = clamp(fs / max, 0, 1); fs += sp.accel * sf.accel * (1 + 0.8 * nb) * thr * (1 - k * k) * dt; }
     if (thr > 0 && fs < -0.5) fs = Math.min(0, fs + sp.brake * thr * dt);                        // throttle while rolling back = brake
     if (brk > 0) { if (fs > 0.3) fs = Math.max(0, fs - sp.brake * brk * dt); else if (thr === 0) fs = Math.max(-sp.revMax, fs - sp.accel * 0.5 * brk * dt); }
     if (hard) { const d = sp.hard * dt; fs = fs > 0 ? Math.max(0, fs - d) : Math.min(0, fs + d); }
@@ -231,7 +238,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
     const rf = (0.5 + sf.drag + (thr === 0 && brk === 0 ? sp.engineBrake : 0)) * dt; fs -= Math.sign(fs) * Math.min(Math.abs(fs), rf);
     if (fs > max) fs = damp(fs, max, 1.2, dt);   // entering sand at speed bleeds off instead of hitting a wall
   }
-  fs = clamp(fs, -sp.revMax, sp.max * 1.05);
+  fs = clamp(fs, -sp.revMax, sp.max * 1.05 * (1 + 0.45 * nb));
   // steering: the angle is capped by the cornering limit at this speed (so it's twitch-free at 30 m/s, tight at walking pace)
   const af = Math.abs(fs);
   const sliding = hard && af > 3 && grounded;
@@ -565,13 +572,19 @@ export function update(dt, ctx) {
     if (Math.abs(ax) > 0.12) steer = Math.sign(ax) * clamp((Math.abs(ax) - 0.12) / 0.7, 0, 1) ** 1.2;
     if (ay < -0.15) thr = Math.max(thr, clamp((-ay - 0.15) / 0.55, 0, 1));
     if (ay > 0.2) brake = Math.max(brake, clamp((ay - 0.2) / 0.55, 0, 1));
+    // nitro: hold Shift with the gas down (phones: stick pushed all the way up) — ~4 s of boost, refills in ~12 s
+    const want = ((key('ShiftLeft') || key('ShiftRight')) && thr > 0.3) || ay < -0.92;
+    S.nitro = S.nitro ?? 1;
+    if (want && S.nitro > 0.02) { S.nitro = Math.max(0, S.nitro - dt / 4); bike.boost = damp(bike.boost || 0, 1, 8, dt); if (!S.nitroOn) { S.nitroOn = true; ctx.hud?.toast?.('NITRO', 700); } }
+    else { S.nitro = Math.min(1, S.nitro + dt / 12); bike.boost = damp(bike.boost || 0, 0, 5, dt); S.nitroOn = false; }
+    nitroBar(S.nitro, bike.boost);
   }
   simulate(bike, dt, thr, brake, hard, steer);
   runOver(bike, dt);
   // speed FOV kick: written through settings.fov so weapons' ADS fov logic composes with it
   {
     if (S.fovWritten > 0 && Math.abs(ctx.settings.fov - S.fovWritten) > 1e-6) S.fovBase = ctx.settings.fov; // user moved the slider while riding
-    const kick = FOV_KICK * clamp(Math.abs(bike.fwdSpeed) / sp.max, 0, 1) ** 1.3;
+    const kick = FOV_KICK * clamp(Math.abs(bike.fwdSpeed) / sp.max, 0, 1.4) ** 1.3 + (bike.boost || 0) * 8;
     S.fovWritten = S.fovBase + kick; ctx.settings.fov = S.fovWritten;
   }
   S.revT -= dt;
