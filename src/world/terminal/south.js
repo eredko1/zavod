@@ -52,7 +52,7 @@ export function buildSouth(world, M, Z) {
     // parapet between corridor (0) and ramp: marble wall, 1.0 m above the corridor, |x| 26 → 50
     { const px0 = Math.min(ax(P.OPEN_X0 - 0.5), ax(P.RAMP_TOP_X)), px1 = Math.max(ax(P.OPEN_X0 - 0.5), ax(P.RAMP_TOP_X)); B.box(M.marble, [px0, -0.7, RAMP_Z0 - 0.3], [px1, 1.0, RAMP_Z0], { uvScale: uv(M.marble) }); world.box([px0, -0.7, RAMP_Z0 - 0.3], [px1, 1.0, RAMP_Z0]); }
     // ramp-side wall below the corridor (the corridor slab face) down to the ramp: solid mass
-    if (side < 0) { B.box(M.marble, [-35.9, -6.6, RZ0 - 0.2], [cx1, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) }); B.box(M.marble, [cx0, -6.6, RAMP_Z0 - 0.45], [-35.9, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) }); }
+    if (side < 0) { B.box(M.marble, [-35.9, -6.6, RZ0 - 0.2], [cx1, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) }); B.box(M.marble, [P.PASS.legW[1], -6.6, RAMP_Z0 - 0.45], [-35.9, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) }); }   // stops at the west passage (it used to cross it: a walk-through wall)
     else B.box(M.marble, [cx0, -6.6, RZ0 - 0.2], [cx1, -0.6, RAMP_Z0 - 0.3], { uvScale: uv(M.marble) });
     // north wall of the ramp strip for |x| < 26.5 (solid behind the ticket offices, marble-clad) — from the pit floor up to the ceiling
     B.box(M.marble, [Math.min(ax(BRIDGE_HX + 0.5), ax(P.OPEN_X0 - 0.5)), -6.6, RZ0 - 0.5], [Math.max(ax(BRIDGE_HX + 0.5), ax(P.OPEN_X0 - 0.5)), 4.2, RAMP_Z0], { uvScale: uv(M.marble) });

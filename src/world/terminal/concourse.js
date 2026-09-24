@@ -59,14 +59,17 @@ export function buildConcourse(world, M, Z) {
       const dir = zz > 0 ? -1 : 1;
       pil.push([x - 3.6, zz + dir * 0.35], [x + 3.6, zz + dir * 0.35]);
     }
+    const inOpening = (x) => Math.abs(x) < P.BRIDGE_HX + 0.3 || (Math.abs(x) > P.OPEN_X0 - 0.8 && Math.abs(x) < P.OPEN_X1 + 0.8);   // south wall: bridge arch + corner openings stay clear
     for (const [x, z] of pil) {
+      if (z > 0 && inOpening(x)) continue;
       const d = z > 0 ? -1 : 1;
       B.box(M.stone, [x - 0.6, 0, Math.min(z, z + d * 0.95)], [x + 0.6, CORNICE - 1.2, Math.max(z, z + d * 0.95)], { uvScale: uv(M.stone) });
       B.box(M.marble, [x - 0.8, CORNICE - 2.6, Math.min(z, z + d * 1.15)], [x + 0.8, CORNICE - 1.2, Math.max(z, z + d * 1.15)], { uvScale: uv(M.marble) });   // capital
       B.box(M.marbleDark, [x - 0.75, 0, Math.min(z, z + d * 1.1)], [x + 0.75, 2.8, Math.max(z, z + d * 1.1)], { uvScale: uv(M.marbleDark) });               // base
     }
     // Botticino wainscot along the long walls (dark band with a cap molding)
-    B.box(M.marbleDark, [X0, 0, Z1 - 0.18], [X1, 2.6, Z1 + 0.05], { uvScale: uv(M.marbleDark) }); B.box(M.marble, [X0, 2.6, Z1 - 0.26], [X1, 2.8, Z1 + 0.05], { uvScale: uv(M.marble) });
+    // (south: in segments between the openings — it used to run straight across them, a walk-through 'wall' in every doorway)
+    for (const [a, b2] of [[X0, -P.OPEN_X1], [-P.OPEN_X0, -P.BRIDGE_HX + 0.5], [P.BRIDGE_HX - 0.5, P.OPEN_X0], [P.OPEN_X1, X1]]) { B.box(M.marbleDark, [a, 0, Z1 - 0.18], [b2, 2.6, Z1 + 0.05], { uvScale: uv(M.marbleDark) }); B.box(M.marble, [a, 2.6, Z1 - 0.26], [b2, 2.8, Z1 + 0.05], { uvScale: uv(M.marble) }); }
     B.box(M.marbleDark, [X0, 0, Z0 - 0.05], [X1, 2.6, Z0 + 0.18], { uvScale: uv(M.marbleDark) }); B.box(M.marble, [X0, 2.6, Z0 - 0.05], [X1, 2.8, Z0 + 0.26], { uvScale: uv(M.marble) });
     // cornice underside molding + a second step (depth)
     B.box(M.marble, [X0 - T, CORNICE - 1.6, Z1 - 0.6], [X1 + T, CORNICE - 1.2, Z1 + 0.2], { uvScale: uv(M.marble) }); B.box(M.marble, [X0 - T, CORNICE - 1.6, Z0 - 0.2], [X1 + T, CORNICE - 1.2, Z0 + 0.6], { uvScale: uv(M.marble) });
