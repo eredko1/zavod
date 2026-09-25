@@ -282,19 +282,21 @@ function viaducts(world, M) {
   const V = new Batch(world, M, 'viaduct');
   const Y = 7.5;   // top of rail
   const near = (x, z) => x > PLAY.x0 - 30 && x < PLAY.x1 + 30 && z > PLAY.z0 - 30 && z < PLAY.z1 + 30;
+  const inTerminal = (x, z) => x > -90 && x < -22 && z > -446 && z < -255;   // the Stillwell terminal builds its own deck + tracks (coney/stillwell.js)
   for (const l of OSM.rl) {
     if (!l.el) continue;
     const pts = l.p; if (pts.length < 2) continue;
     walk(pts, 12, (x, z, dx, dz) => { // bents: two columns + cap girder across the track (+ knee braces in play)
+      if (inTerminal(x, z)) return;
       const ang = Math.atan2(dx, dz);
       for (const s of [-2.4, 2.4]) { const g = boxGeo([-0.25, 0, -0.25], [0.25, Y - 1.1, 0.25]); g.translate(s, 0, 0); g.rotateY(ang); g.translate(x, 0, z); V.add('elGirder', g); }
       const cap = boxGeo([-3.0, Y - 1.3, -0.35], [3.0, Y - 0.9, 0.35]); cap.rotateY(ang); cap.translate(x, 0, z); V.add('elGirder', cap);
       if (near(x, z)) for (const s of [-1, 1]) { const g = new THREE.BoxGeometry(0.16, 1.7, 0.2); g.rotateZ(s * 0.75); g.translate(s * 1.85, Y - 1.85, 0); g.rotateY(ang); g.translate(x, 0, z); V.add('elGirder', g); }
       world.box([x - 0.4, 0, z - 0.4], [x + 0.4, Y - 1, z + 0.4]);
     });
-    if (pts.some(([x, z]) => near(x, z))) walk(pts, 3, (x, z, dx, dz) => { if (!near(x, z)) return; const g = boxGeo([-2.0, Y - 0.62, -0.1], [2.0, Y - 0.25, 0.1]); g.rotateY(Math.atan2(dx, dz)); g.translate(x, 0, z); V.add('elGirder', g); });
+    if (pts.some(([x, z]) => near(x, z))) walk(pts, 3, (x, z, dx, dz) => { if (!near(x, z) || inTerminal(x, z)) return; const g = boxGeo([-2.0, Y - 0.62, -0.1], [2.0, Y - 0.25, 0.1]); g.rotateY(Math.atan2(dx, dz)); g.translate(x, 0, z); V.add('elGirder', g); });
     for (let i = 0; i + 1 < pts.length; i++) {
-      const [ax, az] = pts[i], [bx, bz] = pts[i + 1]; const L = Math.hypot(bx - ax, bz - az); if (L < 0.5) continue; const ang = Math.atan2(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2;
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1]; const L = Math.hypot(bx - ax, bz - az); if (L < 0.5) continue; if (inTerminal((ax + bx) / 2, (az + bz) / 2)) continue; const ang = Math.atan2(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2;
       const seg = (x0, y0, x1, y1, key, uv = true) => { const g = boxGeo([x0, y0, -L / 2 - 0.05], [x1, y1, L / 2 + 0.05]); if (!uv) { const u = g.attributes.uv, p = g.attributes.position; for (let k = 0; k < u.count; k++) u.setXY(k, (p.getX(k) + 2.5) / 5, p.getZ(k) / 2.4); } g.rotateY(ang); g.translate(mx, 0, mz); V.add(key, g, { uv }); };
       seg(-2.2, Y - 1.0, -1.9, Y - 0.2, 'elGirder'); seg(1.9, Y - 1.0, 2.2, Y - 0.2, 'elGirder');                  // plate girders
       seg(-0.95, Y - 0.72, -0.65, Y - 0.25, 'elGirder'); seg(0.65, Y - 0.72, 0.95, Y - 0.25, 'elGirder');          // stringers under the rails

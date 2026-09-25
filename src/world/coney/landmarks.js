@@ -8,6 +8,7 @@ import { Batch, boxGeo } from '../sbu/geo.js';
 import { OSM, PLAY } from './osm.js';
 import { BW } from './shore.js';
 import { bbox, footprintAngle, cen, walk } from '../osmkit.js';
+import { buildStillwell } from './stillwell.js';
 
 export const LM = {
   wheel: { x: 64, z: 61, h: 46 },
@@ -33,7 +34,7 @@ export function buildLandmarks(world, M) {
   wheel(world, M, B);
   parachuteJump(world, M, B);
   for (const c of OSM.rc) { const q = bbox(c.p); if (q.x1 < PLAY.x0 - 50 || q.x0 > PLAY.x1 + 50) continue; if (c.k === 'wood') woodCoaster(world, M, B, c); else steelCoaster(world, M, B, c); }
-  terminal(world, M, B);
+  buildStillwell(world, M);   // the walkable terminal (coney/stillwell.js)
   ballpark(world, M, B);
   hotdogStand(world, M, B);
   flatRides(world, M, B);
@@ -220,37 +221,6 @@ function steelCoaster(world, M, B, c) {
 }
 
 // =========================================================================================================================
-function terminal(world, M, B) {
-  const T = LM.terminal; const Y = 7.5, w = T.x1 - T.x0;
-  // white glazed terracotta: 0.6 x 0.3 m blocks, dark 3 mm joints, a little chipping and grime (critic r7 #5)
-  if (!M.terracotta.map) { const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d'); g.fillStyle = '#ebe8df'; g.fillRect(0, 0, 512, 512);
-    for (let r = 0; r < 16; r++) for (let k = -1; k < 5; k++) { const x = k * 128 + (r % 2) * 64, y = r * 32; g.fillStyle = `rgb(${226 + Math.random() * 20},${223 + Math.random() * 18},${212 + Math.random() * 16})`; g.fillRect(x + 2, y + 2, 124, 28); }
-    g.fillStyle = 'rgba(60,56,50,0.55)'; for (let r = 0; r <= 16; r++) g.fillRect(0, r * 32, 512, 2); for (let r = 0; r < 16; r++) for (let k = 0; k < 5; k++) g.fillRect(k * 128 + (r % 2) * 64, r * 32, 2, 32);
-    for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(${140 + Math.random() * 40},${130 + Math.random() * 40},110,${0.2 + Math.random() * 0.4})`; g.beginPath(); g.ellipse(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 7, 1 + Math.random() * 4, 0, 0, 7); g.fill(); }
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; M.terracotta.map = t; M.terracotta.color.set(0xffffff); M.terracotta.roughness = 0.35; M.terracotta.needsUpdate = true; M.uvScale.terracotta = 1 / 2.4; }
-  // street-level concourse: white terracotta frontage on the south (Surf Avenue) face with tall arched windows, shops inside
-  B.box('terracotta', [T.x0, 0, T.z1 - 8], [T.x1, 10.5, T.z1]);
-  for (let x = T.x0 + 3; x < T.x1 - 3; x += 6) { B.box('glassLight', [x, 2.2, T.z1 + 0.01], [x + 4, 8.8, T.z1 + 0.06], { collide: false }); B.box('steelDark', [x + 1.95, 2.2, T.z1 + 0.02], [x + 2.05, 8.8, T.z1 + 0.09], { collide: false }); B.cyl('terracotta', x + 2, T.z1 + 0.05, 8.8, 9.0, 2.05, 16); }
-  for (let x = T.x0 + 8; x < T.x1 - 8; x += 12) { B.box('glassDark', [x, 0, T.z1 + 0.01], [x + 6, 2.1, T.z1 + 0.06], { collide: false }); }
-  B.box('terracotta', [T.x0 - 0.3, 10.5, T.z1 - 0.3], [T.x1 + 0.3, 11.3, T.z1 + 0.4]);                     // cornice
-  for (let x = T.x0 + 3; x < T.x1 - 3; x += 6) { for (let k = 1; k < 7; k++) B.box('wheelBrown', [x + k * 0.6 - 0.03, 2.2, T.z1 + 0.07], [x + k * 0.6 + 0.03, 8.8, T.z1 + 0.1], { collide: false }); for (let y = 3.1; y < 8.8; y += 0.9) B.box('wheelBrown', [x, y - 0.03, T.z1 + 0.07], [x + 4, y + 0.03, T.z1 + 0.1], { collide: false }); }
-  for (let x = T.x0; x < T.x1; x += 0.4) B.box('bulb', [x, 11.35, T.z1 + 0.38], [x + 0.08, 11.43, T.z1 + 0.46], { collide: false });
-  B.cyl('railSteelGreen', (T.x0 + T.x1) / 2, T.z1 + 0.15, 6.2, 6.4, 1.3, 24);                                 // roundel (blank, no lettering)
-  B.box('wheelGreen', [(T.x0 + T.x1) / 2 - 1.1, 5.2, T.z1 + 0.2], [(T.x0 + T.x1) / 2 + 1.1, 7.4, T.z1 + 0.25], { collide: false });
-  // under the platforms: the arcade of steel columns (open, walkable), the train shed above on steel arches with a glazed/solar barrel roof
-  for (let z = T.z0 + 6; z < T.z1 - 10; z += 12) for (let x = T.x0 + 2; x <= T.x1 - 2; x += (w - 4) / 4) { B.box('railSteelGreen', [x - 0.3, 0, z - 0.3], [x + 0.3, Y - 1, z + 0.3]); }
-  B.box('concreteGrey', [T.x0, Y - 1, T.z0], [T.x1, Y - 0.3, T.z1 - 8], { collide: false });
-  world.box([T.x0, Y - 1, T.z0], [T.x1, Y + 0.8, T.z1 - 8]);                                                    // platform deck (not reachable from below)
-  for (let z = T.z0 + 4; z < T.z1 - 8; z += 12) {
-    for (let k = 0; k <= 12; k++) { const a0 = k / 12 * Math.PI, a1 = (k + 1) / 12 * Math.PI; if (k === 12) break; const R0 = w / 2; const p0 = [T.x0 + w / 2 - Math.cos(a0) * R0, Y + 1.1 + Math.sin(a0) * 9], p1 = [T.x0 + w / 2 - Math.cos(a1) * R0, Y + 1.1 + Math.sin(a1) * 9]; const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); const g = new THREE.BoxGeometry(L, 0.6, 0.5); g.rotateZ(Math.atan2(p1[1] - p0[1], p1[0] - p0[0])); g.translate((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, z); B.add('railSteelGreen', g, { uv: false }); }
-  }
-  const roof = new THREE.CylinderGeometry(w / 2 + 0.3, w / 2 + 0.3, T.z1 - 8 - T.z0, 24, 1, true, -Math.PI / 2, Math.PI); roof.rotateX(Math.PI / 2); roof.scale(1, 9 / (w / 2 + 0.3), 1); roof.translate((T.x0 + T.x1) / 2, Y + 1.1, (T.z0 + T.z1 - 8) / 2);
-  const rm = new THREE.Mesh(roof, new THREE.MeshStandardMaterial({ color: 0x8e9aa4, roughness: 0.35, metalness: 0.5, side: THREE.DoubleSide, envMapIntensity: 1.0, name: 'shedRoof' })); rm.castShadow = true; rm.receiveShadow = true; world.scene.add(rm);
-  // two parked trains in the shed (stainless, lit windows)
-  for (const x of [T.x0 + w * 0.3, T.x0 + w * 0.7]) for (let z = T.z0 + 8; z < T.z1 - 30; z += 19) { B.box('alu', [x - 1.5, Y, z], [x + 1.5, Y + 3.6, z + 18.2], { collide: false }); B.box('glassLit', [x - 1.52, Y + 1.5, z + 1], [x + 1.52, Y + 2.6, z + 17], { collide: false }); }
-  for (let x = T.x0 + 2; x < T.x1 - 2; x += 8) world.cover(x, T.z1 + 1.2, 0, 1);
-}
-
 function ballpark(world, M, B) {
   const P = LM.ballpark; const R = world.R;
   // brick outer wall with arched gates on the north (street) side, grandstand wrapping the NE corner, light towers, scoreboard
