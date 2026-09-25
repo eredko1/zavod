@@ -21,7 +21,7 @@ export function init(ctx) {
   const mini = document.createElement('canvas'); mini.className = 'zvmini'; mini.width = mini.height = size * 2; mini.style.width = mini.style.height = size + 'px'; mini.style.display = 'none'; document.body.appendChild(mini);
   const big = document.createElement('div'); big.className = 'zvbig'; big.innerHTML = '<div class="h"></div><canvas></canvas><div class="k">M · close</div>'; document.body.appendChild(big);
   M = { ctx, mini, mctx: mini.getContext('2d'), size, big, bcan: big.querySelector('canvas'), img: null, shotAt: 0, frame: 0, open: false };
-  const toggle = () => { M.open = !M.open; big.classList.toggle('on', M.open); if (M.open) { big.querySelector('.h').textContent = (ctx.world?.maps?.find((m) => m.id === ctx.world?.mapId)?.name || 'MAP').toUpperCase(); drawBig(); } };
+  const toggle = () => { M.open = !M.open; big.classList.toggle('on', M.open); if (M.open) { pickImg(); big.querySelector('.h').textContent = (ctx.world?.maps?.find((m) => m.id === ctx.world?.mapId)?.name || 'MAP').toUpperCase() + (M.level != null ? `  ·  LEVEL ${M.level === 0 ? 'STREET' : M.level}` : ''); drawBig(); } };
   addEventListener('keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && (ctx.state === 'playing' || M.open) && !document.querySelector('.hkdlg.on') && !document.querySelector('.zvon.on')) { toggle(); } if (e.code === 'Escape' && M.open) toggle(); });
   mini.addEventListener('click', (e) => { e.stopPropagation(); toggle(); }); mini.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); toggle(); }, { passive: false });
   big.addEventListener('click', () => { if (M.open) toggle(); }); big.addEventListener('touchstart', (e) => { e.preventDefault(); if (M.open) toggle(); }, { passive: false });
@@ -36,20 +36,32 @@ export function init(ctx) {
 // the background: the world from above
 function snapshot() {
   const { ctx } = M; const W = ctx.world, b = W?.bounds; if (!b) return;
+  // multi-level interiors (W.mapLevels, else the wave floor levels): one cutaway floor plan per level; everything else one view
+  const levels = Array.isArray(W.mapLevels) ? W.mapLevels : (Array.isArray(W.waveTuning?.levels) && W.waveTuning.levels.length > 1 ? W.waveTuning.levels : null);
+  M.levels = levels ? levels.slice().sort((a, c) => c - a) : null; M.imgs = {};
+  if (M.levels) for (const y of M.levels) M.imgs[y] = shoot(y + 3.2); else M.imgs.all = shoot(null);
+  M.img = M.levels ? M.imgs[M.levels[0]] : M.imgs.all;
+  console.log('[map] snapshot', M.map.RW, 'x', M.map.RH, M.levels ? 'levels ' + M.levels.join(',') : '');
+}
+function shoot(clipY) {
+  const { ctx } = M; const W = ctx.world, b = W.bounds;
   const w = b.max.x - b.min.x, d = b.max.z - b.min.z, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
   const res = ctx.isTouch ? 1024 : 2048, RW = w >= d ? res : Math.round(res * w / d), RH = w >= d ? Math.round(res * d / w) : res;
   const cam = new THREE.OrthographicCamera(-w / 2, w / 2, d / 2, -d / 2, 1, 4000); cam.position.set(cx, 1500, cz); cam.up.set(0, 0, -1); cam.lookAt(cx, 0, cz); cam.updateMatrixWorld(true);
   const scene = ctx.scene, R = ctx.renderer, hidden = [];
   scene.traverse((o) => { if (o === scene || !o.visible) return; const n = o.name || '';
-    if (o === ctx.camera || o.isSprite || o.isPoints || /far|sky|dome|horizon|cloud|star|moon|sun|firework|rain/i.test(n) || (o.isMesh && o.renderOrder < 0) || (o.isMesh && o.material && (o.material.depthTest === false))) { hidden.push(o); o.visible = false; } });
+    if (o === ctx.camera || o.isSprite || o.isPoints || (o.isMesh && o.material?.blending === THREE.AdditiveBlending) || /far|sky|dome|horizon|cloud|star|moon|sun|firework|rain|shaft|godray|beam|glow/i.test(n) || (o.isMesh && o.renderOrder < 0) || (o.isMesh && o.material && (o.material.depthTest === false))) { hidden.push(o); o.visible = false; } });
   const fog = scene.fog, bg = scene.background; scene.fog = null; scene.background = new THREE.Color(0x0e1a24);
   const rt = new THREE.WebGLRenderTarget(RW, RH, { type: THREE.HalfFloatType });
-  const prevT = R.getRenderTarget(); R.setRenderTarget(rt); R.clear(); R.render(scene, cam); R.setRenderTarget(prevT);
+  const prevClip = R.clippingPlanes; if (clipY != null) R.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY)];   // cut away everything above this floor
+  const prevT = R.getRenderTarget(); R.setRenderTarget(rt); R.clear(); R.render(scene, cam); R.setRenderTarget(prevT); R.clippingPlanes = prevClip;
   for (const o of hidden) o.visible = true; scene.fog = fog; scene.background = bg;
   const buf = new Uint16Array(RW * RH * 4); R.readRenderTargetPixels(rt, 0, 0, RW, RH, buf); rt.dispose();
   const c = document.createElement('canvas'); c.width = RW; c.height = RH; const g = c.getContext('2d'); const img = g.createImageData(RW, RH);
   const f16 = (h) => { const s = (h & 0x8000) ? -1 : 1, e = (h >> 10) & 0x1f, m = h & 0x3ff; return e === 0 ? s * Math.pow(2, -14) * (m / 1024) : e === 31 ? 0 : s * Math.pow(2, e - 15) * (1 + m / 1024); };
-  const exp = 1.25;
+  // exposure: night / dark interiors get lifted so the plan reads (target mean ≈ 0.3 after the curve)
+  let sum = 0, cnt = 0; for (let i = 0; i < buf.length; i += 4 * 97) { sum += 0.3 * f16(buf[i]) + 0.59 * f16(buf[i + 1]) + 0.11 * f16(buf[i + 2]); cnt++; }
+  const mean = Math.max(1e-3, sum / cnt), exp = Math.min(8, Math.max(1.25, 0.45 / mean));
   for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
     const si = ((RH - 1 - y) * RW + x) * 4, di = (y * RW + x) * 4;   // read is bottom-up
     for (let k = 0; k < 3; k++) { let v = Math.max(0, f16(buf[si + k])) * exp; v = v / (1 + v); v = Math.pow(v, 1 / 2.2); img.data[di + k] = Math.min(255, v * 255); }
@@ -63,21 +75,25 @@ function snapshot() {
   const px = (x) => (x - b.min.x) / w * RW, pz = (z) => (z - b.min.z) / d * RH, sc = RW / w;
   if (Array.isArray(W.mapRoads)) { g.lineCap = g.lineJoin = 'round';
     for (const pass of [0, 1]) for (const r of W.mapRoads) { if (!r.p?.length) continue; g.beginPath(); r.p.forEach(([x, z], i) => (i ? g.lineTo(px(x), pz(z)) : g.moveTo(px(x), pz(z)))); g.lineWidth = Math.max(1.2, (r.w || 8) * sc) + (pass ? 0 : 2.5 * sc); g.strokeStyle = pass ? 'rgba(214,218,222,0.78)' : 'rgba(20,24,30,0.55)'; g.stroke(); } }
-  M.img = c; M.map = { b, w, d, RW, RH, px, pz };
-  console.log('[map] snapshot', RW, 'x', RH);
+  M.map = { b, w, d, RW, RH, px, pz };
+  return c;
 }
+/** the floor plan for where the player is (multi-level maps) */
+function levelOf(y) { if (!M.levels) return null; let best = M.levels[M.levels.length - 1]; for (const L of M.levels) if (y >= L - 1.5) { best = L; break; } return best; }
+function pickImg() { const y = M.ctx.player?.position?.y ?? 0; const L = levelOf(y); M.level = L; M.img = L == null ? M.imgs.all : M.imgs[L]; }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 export function update(dt, ctx) {
-  if (!M?.img) return; M.frame++;
+  if (!M?.img) return; M.frame++; if (M.frame % 15 === 0) pickImg();
   if (M.open) { if (M.frame % 3 === 0) drawBig(); return; }
   if (ctx.state === 'playing' && M.frame % 3 === 0) drawMini();
 }
 function markers() {
   const { ctx } = M; const out = { enemies: [], thugs: [], friends: [], bikes: [], vendors: [] };
-  for (const s of ctx.ai?.soldiers || []) if (s && !s.dead && s.position) out.enemies.push([s.position.x, s.position.z, !!s.brain]);
+  const off = (y) => M.level != null && Math.abs((y ?? 0) - M.level) > 3;   // on another floor: drawn faded
+  for (const s of ctx.ai?.soldiers || []) if (s && !s.dead && s.position) out.enemies.push([s.position.x, s.position.z, !!s.brain, off(s.position.y)]);
   const th = ctx.world?.mapThugs?.(); if (th) out.thugs = th;
-  const net = ctx.net; if (net?.list) for (const id of net.list()) { const q = net.peer(id); if (q?.pos) out.friends.push([q.pos.x, q.pos.z, q.name || '', q.dead]); }
+  const net = ctx.net; if (net?.list) for (const id of net.list()) { const q = net.peer(id); if (q?.pos) out.friends.push([q.pos.x, q.pos.z, q.name || '', q.dead, off(q.pos.y)]); }
   for (const v of ctx.vehicles?.list || []) if (v !== ctx.vehicles.mounted && v.pos) out.bikes.push([v.pos.x, v.pos.z, !!v.spec?.car]);
   const K = kit(); if (K) for (const v of K.vendors) out.vendors.push([v.pos.x, v.pos.z, v.name]);
   return out;
@@ -89,9 +105,9 @@ function drawMarkers(g, P, scale, rot = 0, big = false) {
   const k = big ? 1 : 2;   // minimap canvas is 2x
   for (const [x, z, car] of mk.bikes) { const [u, v] = P(x, z); g.fillStyle = car ? '#6fd08a' : '#9fe39a'; g.fillRect(u - 3 * k, v - 3 * k, 6 * k, 6 * k); }
   for (const [x, z, n] of mk.vendors) { const [u, v] = dot(x, z, 4.5 * k, '#ffd27a'); if (big) label(u, v - 9, n, '#ffd27a', 12); }
-  for (const [x, z, cop] of mk.enemies) dot(x, z, 4 * k, cop ? '#b36bff' : '#ff4a3a', '#2a0000');
+  for (const [x, z, cop, far] of mk.enemies) { g.globalAlpha = far ? 0.35 : 1; dot(x, z, 4 * k, cop ? '#b36bff' : '#ff4a3a', '#2a0000'); } g.globalAlpha = 1;
   for (const [x, z] of mk.thugs) dot(x, z, 4 * k, '#ff9a3a', '#2a1000');
-  for (const [x, z, n, dead] of mk.friends) { const [u, v] = dot(x, z, 5 * k, dead ? '#667' : '#4aa3ff', '#fff'); if (big) label(u, v - 10, n, '#cfe3ff', 13); else label(u, v - 12, n, '#cfe3ff', 20); }
+  for (const [x, z, n, dead, far] of mk.friends) { g.globalAlpha = far ? 0.45 : 1; const [u, v] = dot(x, z, 5 * k, dead ? '#667' : '#4aa3ff', '#fff'); if (big) label(u, v - 10, n, '#cfe3ff', 13); else label(u, v - 12, n, '#cfe3ff', 20); } g.globalAlpha = 1;
   // you: an arrow along your view
   const p = ctx.player; if (p) { const [u, v] = P(p.position.x, p.position.z); g.save(); g.translate(u, v); g.rotate(rot - p.yaw); g.beginPath(); const s = 9 * k; g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.8); g.lineTo(0, s * 0.35); g.lineTo(-s * 0.7, s * 0.8); g.closePath(); g.fillStyle = '#ffd23b'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#000'; g.stroke(); g.restore(); }
 }
