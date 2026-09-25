@@ -33,6 +33,10 @@ const HP = 100;
 const FIGHT = ['You want smoke? You got smoke!', 'Oh, now you done it.', 'Bratan, big mistake.', 'Get him!', 'Hold my semechki.'];
 let C = null;
 
+/** jobs (coney/jobs.js): a named person at a spot, e.g. a debtor */
+export function spawnPerson(at, name, cash = 40, type = 'mk') { if (!C) return null; const t = spawnGang(type, 'mark', 1, null, { at, name, cash })[0] || null; if (t) t.keep = true; return t; }
+export const crewsAlive = (t) => !!(C && t && C.thugs.get(t.id) === t);
+
 /** the crews (both modes): chill = frequent solo robbers + gangs; otherwise a gang now and then */
 export function buildCrews(world, { chill = false } = {}) {
   const { ctx, W } = world;
@@ -45,7 +49,7 @@ export function buildCrews(world, { chill = false } = {}) {
     C.calmUntil = performance.now() + 60000;
   });
   K.spot({ pos: C.robPos, r: 3.3, dy: 2, when: () => !!C.robT, prompt: () => `F — ROB ${C.robT?.name || ''}`, act: () => C.robT && robVictim(C.robT) });   // no shakedowns for a minute after you respawn
-  W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead').map((t) => [t.pos.x, t.pos.z]);
+  W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead' && t.type !== 'mk').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
   ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null); });
   K.onUpdate((dt, playing) => update(dt, playing));
@@ -100,20 +104,21 @@ function thugModel(name, seed, type = 'ru') {
   return { f, hit: [body, head], blade };
 }
 /** a crew of n (same type) rolls in from one direction, 40–60 m out (or `dist`); intent 'rob' | 'talk' */
-function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.random() < 0.55 ? 'rob' : 'talk', n = 2 + (Math.random() < 0.4 ? 1 : 0), dist = null) {
+function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.random() < 0.55 ? 'rob' : 'talk', n = 2 + (Math.random() < 0.4 ? 1 : 0), dist = null, opts = {}) {
   const { ctx, world } = C; const me = ctx.player.position, nav = ctx.ai?.nav, T = CREWS[type] || CREWS.ru;
-  let base = null;
+  let base = opts.at ? opts.at.clone() : null;
   for (let k = 0; k < 12 && !base; k++) { const a = Math.random() * Math.PI * 2, d = dist ?? (40 + Math.random() * 20); const x = me.x + Math.cos(a) * d, z = me.z + Math.sin(a) * d; const q = nav?.nearestFree ? nav.nearestFree(x, z, 5, me.y) : new THREE.Vector3(x, me.y, z); if (q && Math.abs(q.y - me.y) < 1.5) base = new THREE.Vector3(q.x, q.y, q.z); }
   if (!base) return [];
   const used = new Set(), out = [], lk = Math.floor(Math.random() * 5);   // each member gets his own line
   for (let i = 0; i < n; i++) {
     let at = base.clone(); if (i) { const q = nav?.nearestFree?.(base.x + (Math.random() - 0.5) * 5, base.z + (Math.random() - 0.5) * 5, 3, base.y); if (q) at = new THREE.Vector3(q.x, q.y, q.z); }
-    let name; do { name = T.names[Math.floor(Math.random() * T.names.length)]; } while (used.has(name) && used.size < T.names.length); used.add(name);
+    let name = opts.name; if (!name) { do { name = T.names[Math.floor(Math.random() * T.names.length)]; } while (used.has(name) && used.size < T.names.length); } used.add(name);
     const id = C.nextId++; const m = thugModel(name, id, type); m.f.group.position.copy(at); world.scene.add(m.f.group);
     const t = { id, name, type, intent, m, pos: at, yaw: 0, st: 'walk', hp: HP, cash: 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.6 * i, said: false, talkT: 0, lk: lk + i, blade: !!m.blade };
     for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir); ctx.raycastTargets.push(h); }
     C.thugs.set(id, t); out.push(t);
   }
+  if (opts.cash != null) for (const t of out) t.cash = opts.cash;
   if (n > 1) K.toast(`${type === 'ru' ? 'A crew of gopniks' : 'Some guys from the block'} ${intent === 'rob' ? 'are coming your way — watch your pockets' : 'are rolling up'}`, 2400);
   return out;
 }
@@ -151,7 +156,7 @@ function flee(t) { t.st = 'flee'; t.t = 0; t.m.f.guard = false; t.m.f.hands = fa
 function onRemoteThug(m) {
   const { ctx } = C; if (typeof m.f !== 'string' || !Number.isFinite(+m.x)) return;
   const key = m.f + ':' + m.i; let t = C.remote.get(key);
-  if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 10), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru'); C.world.scene.add(mm.f.group); t = { key, id: key, m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
+  if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 10), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru'); C.world.scene.add(mm.f.group); t = { key, id: key, type: m.k === 'st' || m.k === 'mk' ? m.k : 'ru', m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
     for (const h of mm.hit) { h.userData.onHit = (dmg) => ctx.net?.send?.('thughit', { o: m.f, i: m.i, d: Math.round(dmg) }); ctx.raycastTargets.push(h); } C.remote.set(key, t); }
   if (m.st === 'gone') { removeThug(t, C.remote); return; }
   t.target = new THREE.Vector3(+m.x, +m.y, +m.z); t.yaw = +m.r || 0; t.st = m.st; t.seen = performance.now();
@@ -190,7 +195,7 @@ function update(dt, playing) {
       if (t.t > (t.st === 'flee' ? 14 : 20)) { gone(t); continue; }
     } else if (me.dead || !playing) speed = 0;
     else if (t.intent === 'mark') {   // a regular person walking somewhere; wanders off the map when you're long gone
-      if (d > 110) { gone(t); continue; }
+      if (d > 110 && !t.keep) { gone(t); continue; }
       if (!t.goal || Math.hypot(t.goal.x - t.pos.x, t.goal.z - t.pos.z) < 1.2 || t.t > t.goalT) {
         const a = Math.random() * Math.PI * 2, r = 10 + Math.random() * 18, q = ctx.ai?.nav?.nearestFree?.(t.pos.x + Math.cos(a) * r, t.pos.z + Math.sin(a) * r, 5, t.pos.y);
         t.goal = q ? new THREE.Vector3(q.x, q.y, q.z) : t.pos.clone(); t.goalT = t.t + 25; t.path = null; }

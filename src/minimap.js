@@ -112,6 +112,11 @@ function drawMarkers(g, P, scale, rot = 0, big = false) {
   for (const [x, z, cop, far] of mk.enemies) { g.globalAlpha = far ? 0.35 : 1; dot(x, z, 4 * k, cop ? '#b36bff' : '#ff4a3a', '#2a0000'); } g.globalAlpha = 1;
   for (const [x, z] of mk.thugs) dot(x, z, 4 * k, '#ff9a3a', '#2a1000');
   for (const [x, z, n, dead, far] of mk.friends) { g.globalAlpha = far ? 0.45 : 1; const [u, v] = dot(x, z, 5 * k, dead ? '#667' : '#4aa3ff', '#fff'); if (big) label(u, v - 10, n, '#cfe3ff', 13); else label(u, v - 12, n, '#cfe3ff', 20); } g.globalAlpha = 1;
+  // the current job's destination: a gold diamond (pinned to the rim of the minimap when it's off the dial)
+  const jb = ctx.world?.mapJob?.(); if (jb) { let [u, v] = P(jb[0], jb[1]);
+    if (!big) { const R = g.canvas.width / 2, dx = u - R, dy = v - R, d = Math.hypot(dx, dy), lim = R - 14 * k / 2 - 6; if (d > lim) { u = R + dx / d * lim; v = R + dy / d * lim; } }
+    const s = (7 + Math.sin(performance.now() / 180) * 1.5) * k; g.save(); g.translate(u, v); g.rotate(Math.PI / 4); g.fillStyle = '#ffd23b'; g.strokeStyle = '#2a1a00'; g.lineWidth = 2; g.fillRect(-s / 2, -s / 2, s, s); g.strokeRect(-s / 2, -s / 2, s, s); g.restore();
+    if (big && jb[2]) label(u, v - 12, jb[2], '#ffd23b', 13); }
   // you: an arrow along your view
   const p = ctx.player; if (p) { const [u, v] = P(p.position.x, p.position.z); g.save(); g.translate(u, v); g.rotate(rot - p.yaw); g.beginPath(); const s = 9 * k; g.moveTo(0, -s); g.lineTo(s * 0.7, s * 0.8); g.lineTo(0, s * 0.35); g.lineTo(-s * 0.7, s * 0.8); g.closePath(); g.fillStyle = '#ffd23b'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#000'; g.stroke(); g.restore(); }
 }
@@ -165,6 +170,6 @@ function drawBig() {
   g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(M.bg.can, 0, 0); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawMarkers(g, P, 1, 0, true);
   // legend
-  const items = [['#ffd23b', 'YOU'], ['#4aa3ff', 'FRIENDS'], ['#ff4a3a', 'MERCS'], ['#b36bff', 'COPS'], ['#ff9a3a', 'GOPNIKS'], ['#ffd27a', 'VENDORS'], ['#9fe39a', 'BIKES / CARS']];
+  const items = [['#ffd23b', 'YOU'], ['#4aa3ff', 'FRIENDS'], ['#ff4a3a', 'MERCS'], ['#b36bff', 'COPS'], ['#ff9a3a', 'GOPNIKS'], ['#ffd27a', 'VENDORS'], ['#9fe39a', 'BIKES / CARS'], ['#ffd23b', 'JOB ◆']];
   g.save(); g.fillStyle = 'rgba(6,8,12,.72)'; g.fillRect(10, 10, 118, items.length * 18 + 12); items.forEach(([col, t], i) => { g.fillStyle = col; g.beginPath(); g.arc(24, 24 + i * 18, 5, 0, Math.PI * 2); g.fill(); g.fillStyle = '#e8edf2'; g.font = '600 12px Barlow, Arial'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(t, 36, 24 + i * 18); }); g.restore();
 }

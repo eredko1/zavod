@@ -8,6 +8,7 @@ import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews } from './chill.js';
+import { buildJobs, jobsTalk } from './jobs.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -44,14 +45,15 @@ export function buildHangout(world, M) {
   }
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'LUNA PARK HOUSES', x: b2.centre.x, z: b2.centre.z - 30, kind: 'landmark' });
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
-    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
+    help: 'Igor has side jobs (F → Got any work?)<br>F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
   K.spot({ pos: H.igor, r: 2.4, prompt: 'F — TALK TO IGOR', act: talkIgor });
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
   try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
-  try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }   // chill mode / the crews that roll through (coney/chill.js)
+  try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
+  try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);
@@ -269,6 +271,7 @@ function talkIgor() {
     choices: [
       { label: `A bag — $${PRICE}`, go: () => igorSell('weed') },
       { label: `A bottle — $${PRICE}`, go: () => igorSell('bottle') },
+      { label: 'Got any work?', go: () => jobsTalk() },
       { label: 'What\'s the word?', go: () => ({ text: `IGOR: "${IGOR_GOSSIP[Math.floor(Math.random() * IGOR_GOSSIP.length)]}"`, choices: [{ label: 'Heard', go: null }] }) },
       { label: 'Later', go: null },
     ],
