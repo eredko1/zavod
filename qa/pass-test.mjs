@@ -1,5 +1,5 @@
 // B-to-use + passing test, 2 clients on coney: node qa/pass-test.mjs [outdir]
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const out = process.argv[2] || '/tmp'; const room = 'ps' + Math.random().toString(36).slice(2, 6);
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };

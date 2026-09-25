@@ -1,5 +1,5 @@
 // Scripted hangout playthrough on coney: node qa/hangout-test.mjs [outdir]
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const out = process.argv[2] || '/tmp';
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
 const pg = await browser.newPage({ viewport: { width: 1280, height: 720 } });

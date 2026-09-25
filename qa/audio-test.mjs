@@ -2,7 +2,7 @@
 // Audio QA: renders every sound offline in headless Chrome via ctx.audio.qaRender / qaSpectrogram,
 // saves WAV + spectrogram PNG into qa/shots/audio/, prints a loudness table and pass/fail per sound.
 // Usage: node qa/audio-test.mjs [--only rifle,pistol] [--standalone] [--url http://localhost:8790]
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
 

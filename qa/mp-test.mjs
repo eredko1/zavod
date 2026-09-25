@@ -3,7 +3,7 @@
 // near it, the remote player is drawn at the sender's exact position on every level of the map (balconies, pits, subway,
 // roofs …), B kills A (victim-authoritative damage, score), A respawns on a valid floor away from B with spawn protection.
 // Exit code 1 on any failure.
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const map = process.argv[2] || 'railyard', out = process.argv[3] || '/tmp';
 const room = 'qa' + Math.random().toString(36).slice(2, 7);
 // per-map level probes: pose names (W.poses) on other floors than the start

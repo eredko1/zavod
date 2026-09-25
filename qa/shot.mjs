@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Real-GPU headless screenshot harness.
 // Usage: node qa/shot.mjs <url> <out.png> [--w 1920] [--h 1080] [--wait "<js expr>"] [--eval "<js>"] [--settle ms] [--console] [--timeout ms]
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 import path from 'node:path';
 
 const args = process.argv.slice(2);

@@ -1,5 +1,5 @@
 // WSP / SBU friends loop: node qa/vice-test.mjs <wsp|sbu> [outdir] — deli + Sammy, rasta bag, every shaft up + down, steal.
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const map = process.argv[2] || 'wsp', out = process.argv[3] || '/tmp';
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio'] });
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };

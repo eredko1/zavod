@@ -3,7 +3,7 @@
 // a soldier hurts a non-host player → respawn bike within 15 m on a valid floor → the three players split up across the
 // map's levels / far corners and a wave must reach and engage every one of them (terminal: balcony, dining concourse,
 // subway) → the host leaves, another client takes over, waves go on.
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const A0 = process.argv[2] || ''; const map = A0 && !A0.includes('/') ? A0 : 'coney'; const out = (A0 === map ? process.argv[3] : A0) || '/tmp';
 const room = 'wv' + Math.random().toString(36).slice(2, 7);
 // where the three players (host, client 1, client 2) split up for the engagement check: W.poses names

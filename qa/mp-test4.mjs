@@ -4,7 +4,7 @@
 // reloads (leave + rejoin, same id) and must get its score + the stolen car back via sync; finally one closes (bye).
 // Checks: everyone sees everyone, identical K/D + names on all clients, hidden peer kept (AFK) and resynced, stolen car
 // hidden for the late joiner (its parked-car collider gone), peer removed on leave. Exit code 1 on any failure.
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const map = process.argv[2] || 'coney', out = process.argv[3] || '/tmp';
 const room = 'qa4' + Math.random().toString(36).slice(2, 7);
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });

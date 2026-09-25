@@ -1,5 +1,5 @@
 // Igor's jobs: delivery (reach the beam), collect (rob the debtor), chop shop (bring a stolen car). node qa/jobs-test.mjs [outdir]
-import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+import { chromium } from 'playwright-core';
 const out = process.argv[2] || '/tmp';
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio'] });
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
