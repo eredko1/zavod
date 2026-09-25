@@ -45,7 +45,7 @@ export function buildChase(world) {
   buildUI();
   const bus = ctx.bus;
   // online wave fights (netwaves.js) are self-defence: shooting at / killing wave mercs doesn't bring the cops
-  bus.on('shot', (e) => { if (e && e.who === 'player' && !ctx.netwaves?.busy) crime('shot', e.origin || ctx.player?.position); });
+  bus.on('shot', (e) => { if (e && e.who === 'player' && !e.melee && !ctx.netwaves?.busy) crime('shot', e.origin || ctx.player?.position); });
   bus.on('vehicle', (e) => { if (e?.stage === 'mount' && e.bike?.spec?.car) crime('steal', e.bike.pos || ctx.player?.position); });
   bus.on('enemyKilled', (d) => { if (!d || d.qa || (d.wave && ctx.netwaves)) return; crime(d.chase === 'cop' ? 'copKill' : d.chase === 'crew' ? 'crewKill' : 'kill', d.position || ctx.player?.position); });
   bus.on('playerDied', () => wasted());
@@ -141,6 +141,7 @@ function crime(type, pos) {
   switch (type) {
     case 'shot': K.stars = Math.max(K.stars, 1); if (w && t - K.bump.shot > 12) { K.bump.shot = t; K.stars = Math.min(Math.max(K.stars, 2) + (K.stars >= 2 ? 1 : 0), 3); } break;
     case 'steal': K.stars = Math.max(K.stars, w ? 2 : 1); break;
+    case 'rob': K.stars = Math.max(K.stars, w ? 2 : 1); break;   // somebody called it in (coney/chill.js muggings)
     case 'kill': K.stars = Math.min(5, Math.max(K.stars + 1, 2)); break;
     case 'copKill': K.stars = Math.min(5, Math.max(K.stars + 1, 3)); break;
     case 'crewKill': K.stars = Math.max(K.stars, 1); break;
@@ -263,6 +264,19 @@ function removeUnit(u) { if (u.bike) disposeBike(u); K.ctx.ai.removeSoldier(u.s)
 // ---------------------------------------------------------------------------------------------------------------------------
 // foot / bike behaviour (runs in ai.js think() at ~5 Hz; perceive() already ran: vis = sees the player)
 function brain(u, s, vis) {
+  brainInner(u, s, vis);
+  // one star = they want to cuff you, not kill you: hold fire, and a cop within arm's reach for ~1.2 s makes the collar
+  if (u.kind === 'cop' && K.stars <= 1 && !K.crew.heat) {
+    s.wantFire = false; const p = K.ctx.player;
+    if (vis && !p.dead && s.position.distanceTo(p.position) < 1.9) { K.bustT = (K.bustT || 0) + 0.2; if (K.bustT > 1.2) busted(); } else K.bustT = Math.max(0, (K.bustT || 0) - 0.1);
+  }
+}
+function busted() {
+  if (!K) return; K.bustT = 0; const ctx = K.ctx;
+  try { ctx.bus.emit('busted', {}); } catch {}
+  wasted();
+}
+function brainInner(u, s, vis) {
   const ctx = K.ctx, p = ctx.player, t = K.t, rng = ctx.rng || Math.random, sp = SPEC[u.kind];
   s.wantFire = false; s.leanTarget = 0; s.crouchTarget = u.kind === 'biker' ? 0.62 : 0;
   if (u.leaving || p.dead) { s.clearAim(); if (!u.away) { const d = _v.subVectors(s.position, p.position).setY(0).normalize(); const q = ctx.ai.nav.nearestFree(s.position.x + d.x * 60, s.position.z + d.z * 60, 12, 0); u.away = q || s.position.clone(); } s.setGoal(u.away, 'walk'); return; }
@@ -395,7 +409,7 @@ function carSees(c) {
   return true;
 }
 function carFire(c, dp) {
-  if (!c.manned || !carSees(c)) return; const ctx = K.ctx, p = ctx.player, rng = ctx.rng || Math.random;
+  if (!c.manned || !carSees(c) || K.stars < 2) return;   // no drive-bys over a one-star beef const ctx = K.ctx, p = ctx.player, rng = ctx.rng || Math.random;
   c.seenT = K.t; K.seenT = K.t; K.lastKnown.copy(p.position);
   const o = new THREE.Vector3(c.pos.x, c.pos.y + 1.25, c.pos.z);
   for (let k = 0; k < 3; k++) setTimeout(() => {

@@ -39,7 +39,7 @@ export function build(world) {
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
   ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
-  if (ctx.mode !== 'chill') try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // (chill mode: no cops either)   // wanted level: cops + Luna Park crews (coney/chase.js)
+  try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
   try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }

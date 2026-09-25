@@ -21,7 +21,7 @@ let c = await pg.evaluate(() => window.__game.crews.state());
 ok(toasts.some((t) => /DRE|KEYS|BOOGIE|TAY|SMOKEY|JUJU|BIG MIKE|LIL T/.test(t)), 'the crew talks trash', JSON.stringify(toasts.slice(-3)));
 await pg.screenshot({ path: `${out}/crews-talk.png` });
 await pg.waitForTimeout(6000); c = await pg.evaluate(() => window.__game.crews.state());
-ok(c.thugs.every((t) => t.st === 'leave'), '…then they roll out', JSON.stringify(c.thugs.map((t) => t.st)));
+ok(c.thugs.filter((t) => t.type !== 'mk').every((t) => t.st === 'leave'), '…then they roll out', JSON.stringify(c.thugs.map((t) => t.st)));
 ok(c.robbed === 0, 'talkers don\'t rob');
 // robbing crew
 await pg.evaluate((o) => { window.__game.teleport(o[0] + 40, 0, o[2], 0, 0); window.__game.crews.calm(0); }, o); await pg.waitForTimeout(600);

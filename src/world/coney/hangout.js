@@ -44,7 +44,7 @@ export function buildHangout(world, M) {
   }
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'LUNA PARK HOUSES', x: b2.centre.x, z: b2.centre.z - 30, kind: 'landmark' });
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
-    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
+    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
   K.spot({ pos: H.igor, r: 2.4, prompt: 'F — TALK TO IGOR', act: talkIgor });
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)

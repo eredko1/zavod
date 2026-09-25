@@ -51,16 +51,46 @@ export function buildFigure(o = {}) {
     limbs.legs.push({ hip, knee, s });
   }
   let ph = Math.random() * 6;
-  return {
-    group: g, head,
+  const F = {
+    group: g, head, body, limbs,
+    guard: false, hands: false, act: null,   // fists up / hands up (being robbed) / a one-shot move: punch | hit | shove
+    play(name, dur = name === 'punch' ? 0.34 : name === 'hit' ? 0.42 : 0.5) { F.act = { name, t: 0, dur, side: Math.random() < 0.5 ? 1 : 0 }; },
     update(dt, speed = 0) {   // walk cycle driven by speed (m/s); idle sway otherwise
       if (sit) { head.rotation.y = Math.sin(performance.now() / 2300) * 0.25; return; }
+      F.walk(dt, speed); F.overlay(dt);
+    },
+    walk(dt, speed) {
       ph += dt * (speed > 0.05 ? speed * 5.2 : 0); const a = speed > 0.05 ? Math.sin(ph) * 0.5 : 0;
       for (const L of limbs.legs) { L.hip.rotation.x = a * L.s; L.knee.rotation.x = Math.max(0, -Math.sin(ph + (L.s > 0 ? 0 : Math.PI)) * 0.6) * (speed > 0.05 ? 1 : 0); }
       for (const A of limbs.arms) { A.sh.rotation.x = -a * A.s * 0.8; A.fore.rotation.x = -0.25; }
       body.position.y = hipY + (speed > 0.05 ? Math.abs(Math.cos(ph)) * 0.03 : Math.sin(performance.now() / 900) * 0.004);
     },
+    overlay(dt) {   // fight / surrender poses on top of the walk cycle
+      body.rotation.set(0, 0, 0); head.rotation.set(0, 0, 0);
+      for (const A of limbs.arms) A.sh.rotation.z = A.s * 0.06;
+      if (F.hands) for (const A of limbs.arms) { A.sh.rotation.set(0, 0, A.s * 2.75); A.fore.rotation.set(0, 0, -A.s * 0.35); }
+      else if (F.guard) {   // boxer's guard: fists by the chin, a little bounce and sway
+        const tt = performance.now() / 1000;
+        for (const A of limbs.arms) { A.sh.rotation.set(-1.05 + Math.sin(tt * 6 + A.s) * 0.05, 0, A.s * 0.42); A.fore.rotation.set(-1.75, 0, 0); }
+        body.rotation.x = 0.12; body.position.y += Math.abs(Math.sin(tt * 6)) * 0.025; body.rotation.y = Math.sin(tt * 2.3) * 0.12;
+      }
+      const a = F.act; if (!a) return;
+      a.t += dt; const k = Math.min(1, a.t / a.dur), e = Math.sin(k * Math.PI);
+      if (a.name === 'punch') {   // wind up then snap the arm straight out, torso turning into it
+        const A = limbs.arms[a.side], snap = k < 0.3 ? -k / 0.3 * 0.3 : e;
+        A.sh.rotation.set(-1.55 * Math.max(0, snap) - 0.9 * (1 - Math.max(0, snap)) * (F.guard ? 1 : 0.3), 0, A.s * 0.12); A.fore.rotation.set(-1.7 * (1 - Math.max(0, snap)), 0, 0);
+        body.rotation.y = (a.side ? -1 : 1) * 0.45 * e; body.rotation.x = 0.2 * e;
+      } else if (a.name === 'hit') {   // rocked: lean back, head snaps
+        body.rotation.x = -0.4 * e; head.rotation.x = -0.6 * e; head.rotation.z = (a.side ? 1 : -1) * 0.3 * e;
+        for (const A of limbs.arms) A.sh.rotation.z = A.s * (0.06 + 0.5 * e);
+      } else if (a.name === 'shove') {
+        for (const A of limbs.arms) { A.sh.rotation.set(-1.4 * e, 0, A.s * 0.2); A.fore.rotation.set(-0.3 * (1 - e), 0, 0); }
+        body.rotation.x = 0.25 * e;
+      }
+      if (k >= 1) F.act = null;
+    },
   };
+  return F;
 }
 
 export function nameTag(text, color = '#ffd27a') {

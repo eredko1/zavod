@@ -26,7 +26,7 @@ export const deg = (d) => d * Math.PI / 180;
 
 export function createCtx() {
   const qs = new URLSearchParams(location.search);
-  // ?mode=chill (coney): no mercs, no cops — knives, locals trying to rob you, get wasted (coney/chill.js)
+  // ?mode=chill (coney): no mercs — knives, street fights, robbing / getting robbed, cops on muggings, get wasted (coney/chill.js)
   const mode = qs.get('mode') === 'chill' ? 'chill' : null;
   if (mode) { qs.set('ai', '0'); qs.set('waves', '0'); }
   const qa = qs.get('qa') === '1';
