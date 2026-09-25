@@ -38,11 +38,27 @@ export function buildStillwell(world, M) {
   B.box('terracotta', [S.x1 - 0.6, 0, S.zC], [S.x1, S.DECK_B, fz]);
   B.box('ssTile', [S.x0, 0, S.zC - 0.6], [S.x1, S.DECK_B, S.zC]);
   // concourse: terrazzo floor, ceiling (the deck underside) with light strips
-  B.box('fascia', [S.x0, 0, S.zC], [S.x1, 0.03, fz - FT], { collide: false });
+  { // terrazzo: warm grey chips in a cement matrix, brass divider strips every 1.5 m (one plane, tiled texture)
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+    g.fillStyle = '#b9b2a4'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 2600; i++) { const r = Math.random(); g.fillStyle = r < 0.35 ? '#8c8578' : r < 0.6 ? '#d8d2c4' : r < 0.75 ? '#6f6a60' : r < 0.85 ? '#a38c6c' : '#e9e5da'; const sz = 1 + Math.random() * 3.2; g.fillRect(Math.random() * 256, Math.random() * 256, sz, sz * (0.6 + Math.random() * 0.8)); }
+    g.fillStyle = '#b08a3a'; g.fillRect(0, 0, 256, 3); g.fillRect(0, 0, 3, 256);   // brass strips
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const fw = S.x1 - S.x0, fd = (fz - FT) - S.zC; t.repeat.set(fw / 1.5, fd / 1.5);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd), new THREE.MeshStandardMaterial({ map: t, roughness: 0.42, metalness: 0 }));
+    fl.rotation.x = -Math.PI / 2; fl.position.set((S.x0 + S.x1) / 2, 0.025, (S.zC + fz - FT) / 2); fl.receiveShadow = true; fl.userData.surface = 'concrete'; scene.add(fl);
+  }
+  // white subway-tile wainscot on the inside of the concourse walls, with a green cap band
+  for (const [x0, x1, z0, z1] of [[S.x0 + 0.6, S.x0 + 0.64, S.zC, fz - FT], [S.x1 - 0.64, S.x1 - 0.6, S.zC, fz - FT], [S.x0 + 0.6, S.x1 - 0.6, fz - FT - 0.04, fz - FT]]) {
+    B.box('ssTile', [x0, 0, z0], [x1, 2.4, z1], { collide: false }); B.box('ssBlue', [x0 - 0.005, 2.4, z0], [x1 + 0.005, 2.55, z1], { collide: false }); }
   for (let z = fz - 4; z > S.zC + 2; z -= 6) for (let x = S.x0 + 6; x < S.x1 - 4; x += 10) B.box('bulb', [x, S.DECK_B - 0.08, z], [x + 3.2, S.DECK_B - 0.02, z + 0.25], { collide: false });
   // fare line at z −270: a fare wall with turnstile gaps (walk through, like the real ones) between x −66 and −42
   { const Z0 = -270.4, Z1 = -269.6; let x = S.x0 + 0.6;
-    for (let tx = -66; tx < -42; tx += 2.2) { if (tx > x) { B.box('stwTurn', [x, 0, Z0], [tx, 1.0, Z1]); } B.box('railSteel', [tx, 0, Z0 + 0.1], [tx + 0.35, 1.05, Z1 - 0.1]); x = tx + 1.3; }
+    for (let tx = -66; tx < -42; tx += 2.2) { if (tx > x) { B.box('stwTurn', [x, 0, Z0], [tx, 1.0, Z1]); } B.box('railSteel', [tx, 0, Z0 + 0.1], [tx + 0.35, 1.05, Z1 - 0.1]); x = tx + 1.3;
+      // the turnstile itself: hub on the cabinet side, three arms (one across the gap), a lit MetroCard reader on top
+      B.cyl('railSteel', tx + 0.42, -270, 0.82, 0.98, 0.09, 12, { collide: false });
+      for (const [dy, dz, len] of [[0, 0, 0.55], [0.22, -0.2, 0.3], [-0.22, 0.2, 0.3]]) B.box('railSteel', [tx + 0.42, 0.88 + dy, -270 + dz - 0.02], [tx + 0.42 + len, 0.92 + dy, -270 + dz + 0.02], { collide: false });
+      B.box('ssBlue', [tx + 0.05, 1.05, -270.25], [tx + 0.3, 1.12, -269.75], { collide: false }); B.box('bulb', [tx + 0.12, 1.12, -270.05], [tx + 0.22, 1.15, -269.95], { collide: false }); }
     B.box('stwTurn', [x, 0, Z0], [S.x1 - 0.6, 1.0, Z1]); }
   B.box('fascia', [-36, 0, -265.5], [-30, 2.6, -262.5]); B.box('glassDark', [-36.05, 1.1, -262.55], [-30.05, 2.3, -262.45], { collide: false });   // token booth
   sign(scene, 'TOKEN BOOTH', -33, 2.85, -262.4, 0, 3.4, 0.4, '#111', '#fff');
