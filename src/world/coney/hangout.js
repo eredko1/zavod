@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk } from '../deli.js';
+import { buildLocals, sammyLotion } from './locals.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -40,6 +41,7 @@ export function buildHangout(world, M) {
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
+  try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);
@@ -71,7 +73,7 @@ function placeDeli(world) {
       for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; const dx = c.x - fx, dz = c.z - fz, a = dx * u.x + dz * u.y, d = dx * n.x + dz * n.y; if (Math.abs(a) < 6 && d > -4 && d < 13) K.stealLocal(i, false); }   // clear the kerb
       const D = buildDeli(world, { x: fx, z: fz, yaw, name: "SAMMY'S DELI & GROCERY" });
       H.deli = D;
-      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY') });
+      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY', { extra: sammyLotion }) });
       return;
     }
   }

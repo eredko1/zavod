@@ -25,6 +25,7 @@ export function buildFigure(o = {}) {
   add(head, new THREE.SphereGeometry(0.024, 8, 6), skin, 0, -0.01, 0.115);                                                             // nose
   for (const s of [-1, 1]) add(head, new THREE.SphereGeometry(0.02, 8, 6), skin, s * 0.112, 0, 0);                                    // ears
   if (!o.tam) add(head, new THREE.SphereGeometry(0.12, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, 0, 0.025, -0.006, 1, 0.8, 1.05);
+  if (o.bun) { add(head, new THREE.SphereGeometry(0.125, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), hair, 0, 0.02, -0.01, 1.04, 0.95, 1.1); add(head, new THREE.SphereGeometry(0.065, 10, 8), hair, 0, 0.07, -0.13); }   // longer hair + a bun
   if (o.beard) add(head, new THREE.SphereGeometry(0.1, 12, 8, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5), mat(o.beardColor ?? o.hair ?? 0x1c1714, 0.95), 0, -0.02, 0.025, 0.98, 1.05, 1.02);
   if (o.glasses) { const gm = mat(0x111111, 0.3); for (const s of [-1, 1]) add(head, new THREE.TorusGeometry(0.028, 0.005, 6, 14), gm, s * 0.045, 0.02, 0.105); }
   if (o.tam) {   // rasta knit tam in red / gold / green bands, locs hanging behind
@@ -158,7 +159,7 @@ export function buildDeli(world, o) {
     for (let s = 0; s < 5; s++) for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 7), PAL[(d + s + k) % 3 === 0 ? 3 : (d + k) % 8]); b.position.set(x0 + 0.1 + k * 0.155, 0.28 + s * 0.42, D - 0.66); root.add(b); } }
   for (let d = 0; d <= 7; d++) box(M.frame, -hx + 0.26 + d * 1.06, 0.1, D - 0.69, -hx + 0.3 + d * 1.06, 2.28, D - 0.66);
   // Sammy on his stool behind the counter, facing the aisle; the bodega cat asleep on the counter
-  const sammy = buildFigure({ pose: 'sit', skin: 0xb88760, hair: 0x221c18, beard: false, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0, slim: true, glasses: !!o.glasses, shortSleeve: false });   // thin, clean-shaven
+  const sammy = buildFigure({ pose: 'sit', skin: o.skin ?? 0xb88760, hair: o.hair ?? 0x221c18, beard: false, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0, slim: true, glasses: !!o.glasses, shortSleeve: false, bun: !!o.bun });   // thin, clean-shaven
   sammy.group.position.set(3.25, 0.32, 2.6); sammy.group.rotation.y = -Math.PI / 2; root.add(sammy.group);   // on a tall stool: head clears the counter
   box(M.frame, 3.12, 0, 2.47, 3.38, 0.82, 2.73);   // stool
   const tag = nameTag(o.vendorName || 'SAMMY'); tag.position.set(0, 1.85, 0); sammy.group.add(tag);
@@ -178,12 +179,14 @@ export function buildDeli(world, o) {
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Sammy's talk: the first time he has to ask his question before he'll sell you anything; after that he just teases you.
-export function sammyTalk(vendorName = 'SAMMY', { cousin = false } = {}) {
+export function sammyTalk(vendorName = 'SAMMY', { cousin = false, extra = null } = {}) {
+  let K0 = null;
   const shop = () => ({
     text: `What you need, my friend? Liquor, fifteen dollar — I keep it under the counter. Or, I tell you… the big 40 of Olde English. Five dollar. Best deal in the neighborhood.`,
     choices: [
       { label: 'Bottle of liquor — $15', go: () => after(sell('bottle', 15, vendorName, lines)) },
       { label: '40oz Olde English — $5', go: () => after(sell('forty', 5, vendorName, { ...lines, ok: `Good choice! Here — in the bag. Don't drink it in front of the store, the cops they know me. Share with your boys!` })) },
+      ...(extra ? extra(K0, after) : []),
       { label: 'Nothing, just looking', go: { text: 'Looking is free. The cat is also free. …No. The cat is not free.', choices: [{ label: 'Later, Sammy', go: null }] } },
     ],
   });
@@ -197,7 +200,7 @@ export function sammyTalk(vendorName = 'SAMMY', { cousin = false } = {}) {
       { label: `I don't have a girlfriend.`, go: { text: `No girlfriend?! No anal, no girlfriend — that's why you look so stressed, my friend. OK, OK. Drink, relax, you find one.`, choices: [{ label: 'Wow. OK.', go: shop }] } },
       { label: `Why do you ask everybody about anal?`, go: { text: `Twenty-two years behind this counter. Everybody lies about the Lotto — nobody lies to Sammy about the anal. Hahaha!`, choices: [{ label: 'Fair enough', go: shop }] } },
     ] });
-  return (K, again) => again
+  return (K, again) => (K0 = K, again)
     ? question(['My friend is back! So… you did the anal yet or no? Hahaha. ', 'Ahh, look who it is. So tell me the truth now — the anal, yes? ', 'Again you come! OK, same question, I need to know. '][Math.floor(Math.random() * 3)])
     : question(cousin ? `Ahh, welcome, welcome! My cousin has the store in Coney Island — same family, same prices, same question. ` : `Ahh, my friend! Come in, come in, close the door, the cat gets out. `);
 }

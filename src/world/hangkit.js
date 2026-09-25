@@ -11,6 +11,8 @@ export const ITEMS = {
   weed: { icon: '🌿', name: 'bag of weed' },
   bottle: { icon: '🍾', name: 'bottle of liquor', drunk: 0.8, dur: 150 },
   forty: { icon: '🍺', name: '40 of Olde English', drunk: 1, dur: 180 },
+  kvass: { icon: '🥤', name: 'kvass', drunk: 0.2, dur: 45 },
+  meat: { icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },   // not for B: grill it at the mangal
 };
 
 let V = null;
@@ -32,6 +34,11 @@ export function buildKit(world, o = {}) {
 
 const api = {
   get cash() { return V?.cash ?? 0; },
+  /** status effects: { shades: bool, crabs: bool } */
+  get status() { return V?.status || {}; },
+  setStatus(k, v) { if (!V) return; V.status = V.status || {}; V.status[k] = v; renderCash(); },
+  has: (item) => !!V?.inv.includes(item),
+  take(item) { if (!V) return false; const i = V.inv.indexOf(item); if (i < 0) return false; V.inv.splice(i, 1); renderCash(); return true; },
   pay(n) { if (!V || V.cash < n) return false; V.cash -= n; renderCash(); return true; },
   earn(n) { if (!V) return; V.cash += n; renderCash(); },
   give(item) { if (!V || V.inv.length >= MAX_INV) return false; V.inv.push(item); renderCash(); return true; },
@@ -44,7 +51,7 @@ const api = {
   shaft(s) { V.shafts.push({ kind: 'elevator', floors: 10, ...s }); return V.shafts.length - 1; },
   onUpdate(fn) { V.onUpdate.push(fn); },
   toast: (t, ms) => V?.ctx.hud?.toast?.(t, ms),
-  useItem: () => useItem(), callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
+  puff: (at) => puff(at), useItem: () => useItem(), callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
   nearestParked: (r) => nearestParked(r), endRide: (f) => endRide(f), leavePassenger: () => leavePassenger(), pickRespawn: () => pickRespawn(),
   openDialog: (name, node) => openDialog(name, node), closeDialog: () => closeDialog(), choose: (i) => choose(i), dropCash: (at, n) => dropCash(at, n),
   /** QA: where the interaction points are */
@@ -132,8 +139,9 @@ function update(dt) {
 // ---- stash ----------------------------------------------------------------------------------------------------------------
 /** B: use the newest thing you hold. Weed = lifted/blurry (~2.5 min), liquor / 40 = drowsy; friends within a few metres share it. */
 function useItem() {
-  const { ctx } = V; if (!V.inv.length) { ctx.hud?.toast?.('Nothing on you', 1400); return; }
-  const it = V.inv.pop(); renderCash();
+  const { ctx } = V; const k = V.inv.map((x) => !ITEMS[x]?.keep).lastIndexOf(true);
+  if (k < 0) { ctx.hud?.toast?.(V.inv.length ? 'Raw meat — grill it at Table Park' : 'Nothing on you', 1400); return; }
+  const it = V.inv.splice(k, 1)[0]; renderCash();
   if (it === 'weed') return lightUp();
   drink(true, ITEMS[it], it);
 }
@@ -198,7 +206,8 @@ function updateHigh(dt) {
   if (V.highT > 0) { V.highT -= dt; if (V.highT < 40) V.high = Math.max(0, V.high - dt / 40); }
   if (V.drunkT > 0) { V.drunkT -= dt; if (V.drunkT < 30) V.drunk = Math.max(0, V.drunk - dt / 30); } else V.drunk = 0;
   const k = V.high, d = V.drunk || 0;
-  if (k <= 0.001 && d <= 0.001) { if (cv.style.filter) { cv.style.filter = ''; cv.style.transform = ''; } return; }
+  if (V.status?.crabs && ctx.state === 'playing' && ctx.player && !ctx.player.dead) { V.itchT = (V.itchT ?? 3) - dt; if (V.itchT <= 0) { V.itchT = 2.5 + Math.random() * 4; ctx.player.yaw += (Math.random() - 0.5) * 0.35; ctx.player.pitch += (Math.random() - 0.5) * 0.2; if (Math.random() < 0.4) ctx.hud?.toast?.(['*scratch scratch*', 'why is it so itchy down there', '*SCRATCH*', 'Sammy has lotion…'][Math.floor(Math.random() * 4)], 1100); } }
+  if (k <= 0.001 && d <= 0.001) { const sh = V.status?.shades ? 'brightness(0.82) contrast(1.08) sepia(0.18)' : ''; if (cv.style.filter !== sh) { cv.style.filter = sh; cv.style.transform = ''; } return; }
   const t = performance.now() / 1000;
   // weed: soft blur, saturated, slow hue drift + gentle wobble · liquor: heavy-lidded (darker, desaturated), double vision, big slow sway
   const blur = 2.6 * k + 3.4 * d * (0.55 + 0.45 * Math.sin(t * 0.7));
@@ -444,6 +453,6 @@ function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the
 }
 function renderCash() {
   if (!V?.ui) return;
-  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => ITEMS[i]?.icon || '?').join(' ') + ' (B)' : ''}`;
+  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => ITEMS[i]?.icon || '?').join(' ') + ' (B)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
   if (V.ui.use) V.ui.use.style.display = V.inv.length ? 'block' : 'none';
 }

@@ -134,6 +134,8 @@ export async function init(ctx) {
       if (cur && cur.id === id) { cur.reserve += reserve; cur.cur.reserve = cur.reserve; if (cur.ammo <= 0 && !S.reload) api.reload?.(); ctx.bus.emit('pickup', { id, ammo: true }); return true; }
       setLoadout({ primary: id, secondary: S.loadout.secondary }); const w = S.weapons[0]; if (w) { w.reserve = reserve; w.cur.reserve = reserve; } ctx.bus.emit('pickup', { id, ammo: false }); return true;
     },
+    /** paint a gun (viewmodel) — the golden Deagle from the shashlik */
+    tint: (id, color = 0xd4af37) => { const w = REGISTRY[id] && getWeapon(id); if (!w) return false; w.group.traverse((o) => { if (o.isMesh && o.material && !o.material.transparent && !o.userData.tinted) { o.material = o.material.clone(); o.material.color?.set(color); if ('metalness' in o.material) { o.material.metalness = 0.95; o.material.roughness = 0.22; } if (o.material.map) o.material.map = null; o.material.needsUpdate = true; o.userData.tinted = true; } }); return true; },
     /** a third-person copy of a gun (muzzle toward -z, metres) for the mercs to carry / drop */
     worldModel: (id) => {
       const reg = REGISTRY[id]; if (!reg) return null;
