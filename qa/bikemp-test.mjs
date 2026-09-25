@@ -1,0 +1,22 @@
+// Two clients: ALPHA rides a bike, BRAVO must see the bike AND the rider. node qa/bikemp-test.mjs [outdir]
+import { chromium } from '/Users/eugene/Code/node_modules/playwright-core/index.mjs';
+const out = process.argv[2] || '/tmp'; const room = 'bk' + Math.random().toString(36).slice(2, 6);
+const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
+let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
+const errs = [];
+const mk = async (n) => { const p = await b.newPage({ viewport: { width: 960, height: 540 } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message));
+  await p.goto(`http://localhost:8790/?qa=1&mp=1&room=${room}&map=coney&ai=0&time=day&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
+const A = await mk('ALPHA'), B = await mk('BRAVO'); await A.waitForTimeout(3000);
+const bk = await A.evaluate(() => { const p = window.__ctx.world.tableBikes?.[0] || null; if (p) window.__game.teleport(p.x + 1.2, 0, p.z, 0, 0); return p && [p.x, p.z]; });
+await A.waitForTimeout(600); ok(await A.evaluate(() => window.__ctx.vehicles.qaMount()), 'ALPHA mounts a bike', JSON.stringify(bk));
+A.evaluate(() => window.__ctx.vehicles.qaDrive(0.5, 0, 4)).catch(() => {});
+await B.evaluate((bk) => window.__game.teleport(bk[0] - 12, 0, bk[1] - 12, -Math.PI * 0.75, -0.1), bk || [0, 0]);
+await B.waitForTimeout(3000);
+const r = await B.evaluate(() => { const S = window.__ctx.net; const pe = [...(S._peers?.() || [])]; const info = S.peer ? null : null; let rider = null, bike = null;
+  window.__ctx.scene.traverse((o) => { if (o.name === 'bike' && o.parent?.parent === window.__ctx.scene) bike = o; });
+  return { bike: !!bike }; });
+const vis = await B.evaluate(() => window.__ctx.net.qaPeers?.() || null);
+ok(r.bike, 'BRAVO sees a remote bike'); if (vis) ok(vis.some((p) => p.veh === 'bike' && p.riderVisible), 'BRAVO sees the rider on it', JSON.stringify(vis));
+await B.screenshot({ path: `${out}/bikemp-bravo.png` });
+ok(!errs.length, 'no page errors', JSON.stringify(errs));
+await b.close(); console.log(fails ? `\n${fails} FAILED` : '\nALL PASS'); process.exit(fails ? 1 : 0);

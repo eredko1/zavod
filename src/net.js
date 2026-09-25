@@ -125,6 +125,7 @@ function api() {
     hit: (peer, dmg, hs) => { const p = S.peers.get(peer); if (!p || p.dead || p.afk) return; send({ t: 'hit', to: peer, dmg: Math.max(0, Math.min(250, dmg | 0)), hs: !!hs }); },
     scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
     send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'wv', 'wvhit', 'wvshot'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
+    qaPeers: () => [...S.peers.values()].map((p) => ({ veh: p.veh?.k || null, riderVisible: !!p.inst.group.visible, y: +p.inst.group.position.y.toFixed(2) })),
     peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk } : null; },
     list: () => [...S.peers.keys()],
     stolen: () => [...S.stolen].sort((a, b) => a - b),
@@ -498,7 +499,13 @@ function renderPeer(p, now, rdt, ctx) {
     p.vehKey = vk; p.veh = cur.v ? { ...cur.v } : null;
     if (cur.v) { try { p.vehObj = remoteVehicle(ctx, cur.v); ctx.scene.add(p.vehObj); } catch (e) { console.warn('[net] remote vehicle', e?.message); p.vehObj = null; } }
   }
-  if (p.vehObj) { p.vehObj.position.set(x, y, z); p.vehObj.rotation.set(0, yaw, 0); g.visible = false; } else g.visible = true;
+  if (p.vehObj) {   // snapshots already carry the vehicle's pose (x/y/z/yaw = vehicle) while driving
+    p.vehObj.position.set(x, y, z); p.vehObj.rotation.set(0, yaw, 0);
+    if (cur.v?.k === 'bike') {   // a bike rider stays visible, sat astride and facing the way it goes (was hidden: "invisible riders")
+      g.visible = true; g.position.set(x, y + 0.28, z); g.rotation.set(0, yaw + Math.PI, 0);
+      if (A_) { A_.Idle?.setEffectiveWeight(1); A_.Walk?.setEffectiveWeight(0); A_.Run?.setEffectiveWeight(0); }
+    } else g.visible = false;
+  } else g.visible = true;
   setTag(p);
   p.tag.visible = !p.dead;
   if (p.vehObj) p.tag.position.set(x, y + 2.1, z); else p.tag.position.set(g.position.x, g.position.y + (crouch ? 1.8 : 2.25), g.position.z);
