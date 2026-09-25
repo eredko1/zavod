@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk } from '../deli.js';
 import { buildLocals, sammyLotion } from './locals.js';
+import { buildChill } from './chill.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -42,6 +43,7 @@ export function buildHangout(world, M) {
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
   try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
+  if (ctx.mode === 'chill') try { buildChill(world, H); } catch (e) { console.warn('[hangout] chill', e); }   // chill mode (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);

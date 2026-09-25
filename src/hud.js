@@ -598,7 +598,7 @@ function buildDOM() {
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
       <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
-      <nav class="menu">${mi('friends', 0, 'Play with friends', 'primary')}${mi('deploy', 1, 'Play solo')}${mi('maps', 2, 'Select map')}${mi('loadout', 3, 'Loadout')}${mi('settings', 4, 'Settings')}${mi('controls', 5, 'Controls')}</nav>
+      <nav class="menu">${mi('friends', 0, 'Play with friends', 'primary')}${mi('chill', 1, 'Chill mode · Coney')}${mi('deploy', 2, 'Play solo')}${mi('maps', 3, 'Select map')}${mi('loadout', 4, 'Loadout')}${mi('settings', 5, 'Settings')}${mi('controls', 6, 'Controls')}</nav>
     </div>
     <div class="tag-tr in" style="--i:2"><i></i>Callsign <b>REAPER-1</b><br>Status <b>Sole operator on site</b></div>
     <div class="tag-bl in up" style="--i:6">Build <b>${VERSION}</b> · three r186 · webgl2<br>Zavod is a non-commercial tech demo · fictional locations, no real people or groups</div>

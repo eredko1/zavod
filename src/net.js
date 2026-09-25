@@ -76,7 +76,7 @@ export async function init(ctx) {
   let name = cleanName(qs.get('name')); try { if (!name) name = cleanName(localStorage.getItem('zavod.name')); else localStorage.setItem('zavod.name', name); localStorage.setItem('zavod.room', room); } catch {}
   const id = identity(map, room);
   name = name || 'OP-' + id.slice(0, 4).toUpperCase();
-  const base = `${PROTO}/${map}/${room}/`;
+  const base = `${PROTO}/${map}/${room}${ctx.mode ? '.' + ctx.mode : ''}/`;   // chill-mode players get their own room (no mercs from a waves host)
   const pick = (qs.get('brokers') || '').split(',').map((v) => parseInt(v, 10)).filter((v) => v >= 0 && v < ALL_BROKERS.length);
   S = { ctx, mqtt: null, id, inst: rid(), room, name, map, base, brokers: pick.length ? pick.map((i) => ALL_BROKERS[i]) : ALL_BROKERS,
     links: [], peers: new Map(), score: new Map(), stolen: new Set(), buckets: new Map(), dedupe: new Map(), disp: new Map(), outbox: [],

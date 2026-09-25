@@ -25,6 +25,7 @@ const OPTIONAL = [
   ['./weapons/smg.js', 'SMG_SPEC', 'buildSmg'],
   ['./weapons/ak.js', 'AK_SPEC', 'buildAk'],
   ['./weapons/deagle.js', 'DEAGLE_SPEC', 'buildDeagle'],
+  ['./weapons/knife.js', 'KNIFE_SPEC', 'buildKnife'],
 ];
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _rlp = new THREE.Vector3(), _rlr = new THREE.Vector3(), _ins = new THREE.Vector3(), _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _up = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _ray = new THREE.Ray();
@@ -121,6 +122,7 @@ export async function init(ctx) {
     get reloading() { return !!S.reload; },
     get grenades() { return S.grenadeCount; },
     /** the primary you carry: { id, ammo, reserve } */
+    get currentId() { return S.weapons[S.cur]?.id ?? null; },
     get primary() { const w = S.weapons[0]; return w ? { id: w.id, ammo: w.ammo, reserve: w.reserve } : null; },
     get spread() { return currentSpread(); },
     get sprinting() { return S.sprint > 0.5; },
@@ -134,6 +136,8 @@ export async function init(ctx) {
       if (cur && cur.id === id) { cur.reserve += reserve; cur.cur.reserve = cur.reserve; if (cur.ammo <= 0 && !S.reload) api.reload?.(); ctx.bus.emit('pickup', { id, ammo: true }); return true; }
       setLoadout({ primary: id, secondary: S.loadout.secondary }); const w = S.weapons[0]; if (w) { w.reserve = reserve; w.cur.reserve = reserve; } ctx.bus.emit('pickup', { id, ammo: false }); return true;
     },
+    /** chill mode: keep a slot out of reach until it's earned (lock(1, true, 'msg')) */
+    lock: (slot, on = true, msg = '') => { S.locked = S.locked || new Set(); if (on) S.locked.add(slot); else S.locked.delete(slot); if (msg) S.lockMsg = msg; },
     /** paint a gun (viewmodel) — the golden Deagle from the shashlik */
     tint: (id, color = 0xd4af37) => { const w = REGISTRY[id] && getWeapon(id); if (!w) return false; w.group.traverse((o) => { if (o.isMesh && o.material && !o.material.transparent && !o.userData.tinted) { o.material = o.material.clone(); o.material.color?.set(color); if ('metalness' in o.material) { o.material.metalness = 0.95; o.material.roughness = 0.22; } if (o.material.map) o.material.map = null; o.material.needsUpdate = true; o.userData.tinted = true; } }); return true; },
     /** a third-person copy of a gun (muzzle toward -z, metres) for the mercs to carry / drop */
@@ -252,6 +256,7 @@ function setLoadout(lo = {}, opts = {}) {
 function cancelActions() { if (S.reload) endReload(false); S.throwing = null; S.inspect = null; S.adsTarget = 0; }
 
 function startSwap(slot) {
+  if (S.locked?.has(arguments[0])) { S.ctx.hud?.toast?.(S.lockMsg || 'Locked', 1400); return false; }   // chill mode: the handgun slot until you buy one
   if (slot == null || slot === S.cur || slot < 0 || slot >= S.weapons.length || (S.swap && S.swap.to === slot)) return false;
   if (S.reload) endReload(false); S.throwing = null; S.inspect = null;
   S.swap = { to: slot, t: 0, phase: 'lower', dur: S.weapons[S.cur].spec.swapTime }; return true;
@@ -310,7 +315,7 @@ function fireShot(w, opts = {}) {
   const ctx = S.ctx, sp = w.spec, cam = ctx.camera, p = ctx.player, rng = ctx.rng;
   const now = S.time;
   if (now - w.lastShot > 0.35) w.shots = 0;
-  w.ammo = Math.max(0, w.ammo - 1); w.shots++; w.lastShot = now; w.boltT = 0; w.trigT = 0; S.fired++;
+  if (!sp.melee) w.ammo = Math.max(0, w.ammo - 1); w.shots++; w.lastShot = now; w.boltT = 0; w.trigT = 0; S.fired++;
   if (w.parts.slide && w.ammo === 0) w.slideLocked = true;
   S.inspect = null;
   if (sp.action) startAction(w, sp.actionDelay ?? 0.1);
@@ -343,7 +348,10 @@ function fireShot(w, opts = {}) {
     if (!n) { n = hit.face ? hit.face.normal.clone() : d.clone().negate(); if (hit.instanceId !== undefined && hit.object.getMatrixAt) { hit.object.getMatrixAt(hit.instanceId, _m); _m.premultiply(hit.object.matrixWorld); n.transformDirection(_m); } else n.transformDirection(hit.object.matrixWorld); }
     if (n.dot(d) > 0) n.negate();
     const ud = hit.object.userData || {};
-    if (ud.remote) {   // another online player (net.js hitbox): accumulate like a soldier, resolved by the victim's client
+    if (typeof ud.onHit === 'function') {   // map NPCs (coney chill mode thugs): they resolve their own damage
+      const head = ud.part === 'head'; try { ud.onHit(sp.damage * (head ? sp.headMul : 1) * falloff(dist), head, hit.point.clone(), d.clone()); } catch (e) { console.warn('[weapons] onHit', e); }
+      S.fx.impact(hit.point, n, 'flesh', d); ctx.bus.emit('hit', { damage: sp.damage, headshot: head, point: hit.point.clone() });
+    } else if (ud.remote) {   // another online player (net.js hitbox): accumulate like a soldier, resolved by the victim's client
       const head = ud.part === 'head';
       let acc = remoteHits.get(ud.remote); if (!acc) { acc = { dmg: 0, head: 0, n: 0, point: hit.point.clone() }; remoteHits.set(ud.remote, acc); }
       acc.dmg += sp.damage * (head ? sp.headMul : 1) * falloff(dist); acc.n++; if (head) acc.head++;
@@ -377,6 +385,7 @@ function fireShot(w, opts = {}) {
 
   // muzzle world position (visual) — used by light, brass, tracer, smoke
   const muzzle = w.parts.muzzle.getWorldPosition(new THREE.Vector3());
+  if (sp.melee) { const k = 1; S.rpv.z += sp.kickBack * 40 * k; S.rrv.x += sp.kickUp * 40 * k; S.rrv.z += (rng() - 0.5) * 2 * sp.kickRoll * 40 * k; ctx.bus.emit('shot', { origin, dir, weapon: sp.name, id: sp.id, who: 'player', melee: true, muzzle, hit: firstHit ? firstHit.point.clone() : null }); return; }
   S.fx.muzzleLightAt(muzzle, sp.flashStrength ?? (sp.slot === 0 ? 1 : 0.7), opts.hold ? opts.hold : 0.045);
   // viewmodel flash
   S.flashT = 0; S.flashLife = opts.hold ? opts.hold : (0.04 + rng() * 0.02) * (sp.pellets ? 1.6 : 1); S.flashW = w;
@@ -437,7 +446,7 @@ export function update(dt, ctx) {
     const trig = !!input.fire; if (trig && !S.triggerHeld) S.triggerPressed = true; if (!trig) S.dryLatch = false; S.triggerHeld = trig;
     if (S.triggerPressed && S.reload?.style === 'shell' && S.reload.phase === 'shell' && w.ammo > 0) S.reload.interrupt = true; // fire interrupts a shell-by-shell reload
     const busy = S.swap || S.throwing;
-    S.adsTarget = (input.ads && !busy && !S.reload && !(actionBusy && sp.scope) && (p?.sprinting !== true || S.triggerHeld)) ? 1 : 0;
+    S.adsTarget = (input.ads && !sp.melee && !busy && !S.reload && !(actionBusy && sp.scope) && (p?.sprinting !== true || S.triggerHeld)) ? 1 : 0;
     if (S.qaAds != null) S.adsTarget = S.qaAds;
     if (S.adsTarget && S.inspect) S.inspect = null;
   } else { S.triggerPressed = false; if (!playing) S.adsTarget = 0; }

@@ -174,10 +174,10 @@ function buildMarket(world, H) {
   world.box([at.x - 0.6, 0, at.z - 0.3], [at.x + 0.6, 0.85, at.z + 0.3]);
   const tag = nameTag('MANGAL', '#ffb070'); tag.position.set(0, 1.5, 0); tag.scale.set(0.9, 0.23, 1); g.add(tag);
   const G = L.grill = { pos: at, state: 'idle', t: 0, coals, skewers };
-  K.spot({ pos: at, r: 2.2, prompt: () => G.state === 'idle' ? (K.has('meat') ? 'F — GRILL THE SHASHLIK' : 'MANGAL — buy shashlik at NET GOST (W 8th St)') : G.state === 'cooking' ? `sizzling… ${Math.ceil(G.t)} s` : 'F — EAT THE SHASHLIK',
+  K.spot({ pos: at, r: 2.2, prompt: () => G.state === 'idle' ? (K.has('meat') ? 'F — GRILL THE SHASHLIK' : 'MANGAL — buy shashlik at NET GOST (W 8th St)') : G.state === 'cooking' ? `sizzling… ${Math.ceil(G.t)} s` : (ctx.mode === 'chill' ? 'F — TAKE THE SHASHLIK' : 'F — EAT THE SHASHLIK'),
     when: () => true, act: () => {
       if (G.state === 'idle' && K.take('meat')) { G.state = 'cooking'; G.t = 15; skewers.visible = true; K.toast('On the mangal. 15 seconds. Don\'t leave it.', 2000); }
-      else if (G.state === 'ready') { G.state = 'idle'; skewers.visible = false; eatShashlik(); }
+      else if (G.state === 'ready') { G.state = 'idle'; skewers.visible = false; if (ctx.mode === 'chill') { K.give('skewer'); K.toast('Hot shashlik to go — VITEK is hungry (behind the towers)', 2600); } else eatShashlik(); }
     } });
   K.onUpdate((dt) => {
     coals.material.emissiveIntensity = G.state === 'cooking' ? 1.2 + Math.sin(performance.now() / 120) * 0.3 : G.state === 'ready' ? 0.5 : 0.05;

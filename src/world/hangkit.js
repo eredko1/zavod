@@ -12,7 +12,8 @@ export const ITEMS = {
   bottle: { icon: '🍾', name: 'bottle of liquor', drunk: 0.8, dur: 150 },
   forty: { icon: '🍺', name: '40 of Olde English', drunk: 1, dur: 180 },
   kvass: { icon: '🥤', name: 'kvass', drunk: 0.2, dur: 45 },
-  meat: { icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },   // not for B: grill it at the mangal
+  meat: { icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },
+  skewer: { icon: '🍢', name: 'hot shashlik skewer', keep: true },   // not for B: grill it at the mangal
 };
 
 let V = null;

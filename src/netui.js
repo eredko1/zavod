@@ -79,6 +79,11 @@ export function install(ctx, opts) {
     if (info && curMap() !== 'coney') { announceGoto('coney'); setTimeout(() => { location.href = u.toString(); }, 400); return; }
     location.href = u.toString();
   });
+  ctx.bus.on('ui', (e) => {
+    if (e?.action !== 'chill') return;
+    if (U.ctx.mode === 'chill' && curMap() === 'coney') { if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
+    U.forceMap = 'coney'; U.forceChill = true; openOnline();
+  });
   ctx.bus.on('state', () => refresh());
   // phones: hangout F-prompts ("F — TALK TO IGOR") get a tappable button
   if (ctx.isTouch) installTouchAct(ctx);
@@ -146,7 +151,7 @@ export function frame(show) {
 
 // ---------- "Play online" overlay ----------
 const randomRoom = (map) => `${map}-${Math.random().toString(36).slice(2, 6)}`;
-function shareUrl(map, room) { const u = new URL(location.origin + location.pathname); u.searchParams.set('map', map); u.searchParams.set('room', room); return u.toString(); }
+function shareUrl(map, room) { const u = new URL(location.origin + location.pathname); u.searchParams.set('map', map); u.searchParams.set('room', room); if (U?.chill && map === 'coney') u.searchParams.set('mode', 'chill'); return u.toString(); }
 function curMap() { return netInfo()?.map || U.ctx.world?.mapId || U.opts.map || 'zavod'; }
 function selMap() { return U.sel || curMap(); }
 function mapList() { const l = U.ctx.world?.maps; return Array.isArray(l) && l.length ? l.filter((m) => m?.id) : [{ id: curMap(), name: curMap().toUpperCase() }]; }
@@ -154,6 +159,7 @@ function mapName(id) { return (mapList().find((m) => m.id === id)?.name || id).t
 /** select a map in the overlay; an auto-named room (<map>-xxxx) follows the map so the invite reads right */
 function pickMap(id, quiet = false) {
   const prev = U.sel; U.sel = id; if (!U.f) return;
+  if (id !== 'coney' && U.chill) { U.chill = false; U.f.mc?.classList.remove('primary'); U.f.mw?.classList.add('primary'); }
   for (const b of U.f.maps.children) { const on = b.dataset.id === id; b.classList.toggle('sel', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }
   const m = mapList().find((x) => x.id === id); U.f.mapd.textContent = m ? `${m.subtitle || ''}${m.subtitle && m.description ? ' — ' : ''}${m.description || ''}` : '';
   if (!quiet && prev && prev !== id) { const r = cleanRoom(U.f.room.value); if (!r || r.startsWith(prev + '-')) U.f.room.value = randomRoom(id); }
@@ -165,6 +171,7 @@ function buildOverlay() {
   o.innerHTML = `<div class="card wide" role="dialog" aria-label="Play online">
     <h2>Play with friends</h2><div class="sub">Tap a map, then Go — everyone in the same room + map plays together · <b class="mp"></b></div>
     <label>Map</label><div class="maps" role="radiogroup" aria-label="Map"></div><div class="mapd"></div>
+    <label>Mode</label><div class="modes" style="display:flex;gap:6px"><button type="button" class="mw">Mercenary waves</button><button type="button" class="mc">Chill · no mercs (Coney)</button></div>
     <label for="zv-room">Room</label><input id="zv-room" class="room" maxlength="24" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="e.g. coney-night">
     <label for="zv-name">Your name</label><input id="zv-name" class="name" maxlength="16" autocomplete="nickname" autocapitalize="words" spellcheck="false" enterkeyhint="go" placeholder="callsign">
     <div class="hint">Keep the room as <b>lunapark</b> and your friends just pick the same map — or send them the invite link. Switching maps later? Friends in your room get a “follow” button.</div>
@@ -174,7 +181,7 @@ function buildOverlay() {
   </div>`;
   document.body.appendChild(o);
   const q = (s) => o.querySelector(s);
-  U.over = o; U.f = { room: q('.room'), name: q('.name'), url: q('.url'), mp: q('.mp'), who: q('.who'), copied: q('.copied'), leave: q('.leave'), maps: q('.maps'), mapd: q('.mapd') };
+  U.over = o; U.f = { mw: q('.mw'), mc: q('.mc'), room: q('.room'), name: q('.name'), url: q('.url'), mp: q('.mp'), who: q('.who'), copied: q('.copied'), leave: q('.leave'), maps: q('.maps'), mapd: q('.mapd') };
   const upd = () => { const r = cleanRoom(U.f.room.value) || '…'; U.f.url.textContent = shareUrl(selMap(), r); U.f.mp.textContent = mapName(selMap()); };
   // map picker: every registered map, thumbnail from assets/thumbs/<id>.jpg (gradient + name if there is none)
   for (const m of mapList()) {
@@ -186,6 +193,9 @@ function buildOverlay() {
   }
   U.f.room.addEventListener('input', () => { const c = cleanRoom(U.f.room.value); if (c !== U.f.room.value) U.f.room.value = c; upd(); });
   U.f.upd = upd;
+  U.f.setChill = (on) => { U.chill = !!on; U.f.mc.classList.toggle('primary', U.chill); U.f.mw.classList.toggle('primary', !U.chill); if (U.chill) pickMap('coney'); upd(); };
+  U.f.mw.addEventListener('click', (e) => { e.stopPropagation(); U.f.setChill(false); });
+  U.f.mc.addEventListener('click', (e) => { e.stopPropagation(); U.f.setChill(true); });
   q('.copy').addEventListener('click', (e) => { e.stopPropagation(); share(q('.copy')); });
   q('.join').addEventListener('click', (e) => { e.stopPropagation(); join(); });
   q('.back').addEventListener('click', (e) => { e.stopPropagation(); closeOnline(); });
@@ -203,7 +213,7 @@ export function openOnline() {
   U.sel = U.forceMap || (info ? curMap() : ids.includes(lastMap) ? lastMap : curMap()); U.forceMap = null;
   U.f.room.value = info?.room || lastRoom || 'lunapark';   // one shared room by default: friends who pick the same map meet without typing anything
   U.f.name.value = info?.name || lastName || '';
-  pickMap(U.sel, true);
+  pickMap(U.sel, true); U.f.setChill(U.forceChill || U.ctx.mode === 'chill'); U.forceChill = false;
   U.f.leave.style.display = info ? '' : 'none';
   U.over.querySelector('.join').textContent = info ? 'Go' : 'Go — play';
   U.f.copied.textContent = ''; U.f.upd(); fillWho();
@@ -221,9 +231,10 @@ function join() {
   const map = selMap(); const room = cleanRoom(U.f.room.value) || randomRoom(map); const name = cleanName(U.f.name.value);
   try { localStorage.setItem('zavod.room', room); localStorage.setItem('zavod.onlineMap', map); if (name) localStorage.setItem('zavod.name', name); } catch {}
   const info = netInfo();
-  if (info && info.room === room && map === curMap() && (!name || name === info.name)) { closeOnline(); if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
+  if (info && info.room === room && map === curMap() && (!name || name === info.name) && !!U.chill === (U.ctx.mode === 'chill')) { closeOnline(); if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
   const u = new URL(location.href); u.searchParams.set('map', map); u.searchParams.set('room', room); u.searchParams.delete('mp'); u.searchParams.delete('pose');
   if (name) u.searchParams.set('name', name); else u.searchParams.delete('name');
+  if (U.chill && map === 'coney') u.searchParams.set('mode', 'chill'); else u.searchParams.delete('mode');
   if (info && info.room === room && map !== curMap()) { announceGoto(map); setTimeout(() => { location.href = u.toString(); }, 400); return; }
   location.href = u.toString();
 }

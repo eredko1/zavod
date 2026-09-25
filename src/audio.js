@@ -60,6 +60,7 @@ function bind(ctx) {
   const surf = (s) => (['concrete', 'metal', 'wood', 'water', 'ground', 'flesh'].includes(s) ? s : 'concrete');
   bus.on('shot', (d = {}) => {
     if (d.who === 'enemy') { P('enemy_rifle', { position: d.origin || d.position }); return; }
+    if (d.melee) { P('swap'); return; }   // knife: a swipe, not a gunshot
     const w = d.weapon; const name = typeof w === 'string' ? w : (w?.name ?? w?.type ?? '');
     P(/pistol|m1911|1911|9mm|glock|handgun|sidearm/i.test(name) || w?.slot === 2 ? 'pistol' : 'rifle');
   });
