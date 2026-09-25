@@ -131,7 +131,8 @@ function shadesTalk(Kk, again) {
     setTimeout(() => { K.setStatus('crabs', true); K.toast('…why is everything itchy? (Sammy sells a special lotion)', 3200); }, 25000);
     return { text: 'SHADES: "Lookin\' like a movie star! No refunds. No returns. Don\'t ask where they been."', choices: [{ label: 'Sweet', go: null }] };
   };
-  return { text: again ? 'SHADES: "Back for another pair? Two for fifteen!"' : 'SHADES: "Yo yo yo, sunglasses! Designer sunglasses! Ten dollars! Real Italian, from Italy, the country!"', choices: [{ label: 'Gimme a pair — $10', go: buy }, { label: 'Nah', go: { text: 'SHADES: "Your eyes, your funeral, boss."', choices: [{ label: '…', go: null }] } }] };
+  const fence = K.has('gps') ? [{ label: 'Wanna buy a GPS? ($15 each)', go: () => { let n = 0; while (K.take('gps')) n++; K.earn(15 * n); return { text: `SHADES: "Ooh, ${n > 1 ? n + ' of \'em' : 'a GPS'}. No questions. Here — $${15 * n}. Go buy yourself something green."`, choices: [{ label: 'Pleasure', go: null }] }; } }] : [];
+  return { text: again ? 'SHADES: "Back for another pair? Two for fifteen!"' : 'SHADES: "Yo yo yo, sunglasses! Designer sunglasses! Ten dollars! Real Italian, from Italy, the country!"', choices: [...fence, { label: 'Gimme a pair — $10', go: buy }, { label: 'Nah', go: { text: 'SHADES: "Your eyes, your funeral, boss."', choices: [{ label: '…', go: null }] } }] };
 }
 /** Sammy's lotion (hooked into his shop menu from hangout.js) */
 export function sammyLotion(Kk, after) {

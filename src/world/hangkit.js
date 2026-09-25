@@ -13,7 +13,8 @@ export const ITEMS = {
   forty: { icon: '🍺', name: '40 of Olde English', drunk: 1, dur: 180 },
   kvass: { icon: '🥤', name: 'kvass', drunk: 0.2, dur: 45 },
   meat: { icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },
-  skewer: { icon: '🍢', name: 'hot shashlik skewer', keep: true },   // not for B: grill it at the mangal
+  skewer: { icon: '🍢', name: 'hot shashlik skewer', keep: true },
+  gps: { icon: '📟', name: 'stolen GPS', keep: true },   // SHADES buys them   // not for B: grill it at the mangal
 };
 
 let V = null;
@@ -130,7 +131,8 @@ function update(dt) {
       t.lobby.cars.forEach((c, k) => { if (!act && near(c.pos, t.r || 1.4)) { prompt = t.label ? `${up} · ${t.label}` : up; act = () => callElevator(i, k, 'up'); } });
       t.tops.forEach((side, si) => side.cars.forEach((c, k) => { if (!act && near(c.pos, t.r || 1.4)) { prompt = dn; act = () => callElevator(i, k, 'down', si); } }));
     }
-    if (!act) { const c = nearestParked(3.0); if (c) { prompt = 'F — STEAL CAR'; act = () => steal(c); } }
+    if (!act) { const c = nearestParked(3.0); if (c) { prompt = c.gpsGone ? 'F — STEAL CAR' : 'F — STEAL CAR  ·  X — SWIPE THE GPS'; act = () => steal(c);
+      if (!c.gpsGone && ctx.input?.pressed?.has?.('KeyX')) { ctx.input.pressed.delete('KeyX'); swipeGps(c); } } }
     if (!act) { const f = nearestFriendCar(3.8); if (f) { prompt = `F — HOP IN WITH ${f.name}`; act = () => enterPassenger(f.id); } }
   }
   ctx.interactNear = !!act;   // next frame's weapons.js leaves F alone while a prompt is up
@@ -368,6 +370,13 @@ function steal(c) {
   const car = ctx.vehicles?.spawnCar?.(c.x, c.z, (c.ry || 0) - Math.PI / 2, c.kind === 'cab' ? 'sedan' : c.kind, c.color ?? 0x22305c, c.y || 0);
   if (car) { ctx.vehicles.mount(car); ctx.hud?.toast?.('Hot-wired it. Drive.', 1800); }
   ctx.net?.send?.('steal', { i });
+}
+/** smash the window, pull the GPS off the dash (car alarm!) — sell it to SHADES for weed money */
+function swipeGps(c) {
+  const { ctx } = V; if (!api.give('gps')) { ctx.hud?.toast?.('Hands full — sell or use something first', 1600); return; }
+  c.gpsGone = true; ctx.hud?.toast?.('*SMASH* — got the GPS! (WEEOOWEEOO — car alarm) · SHADES buys them', 2600);
+  try { ctx.audio?.play?.('impact_metal', { position: new THREE.Vector3(c.x, 1, c.z) }); } catch {}
+  horn(0.6); setTimeout(() => horn(0.5), 550); setTimeout(() => horn(0.45), 1100);
 }
 function stealLocal(i, mine) {
   const c = (V.world.parkedCars || [])[i]; if (!c || c.gone) return; const { ctx } = V; void mine;
