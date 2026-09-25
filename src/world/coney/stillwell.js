@@ -18,6 +18,7 @@ const STAIR = { z0: -276, run: 13.4, w: 3.0 }, CAR = 18.4, NCAR = 8;
 export function buildStillwell(world, M) {
   const { scene, ctx, W } = world; const S = STILLWELL, B = new Batch(world, M, 'stillwell');
   // matte platform concrete + brushed turnstile steel (the shared greys are glossy: SSR mirrored the solar roof in them)
+  if (!M.edgeYellow) { M.edgeYellow = new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.7 }); M.surface.edgeYellow = 'concrete'; }
   if (!M.stwPlat) { M.stwPlat = new THREE.MeshStandardMaterial({ color: 0xa3a39c, roughness: 0.93, metalness: 0 }); M.surface.stwPlat = 'concrete'; M.stwTurn = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.35, metalness: 0.9 }); M.surface.stwTurn = 'metal'; }
   const w = S.x1 - S.x0, sTop = STAIR.z0 - STAIR.run, cxs = ISLANDS.map(([a, b]) => (a + b) / 2);
   const inStair = (x0, x1) => cxs.some((c) => x1 > c - STAIR.w / 2 - 0.1 && x0 < c + STAIR.w / 2 + 0.1);
@@ -64,7 +65,7 @@ export function buildStillwell(world, M) {
   slabs(S.x0, S.x1, S.DECK_B, S.DECK_T, 'elSoffit', zDeck0, zDeck1);
   for (const [a, b] of ISLANDS) {
     slabs(a, b, S.DECK_T, S.PLAT, 'stwPlat', S.zP0, S.zP1);
-    for (const e of [a, b]) { const s = e === a ? 1 : -1; B.box('ssOrange', [Math.min(e, e + s * 0.6), S.PLAT, S.zP1], [Math.max(e, e + s * 0.6), S.PLAT + 0.012, S.zP0], { collide: false }); }   // yellow edge strips
+    for (const e of [a, b]) { const s = e === a ? 1 : -1; B.box('edgeYellow', [Math.min(e, e + s * 0.6), S.PLAT, S.zP1], [Math.max(e, e + s * 0.6), S.PLAT + 0.012, S.zP0], { collide: false }); }   // yellow edge strips
     for (let z = S.zP0 - 8; z > S.zP1 + 4; z -= 12) { if (z < STAIR.z0 + 2 && z > sTop - 2) continue; B.box('railSteelGreen', [(a + b) / 2 - 0.25, S.PLAT, z - 0.25], [(a + b) / 2 + 0.25, 14.5, z + 0.25]); }   // platform columns
     for (let z = S.zP0 - 14; z > S.zP1 + 10; z -= 36) sign(scene, 'Coney Island – Stillwell Av', (a + b) / 2, S.PLAT + 3.2, z, Math.PI / 2, 5.2, 0.55, '#111', '#fff', true);
   }

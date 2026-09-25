@@ -282,7 +282,9 @@ function viaducts(world, M) {
   const V = new Batch(world, M, 'viaduct');
   const Y = 7.5;   // top of rail
   const near = (x, z) => x > PLAY.x0 - 30 && x < PLAY.x1 + 30 && z > PLAY.z0 - 30 && z < PLAY.z1 + 30;
-  const inTerminal = (x, z) => x > -90 && x < -22 && z > -446 && z < -255;   // the Stillwell terminal builds its own deck + tracks (coney/stillwell.js)
+  const W8u = [0.970, 0.242];   // W 8 St station axis (coney/w8th.js): its own two-level structure
+  const inW8 = (x, z) => { const dx = x - 274.5, dz = z + 153, a = dx * W8u[0] + dz * W8u[1], o = -dx * W8u[1] + dz * W8u[0]; return a > -12 && a < 200 && Math.abs(o) < 11; };
+  const inTerminal = (x, z) => (x > -90 && x < -22 && z > -446 && z < -255) || inW8(x, z);   // the Stillwell terminal + W 8 St build their own decks + tracks
   for (const l of OSM.rl) {
     if (!l.el) continue;
     const pts = l.p; if (pts.length < 2) continue;

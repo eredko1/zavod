@@ -9,6 +9,7 @@ import { OSM, PLAY } from './osm.js';
 import { BW } from './shore.js';
 import { bbox, footprintAngle, cen, walk } from '../osmkit.js';
 import { buildStillwell } from './stillwell.js';
+import { buildW8th } from './w8th.js';
 
 export const LM = {
   wheel: { x: 64, z: 61, h: 46 },
@@ -35,6 +36,7 @@ export function buildLandmarks(world, M) {
   parachuteJump(world, M, B);
   for (const c of OSM.rc) { const q = bbox(c.p); if (q.x1 < PLAY.x0 - 50 || q.x0 > PLAY.x1 + 50) continue; if (c.k === 'wood') woodCoaster(world, M, B, c); else steelCoaster(world, M, B, c); }
   buildStillwell(world, M);   // the walkable terminal (coney/stillwell.js)
+  try { buildW8th(world, M); } catch (e) { console.warn('[coney] w8th', e); }   // W 8 St – NY Aquarium, two levels (coney/w8th.js)
   ballpark(world, M, B);
   hotdogStand(world, M, B);
   flatRides(world, M, B);
