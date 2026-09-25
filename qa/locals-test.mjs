@@ -11,6 +11,7 @@ const H = () => pg.evaluate(() => window.__game.hangout.state());
 const tp = (p, yaw = 0, pitch = 0) => pg.evaluate(([p, yaw, pitch]) => window.__game.teleport(p[0], p[1], p[2], yaw, pitch), [p, yaw, pitch]);
 await pg.evaluate(() => { window.__ctx.ai.qaStartWave = () => {}; window.__game.killAll(); window.__game.hangout.give(100); });
 // ---- POPS ----
+await tp([0, 0, 100], 0); await pg.waitForTimeout(3500);
 const p0 = await pg.evaluate(() => window.__game.locals.pops()); await pg.waitForTimeout(2000); const p1 = await pg.evaluate(() => window.__game.locals.pops());
 ok(Math.hypot(p1.pos[0] - p0.pos[0], p1.pos[2] - p0.pos[2]) > 2, 'POPS cruises in his cart', JSON.stringify([p0.pos, p1.pos]));
 await tp([p1.pos[0] + 2.2, p1.pos[1], p1.pos[2]], Math.PI / 2); await pg.waitForTimeout(700); await pg.screenshot({ path: `${out}/locals-pops.png` });
@@ -51,7 +52,11 @@ const mg = await pg.evaluate(() => window.__game.locals.mangal()); await tp([mg[
 await pg.keyboard.press('KeyF'); await pg.waitForTimeout(500); ok((await pg.evaluate(() => window.__game.locals.grill().state)) === 'cooking', 'meat on the mangal');
 await pg.waitForTimeout(3000); await pg.screenshot({ path: `${out}/locals-mangal.png` });
 await pg.waitForTimeout(13000); ok((await pg.evaluate(() => window.__game.locals.grill().state)) === 'ready', 'shashlik ready');
-await pg.keyboard.press('KeyF'); await pg.waitForTimeout(1500);
+for (let k = 0; k < 4; k++) {   // a walker passing by may be closer — step right up to the grill and retry
+  await pg.evaluate(() => window.__game.hangout.close()); await pg.evaluate((m) => window.__game.teleport(m[0], 0, m[2] + 0.9, 0, 0), mg); await pg.waitForTimeout(300);
+  await pg.keyboard.press('KeyF'); await pg.waitForTimeout(700); console.log('  eat try', k, JSON.stringify(await pg.evaluate(async () => ({ g: window.__game.locals.grill().state, dlg: window.__game.hangout.state().dialog?.name, v: (await import('/src/world/hangkit.js')).kit().vendors.map((v) => [v.name, +Math.hypot(v.pos.x - window.__ctx.player.position.x, v.pos.z - window.__ctx.player.position.z).toFixed(1)]), lo: window.__ctx.weapons.loadout, p: window.__ctx.player.position.toArray().map((x) => +x.toFixed(1)), mounted: !!window.__ctx.player.mounted })))); if ((await pg.evaluate(() => window.__game.locals.grill().state)) !== 'ready') break;
+}
+await pg.waitForTimeout(800);
 const lo = await pg.evaluate(() => window.__ctx.weapons.loadout); ok(lo.secondary === 'deagle', 'ate it → golden Deagle', JSON.stringify(lo));
 await pg.screenshot({ path: `${out}/locals-deagle.png` });
 ok(!errs.length, 'no page errors', JSON.stringify(errs));
