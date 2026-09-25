@@ -93,7 +93,7 @@ function bindOnce(ctx) {
     if (m) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) choose(+m[2] - 1); }
     else if (e.code === 'KeyF' || e.code === 'Digit0') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) closeDialog(); }
   }, { capture: true });
-  addEventListener('keydown', (e) => { if (V?.ui?.help && e.code === 'KeyH' && !e.repeat) V.ui.help.style.display = V.ui.help.style.display === 'none' ? 'block' : 'none'; });
+  addEventListener('keydown', (e) => { if (V?.ui?.help && e.code === 'KeyH' && !e.repeat) { V.ui.help.style.display = V.ui.help.style.display === 'none' ? 'block' : 'none'; syncChip(); } });
   // Q: horn (in a car — friends hear it) · N: give $10 to the closest friend within 3 m
   addEventListener('keydown', (e) => {
     if (!V || e.repeat || V.ctx.state !== 'playing' || V.dialog) return;
@@ -456,13 +456,19 @@ function buildUI(o) {
   if (o.help) {
     help = el('hghelp'); help.style.cssText = 'position:fixed;right:14px;top:60px;z-index:44;background:rgba(8,10,14,.78);border-left:2px solid #ffb24a;color:#e8edf2;font:500 13px Barlow,Arial;padding:10px 14px;line-height:1.55;pointer-events:none;max-width:280px';
     help.innerHTML = `<b style="letter-spacing:.14em;font-family:Barlow Condensed">${o.title || 'CONTROLS'} (H)</b><br>${o.help}`;
-    if (V.ctx.isTouch) help.style.display = 'none';   // phones: the on-screen buttons need that corner
-    setTimeout(() => { if (help) help.style.display = 'none'; }, 14000);
+    help.style.display = 'none';
+    // first time ever: open for 10 s once you're actually playing; afterwards it lives behind a small "H · controls" chip
+    let seen = false; try { seen = localStorage.getItem('zavod.helpSeen') === '1'; } catch {}
+    if (!seen && !V.ctx.isTouch) {
+      const t0 = setInterval(() => { if (V?.ctx.state !== 'playing' || !help) return; clearInterval(t0); help.style.display = 'block'; try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} setTimeout(() => { if (help) help.style.display = 'none'; syncChip(); }, 10000); syncChip(); }, 500); }
   }
-  V.ui = { cash, fade, floor, use, help, dlg, dname: dlg.querySelector('.nm'), dtext: dlg.querySelector('.tx'), dch: dlg.querySelector('.chs') }; renderCash(); showUI(V.ctx.state === 'playing');
+  let chip = null;
+  if (help && !V.ctx.isTouch) { chip = el('hgchip'); chip.style.cssText = 'position:fixed;right:14px;top:60px;z-index:44;background:rgba(8,10,14,.6);color:#c9d2da;font:600 11px Barlow Condensed,Arial;letter-spacing:.14em;padding:4px 9px;pointer-events:none'; chip.innerHTML = '<b style="color:#ffb24a">H</b> · CONTROLS'; }
+  V.ui = { chip, cash, fade, floor, use, help, dlg, dname: dlg.querySelector('.nm'), dtext: dlg.querySelector('.tx'), dch: dlg.querySelector('.chs') }; renderCash(); syncChip(); showUI(V.ctx.state === 'playing');
 }
+function syncChip() { const u = V?.ui; if (u?.chip) u.chip.style.display = u.help && u.help.style.display === 'none' ? 'block' : 'none'; }
 function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the menus, pause and death screens
-  if (!V?.ui) return; for (const k of ['cash', 'use', 'help']) { const e = V.ui[k]; if (e) e.style.visibility = on ? '' : 'hidden'; }
+  if (!V?.ui) return; for (const k of ['cash', 'use', 'help', 'chip']) { const e = V.ui[k]; if (e) e.style.visibility = on ? '' : 'hidden'; }
 }
 function renderCash() {
   if (!V?.ui) return;

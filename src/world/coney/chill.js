@@ -27,12 +27,13 @@ let C = null;
 /** the crews (both modes): chill = frequent solo robbers + gangs; otherwise a gang now and then */
 export function buildCrews(world, { chill = false } = {}) {
   const { ctx, W } = world;
-  C = { world, ctx, chill, thugs: new Map(), remote: new Map(), nextId: 1, spawnT: 25, gangT: chill ? 60 : 90, robbed: 0, sendT: 0 };
+  C = { world, ctx, chill, thugs: new Map(), remote: new Map(), nextId: 1, spawnT: 60, gangT: chill ? 120 : 180, robbed: 0, sendT: 0, calmUntil: 0 };
+  ctx.bus.on('playerRespawn', () => { C.calmUntil = performance.now() + 60000; ctx.deathNote = null; });   // no shakedowns for a minute after you respawn
   W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
   ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null); });
   K.onUpdate((dt, playing) => update(dt, playing));
-  if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d) };
+  if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d), calm: (ms = 0) => { C.calmUntil = performance.now() + ms; } };
   return C;
 }
 
@@ -127,9 +128,11 @@ function onRemoteThug(m) {
 function update(dt, playing) {
   const { ctx } = C; const me = ctx.player; const now = performance.now();
   const alive = [...C.thugs.values()].filter((t) => t.st !== 'dead').length, cap = C.chill ? 5 : 3;
-  // chill: a lone robber every 35–60 s; both modes: a crew now and then (chill 70–110 s, otherwise 2.5–4 min)
-  if (C.chill) { C.spawnT -= dt; if (playing && C.spawnT <= 0 && alive < cap) { C.spawnT = 35 + Math.random() * 25; spawnGang(undefined, 'rob', 1); } }
-  C.gangT -= dt; if (playing && C.gangT <= 0 && alive + 2 <= cap) { C.gangT = C.chill ? 70 + Math.random() * 40 : 150 + Math.random() * 90; spawnGang(); }
+  // chill: a lone robber every 90–150 s; both modes: a crew now and then (chill 3–5 min, otherwise 4–6 min)
+  if (C.chill) { C.spawnT -= dt; if (playing && C.spawnT <= 0 && alive < cap) { C.spawnT = 90 + Math.random() * 60; spawnGang(undefined, 'rob', 1); } }
+  C.gangT -= dt; if (playing && C.gangT <= 0 && alive + 2 <= cap) { C.gangT = C.chill ? 180 + Math.random() * 120 : 240 + Math.random() * 120; spawnGang(); }
+  // Table Park is neutral ground, and there's a breather after every respawn / robbery: robbers who arrive then just talk
+  const os = C.world.W.onlineStart, safe = (os && Math.hypot(me.position.x - os[0], me.position.z - os[2]) < 25) || now < C.calmUntil;
   const gone = (t) => { removeThug(t); ctx.net?.send?.('thug', { i: t.id, st: 'gone', x: 0, y: 0, z: 0 }); };
   for (const t of [...C.thugs.values()]) {
     t.t += dt; const g = t.m.f.group, T = CREWS[t.type] || CREWS.ru;
@@ -145,7 +148,8 @@ function update(dt, playing) {
       else { if (t.st !== 'talk') { t.st = 'talk'; t.talkT = 0; } t.talkT += dt; t.yaw = Math.atan2(dx, dz);
         if (!t.said && t.talkT > 0.4 + (t.id % 3) * 1.6) { t.said = true; say(t, T.hi[t.lk % T.hi.length]); }
         if (t.talkT > 7) { t.st = 'leave'; t.t = 0; if (t.id % 2 === 0) say(t, T.bye[Math.floor(Math.random() * T.bye.length)]); } }
-    } else if (d > 1.3) {
+    } else if (safe && t.intent === 'rob' && d < 6) { t.intent = 'talk'; t.said = false; }
+    else if (d > 1.3) {
       speed = d > 25 ? 1.6 : 3.4; goal = me.position; t.st = d > 25 ? 'walk' : 'run';
       if (!t.said && d < 9) { t.said = true; say(t, T.hi[t.lk % T.hi.length]); }
     } else { t.st = 'rob'; t.punchT -= dt; if (t.punchT <= 0) { t.punchT = 1.2; rob(t); } }   // up close: shake you down
@@ -173,8 +177,8 @@ function rob(t) {
   let what = '';
   if (cash >= 10) { const n = Math.max(10, Math.round(cash * 0.3 / 5) * 5); K.pay(n); t.loot.push(n); what = `$${n}`; }
   else if (st?.inv?.length) { const it = st.inv[st.inv.length - 1]; K.take(it); t.loot.push(8); what = `your ${it === 'weed' ? 'bag' : it === 'forty' ? '40' : it === 'bottle' ? 'bottle' : it}`; }
-  else { me.damage?.(12, t.pos.clone()); K.toast(`${t.name}: "Broke?! Then I take it out of your face."`, 1600); return; }
-  C.robbed++; K.toast(`${t.name}: "${T.rob[Math.floor(Math.random() * T.rob.length)]}" — took ${what}! (take them down to get it back)`, 3000);
+  else { if ((me.health ?? 100) > 30) me.damage?.(Math.min(12, (me.health ?? 100) - 30), t.pos.clone()); ctx.deathNote = { text: `jumped by ${t.name}'s crew`, at: performance.now() }; K.toast(`${t.name}: "Broke?! Then I take it out of your face."`, 1600); t.st = 'flee'; t.t = 0; return; }   // a beating, never a killing
+  C.robbed++; C.calmUntil = performance.now() + 60000; K.toast(`${t.name}: "${T.rob[Math.floor(Math.random() * T.rob.length)]}" — took ${what}! (take them down to get it back)`, 3000);
   try { ctx.bus.emit('playerDamaged', { amount: 1, from: t.pos.clone() }); } catch {}
   t.st = 'flee'; t.t = 0;
 }

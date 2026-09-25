@@ -83,10 +83,10 @@ export function buildW8th(world, M) {
   void colsBefore;
   // signs
   for (const [lv, route, col, name] of [[S.LO, 'Q', '#fccc0a', 'W 8 St – NY Aquarium'], [S.UP, 'F', '#ff6319', 'W 8 St – NY Aquarium']]) for (const s of [-1, 1]) for (let a = 20; a < L - 10; a += 45) {
-    const p = at(a, s * (S.platIn + S.platOut) / 2, lv.plat + 2.6); sign(scene, `${route}  ·  ${name}`, p, ang + Math.PI / 2, 4.6, 0.5, col); }
+    const p = at(a, s * (S.platIn + S.platOut) / 2, lv.plat + 2.6); sign(scene, `${route}  ·  ${name}`, p, ang + Math.PI / 2 + (s > 0 ? Math.PI : 0), 4.6, 0.5, col); }
   // ---- trains: an F up top and a Q below, each stopping ~25 s then moving on (wall clock, 160 s cycle) ------------------------
   buildTrains(world, S, u, n, at);
-  W.w8th = { lower: at(80, S.platIn + 1.5, S.LO.plat), upper: at(120, S.platIn + 1.5, S.UP.plat), street: at(40, oN, 0), bridge: W.aquariumBridge };
+  W.w8th = { lower: at(80, S.platIn + 1.5, S.LO.plat), upper: at(120, S.platIn + 1.5, S.UP.plat), street: at(40, oN, 0), bridge: W.aquariumBridge }; if (typeof window !== 'undefined' && window.__game) window.__game.w8th = W.w8th;
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'W 8 ST – NY AQUARIUM STATION', x: at(L / 2, 0).x, z: at(L / 2, 0).z, kind: 'transit' });
 }
 

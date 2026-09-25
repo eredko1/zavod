@@ -124,7 +124,7 @@ function buildTrains(world, M) {
       if (ph < IN) z = FAR + (STOP - FAR) * ease(ph / IN); else if (ph < IN + DW) z = STOP; else if (ph < IN + DW + OUT) { const u = (ph - IN - DW) / OUT; z = STOP + (FAR - STOP) * u * u; } else z = FAR - 400;
       m.v = dt > 0 ? Math.abs(z - m.z) / dt : 0; if (z !== m.z) { m.z = z; place(m.k, m.x, z); dirty = true; }
       // standing on the tracks when it comes through: that's it for you
-      const me = ctx.player; if (me && !me.dead && m.v > 1.5 && Math.abs(me.position.x - m.x) < 1.7 && me.position.y > S.DECK_T - 0.5 && me.position.y < S.RAIL + 3 && me.position.z < z + 1 && me.position.z > z - NCAR * CAR) { me.damage?.(500, new THREE.Vector3(m.x, S.RAIL + 1, z)); ctx.hud?.toast?.('Hit by the train. Stay off the tracks.', 2600); }
+      const me = ctx.player; if (me && !me.dead && m.v > 1.5 && Math.abs(me.position.x - m.x) < 1.7 && me.position.y > S.DECK_T - 0.5 && me.position.y < S.RAIL + 3 && me.position.z < z + 1 && me.position.z > z - NCAR * CAR) { ctx.deathNote = { text: 'hit by a Coney-bound train', at: performance.now() }; me.damage?.(500, new THREE.Vector3(m.x, S.RAIL + 1, z)); ctx.hud?.toast?.('Hit by the train. Stay off the tracks.', 2600); }
     }
     if (dirty) for (const im of Object.values(I)) im.instanceMatrix.needsUpdate = true;
   });

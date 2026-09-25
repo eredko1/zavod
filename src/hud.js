@@ -367,7 +367,14 @@ function onState(H, state, prev) {
   H.ui = state === 'menu' ? L.menu : state === 'paused' ? L.pause : state === 'dead' ? L.dead : state === 'victory' ? L.vic : null;
   if (H.ui) select(H, 0);
   if (state === 'dead' || state === 'victory') fillStats(H, L[state === 'dead' ? 'dead' : 'vic']);
-  if (state === 'dead') { const r = L.dead.querySelector('[data-act="retry"]'); if (r) r.style.display = H.ctx.net?.connected ? 'none' : ''; }
+  if (state === 'dead') {
+    const on = !!H.ctx.net?.connected, r = L.dead.querySelector('[data-act="retry"]'); if (r) r.style.display = on ? 'none' : '';
+    const c = L.dead.querySelector('[data-cause]'), dn = H.ctx.deathNote, note = dn && performance.now() - dn.at < 8000 ? dn.text : null;   // say what actually got you
+    if (c) c.textContent = note ? `Killed in action — ${note}`
+      : H.ctx.mode === 'chill' ? (on ? 'Down — back on your feet in a moment' : 'Down — rough night on the block')
+      : on ? 'Killed in action — respawning shortly' : 'Killed in action — the site fell to the mercenaries';
+    H.ctx.deathNote = null;
+  }
   if (state === 'playing' && prev && prev !== 'paused') { H.c.hpOn = null; }
 }
 const root = (H) => H.root;
@@ -622,7 +629,7 @@ function buildDOM() {
     <div class="backdrop"></div><div class="flash"></div>
     <div class="center">
       <div class="kia">K.I.A.</div>
-      <div class="sub in up" style="--i:3">Killed in action — the site fell to the mercenaries</div>
+      <div class="sub in up" data-cause style="--i:3">Killed in action — the site fell to the mercenaries</div>
       <div class="rule in up" style="--i:4"></div>
       ${stats(true)}
       <div class="btns in up" style="--i:7"><button class="btn primary" data-act="retry">Retry</button><button class="btn" data-act="menu">Quit to menu</button></div>

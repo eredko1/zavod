@@ -24,6 +24,8 @@ await pg.waitForTimeout(6000); c = await pg.evaluate(() => window.__game.crews.s
 ok(c.thugs.every((t) => t.st === 'leave'), '…then they roll out', JSON.stringify(c.thugs.map((t) => t.st)));
 ok(c.robbed === 0, 'talkers don\'t rob');
 // robbing crew
+await pg.evaluate((o) => { window.__game.teleport(o[0] + 40, 0, o[2], 0, 0); window.__game.crews.calm(0); }, o); await pg.waitForTimeout(600);
+// the park itself is neutral ground and there's a grace minute after a spawn, so step out and clear the grace
 await pg.evaluate(() => { window.__game.hangout.give(80); window.__game.crews.gang('ru', 'rob', 2); }); 
 await pg.waitForFunction(() => window.__game.crews.state().robbed >= 1, null, { timeout: 25000 }).catch(() => {});
 c = await pg.evaluate(() => window.__game.crews.state()); ok(c.robbed >= 1, 'the gopniks rob you', `robbed ${c.robbed}×`);
