@@ -46,6 +46,11 @@ export function buildSbuHangout(world) {
     else console.warn('[sbu] no free spot for the deli');
   } catch (e) { console.warn('[sbu] deli', e); }
 
+  // ---- the map (src/minimap.js) -----------------------------------------------------------------------------------------------
+  W.mapLabels = [{ t: 'ACADEMIC MALL', x: 20, z: -1 }];
+  W.mapPOIs = [...(W.mapPOIs || []), { name: 'LIBRARY (roof elevator)', x: (LIB.entX0 + LIB.entX1) / 2, z: LIB.z1, kind: 'landmark' }, { name: 'SAC (roof stairs)', x: SAC.x0, z: (SAC.z0 + SAC.hallZ1) / 2, kind: 'landmark' },
+    { name: 'SAC PLAZA', x: -96, z: 24, kind: 'park' }, ...(W.deli ? [{ name: "SAMMY'S CAMPUS DELI", x: W.deli.door.x, z: W.deli.door.z, kind: 'shop' }] : [])];
+
   // ---- rasta dealers on the Academic Mall and around the SAC plaza ----------------------------------------------------------
   buildWalker(world, K, { name: 'RAS', tam: true, talk: rastaTalk('RAS'), shirt: 0x2e6b34, pants: 0x3c3a30, path: [[-110, 0], [-80, 2], [-40, 1], [0, -2], [40, -2], [90, 0], [130, 2]] });
   buildWalker(world, K, { name: 'IRIE', tam: true, talk: rastaTalk('IRIE'), shirt: 0xc9a52c, pants: 0x2e3a2a, skin: 0x4a2e20, path: [[-100, 40], [-112, 26], [-104, 8], [-86, 12], [-90, 30]] });

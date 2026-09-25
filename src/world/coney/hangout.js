@@ -35,8 +35,16 @@ export function buildHangout(world, M) {
   H = { world, ctx, towers, b2, igor, buys: 0 };
   H.igor = buildIgor(world, M, igor);   // the interaction point is Igor's bench, not the park centre
   if (H.gate) { const g = H.gate, dx = H.igor.x - g.x, dz = H.igor.z - g.z; W.onlineStart = [g.x, 0, g.z, Math.atan2(-dx, -dz)]; }   // friends spawn at Igor's gate
+  // three bikes parked in a row just outside the park gate (vehicles.js takes W.vehicleSpots; coney.js puts these first)
+  if (H.gate) {
+    const g = H.gate, ax = H.igor.x - g.x, az = H.igor.z - g.z, L0 = Math.hypot(ax, az) || 1, ux = ax / L0, uz = az / L0, px = -uz, pz = ux;   // u: gate → park, p: along the fence
+    const clearAt = (x, z) => !ctx.colliders.some((b) => x > b.min.x - 1.3 && x < b.max.x + 1.3 && z > b.min.z - 1.3 && z < b.max.z + 1.3 && b.max.y > 0.3 && b.min.y < 1.6);
+    W.tableBikes = [];
+    for (const back of [4, 6, 8, 10]) { for (let k = -4; k <= 4 && W.tableBikes.length < 3; k++) { const x = g.x - ux * back + px * (5 + k * 2.4), z = g.z - uz * back + pz * (5 + k * 2.4); if (clearAt(x, z) && W.tableBikes.every((b) => Math.hypot(b.x - x, b.z - z) > 2.2)) W.tableBikes.push({ x, y: 0, z, yaw: Math.atan2(ux, uz) }); } if (W.tableBikes.length >= 3) break; }
+  }
+  (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'LUNA PARK HOUSES', x: b2.centre.x, z: b2.centre.z - 30, kind: 'landmark' });
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
-    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
+    help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
   K.spot({ pos: H.igor, r: 2.4, prompt: `F — TALK TO IGOR ($${PRICE})`, act: buyIgor });
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
@@ -74,7 +82,7 @@ function placeDeli(world) {
       if (!clear(fx, fz, u, n)) continue;
       for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; const dx = c.x - fx, dz = c.z - fz, a = dx * u.x + dz * u.y, d = dx * n.x + dz * n.y; if (Math.abs(a) < 6 && d > -4 && d < 13) K.stealLocal(i, false); }   // clear the kerb
       const D = buildDeli(world, { x: fx, z: fz, yaw, name: "SAMMY'S DELI & GROCERY" });
-      H.deli = D;
+      H.deli = D; (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: "SAMMY'S DELI", x: D.door.x, z: D.door.z, kind: 'shop' });
       K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY', { extra: sammyLotion }) });
       return;
     }

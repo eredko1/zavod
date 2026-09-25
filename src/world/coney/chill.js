@@ -31,7 +31,8 @@ export function buildChill(world, H) {
   const tag = nameTag('VITEK', '#9fe39a'); tag.position.set(0, 2.15, 0); vf.group.add(tag); vf.group.position.copy(vp); world.scene.add(vf.group);
   K.onUpdate((dt) => { const me = ctx.player.position; vf.group.rotation.y = Math.atan2(me.x - vp.x, me.z - vp.z); vf.update(dt, 0); });
   K.vendor({ name: 'VITEK', pos: vp, r: 2.4, talk: vitekTalk });
-  C.vitek = vp;
+  C.vitek = vp; (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'VITEK (guns)', x: vp.x, z: vp.z, kind: 'danger' });
+  W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead').map((t) => [t.pos.x, t.pos.z]);
   // loadout: the knife; the handgun slot is locked until Vitek comes through
   const arm = () => { const w = ctx.weapons; if (!w?.setLoadout) return false; w.setLoadout({ primary: 'knife', secondary: 'm9' }); w.lock?.(1, !C.armed, 'No gun yet — VITEK (behind the towers) sells one'); return true; };
   ctx.bus.on('playerRespawn', () => { setTimeout(arm, 50); });

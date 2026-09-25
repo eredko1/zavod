@@ -56,6 +56,12 @@ export function buildWspHangout(world) {
   buildWalker(world, K, { name: 'JAH-B', tam: true, talk: rastaTalk('JAH-B'), shirt: 0xd6b23a, pants: 0x2e3a2a, skin: 0x4a2e20,
     path: [[24, -18], [32, 1], [57, 1], [69, 8], [88, 26], [104, 44], [70, 62], [40, 57], [30, 30]] });     // east lawns loop
 
+  // ---- the map (src/minimap.js): street names + points of interest ------------------------------------------------------------
+  W.mapLabels = STREETS.filter((st) => !st.cobble).map((st) => st.axis === 'x' ? { t: st.name.toUpperCase(), x: Math.max(st.a0, BOUNDS.x0 + 60) + 40, z: (st.r0 + st.r1) / 2 } : { t: st.name.toUpperCase(), x: (st.r0 + st.r1) / 2, z: Math.max(st.a0, BOUNDS.z0 + 30) + 30, r: Math.PI / 2 });
+  W.mapPOIs = [...(W.mapPOIs || []), { name: 'MEMORIAL ARCH (hidden stairs)', x: A.cx, z: A.cz, kind: 'landmark' }, { name: 'FOUNTAIN', x: 0, z: 0, kind: 'park' },
+    ...(lib ? [{ name: 'LIBRARY (roof elevator)', x: (lib.x0 + lib.x1) / 2, z: lib.z0, kind: 'landmark' }] : []),
+    ...(W.deli ? [{ name: "SAMMY'S DELI", x: W.deli.door.x, z: W.deli.door.z, kind: 'shop' }] : [])];
+
   // ---- cars parked along the kerbs (stealable) ---------------------------------------------------------------------------
   try { parkCars(world); } catch (e) { console.warn('[wsp] cars', e); }
 }

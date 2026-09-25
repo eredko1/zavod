@@ -153,7 +153,7 @@ function buildMarket(world, H) {
   if (spot) {
     for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; if (Math.hypot(c.x - spot[0], c.z - spot[1]) < 12) K.stealLocal(i, false); }
     const D = buildDeli(world, { x: spot[0], z: spot[1], yaw, name: 'NET GOST MARKET · ПРОДУКТЫ', vendorName: 'OLGA', shirt: 0x7a2a4a, bun: true, hair: 0xb58a4a, skin: 0xe8c2a0 });
-    L.market = D;
+    L.market = D; (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'NET GOST MARKET', x: D.door.x, z: D.door.z, kind: 'shop' });
     K.vendor({ name: 'OLGA', pos: D.sammy, r: 2.3, talk: (Kk, again) => ({
       text: again ? 'OLGA: "Again you? OK. What?"' : 'OLGA: "Zdravstvuyte. Shashlik is marinated since yesterday — pork, onion, a little vinegar. Twelve dollar. Kvass, three."',
       choices: [

@@ -1,6 +1,6 @@
 // CONEY — Luna Park Radio. One station, a shuffle-free rotation of the crew's tracks, on the wall clock: everyone in the room
 // hears the same song at the same second (position = Date.now() mod the rotation). Settings → Audio → Luna Park Radio:
-// Off / In cars (default: the car radio, louder) / Always (quieter on foot); Radio volume. Keys: M on/off, . next track
+// Off / In cars (default: the car radio, louder) / Always (quieter on foot); Radio volume. Keys: L on/off, . next track
 // (skips the station for you only). Plain <audio> elements (streamed, nothing decoded up front). CONEY agent.
 import { saveAudio } from '../../ctx.js';
 
@@ -24,8 +24,8 @@ export function buildRadio(world) {
   const stop = () => { for (const a of R.els) if (!a.paused) a.pause(); R.on = false; R.cur = -1; };
   addEventListener('keydown', (e) => {
     if (e.repeat || ctx.state !== 'playing' || world.W !== ctx.world) return;
-    // M: on if you can't hear it, off if you can
-    if (e.code === 'KeyM') { S.radio = R.on ? 'off' : 'always'; saveAudio(S); ctx.hud?.toast?.(S.radio === 'off' ? 'RADIO OFF' : '📻 LUNA PARK RADIO — ON', 1400); }
+    // L: on if you can't hear it, off if you can (M is the map)
+    if (e.code === 'KeyL') { S.radio = R.on ? 'off' : 'always'; saveAudio(S); ctx.hud?.toast?.(S.radio === 'off' ? 'RADIO OFF' : '📻 LUNA PARK RADIO — ON', 1400); }
     if (e.code === 'Period' && R.on) { const [, off] = at(); R.skip += (R.dur[R.cur] || 0) - off + 0.05; R.cur = -1; }   // next track (just for you)
   });
   world.updaters.push(() => {

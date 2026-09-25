@@ -43,7 +43,19 @@ export function build(world) {
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
   try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
-  try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)   // the Belt Parkway run to JFK (its own zone, coney/belt.js)
+  try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
+  // the map (src/minimap.js): street centrelines, street names, points of interest
+  W.mapRoads = OSM.r.map((r) => ({ p: r.p, w: r.w }));
+  W.mapLabels = [
+    { t: 'SURF AVE', x: -250, z: -141 }, { t: 'SURF AVE', x: 120, z: -93 }, { t: 'MERMAID AVE', x: -230, z: -290 }, { t: 'NEPTUNE AVE', x: 200, z: -541 },
+    { t: 'STILLWELL AVE', x: -87, z: -205, r: Math.PI / 2 }, { t: 'W 8TH ST', x: 356, z: -330, r: Math.PI / 2 },
+    { t: 'RIEGELMANN BOARDWALK', x: -60, z: 149, col: '#ffe6b0' }, { t: 'BEACH', x: 0, z: 230, col: '#ffe6b0' }, { t: 'ATLANTIC OCEAN', x: 0, z: 360, col: '#9fd0ff', fs: 18 },
+  ];
+  { const P = (name, x, z, kind) => W.mapPOIs.push({ name, x, z, kind }); W.mapPOIs = W.mapPOIs || [];
+    const os = W.onlineStart; if (os) P('TABLE PARK', os[0], os[2], 'park');
+    P('WONDER WHEEL', LM.wheel.x, LM.wheel.z, 'ride'); P('CYCLONE', 194, -2, 'ride'); P('PARACHUTE JUMP', LM.pj.x, LM.pj.z, 'ride'); P('THUNDERBOLT', -189, 75, 'ride');
+    P('STILLWELL AVE STATION', (LM.terminal.x0 + LM.terminal.x1) / 2, (LM.terminal.z0 + LM.terminal.z1) / 2, 'transit'); P('BALLPARK', (LM.ballpark.x0 + LM.ballpark.x1) / 2, (LM.ballpark.z0 + LM.ballpark.z1) / 2, 'landmark'); P('AQUARIUM', 370, 15, 'landmark');
+    P('BELT PKWY → JFK', 407, -548, 'road'); }   // the Belt Parkway run to JFK (its own zone, coney/belt.js)
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);
 
@@ -190,7 +202,7 @@ function placeSpawnsBikesCover(world, M, piers) {
   { const l = lotNear(-154, -185); if (l) { const q = bbox(l); nearSpot(q.x1 - 4, q.z0 + 6, WEST, 'lot', l); } }
   nearSpot(12, BW.z0 + 2.5, E, 'boardwalk');              // boardwalk at the foot of the side street (inland edge)
   nearSpot(-178, BW.z1 - 4.5, WEST, 'boardwalk');         // beside the beach stairs head
-  W.vehicleSpots = bikes.map(({ x, y, z, yaw }) => ({ x, y, z, yaw })); W.vehicleMax = bikes.length;
+  W.vehicleSpots = [...(W.tableBikes || []), ...bikes.map(({ x, y, z, yaw }) => ({ x, y, z, yaw }))]; W.vehicleMax = W.vehicleSpots.length;   // the grill park's bikes first
   // online (hangout start is set by coney/hangout.js): default wave ring; a respawn stays within reach of the nearest friend (the strip is 1 km long)
   W.waveTuning = { respawnMax: 200 };
 
