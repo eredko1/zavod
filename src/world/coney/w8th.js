@@ -31,7 +31,8 @@ export function buildW8th(world, M) {
   };
   const L = S.L, E = 8;   // platforms run a = 0…L; the structure extends E past each end
   for (const lv of [S.LO, S.UP]) {
-    sbox('elSoffit', -E, L + E, -S.platIn, S.platIn, lv.bot, lv.top, { walkable: true, cell: 2.2 });                                  // trackbed between the platforms
+    sbox('elSoffit', -E, L + E, -S.platIn, S.platIn, lv.bot, lv.top, { walkable: true, cell: 2.2 });
+    sbox('stwCeil', -E, L + E, -S.platIn, S.platIn, lv.bot - 0.04, lv.bot - 0.01, { collide: false });   // plain underside: the tie texture moirés from the street                                  // trackbed between the platforms
     for (const s of [-1, 1]) {
       const oi = s * S.platIn, oo = s * S.platOut, [o0, o1] = [Math.min(oi, oo), Math.max(oi, oo)];
       sbox('w8Plat', 0, L, o0, o1, lv.top, lv.plat, { walkable: true, cell: 1.8 });                                                    // side platform

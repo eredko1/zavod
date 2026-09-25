@@ -5,7 +5,7 @@
 // (cash, stash, B, elevators, stealing, passengers, merc cash, respawn-at) lives in ../hangkit.js. CONEY agent.
 import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
-import { buildDeli, sammyTalk } from '../deli.js';
+import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews } from './chill.js';
 import { OSM } from './osm.js';
@@ -46,7 +46,7 @@ export function buildHangout(world, M) {
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
     help: 'F · talk (Igor, Sammy) / elevator / steal car / hop in<br>B · blaze or drink (stand close to share)<br>Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
-  K.spot({ pos: H.igor, r: 2.4, prompt: `F — TALK TO IGOR ($${PRICE})`, act: buyIgor });
+  K.spot({ pos: H.igor, r: 2.4, prompt: 'F — TALK TO IGOR', act: talkIgor });
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
@@ -160,7 +160,7 @@ function buildIgor(world, M, pos) {
   const ipos = igorBench.getWorldPosition(new THREE.Vector3()); ipos.y = 0;
   // name tag
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.font = '700 34px Barlow, Arial'; x.textAlign = 'center'; x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(40, 10, 176, 44); x.fillStyle = '#ffd27a'; x.fillText('IGOR', 128, 44);
-  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); tag.scale.set(1.1, 0.28, 1); tag.position.set(0, 1.95, 0); igor.add(tag);
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); tag.scale.set(1.1, 0.28, 1); tag.position.set(0, 1.95, 0); igor.add(tag); fadeNear(tag);
   return ipos;
 }
 
@@ -244,15 +244,37 @@ function updateWheelRide(dt) {
 }
 
 // ---- Igor -------------------------------------------------------------------------------------------------------------------
-function buyIgor() {
+/** Igor's bench: a conversation, not a vending machine */
+const IGOR_GOSSIP = [
+  'Sammy? Good man. Strange questions. Don\'t answer them, just buy.',
+  'Olga at Net Gost — her shashlik on the mangal here, and Vitek gets very friendly. You understand.',
+  'Top of the tower there is a roof. Nineteen floors. You can see Rockaway, you can see your whole life.',
+  'Train at Stillwell kills more people than mercenaries. Stay off the tracks, genius.',
+  'The guy with sunglasses? Don\'t buy. Or buy. But then you go see Sammy. For the lotion.',
+  'Pops in the cart — give him a sip of your forty, he fights like it\'s 1971.',
+  'In my day we had one bench, one bottle, and we were happy. Now you have bench AND map.',
+];
+function igorSell(item) {
   const { ctx } = H;
-  if (K.full()) { ctx.hud?.toast?.(`IGOR: "Finish what you got first." (B to use)`, 2200); return; }
-  if (!K.pay(PRICE)) { ctx.hud?.toast?.('IGOR: "No money, no honey."', 2200); return; }
-  const item = (H.buys++ % 2 === 0) ? 'weed' : 'bottle'; K.give(item);
-  ctx.hud?.toast?.(item === 'weed' ? 'IGOR: "Ten bucks. B to blaze — pass it around."' : 'IGOR: "Here, a bottle. B to drink — share with the boys."', 2800);
-  try { ctx.audio?.play?.('ui_click'); } catch {}
+  if (K.full()) return { text: 'IGOR: "Finish what you got first. B to use."', choices: [{ label: 'Fair', go: null }] };
+  if (!K.pay(PRICE)) return { text: 'IGOR: "No money, no honey. Go shoot somebody who has wallet."', choices: [{ label: '…', go: null }] };
+  K.give(item); try { ctx.audio?.play?.('ui_click'); } catch {}
   ctx.net?.send?.('igor');
+  return { text: item === 'weed' ? 'IGOR: "Ten bucks. B to blaze — and pass it, don\'t be greedy."' : 'IGOR: "Bottle. B to drink. Share with the boys, or they remember."', choices: [{ label: 'Spasibo, Igor', go: null }] };
 }
+function talkIgor() {
+  const again = H.buys++ > 0;
+  K.openDialog('IGOR', {
+    text: again ? 'IGOR: "Back again. You like Igor, or you like what Igor has?"' : 'IGOR: "Sit, sit. Is free bench. Everything else — ten dollars."',
+    choices: [
+      { label: `A bag — $${PRICE}`, go: () => igorSell('weed') },
+      { label: `A bottle — $${PRICE}`, go: () => igorSell('bottle') },
+      { label: 'What\'s the word?', go: () => ({ text: `IGOR: "${IGOR_GOSSIP[Math.floor(Math.random() * IGOR_GOSSIP.length)]}"`, choices: [{ label: 'Heard', go: null }] }) },
+      { label: 'Later', go: null },
+    ],
+  });
+}
+function buyIgor() { const { ctx } = H; const r = igorSell(H.buys++ % 2 === 0 ? 'weed' : 'bottle'); ctx.hud?.toast?.(r.text, 2400); }   // QA shortcut
 
 /** QA hooks (window.__game.hangout) */
 export const hangoutQA = {

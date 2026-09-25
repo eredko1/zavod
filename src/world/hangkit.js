@@ -248,7 +248,7 @@ function openDialog(name, node, vendor = null) {
   const u = V.ui; u.dname.textContent = name; u.dtext.textContent = node.text;
   u.dch.innerHTML = '';
   (node.choices || [{ label: 'Leave', go: null }]).forEach((c, i) => {
-    const b = document.createElement('button'); b.className = 'hkch'; b.innerHTML = `<b>${i + 1}</b> ${c.label}`;
+    const b = document.createElement('button'); b.className = 'hkch'; b.innerHTML = `<b>${i + 1}</b> ${c.label}`; const cost = c.cost ?? +(/— \$(\d+)/.exec(c.label)?.[1] || 0); if ((cost && V.cash < cost) || (c.need && !api.has(c.need))) b.classList.add('dim');   // still pickable: the vendor tells you why
     const pick = (e) => { e.preventDefault(); e.stopPropagation(); choose(i); };
     b.addEventListener('touchstart', pick, { passive: false }); b.addEventListener('mousedown', pick); u.dch.appendChild(b);
   });
@@ -444,6 +444,7 @@ function buildUI(o) {
   .hkch{display:block;width:100%;text-align:left;margin:5px 0 0;padding:9px 12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;font:600 15px Barlow,Arial;border-radius:4px;cursor:pointer}
   .hkch b{display:inline-block;min-width:22px;color:#ffb24a}
   .hkch:hover,.hkch:active{background:rgba(255,178,74,.2)}
+  .hkch.dim{opacity:.45}
   .hkdlg .ft{margin-top:8px;font:500 12px Barlow,Arial;color:#9aa4ad;letter-spacing:.05em}`;
     document.head.appendChild(css);
   }

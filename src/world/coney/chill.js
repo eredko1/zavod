@@ -198,6 +198,6 @@ function vitekTalk(Kk, again) {
   };
   return {
     text: again ? 'VITEK: "Psst. You back? Got my shashlik? Got sixty?"' : 'VITEK: "Psst. Bratan. The gopniks giving you trouble? I can help. A Makarov. Sixty dollar — and I\'m starving. Bring me a hot skewer of shashlik off the mangal at Table Park."',
-    choices: [{ label: 'Here — shashlik and $60', go: deal }, { label: 'Not now', go: null }],
+    choices: [{ label: 'Here — shashlik and $60', go: deal, cost: 60, need: 'skewer' }, { label: 'Not now', go: null }],
   };
 }

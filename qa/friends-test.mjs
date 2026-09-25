@@ -12,7 +12,7 @@ const hs = () => all(() => ({ ...window.__game.hangout.state(), lobby: 0, top: 0
 // 1) everyone starts near building 2
 let s = await hs(); ok(s.every((x) => Math.hypot(x.pos[0] - x.start[0], x.pos[2] - x.start[2]) < 6), 'all 3 start outside building 2 ' + JSON.stringify(s.map((x) => x.pos)));
 // 2) each buys from Igor with a real F press (C taps via bus the same path)
-for (const p of P) { await p.evaluate(() => { const [x, , z] = window.__game.hangout.state().igor; window.__game.teleport(x + 1.5, 0, z, Math.PI / 2, 0); }); await p.waitForTimeout(900); await p.keyboard.press('KeyF'); await p.waitForTimeout(400); }
+for (const p of P) { await p.evaluate(() => { const [x, , z] = window.__game.hangout.state().igor; window.__game.teleport(x + 1.5, 0, z, Math.PI / 2, 0); }); await p.waitForTimeout(900); await p.keyboard.press('KeyF'); await p.waitForTimeout(400); await p.keyboard.press('Digit1'); await p.waitForTimeout(300); await p.keyboard.press('Digit1'); await p.waitForTimeout(300); }
 s = await hs(); ok(s.every((x) => x.stash === 1 && x.cash === 10), 'each bought from Igor ' + JSON.stringify(s.map((x) => [x.cash, x.stash])));
 // 3) all stand at lobby elevator 0; ALPHA presses F; all ride up
 for (const [i, p] of P.entries()) await p.evaluate((i) => { const [x, y, z] = window.__game.hangout.state().lobby[0]; window.__game.teleport(x + (i - 1) * 0.6, 0, z + (i - 1) * 0.3, 0, 0); }, i);

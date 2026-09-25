@@ -19,6 +19,7 @@ export function buildStillwell(world, M) {
   const { scene, ctx, W } = world; const S = STILLWELL, B = new Batch(world, M, 'stillwell');
   // matte platform concrete + brushed turnstile steel (the shared greys are glossy: SSR mirrored the solar roof in them)
   if (!M.edgeYellow) { M.edgeYellow = new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.7 }); M.surface.edgeYellow = 'concrete'; }
+  if (!M.stwCeil) { M.stwCeil = new THREE.MeshStandardMaterial({ color: 0x5d6b62, roughness: 0.8, metalness: 0.2, emissive: 0x1a221d, emissiveIntensity: 1 }); M.surface.stwCeil = 'metal'; }   // plain painted deck underside (the tie texture moiréd)
   if (!M.stwPlat) { M.stwPlat = new THREE.MeshStandardMaterial({ color: 0xa3a39c, roughness: 0.93, metalness: 0 }); M.surface.stwPlat = 'concrete'; M.stwTurn = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.35, metalness: 0.9 }); M.surface.stwTurn = 'metal'; }
   const w = S.x1 - S.x0, sTop = STAIR.z0 - STAIR.run, cxs = ISLANDS.map(([a, b]) => (a + b) / 2);
   const inStair = (x0, x1) => cxs.some((c) => x1 > c - STAIR.w / 2 - 0.1 && x0 < c + STAIR.w / 2 + 0.1);
@@ -46,7 +47,7 @@ export function buildStillwell(world, M) {
   B.box('fascia', [-36, 0, -265.5], [-30, 2.6, -262.5]); B.box('glassDark', [-36.05, 1.1, -262.55], [-30.05, 2.3, -262.45], { collide: false });   // token booth
   sign(scene, 'TOKEN BOOTH', -33, 2.85, -262.4, 0, 3.4, 0.4, '#111', '#fff');
   for (const x of [-84, -82, -80]) { B.box('ssBlue', [x, 0, -262], [x + 1.2, 1.9, -261.2]); }   // MetroCard machines
-  sign(scene, 'D  F  N  Q  ·  TO ALL TRAINS  ↑', -54, 5.6, -270, 0, 12, 0.7, '#111', '#fff');
+  sign(scene, 'D  F  N  Q  ·  TO ALL TRAINS  ↑', -54, 4.6, -270, 0, 12, 0.7, '#111', '#fff');
   // ---- stairs: one bank per island, from the concourse (z −276) north up to the platform (8.6 m) -----------------------------
   for (const cx of cxs) {
     B.stairs('concreteGrey', { x: cx, z: STAIR.z0, y0: 0, rise: S.PLAT, run: STAIR.run, width: STAIR.w, axis: 'z', dir: -1, n: 46, walkable: true, base: 0 });
@@ -62,7 +63,7 @@ export function buildStillwell(world, M) {
     piece(zA, STAIR.z0, x0, x1); piece(sTop, zB, x0, x1);
     let x = x0; for (const c of cuts) { piece(STAIR.z0, sTop, x, c - STAIR.w / 2); x = c + STAIR.w / 2; } piece(STAIR.z0, sTop, x, x1);
   };
-  slabs(S.x0, S.x1, S.DECK_B, S.DECK_T, 'elSoffit', zDeck0, zDeck1);
+  slabs(S.x0, S.x1, S.DECK_B, S.DECK_T, 'stwCeil', zDeck0, zDeck1);
   for (const [a, b] of ISLANDS) {
     slabs(a, b, S.DECK_T, S.PLAT, 'stwPlat', S.zP0, S.zP1);
     for (const e of [a, b]) { const s = e === a ? 1 : -1; B.box('edgeYellow', [Math.min(e, e + s * 0.6), S.PLAT, S.zP1], [Math.max(e, e + s * 0.6), S.PLAT + 0.012, S.zP0], { collide: false }); }   // yellow edge strips

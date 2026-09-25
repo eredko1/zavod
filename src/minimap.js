@@ -44,7 +44,11 @@ function snapshot() {
   console.log('[map] snapshot', M.map.RW, 'x', M.map.RH, M.levels ? 'levels ' + M.levels.join(',') : '');
 }
 function shoot(clipY) {
-  const { ctx } = M; const W = ctx.world, b = W.bounds;
+  const { ctx } = M; const W = ctx.world, b0 = W.bounds;
+  // frame = play bounds + everything that has a label, padded 60 m so nothing sits on the edge
+  const b = { min: { x: b0.min.x, z: b0.min.z }, max: { x: b0.max.x, z: b0.max.z } };
+  for (const q of W.mapPOIs || []) { b.min.x = Math.min(b.min.x, q.x - 30); b.max.x = Math.max(b.max.x, q.x + 30); b.min.z = Math.min(b.min.z, q.z - 30); b.max.z = Math.max(b.max.z, q.z + 30); }
+  b.min.x -= 60; b.min.z -= 60; b.max.x += 60; b.max.z += 60;
   const w = b.max.x - b.min.x, d = b.max.z - b.min.z, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
   const res = ctx.isTouch ? 1024 : 2048, RW = w >= d ? res : Math.round(res * w / d), RH = w >= d ? Math.round(res * d / w) : res;
   const cam = new THREE.OrthographicCamera(-w / 2, w / 2, d / 2, -d / 2, 1, 4000); cam.position.set(cx, 1500, cz); cam.up.set(0, 0, -1); cam.lookAt(cx, 0, cz); cam.updateMatrixWorld(true);
@@ -123,21 +127,42 @@ function drawMini() {
   const P = (x, z) => { const dx = x - p.position.x, dz = z - p.position.z, c = Math.cos(rot), s = Math.sin(rot); return [R + (dx * c - dz * s) * k, R + (dx * s + dz * c) * k]; };
   drawMarkers(g, P, k, rot, false);
   g.restore();
+  const off = p.position.x < m.b.min.x || p.position.x > m.b.max.x || p.position.z < m.b.min.z || p.position.z > m.b.max.z;
+  if (off) { const zn = (ctx.world?.zones || []).find((z) => p.position.z >= z.z0 && p.position.z <= z.z1);   // off the plan (the Belt / JFK run)
+    g.save(); g.fillStyle = 'rgba(14,26,36,.9)'; g.beginPath(); g.arc(R, R, R - 2, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffd27a'; g.font = '700 20px Barlow Condensed, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(zn?.name || 'OFF THE MAP', R, R - 10);
+    g.fillStyle = '#c9d2da'; g.font = '600 14px Barlow, Arial'; g.fillText(zn?.hint || 'back to Coney: the ramp', R, R + 14); g.restore(); }
   // north tick
   const na = rot; g.save(); g.translate(R, R); g.rotate(na); g.fillStyle = '#fff'; g.font = '700 22px Barlow Condensed, Arial'; g.textAlign = 'center'; g.fillText('N', 0, -R + 24); g.restore();
   g.beginPath(); g.arc(R, R, R - 2, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,.35)'; g.stroke();
+}
+function bakeBig(CW, CH, dpr, P) {
+  const W = M.ctx.world, c = document.createElement('canvas'); c.width = CW * dpr; c.height = CH * dpr; const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.drawImage(M.img, 0, 0, CW, CH);
+  const taken = [];   // label rects: a label that would overlap one already drawn is skipped (POIs first — they matter more)
+  const fits = (u, v, w, h) => { const r = [u - w / 2, v - h / 2, u + w / 2, v + h / 2]; if (taken.some((t) => r[0] < t[2] && r[2] > t[0] && r[1] < t[3] && r[3] > t[1])) return false; taken.push(r); return true; };
+  const label = (u, v, t, col, fs, rot = 0, weight = 700, force = false) => {
+    g.save(); g.font = `${weight} ${fs}px Barlow Condensed, Arial`; const tw = g.measureText(t).width;
+    if (!rot) u = Math.min(CW - tw / 2 - 6, Math.max(tw / 2 + 6, u));   // keep it inside the frame
+    if (!force && !rot && !fits(u, v, tw + 6, fs + 4)) { g.restore(); return; }
+    g.translate(u, v); g.rotate(rot); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3.5; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(t, 0, 0); g.fillStyle = col; g.fillText(t, 0, 0); g.restore(); };
+  const pois = (W?.mapPOIs || []).map((q) => ({ q, uv: P(q.x, q.z) }));
+  for (const { q, uv: [u, v] } of pois) { const [col, icon] = KIND[q.kind] || KIND.landmark;
+    g.beginPath(); g.arc(u, v, 8, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,.65)'; g.fill(); g.lineWidth = 2; g.strokeStyle = col; g.stroke();
+    g.font = '700 11px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = col; g.fillText(icon, u, v + 0.5); fits(u, v, 16, 14); }
+  for (const { q, uv: [u, v] } of pois) { const col = (KIND[q.kind] || KIND.landmark)[0]; label(u, v + 17, q.name, col, 13); }
+  for (const L of W?.mapLabels || []) { const [u, v] = P(L.x, L.z); label(u, v, L.t, L.col || '#e9eef2', L.fs || 14, L.r || 0, 600); }
+  return c;
 }
 function drawBig() {
   if (!M.img) return; const { ctx, bcan: c } = M; const m = M.map, W = ctx.world;
   const maxW = innerWidth * 0.96, maxH = innerHeight * 0.88, sc = Math.min(maxW / m.RW, maxH / m.RH), CW = Math.round(m.RW * sc), CH = Math.round(m.RH * sc), dpr = Math.min(2, devicePixelRatio || 1);
   if (c.width !== CW * dpr) { c.width = CW * dpr; c.height = CH * dpr; c.style.width = CW + 'px'; c.style.height = CH + 'px'; }
-  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.drawImage(M.img, 0, 0, CW, CH);
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const P = (x, z) => [(x - m.b.min.x) / m.w * CW, (z - m.b.min.z) / m.d * CH];
-  const label = (u, v, t, col, fs, rot = 0, weight = 700) => { g.save(); g.translate(u, v); g.rotate(rot); g.font = `${weight} ${fs}px Barlow Condensed, Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3.5; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(t, 0, 0); g.fillStyle = col; g.fillText(t, 0, 0); g.restore(); };
-  for (const L of W?.mapLabels || []) { const [u, v] = P(L.x, L.z); label(u, v, L.t, L.col || '#e9eef2', L.fs || 14, L.r || 0, 600); }
-  for (const q of W?.mapPOIs || []) { const [col, icon] = KIND[q.kind] || KIND.landmark; const [u, v] = P(q.x, q.z);
-    g.beginPath(); g.arc(u, v, 8, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,.65)'; g.fill(); g.lineWidth = 2; g.strokeStyle = col; g.stroke();
-    g.font = '700 11px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = col; g.fillText(icon, u, v + 0.5); label(u, v + 16, q.name, col, 13); }
+  // the plan + street names + POIs don't move: bake them once per size / floor, then just blit (was a full redraw every 3rd frame)
+  if (!M.bg || M.bg.src !== M.img || M.bg.w !== CW * dpr) { M.bg = { src: M.img, w: CW * dpr, can: bakeBig(CW, CH, dpr, P) }; }
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(M.bg.can, 0, 0); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawMarkers(g, P, 1, 0, true);
   // legend
   const items = [['#ffd23b', 'YOU'], ['#4aa3ff', 'FRIENDS'], ['#ff4a3a', 'MERCS'], ['#b36bff', 'COPS'], ['#ff9a3a', 'GOPNIKS'], ['#ffd27a', 'VENDORS'], ['#9fe39a', 'BIKES / CARS']];

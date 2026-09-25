@@ -66,7 +66,12 @@ export function buildFigure(o = {}) {
 export function nameTag(text, color = '#ffd27a') {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.font = '700 34px Barlow, Arial'; x.textAlign = 'center';
   const w = Math.min(236, x.measureText(text).width + 36); x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(128 - w / 2, 10, w, 44); x.fillStyle = color; x.fillText(text, 128, 44);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); s.scale.set(1.1, 0.28, 1); return s;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); s.scale.set(1.1, 0.28, 1); fadeNear(s); return s;
+}
+/** name tags fade out when you're right on top of them (they otherwise fill the screen mid-conversation) */
+const _tp = new THREE.Vector3();
+export function fadeNear(s, near = 1.6, far = 3.2) {
+  s.onBeforeRender = (r, sc, cam) => { s.getWorldPosition(_tp); const d = _tp.distanceTo(cam.position); s.material.opacity = Math.min(1, Math.max(0, (d - near) / (far - near))); };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------

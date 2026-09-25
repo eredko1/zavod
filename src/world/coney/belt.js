@@ -22,7 +22,7 @@ let Z = null;
 
 export function buildBelt(world) {
   const { ctx, W, scene } = world;
-  (W.zones || (W.zones = [])).push({ x0: ZONE.x0, x1: ZONE.x1, z0: ZONE.z0, z1: ZONE.z1 });
+  (W.zones || (W.zones = [])).push({ x0: ZONE.x0, x1: ZONE.x1, z0: ZONE.z0, z1: ZONE.z1, name: 'BELT PKWY → JFK', hint: 'ramp back to Coney at the loop' });
   { const gh = W.groundHeight; W.groundHeight = (x, z) => (z > ZONE.z0 - 50 && z < ZONE.z1 + 50 && x > ZONE.x0 - 50 && x < ZONE.x1 + 50 ? 0 : gh ? gh(x, z) : 0); }   // the parkway zone is flat (coney's function reports sea floor out here)
   const root = new THREE.Group(); root.name = 'beltParkway'; root.position.set(0, 0, ZONE.oz); scene.add(root);
   Z = { world, ctx, root, planes: [], traffic: [], t: 0, busy: false, lastTrip: -9 };
