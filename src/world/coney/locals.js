@@ -2,12 +2,12 @@
 //  · POPS, a cranky old-timer who cruises the neighborhood in his green cart. Listen to him ramble (or hand him a sip of your
 //    40) and he rolls with you for 3 minutes blasting mercs with his old pump shotgun. Cruising is on the wall clock (every
 //    client sees him in the same spot); who he's riding with is a net event; the rider's own client applies his damage.
-//  · SHADES, working the boardwalk: $10 designer sunglasses. They come with crabs. Sammy sells the special lotion.
+//  · SHADES, working the paths round Table Park: $10 designer sunglasses. They come with crabs. Sammy sells the special lotion.
 //  · NET GOST MARKET (the Russian grocery by the park): OLGA sells marinated shashlik + kvass. Grill the meat on the mangal at
 //    Table Park and eat it off the skewer: the golden Deagle.
 import * as THREE from 'three';
 import { hangkit as K, sell } from '../hangkit.js';
-import { buildFigure, nameTag, buildDeli, buildWalker } from '../deli.js';
+import { buildFigure, nameTag, buildDeli, buildWalker, rastaTalk } from '../deli.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _rc = new THREE.Raycaster();
 let L = null;
@@ -18,6 +18,7 @@ export function buildLocals(world, H) {
   try { buildPops(world, H); } catch (e) { console.warn('[locals] pops', e); }
   try { buildShades(world); } catch (e) { console.warn('[locals] shades', e); }
   try { buildMarket(world, H); } catch (e) { console.warn('[locals] market', e); }
+  try { buildVisitors(world); } catch (e) { console.warn('[locals] visitors', e); }
   ctx.bus.on('net:grill', () => { if (L?.grill) K.puff(L.grill.pos.clone().add(new THREE.Vector3(0, 1.0, 0))); });
   ctx.bus.on('net:pops', (m) => { if (L?.pops && typeof m.f === 'string') { L.pops.leader = m.f; L.pops.until = performance.now() + Math.min(200, +m.u || 180) * 1000; } });
   if (typeof window !== 'undefined' && window.__game) window.__game.locals = { pops: () => L.pops && { pos: L.pops.pos.toArray().map((v) => +v.toFixed(1)), leader: L.pops.leader, left: Math.max(0, Math.round((L.pops.until - performance.now()) / 1000)), kills: L.pops.kills }, recruit: () => recruit(), grill: () => L.grill && { state: L.grill.state }, market: () => L.market && { counter: L.market.counter.toArray(), cashier: L.market.sammy.toArray(), door: L.market.door.toArray(), face: L.market.face }, mangal: () => L.grill && L.grill.pos.toArray() };
@@ -43,7 +44,7 @@ function buildPops(world, H) {
   const flash = new THREE.PointLight(0xffc070, 0, 10); flash.position.set(0.6, 1.4, 0); g.add(flash);
   // cruise route: a loop through the neighborhood on the AI nav floor (Table Park → W 8th St → the boardwalk → back)
   const start = W.onlineStart || [220, 0, -380];
-  const anchors = [[start[0] + 6, start[2] + 6], [330, -300], [372, -180], [330, 120], [200, 146], [60, 146], [120, -60], [180, -250]];
+  const anchors = [[start[0] + 8, start[2] + 6], [start[0] + 45, start[2] + 12], [start[0] + 50, start[2] - 35], [start[0] + 5, start[2] - 55], [start[0] - 40, start[2] - 30], [start[0] - 38, start[2] + 18]];   // a tight loop round Table Park
   let route = [];
   const nav = ctx.ai?.nav;
   for (let i = 0; i < anchors.length; i++) {
@@ -118,7 +119,9 @@ function popsTalk(again) {
 // ---------------------------------------------------------------------------------------------------------------------------
 // SHADES: sunglasses (with complimentary crabs) on the boardwalk
 function buildShades(world) {
-  buildWalker(world, K, { name: 'SHADES', talk: shadesTalk, shirt: 0xe3e3e3, pants: 0x2a2f3a, skin: 0x6b4430, path: [[-80, 148], [-20, 150], [40, 149], [110, 151], [170, 150], [240, 148]], speed: 0.9 });
+  const o = world.W.onlineStart || [220, 0, -380], nav = world.ctx.ai?.nav;
+  const pts = [[14, 8], [22, -6], [14, -22], [-4, -26], [-18, -12], [-16, 6]].map(([dx, dz]) => { const q = nav?.nearestFree?.(o[0] + dx, o[2] + dz, 4, 0); return q ? [q.x, q.z] : [o[0] + dx, o[2] + dz]; });
+  buildWalker(world, K, { name: 'SHADES', talk: shadesTalk, shirt: 0xe3e3e3, pants: 0x2a2f3a, skin: 0x6b4430, path: pts, speed: 0.9 });   // laps round Table Park
 }
 function shadesTalk(Kk, again) {
   const buy = () => {
@@ -177,7 +180,7 @@ function buildMarket(world, H) {
   K.spot({ pos: at, r: 2.2, prompt: () => G.state === 'idle' ? (K.has('meat') ? 'F — GRILL THE SHASHLIK' : 'MANGAL — buy shashlik at NET GOST (W 8th St)') : G.state === 'cooking' ? `sizzling… ${Math.ceil(G.t)} s` : (ctx.mode === 'chill' ? 'F — TAKE THE SHASHLIK' : 'F — EAT THE SHASHLIK'),
     when: () => true, act: () => {
       if (G.state === 'idle' && K.take('meat')) { G.state = 'cooking'; G.t = 15; skewers.visible = true; K.toast('On the mangal. 15 seconds. Don\'t leave it.', 2000); }
-      else if (G.state === 'ready') { G.state = 'idle'; skewers.visible = false; if (ctx.mode === 'chill') { K.give('skewer'); K.toast('Hot shashlik to go — VITEK is hungry (behind the towers)', 2600); } else eatShashlik(); }
+      else if (G.state === 'ready') { G.state = 'idle'; skewers.visible = false; if (ctx.mode === 'chill') { K.give('skewer'); K.toast('Hot shashlik to go — VITEK is hungry (by the park gate)', 2600); } else eatShashlik(); }
     } });
   K.onUpdate((dt) => {
     coals.material.emissiveIntensity = G.state === 'cooking' ? 1.2 + Math.sin(performance.now() / 120) * 0.3 : G.state === 'ready' ? 0.5 : 0.05;
@@ -193,4 +196,41 @@ function eatShashlik() {
   if (ctx.player) ctx.player.health = ctx.player.maxHealth || 100;
   K.toast('Shashlik! Full health — and a GOLDEN DEAGLE (slot 2)', 3200);
   ctx.net?.send?.('buy', { k: 'meat', v: 'the mangal' });
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// RASTA VISITORS: every ~3 min one strolls up to Table Park, hangs by the gate selling bags for a bit, then heads off. The
+// schedule and the route come from the wall clock (cycle index → direction), so every client sees the same guy.
+const RASTAS = ['RAS', 'JAH-B', 'IRIE', 'BINGHI', 'RUDIE'];
+function buildVisitors(world) {
+  const { ctx, W, scene } = world; const o = W.onlineStart || [220, 0, -380], nav = ctx.ai?.nav;
+  const CYCLE = 190, ARRIVE = 35, STAY = 70, LEAVE = 30;   // seconds
+  let cur = null;
+  const hash = (n) => { let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
+  const make = (ci) => {
+    const a = hash(ci) * Math.PI * 2, far = new THREE.Vector3(o[0] + Math.cos(a) * 55, 0, o[2] + Math.sin(a) * 55), near = new THREE.Vector3(o[0] + Math.cos(a) * 7, 0, o[2] + Math.sin(a) * 7);
+    const fq = nav?.nearestFree?.(far.x, far.z, 8, 0), nq = nav?.nearestFree?.(near.x, near.z, 4, 0); if (fq) far.set(fq.x, fq.y, fq.z); if (nq) near.set(nq.x, nq.y, nq.z);
+    let path = null; try { path = nav?.findPath?.(far, near, { maxExpand: 30000 }); } catch {} if (!path || !path.length) path = [far, near];
+    const pts = [far, ...path.map((p) => new THREE.Vector3(p.x, p.y, p.z))]; const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+    const name = RASTAS[Math.floor(hash(ci + 7) * RASTAS.length)];
+    const f = buildFigure({ tam: true, skin: [0x5a3a28, 0x4a2e20, 0x6b4430][ci % 3], hair: 0x1a120c, beard: true, beardColor: 0x1a120c, shirt: [0x2e6b34, 0xc9a52c, 0x7a2a22, 0xe8e2d0][ci % 4], pants: 0x3c3a30, shoe: 0x6a5238, belly: 0.1 });
+    const tag = nameTag(name); tag.position.set(0, 2.15, 0); f.group.add(tag); scene.add(f.group);
+    const pos = pts[0].clone(); const v = K.vendor({ name, pos, r: 2.4, talk: rastaTalk(name) });
+    return { ci, f, pts, cum, pos, v, yaw: 0 };
+  };
+  const at = (c, d, out) => { const L = c.cum[c.cum.length - 1]; d = Math.max(0, Math.min(L, d)); let i = 0; while (i < c.cum.length - 2 && c.cum[i + 1] < d) i++; const seg = c.cum[i + 1] - c.cum[i]; return out.copy(c.pts[i]).lerp(c.pts[i + 1], seg > 0 ? (d - c.cum[i]) / seg : 0); };
+  const tmp = new THREE.Vector3();
+  K.onUpdate((dt) => {
+    const t = Date.now() / 1000, ci = Math.floor(t / CYCLE), ph = t - ci * CYCLE, on = ph < ARRIVE + STAY + LEAVE;
+    if (cur && (cur.ci !== ci || !on)) { scene.remove(cur.f.group); K.removeVendor(cur.v); cur = null; }
+    if (!on) return;
+    if (!cur) { cur = make(ci); if (ph < ARRIVE + 2) K.toast(`${cur.v.name} is heading to Table Park — got herb for sale`, 2600); }
+    const L = cur.cum[cur.cum.length - 1]; let d, speed = 0;
+    if (ph < ARRIVE) { d = L * ph / ARRIVE; speed = L / ARRIVE; } else if (ph < ARRIVE + STAY) d = L; else { d = L * (1 - (ph - ARRIVE - STAY) / LEAVE); speed = L / LEAVE; }
+    const prev = cur.pos.clone(); at(cur, d, tmp); cur.pos.copy(tmp);
+    const me = ctx.player.position, talking = K.state()?.dialog?.name === cur.v.name;
+    if (speed > 0 && prev.distanceToSquared(cur.pos) > 1e-6) cur.yaw = Math.atan2(cur.pos.x - prev.x, cur.pos.z - prev.z); else if (Math.hypot(me.x - cur.pos.x, me.z - cur.pos.z) < 5 || talking) cur.yaw = Math.atan2(me.x - cur.pos.x, me.z - cur.pos.z);
+    cur.f.group.position.copy(cur.pos); cur.f.group.rotation.y = cur.yaw; cur.f.update(dt, speed);
+  });
+  if (typeof window !== 'undefined' && window.__game) window.__game.visitor = () => cur && { name: cur.v.name, pos: cur.pos.toArray().map((x) => +x.toFixed(1)) };
 }

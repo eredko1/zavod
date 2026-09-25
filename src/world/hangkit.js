@@ -47,7 +47,8 @@ const api = {
   /** interaction point: { pos: Vector3 (may move), r, dy, prompt: string | () => string, act: () => void, when?: () => bool } */
   spot(s) { V.spots.push({ r: 2, dy: 1.3, ...s }); return s; },
   /** vendor: { name, pos: Vector3 (may move), r, talk: () => node }  node = { text, choices: [{ label, go: node | () => node | null }] } */
-  vendor(v) { V.vendors.push({ r: 2.2, ...v }); return v; },
+  vendor(v) { const e = { r: 2.2, ...v }; V.vendors.push(e); return e; },
+  removeVendor(e) { if (!V) return; const i = V.vendors.indexOf(e); if (i > -1) V.vendors.splice(i, 1); if (V.dialog?.vendor === e) closeDialog(); },
   /** elevator / stair shaft: { kind: 'elevator' | 'stairs', floors, label, lobby: { cars: [{ pos, yaw }] }, tops: [{ cars: [{ pos, yaw }], face }] } */
   shaft(s) { V.shafts.push({ kind: 'elevator', floors: 10, ...s }); return V.shafts.length - 1; },
   onUpdate(fn) { V.onUpdate.push(fn); },
