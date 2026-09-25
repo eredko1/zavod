@@ -121,8 +121,10 @@ function update(dt) {
   const pos = p.position; const near = (v, r, dy = 1.3) => Math.hypot(v.x - pos.x, v.z - pos.z) < r && Math.abs(v.y - pos.y) < dy;
   let prompt = null, act = null;
   if (!ctx.vehicles?.mounted) {
-    for (const v of V.vendors) if (!act && near(v.pos, v.r)) { prompt = `F — TALK TO ${v.name}`; act = () => talk(v); }
-    for (const s of V.spots) if (!act && (!s.when || s.when()) && near(s.pos, s.r, s.dy)) { prompt = typeof s.prompt === 'function' ? s.prompt() : s.prompt; act = s.act; }
+    // the closest vendor / interaction point wins (walkers pass by the mangal, the deli counter, …)
+    let bd = Infinity; const dist = (v) => Math.hypot(v.x - pos.x, v.z - pos.z);
+    for (const v of V.vendors) if (near(v.pos, v.r) && dist(v.pos) < bd) { bd = dist(v.pos); prompt = `F — TALK TO ${v.name}`; act = () => talk(v); }
+    for (const s of V.spots) if ((!s.when || s.when()) && near(s.pos, s.r, s.dy) && dist(s.pos) < bd) { bd = dist(s.pos); prompt = typeof s.prompt === 'function' ? s.prompt() : s.prompt; act = s.act; }
     for (let i = 0; i < V.shafts.length && !act; i++) {
       const t = V.shafts[i], up = t.kind === 'stairs' ? 'F — CLIMB ▲' : `F — ELEVATOR ▲ ${t.floors}`, dn = t.kind === 'stairs' ? 'F — GO DOWN ▼' : 'F — ELEVATOR ▼ LOBBY';
       t.lobby.cars.forEach((c, k) => { if (!act && near(c.pos, t.r || 1.4)) { prompt = t.label ? `${up} · ${t.label}` : up; act = () => callElevator(i, k, 'up'); } });

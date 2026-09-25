@@ -12,7 +12,7 @@ import { buildFigure, nameTag } from '../deli.js';
 
 // crews: Russian gopniks and neighborhood hustlers. Some just roll up and talk trash, some shake you down together.
 const CREWS = {
-  ru: { names: ['KOLYAN', 'VOVCHIK', 'DIMON', 'TOLIK', 'SLAVIK', 'ZHEKA', 'LYOKHA', 'BORYA'], tag: '#ff8a6a',
+  ru: { names: ['DIMA', 'MISHA', 'MAX', 'SASHA', 'VOVA', 'KOSTYA', 'ZHENYA', 'SEVA', 'TOLIK', 'LYOSHA', 'KOLYAN', 'SLAVIK'], tag: '#ff8a6a',
     hi: ['Bratan, which district you from?', 'Want semechki? No? Then give money.', 'Three stripes, bro. Respect the three stripes.', 'Why you walk like tourist?', 'Sammy is my cousin. Everybody is Sammy cousin.'],
     rob: ['Ey, bratan — got a cigarette?', 'Pay the neighborhood tax.', 'Brother, lend me twenty. Forever.'],
     bye: ['OK bratan, stay calm, we go.', 'Next time you pay.', 'Poka, tourist.'], look: [[0x15161a, 0xe8e8e8], [0x1c2b5a, 0xe8e8e8], [0x2a2a2e, 0xe8e8e8]], cap: 0x111111 },
