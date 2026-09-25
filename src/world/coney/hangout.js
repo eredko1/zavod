@@ -279,6 +279,8 @@ function buyIgor() { const { ctx } = H; const r = igorSell(H.buys++ % 2 === 0 ? 
 /** QA hooks (window.__game.hangout) */
 export const hangoutQA = {
   state: () => { const s = K.state(); return H && s && { ...s, stash: s.inv.length, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()), deli: H.deli && { sammy: H.deli.sammy.toArray(), counter: H.deli.counter.toArray(), door: H.deli.door.toArray(), inside: H.deli.inside.toArray(), face: H.deli.face } }; },
+  roof: () => { const r = H.b2?.roof?.top; return r && [...r.pos.toArray(), r.yaw]; },
+  roofAt: (a, c) => { const t = H.b2, k = t.core; return t.toWorld(a, k.roof.y, k.roof.c + c).toArray(); },
   buy: () => buyIgor(), use: () => K.useItem(), light: () => { K.give('weed'); K.useItem(); }, ride: (dir = 'up', k = 0) => K.callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = K.nearestParked(1e9); if (c) K.steal(c); return !!c; },
   park: () => K.pickRespawn(), wheel: () => { const WW = H.world.W.wonderWheel; if (WW) rideWheel(WW); return !!WW; }, wheelState: () => H.wheel && { i: H.wheel.i, t: +H.wheel.t.toFixed(1), y: +H.ctx.player.position.y.toFixed(1) }, choose: (i) => K.choose(i), close: () => K.closeDialog(), give: (n) => K.earn(n), drop: (n = 30) => { const p = H.ctx.player.position; K.dropCash(p.clone().add(new THREE.Vector3(3, 0, 0)), n); },
 };

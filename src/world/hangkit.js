@@ -346,6 +346,8 @@ function startRide(ti, k, dir, side, delay = 0) {
 function updateRide(dt) {
   const r = V.riding, { ctx } = V; r.t += dt; const p = ctx.player, T = r.T;
   const k = r.t < 0 ? 0 : r.t < FADE ? r.t / FADE : r.t < T - FADE ? 1 : Math.max(0, (T - r.t) / FADE);
+  const car = r.shaft.kind !== 'stairs'; V.ui.fade.classList.toggle('car', car); V.ui.floor.classList.toggle('car', car);
+  if (car) V.ui.fade.classList.toggle('flick', Math.random() < 0.06);   // tired fluorescent tube
   V.ui.fade.style.opacity = k.toFixed(3);
   const prog = Math.min(1, Math.max(0, (r.t - FADE) / (T - 2 * FADE))), n = r.shaft.floors;
   if (r.shaft.kind === 'stairs') V.ui.floor.textContent = r.t > 0 ? (r.dir === 'up' ? 'climbing…' : 'heading down…') : '';
@@ -436,6 +438,12 @@ function buildUI(o) {
     const css = document.createElement('style'); css.id = 'hkcss'; css.textContent = `
   .hgcash{position:fixed;left:18px;bottom:92px;z-index:40;font:700 20px 'Barlow Condensed',Arial;color:#9fe39a;text-shadow:0 1px 2px #000;pointer-events:none;letter-spacing:.06em}
   .hgfade{position:fixed;inset:0;background:#050505;opacity:0;z-index:45;pointer-events:none;transition:none}
+  .hgfade.car{background:radial-gradient(ellipse at 50% 0%,rgba(255,250,230,.28),transparent 60%),repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),linear-gradient(90deg,#4d5257 0%,#8d9399 18%,#6f757b 48.8%,#141414 49.4%,#141414 50.6%,#6f757b 51.2%,#959ba1 82%,#4a4f54 100%);box-shadow:inset 0 0 180px rgba(0,0,0,.85)}
+  .hgfade.car::before{content:'';position:absolute;left:50%;top:8%;transform:translateX(-50%);width:170px;height:84px;background:#0b0b0b;border:3px solid #3a3d40;border-radius:6px}
+  .hgfade .tag{display:none;position:absolute;left:18%;top:58%;transform:rotate(-8deg);font:italic 700 34px 'Comic Sans MS','Marker Felt',cursive;color:rgba(20,20,20,.55);letter-spacing:.04em}
+  .hgfade.car .tag{display:block}
+  .hgfade.car.flick{filter:brightness(.8)}
+  .hgfloor.car{top:calc(8% + 45px)}
   .hgfloor{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);z-index:46;font:700 64px 'Barlow Condensed',Arial;color:#ffb24a;letter-spacing:.1em;text-shadow:0 0 18px rgba(255,160,40,.6);pointer-events:none}
   .hkdlg{position:fixed;left:50%;bottom:9vh;transform:translateX(-50%);width:min(620px,92vw);z-index:47;background:rgba(10,12,16,.9);border-left:3px solid #ffb24a;color:#eef2f5;padding:14px 18px 12px;display:none;font:500 17px Barlow,Arial;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.5)}
   .hkdlg.on{display:block}
@@ -449,7 +457,7 @@ function buildUI(o) {
     document.head.appendChild(css);
   }
   const el = (cls, tag = 'div') => { const e = document.createElement(tag); e.className = cls + ' hkui'; document.body.appendChild(e); return e; };
-  const cash = el('hgcash'), fade = el('hgfade'), floor = el('hgfloor');
+  const cash = el('hgcash'), fade = el('hgfade'), floor = el('hgfloor'); fade.innerHTML = '<i class="tag">LPH 4 LIFE · DIMA ✶ 19</i>';
   const dlg = el('hkdlg'); dlg.innerHTML = '<div class="nm"></div><div class="tx"></div><div class="chs"></div><div class="ft">1–4 choose · F leave</div>';
   const use = el('hguse', 'button'); use.textContent = 'USE (B)'; use.style.cssText = 'position:fixed;left:18px;bottom:130px;z-index:46;display:none;padding:12px 18px;font:700 16px Barlow Condensed,Arial;letter-spacing:.12em;color:#fff;background:rgba(40,120,60,.8);border:1px solid rgba(255,255,255,.4);border-radius:6px';
   use.addEventListener('touchstart', (e) => { e.preventDefault(); useItem(); }, { passive: false }); use.addEventListener('click', (e) => { e.stopPropagation(); useItem(); });

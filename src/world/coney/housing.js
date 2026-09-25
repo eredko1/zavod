@@ -251,6 +251,10 @@ function makeHousingMats(world, M) {
   reg('hIndicator', new THREE.MeshStandardMaterial({ color: 0x2a1406, emissive: 0xff7a20, emissiveIntensity: 1.3, roughness: 0.4 }), 'metal', 1);
   reg('hDirectory', new THREE.MeshStandardMaterial({ map: plaqueTexture(['RESIDENTS & GUESTS ONLY', 'NO LOITERING · NO SMOKING'], '#1f3f7a'), roughness: 0.4, metalness: 0.1 }), 'metal', 1);
   { const t = floorNumberTexture('19'); reg('hFloor19', new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.12, roughness: 0.8, metalness: 0 }), 'concrete', 1); }
+  reg('hCouch', new THREE.MeshStandardMaterial({ color: 0x5a1a22, roughness: 0.55, metalness: 0 }), 'wood', 1);           // roof hangout: a dragged-up vinyl couch
+  reg('hCrate', new THREE.MeshStandardMaterial({ color: 0x1f4fa8, roughness: 0.7, metalness: 0 }), 'wood', 1);            // milk crates
+  reg('hBoom', new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.4, metalness: 0.5 }), 'metal', 1);          // boombox
+  reg('hBulb', new THREE.MeshStandardMaterial({ color: 0xfff0c0, emissive: 0xffd080, emissiveIntensity: 2.2 }), 'metal', 1); // string lights
   reg('hLobbyCeil', new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf2f6ff, emissiveIntensity: 1.1, roughness: 0.6 }), 'concrete', 0.5);
   reg('hButton', new THREE.MeshStandardMaterial({ color: 0xffd27a, emissive: 0xffb040, emissiveIntensity: 2.2, roughness: 0.4 }), 'metal', 1);
   reg('hCanopy', new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.55, metalness: 0.5 }), 'metal', 0.5);
@@ -690,14 +694,23 @@ function coreInterior(L, p, Ht) {
     vis('hBrickPlain', sa1 - 0.1, Ht + 2.2, sc0, sa1, Ht + BH, sc1);   // door head
     for (const c of [sc0 + 0.04, sc1 - 0.04]) vis('hRail', sa1 - 0.08, Ht, c - 0.04, sa1, Ht + 2.2, c + 0.04);
     vis('hLobbyCeil', sa0 + 1.2, Ht + BH - 0.06, cm - 0.25, sa0 + 1.8, Ht + BH - 0.02, cm + 0.25); vis('hLobbyCeil', sa0 + 1.4, yF + CEIL - 0.05, cm - 0.2, sa0 + 1.9, yF + CEIL - 0.02, cm + 0.2); }
+  // the roof hangout right outside the bulkhead door (where the stairs let you out): a couch along the rail, milk crates
+  // and a boombox on the other side, string lights from the bulkhead to the parapet
+  if (A[1] - sa1 > 4) { const y = Ht, a0 = sa1 + 1.4, a1 = Math.min(A[1] - 0.7, sa1 + 3.6), cR = C[1] - 0.45, cL = C[0] + 0.45;
+    vis('hCouch', a0, y, cR - 0.9, a1, y + 0.45, cR); vis('hCouch', a0, y + 0.45, cR - 0.25, a1, y + 0.95, cR); colF(a0, y, cR - 0.9, a1, y + 0.5, cR);
+    for (const aa of [a0, a1 - 0.3]) vis('hCouch', aa, y + 0.45, cR - 0.9, aa + 0.3, y + 0.7, cR);
+    for (const [da, h] of [[0.2, 0.35], [0.7, 0.35], [0.2, 0.7]]) { vis('hCrate', a0 + da - 0.18, y + h - 0.35, cL, a0 + da + 0.18, y + h, cL + 0.36); if (h < 0.5) colF(a0 + da - 0.18, y, cL, a0 + da + 0.18, y + h, cL + 0.36); }
+    vis('hBoom', a0, y + 0.7, cL + 0.04, a0 + 0.42, y + 0.94, cL + 0.32);
+    for (let k = 0; k < 12; k++) { const t = k / 11, aa = sa1 + (A[1] - 0.5 - sa1) * t, sag = Math.sin(t * Math.PI) * 0.3; for (const cc of [cL + 0.2, cR - 0.2]) vis('hBulb', aa - 0.05, y + 2.4 - sag, cc - 0.05, aa + 0.05, y + 2.5 - sag, cc + 0.05); }
+  }
   col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1); col(mid + LOBBY_HALF, 0, i0, A[1], ST, i1);
   // lobby glass walls (colliders) with the entrance gaps
   for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + LOBBY_HALF, ST, c + 0.06); }
   // lobby dressing: 12" VCT checker floor, glazed-tile wainscot walls, a dropped ceiling with light panels, three steel cars
   // with call-button plates and lit floor indicators, a bank of aluminium mailboxes, a directory board, a bench
   vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + LOBBY_HALF, 0.03, i1);
-  vis('hLobbyCeiling', mid - LOBBY_HALF, ST - 0.02, i0, mid + LOBBY_HALF, ST, i1);
-  for (let a = mid - LOBBY_HALF + 1.5; a < mid + LOBBY_HALF - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.05, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.02, (i0 + i1) / 2 + 0.3);
+  vis('hLobbyCeiling', mid - LOBBY_HALF, ST - 0.07, i0, mid + LOBBY_HALF, ST - 0.04, i1);   // clear of the slab above (it z-fought)
+  for (let a = mid - LOBBY_HALF + 1.5; a < mid + LOBBY_HALF - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.075, (i0 + i1) / 2 + 0.3);
   vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); vis('hLobbyWall', mid + LOBBY_HALF, 0, i0, mid + LOBBY_HALF + 0.05, ST, i1);
   const cars = [0, 1, 2].map((k) => i0 + (i1 - i0) * (k + 0.5) / 3);
   // the bank of 3 steel cars on the lobby end wall (a = mid - LOBBY_HALF, facing +a): ground floor and the same shafts on 19
@@ -721,8 +734,8 @@ function coreInterior(L, p, Ht) {
   // (the same 3 shafts as the ground floor, VCT floor, tile walls, lit ceiling panels) with two open doorways on each side.
   const OPEN = [[mid - 6.3, mid - 3.5], [mid + 2.6, mid + 5.4]], WT = 0.2, HEAD = 2.25;
   vis('hLobbyFloor', mid - LOBBY_HALF, yF, i0, mid + LOBBY_HALF, yF + 0.03, i1);
-  vis('hLobbyCeiling', mid - LOBBY_HALF, yF + CEIL - 0.02, i0, mid + LOBBY_HALF, yF + CEIL, i1);
-  for (let a = mid - LOBBY_HALF + 1.6; a < mid + LOBBY_HALF - 1; a += 2.8) vis('hLobbyCeil', a - 0.6, yF + CEIL - 0.05, (i0 + i1) / 2 - 0.3, a + 0.6, yF + CEIL - 0.02, (i0 + i1) / 2 + 0.3);
+  vis('hLobbyCeiling', mid - LOBBY_HALF, yF + CEIL - 0.07, i0, mid + LOBBY_HALF, yF + CEIL - 0.04, i1);
+  for (let a = mid - LOBBY_HALF + 1.6; a < mid + LOBBY_HALF - 1; a += 2.8) vis('hLobbyCeil', a - 0.6, yF + CEIL - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, yF + CEIL - 0.075, (i0 + i1) / 2 + 0.3);
   vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF, sc1, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
   for (const c of [sc0, sc1]) vis('hRail', mid + LOBBY_HALF - 0.04, yF, c - 0.05, mid + LOBBY_HALF + 0.06, yF + 2.2, c + 0.05); vis('hRail', mid + LOBBY_HALF - 0.04, yF + 2.15, sc0, mid + LOBBY_HALF + 0.06, yF + 2.22, sc1);   // stair door frame
   bank(yF);
