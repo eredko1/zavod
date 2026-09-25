@@ -325,7 +325,7 @@ function buildSprawl(world, R, texF, texR) {
   const TINTS = [[0.78, 0.42, 0.32], [0.72, 0.5, 0.38], [0.86, 0.78, 0.66], [0.92, 0.9, 0.86], [0.66, 0.36, 0.28], [0.8, 0.68, 0.52], [0.7, 0.72, 0.74], [0.9, 0.84, 0.72]];
   const near = [], far = [], tanks = [], trees = [];
   const bad = (x0, z0, x1, z1) => onRoad(x0, z0, x1, z1) || inExcl(x0, z0, 6) || inExcl(x1, z1, 6) || inExcl(x0, z1, 6) || inExcl(x1, z0, 6) || inExcl((x0 + x1) / 2, (z0 + z1) / 2, 6);
-  const put = (list, x0, z0, x1, z1, h, tint, seed) => { if (bad(x0, z0, x1, z1)) { const o = [8, -8, 16, -16, 26, -26].find((dz) => !bad(x0, z0 + dz, x1, z1 + dz)); if (o === undefined) return; z0 += o; z1 += o; } list.push({ x0, z0, x1, z1, h, tint, seed, d: Math.hypot((x0 + x1) / 2 - P0[0], (z0 + z1) / 2 - P0[1]) }); };
+  const put = (list, x0, z0, x1, z1, h, tint, seed) => { if (bad(x0, z0, x1, z1)) { const o = [8, -8, 16, -16, 26, -26].find((dz) => !bad(x0, z0 + dz, x1, z1 + dz)); if (o === undefined) return null; z0 += o; z1 += o; } const e = { x0, z0, x1, z1, h, tint, seed, d: Math.hypot((x0 + x1) / 2 - P0[0], (z0 + z1) / 2 - P0[1]) }; list.push(e); return e; };
   // known tower groups (lat, lon, count, floors)
   const TOWERS = [[40.5795, -73.9695, 7, 23], [40.5818, -73.9655, 5, 22], [40.5772, -73.9560, 4, 15], [40.5790, -73.9745, 3, 18], [40.5955, -74.0010, 3, 20], [40.5835, -73.9550, 3, 20], [40.5870, -73.9635, 2, 17], [40.5800, -73.9460, 2, 14], [40.6060, -73.9780, 2, 16], [40.5960, -73.9580, 3, 21], [40.5920, -73.9440, 2, 18], [40.6100, -73.9600, 3, 14], [40.5835, -73.9380, 3, 16]];
   const towerSpots = [];
@@ -349,8 +349,8 @@ function buildSprawl(world, R, texF, texR) {
         const avEnd = x < x0 + 30 || x > x1 - 60; const walk = avEnd && hash(i * 3 + (sz0 > cz), j) < 0.55;
         const len = walk ? 26 + R() * 14 : Math.min(x1 - 1 - x, 18 + R() * 30); const h = walk ? 16 + R() * 5 : 7.5 + R() * 3.5 + (R() < 0.15 ? 3 : 0);
         const dz = walk ? 4 : 0;
-        put(T, x, sz0 - (sz0 < cz ? 0 : dz), x + len - 0.3, sz1 + (sz0 < cz ? dz : 0), h, TINTS[(R() * TINTS.length) | 0], R());
-        if (walk && isNear) tanks.push([x + len * (0.3 + R() * 0.4), (sz0 + sz1) / 2, h]);
+        const b = put(T, x, sz0 - (sz0 < cz ? 0 : dz), x + len - 0.3, sz1 + (sz0 < cz ? dz : 0), h, TINTS[(R() * TINTS.length) | 0], R());
+        if (b && walk && isNear) tanks.push([b.x0 + (b.x1 - b.x0) * (0.3 + R() * 0.4), (b.z0 + b.z1) / 2, h]);   // on the roof put() actually kept (it can shift or drop the block)
         x += len;
       }
     }
