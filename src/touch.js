@@ -24,7 +24,7 @@ const CSS = `
 #touch .act{left:calc(env(safe-area-inset-left,0px) + 120px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);min-width:96px;height:44px;padding:0 14px;border-radius:22px;font-size:13px;background:rgba(233,162,59,.35);border-color:#e9a23b;display:none}
 #touch .act.show{display:flex}
 #touch.stow .fire,#touch.stow .fireL,#touch.stow .ads,#touch.stow .reload,#touch.stow .nade{opacity:.22;pointer-events:none}
-#touch .fireL{left:calc(env(safe-area-inset-left,0px) + 30px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);width:70px;height:70px;background:rgba(160,40,30,.3);border-color:rgba(255,120,100,.45)}
+#touch .fireL{font-size:11px;left:calc(env(safe-area-inset-left,0px) + 30px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);width:70px;height:70px;background:rgba(160,40,30,.3);border-color:rgba(255,120,100,.45)}
 `;
 
 let S = null;
@@ -37,7 +37,7 @@ export async function init(ctx) {
     <div class="zone l"></div><div class="zone r"></div>
     <div class="stick"><i></i></div>
     <div class="btn pause">II</div>
-    <div class="btn fire">FIRE</div><div class="btn fireL"></div>
+    <div class="btn fire">FIRE</div><div class="btn fireL">FIRE</div>
     <div class="btn ads tog">ADS</div>
     <div class="btn jump">JUMP</div>
     <div class="btn crouch tog">CROUCH</div>
@@ -104,6 +104,9 @@ export function update(dt, ctx) {
   if (!S || !S.act) return;
   const m = ctx.player?.mounted, stowed = !!(m && (m.elevator || m.passenger || m.spec?.car));
   if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { ctx.input.touch.fire = false; S.setAds?.(false); } }
+  // fire buttons say what they do (the left one is a second trigger for the left thumb)
+  const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? 'SLASH' : 'FIRE';
+  if (ft !== S.fireTxt) { S.fireTxt = ft; S.root.querySelector('.fire').textContent = ft; S.root.querySelector('.fireL').textContent = ft; }
   // contextual action button: weapon pickup or motorcycle mount/dismount
   const pk = ctx.ai?.nearPickup, bike = ctx.vehicles?.nearBike, mounted = ctx.vehicles?.mounted || ctx.player?.mounted;
   const label = mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;

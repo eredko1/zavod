@@ -693,6 +693,7 @@ export async function init(ctx) {
       return out;
     },
   };
+  api.blood = (x, z, scale = 0.6, y = 0) => { try { placeBlood(ctx, x, z, scale, y); } catch {} };   // melee hits / street fights (coney chill)
   ctx.ai = api; S.api = api;
   return api;
 }

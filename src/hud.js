@@ -161,7 +161,8 @@ export function update(dt, ctx) {
 
   // ---- weapon ----
   const cur = w?.current || {};
-  const name = cur.name ?? '—', mag = cur.ammo ?? 0, magSize = cur.mag ?? 30, res = cur.reserve ?? 0;
+  const melee = cur.mode === 'MELEE';   // knife: no ammo count
+  const name = cur.name ?? '—', mag = melee ? '∞' : cur.ammo ?? 0, magSize = cur.mag ?? 30, res = melee ? '' : cur.reserve ?? 0;
   const mode = (cur.mode ?? cur.fireMode ?? w?.fireMode ?? 'AUTO');
   const gr = w?.grenades ?? cur.grenades ?? p?.grenades ?? 2;
   const si = Array.isArray(w?.slots) ? w.slots.indexOf(cur) : -1; const slot = si >= 0 ? si : clamp(cur.slot ?? 0, 0, 1);
@@ -171,7 +172,7 @@ export function update(dt, ctx) {
   if (res !== c.res) { c.res = res; H.wRes.textContent = res; }
   if (gr !== c.gr) { c.gr = gr; H.wGr.textContent = gr; }
   if (slot !== c.slot) { c.slot = slot; H.wSlots.forEach((el, i) => el.classList.toggle('on', i === slot)); }
-  const lowAmmo = magSize > 0 && mag / magSize < 0.2 && mag > 0, empty = mag === 0;
+  const lowAmmo = !melee && magSize > 0 && mag / magSize < 0.2 && mag > 0, empty = !melee && mag === 0;
   if (lowAmmo !== c.lowAmmo) { c.lowAmmo = lowAmmo; H.wpn.classList.toggle('low', lowAmmo); }
   if (empty !== c.empty) { c.empty = empty; H.wpn.classList.toggle('empty', empty); }
 

@@ -65,6 +65,7 @@ function bind(ctx) {
     P(/pistol|m1911|1911|9mm|glock|handgun|sidearm/i.test(name) || w?.slot === 2 ? 'pistol' : 'rifle');
   });
   bus.on('impact', (d = {}) => P('impact_' + surf(d.surface), { position: d.point }));
+  bus.on('meleeHit', (d = {}) => P('impact_flesh', { position: d.point, volume: 1.3 }));   // knife going in / a punch landing
   bus.on('hit', (d = {}) => P('hitmarker', { headshot: !!d.headshot }));
   bus.on('enemyKilled', () => P('kill'));
   bus.on('playerDamaged', (d = {}) => P('hurt', { volume: Math.min(1.3, 0.55 + (d.amount ?? 20) / 45) }));

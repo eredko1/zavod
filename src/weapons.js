@@ -8,6 +8,13 @@ import { buildScope } from './weapons/scope.js';
 import { FX } from './weapons/fx.js';
 import { Grenades } from './weapons/grenade.js';
 
+// melee keyframes [time s, [dx, dy, dz, rotX, rotY, rotZ]] added on top of the sway node (knife held edge-down, tip forward)
+const SWINGS = [
+  [[0, [0, 0, 0, 0, 0, 0]], [0.08, [-0.1, 0.02, 0.02, 0.15, -0.35, 0.7]], [0.19, [0.15, 0.06, -0.1, -0.2, 0.55, -0.6]], [0.25, [0.17, 0.07, -0.07, -0.2, 0.6, -0.65]], [0.46, [0, 0, 0, 0, 0, 0]]],   // backhand: low-left → up-right
+  [[0, [0, 0, 0, 0, 0, 0]], [0.08, [0.12, 0.07, 0.02, 0.2, 0.55, -0.9]], [0.2, [-0.17, -0.05, -0.12, -0.25, -0.65, 0.7]], [0.26, [-0.19, -0.07, -0.08, -0.25, -0.7, 0.75]], [0.48, [0, 0, 0, 0, 0, 0]]],   // forehand: up-right → across → down-left
+];
+const smooth = (x) => { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3 - 2 * x); };
+
 const DEG = Math.PI / 180;
 const VM_FOV = 50;                // vertical fov the viewmodel is authored for (x/y-scale trick emulates it under the world fov)
 const ADS_FOV_MUL = 0.7;
@@ -148,6 +155,8 @@ export async function init(ctx) {
       return S.wmProto[id].clone(true);
     },
     fire: () => { const w = S.weapons[S.cur]; if (w.ammo > 0 && !w.needsAction) fireShot(w); else if (w.ammo <= 0) dryFire(w); },
+    qaSwingAt: (kind, t) => { S.swing = { t, kind, freeze: true }; },
+    qaSwing: () => S.swing && { t: +S.swing.t.toFixed(2), kind: S.swing.kind },
     qaFire: (n = 1) => { const w = S.weapons[S.cur]; for (let i = 0; i < n; i++) { if (w.ammo <= 0) { w.ammo = w.spec.mag; } w.needsAction = false; w.actionT = 9; fireShot(w, { hold: 0.6 }); } },
     reload: () => startReload(),
     swap: (slot) => startSwap(slot),
@@ -385,7 +394,9 @@ function fireShot(w, opts = {}) {
 
   // muzzle world position (visual) — used by light, brass, tracer, smoke
   const muzzle = w.parts.muzzle.getWorldPosition(new THREE.Vector3());
-  if (sp.melee) { const k = 1; S.rpv.z += sp.kickBack * 40 * k; S.rrv.x += sp.kickUp * 40 * k; S.rrv.z += (rng() - 0.5) * 2 * sp.kickRoll * 40 * k; ctx.bus.emit('shot', { origin, dir, weapon: sp.name, id: sp.id, who: 'player', melee: true, muzzle, hit: firstHit ? firstHit.point.clone() : null }); return; }
+  if (sp.melee) { S.swing = { t: 0, kind: (S.swingN = (S.swingN || 0) + 1) % 2 };
+    const hu = firstHit?.object?.userData; if (hu && (hu.onHit || hu.soldier || hu.remote)) { ctx.ai?.blood?.(firstHit.point.x, firstHit.point.z, 0.35 + rng() * 0.25, firstHit.point.y - 1); S.rpv.z += 6; ctx.bus.emit('meleeHit', { point: firstHit.point.clone() }); }   // it went in: blood on the ground + the hand stops dead
+    ctx.bus.emit('shot', { origin, dir, weapon: sp.name, id: sp.id, who: 'player', melee: true, muzzle, hit: firstHit ? firstHit.point.clone() : null }); return; }
   S.fx.muzzleLightAt(muzzle, sp.flashStrength ?? (sp.slot === 0 ? 1 : 0.7), opts.hold ? opts.hold : 0.045);
   // viewmodel flash
   S.flashT = 0; S.flashLife = opts.hold ? opts.hold : (0.04 + rng() * 0.02) * (sp.pellets ? 1.6 : 1); S.flashW = w;
@@ -539,7 +550,7 @@ export function update(dt, ctx) {
   // ---------- reload timeline ----------
   const reloadOff = { pos: _rlp.set(0, 0, 0), rot: _rlr.set(0, 0, 0) }; // extra weapon offset while reloading / cycling
   const armL = w.parts.armL, armR = w.parts.armR, mag = w.parts.mag;
-  armL.position.copy(armL.userData.home.pos); armL.rotation.set(0, 0, 0);
+  if (armL) { armL.position.copy(armL.userData.home.pos); armL.rotation.set(0, 0, 0); }   // the knife is one-handed
   if (armR) { armR.position.copy(armR.userData.home.pos); armR.rotation.set(0, 0, 0); }
   if (S.reload && S.reload.style === 'mag') {
     const r = S.reload; r.t += dt; const u = clamp(r.t / r.dur, 0, 1);
@@ -690,6 +701,15 @@ export function update(dt, ctx) {
     (Math.sin(t * 0.9 + 0.4) * 0.004) * adsK - S.lookY * 0.0012 * adsK + S.rr.x * 0.05 - land * 0.12 - S.bobY * 1.4 * adsK,
     (Math.sin(t * 0.6 + 1.7) * 0.004) * adsK - S.lookX * 0.0016 * adsK + S.rr.y * 0.05 + S.bobX * 1.2 * adsK,
     (Math.sin(t * 0.8 + 3.1) * 0.005) * adsK - S.lookX * 0.0011 * adsK + S.rr.z * 0.05 + (bob.roll || 0) * 0.6 + S.bobX * 1.4 * adsK);
+
+  // ---------- melee swing: keyed wind-up → strike → recover, alternating a straight stab and a backhand slash ----------
+  if (S.swing && !S.showcase) {
+    const sw = S.swing, keys = SWINGS[sw.kind], dur = keys[keys.length - 1][0]; if (!sw.freeze) sw.t += dt;
+    if (sw.t >= dur || !sp.melee) S.swing = null;
+    else { let i = 0; while (i < keys.length - 2 && sw.t > keys[i + 1][0]) i++;
+      const [t0, a] = keys[i], [t1, b] = keys[i + 1], k = smooth((sw.t - t0) / Math.max(1e-3, t1 - t0)), L = (j) => a[j] + (b[j] - a[j]) * k;
+      sn.position.x += L(0); sn.position.y += L(1); sn.position.z += L(2); sn.rotation.x += L(3); sn.rotation.y += L(4); sn.rotation.z += L(5); }
+  }
 
   // ---------- scope (sniper): overlay replaces the viewmodel once the eye is on the eyepiece; aim sway moves the camera ----------
   const scoped = !!sp.scope && S.ads > 0.85 && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && !S.showcase && !(w.needsAction && w.actionT >= 0);
