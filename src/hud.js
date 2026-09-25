@@ -2,6 +2,7 @@
 // DOM + CSS + two small canvases (compass, damage arcs). Reads ctx.player / ctx.weapons / ctx.ai defensively every frame.
 // Public API (ctx.hud): hitmarker(headshot, kill) · damageFrom(dirOrPos) · killfeed(text) · toast(text, ms) · scorePopup(text, headshot)
 //                       showMenu() · hideMenu() · wave(n, total)
+import { saveAudio } from './ctx.js';
 
 const VERSION = '0.1.0';
 const ICON_HS = '<svg viewBox="0 0 16 16"><path d="M8 1.5a4.6 4.6 0 0 0-4.6 4.6c0 1.9 1 3.3 2.1 4.1v1.6c0 .4.3.7.7.7h3.6c.4 0 .7-.3.7-.7v-1.6c1.1-.8 2.1-2.2 2.1-4.1A4.6 4.6 0 0 0 8 1.5zm-2 5.2a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2zm4 0a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2zM6.2 13.2h3.6v1.3H6.2z"/></svg>';
@@ -460,9 +461,15 @@ function buildSettings(H) {
   const tod = ctx.world?.tod;
   if (tod) { h4('World'); cycle('Time of day', tod.options, () => tod.get(), (v) => tod.set(v), false); }
   h4('Audio');
-  slider('Master volume', 0, 100, 1, () => Math.round(S.masterVolume * 100), (v) => { S.masterVolume = v / 100; ctx.bus.emit('setting', { key: 'masterVolume', value: v / 100 }); }, (v) => `${v}`);
+  const vol = (label, key) => slider(label, 0, 100, 1, () => Math.round((S[key] ?? 1) * 100), (v) => { S[key] = v / 100; saveAudio(S); ctx.bus.emit('setting', { key, value: v / 100 }); }, (v) => `${v}`);
+  vol('Master volume', 'masterVolume'); vol('Effects', 'sfxVolume'); vol('Footsteps', 'footVolume'); vol('Ambience', 'ambVolume');
+  if (ctx.world?.radio) {   // coney: Luna Park Radio
+    const L = { off: 'Off', car: 'In cars', always: 'Always' }, back = { Off: 'off', 'In cars': 'car', Always: 'always' };
+    cycle('Luna Park Radio', ['Off', 'In cars', 'Always'], () => L[S.radio] || 'In cars', (v) => { S.radio = back[v] || 'car'; saveAudio(S); }, false);
+    vol('Radio volume', 'radioVolume');
+  }
   H.panels.settings.querySelector('.reset').addEventListener('click', () => {
-    Object.assign(S, { fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6, shadows: true, rain: true, motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true, masterVolume: 1, quality: 'ultra' });
+    Object.assign(S, { fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6, shadows: true, rain: true, motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true, masterVolume: 1, sfxVolume: 1, footVolume: 0.45, ambVolume: 0.8, radioVolume: 0.7, quality: 'ultra' }); saveAudio(S);
     ctx.bus.emit('quality', 'ultra'); H.syncers.forEach(f => f());
   });
 }
@@ -531,7 +538,7 @@ function buildLoadout(H) {
 
 function buildControls(H) {
   const body = H.panels.controls.querySelector('.body');
-  const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim', 'RMB / E'], ['Scope zoom', 'WHEEL'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Interact', 'F'], ['Blaze / drink', 'B'], ['Vehicle camera', 'V'], ['Nitro (driving)', 'SHIFT'], ['Horn', 'Q'], ['Give a friend $10', 'N'], ['Map help card', 'H'], ['Follow a friend', 'J'], ['Respawn at spot', 'T'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
+  const keys = [['Move', 'W A S D'], ['Sprint', 'SHIFT'], ['Jump', 'SPACE'], ['Crouch', 'C / CTRL'], ['Fire', 'LMB'], ['Aim', 'RMB / E'], ['Scope zoom', 'WHEEL'], ['Reload', 'R'], ['Grenade', 'G'], ['Primary', '1'], ['Secondary', '2'], ['Interact', 'F'], ['Blaze / drink', 'B'], ['Vehicle camera', 'V'], ['Nitro (driving)', 'SHIFT'], ['Horn', 'Q'], ['Give a friend $10', 'N'], ['Radio on / off · next', 'M · .'], ['Map help card', 'H'], ['Follow a friend', 'J'], ['Respawn at spot', 'T'], ['Scoreboard', 'TAB'], ['Pause', 'ESC']];
   const grid = document.createElement('div'); grid.className = 'keys';
   for (const [a, k] of keys) { const r = document.createElement('div'); r.className = 'row'; r.innerHTML = `<label>${a}</label><div class="ctl">${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</div>`; grid.appendChild(r); }
   body.appendChild(grid);

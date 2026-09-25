@@ -49,7 +49,9 @@ export function createCtx() {
       renderScale: +(qs.get('scale') || 1),
       texMax: +(qs.get('texmax') || (isTouch ? 512 : 4096)), // mobile GPUs: cap texture edge (VRAM), see assets.js fit()
       shadowMax: isTouch ? 2048 : 4096, // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
-      masterVolume: 1,
+      // audio mix (persisted per device, see saveAudio): effects = weapons/enemies/UI, footsteps = the foley bus (quieter by
+      // default so the radio carries), ambience; radio = coney's Luna Park Radio: 'off' | 'car' | 'always'
+      ...loadAudio(),
     },
     input: null,     // main
     world: null,     // world.js
@@ -66,4 +68,13 @@ export function createCtx() {
     lights: { key: null, fill: null, hemi: null, spots: [] },
   };
   return ctx;
+}
+
+function loadAudio() {
+  let A = {}; try { A = JSON.parse(localStorage.getItem('zavod.audio') || '{}') || {}; } catch {}
+  const n = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1.5, v)) : d);
+  return { masterVolume: n(A.master, 1), sfxVolume: n(A.sfx, 1), footVolume: n(A.foot, 0.45), ambVolume: n(A.amb, 0.8), radio: ['off', 'car', 'always'].includes(A.radio) ? A.radio : 'car', radioVolume: n(A.radioVol, 0.7) };
+}
+export function saveAudio(S) {
+  try { localStorage.setItem('zavod.audio', JSON.stringify({ master: S.masterVolume, sfx: S.sfxVolume, foot: S.footVolume, amb: S.ambVolume, radio: S.radio, radioVol: S.radioVolume })); } catch {}
 }

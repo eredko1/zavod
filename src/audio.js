@@ -131,6 +131,10 @@ export function update(dt, ctx) {
     E.updateVitals(now, { health: p?.health ?? 100, maxHealth: p?.maxHealth ?? 100, playing: ctx.state === 'playing', paused: ctx.state === 'paused' });
     const mv = ctx.settings?.masterVolume ?? 1;
     if (mv !== lastVolume) { lastVolume = mv; E.setVolume('master', mv); }
+    // the mix sliders: effects (weapons / enemies / UI), footsteps (foley), ambience — relative to each bus's base level
+    const S = ctx.settings || {}, key = `${S.sfxVolume}|${S.footVolume}|${S.ambVolume}`;
+    if (key !== update._mix) { update._mix = key; const fx = S.sfxVolume ?? 1;
+      E.setVolume('weapons', fx); E.setVolume('enemies', 0.79 * fx); E.setVolume('ui', 0.63 * fx); E.setVolume('foley', 0.79 * (S.footVolume ?? 0.45)); E.setVolume('ambience', 0.5 * (S.ambVolume ?? 0.8)); }
   } catch (e) { warn(e); }
 }
 
