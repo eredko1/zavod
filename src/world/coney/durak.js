@@ -193,6 +193,7 @@ export function openDurak(ctx, { stake = 0, onEnd, mode = 'perevodnoy' } = {}) {
   root.addEventListener('click', onClick); addEventListener('keydown', onKey, true);
   render(); setTimeout(step, 700);
 }
+export function closeDurak() { if (U) close('reset'); }   // start fresh from the pause menu
 function close(result) {
   if (!U) return; const { ctx, root, onEnd } = U;
   removeEventListener('keydown', onKey, true); root.remove(); if (ctx.player?.mounted?.dialog) ctx.player.mounted = null; ctx.durakOpen = false;

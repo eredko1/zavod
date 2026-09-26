@@ -57,7 +57,7 @@ const api = {
   spot(s) { V.spots.push({ r: 2, dy: 1.3, ...s }); return s; },
   /** vendor: { name, pos: Vector3 (may move), r, talk: () => node }  node = { text, choices: [{ label, go: node | () => node | null }] } */
   vendor(v) { const e = { r: 2.2, ...v }; V.vendors.push(e); if (v.fig) e.hurt = hurtable(v.fig, { name: v.name, vendor: e }); return e; },
-  hurtable: (fig, o) => hurtable(fig, o),
+  hurtable: (fig, o) => hurtable(fig, o), setStartCash: (n) => { if (V) V.startCash = n; },
   removeVendor(e) { if (!V) return; const i = V.vendors.indexOf(e); if (i > -1) V.vendors.splice(i, 1); if (V.dialog?.vendor === e) closeDialog(); },
   /** elevator / stair shaft: { kind: 'elevator' | 'stairs', floors, label, lobby: { cars: [{ pos, yaw }] }, tops: [{ cars: [{ pos, yaw }], face }] } */
   shaft(s) { V.shafts.push({ kind: 'elevator', floors: 10, ...s }); return V.shafts.length - 1; },
@@ -110,6 +110,16 @@ function bindOnce(ctx) {
     if (e.code === 'KeyQ' && V.ctx.vehicles?.mounted?.spec?.car) { const p = V.ctx.vehicles.mounted.pos; horn(1); V.ctx.net?.send?.('horn', { p: [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); }
     if (e.code === 'KeyN') giveCash();
     if (e.code === 'KeyP' && !V.ctx.vehicles?.mounted && !V.riding && !V.passenger && !V.piss) startPiss();
+  });
+  // START FRESH (pause menu): everyone in the room goes back to square one
+  ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
+  ctx.bus.on('worldReset', () => {
+    if (!V) return; const { ctx } = V; closeDialog();
+    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.status = {}; V.iceT = null; renderCash();
+    for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
+    for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
+    for (const m of V.puddles || []) m.visible = false;
+    const p = ctx.player, os = V.world.W.onlineStart; if (p) { if (p.dead) { try { p.respawn?.(); } catch {} } if (os) p.teleport?.(os[0], os[1] || 0, os[2], os[3] || 0, 0); p.heal?.(); if (p.mounted?.dialog) p.mounted = null; }
   });
   ctx.bus.on('net:piss', (m) => { if (!V || !Array.isArray(m.p)) return; puddle(new THREE.Vector3(m.p[0], m.p[1], m.p[2])); const me = V.ctx.player.position; if (Math.hypot(me.x - m.p[0], me.z - m.p[2]) < 25) V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Somebody'} is taking a leak. Classy.`, 1800); });
   ctx.bus.on('net:horn', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player.position; const d = Math.hypot(me.x - m.p[0], me.z - m.p[2]); if (d < 160) horn(Math.max(0.08, 1 - d / 160)); });

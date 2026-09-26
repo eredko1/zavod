@@ -67,6 +67,7 @@ export function buildCrews(world, { chill = false } = {}) {
   K.spot({ pos: C.robPos, r: 3.3, dy: 2, when: () => !!C.robT, prompt: () => (C.robT?.dealer ? `F — TALK TO ${C.robT.name}` : `F — ROB ${C.robT?.name || ''}`), act: () => { const t = C.robT; if (!t) return; if (t.dealer) { t.talkT = -20; t.st = 'talk'; K.openDialog(t.name, gunShop(t.name, t.dealer, `${t.name}: "${t.type === 'ru' ? 'Bratan. You need something that goes bang? I have.' : 'Psst. You need a piece? I got a couple. Cash only.'}"`)); } else robVictim(t); } });   // no shakedowns for a minute after you respawn
   W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead' && t.type !== 'mk').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
+  ctx.bus.on('worldReset', () => { for (const t of [...C.thugs.values()]) removeThug(t); for (const t of [...C.remote.values()]) removeThug(t, C.remote); C.robbed = 0; C.calmUntil = performance.now() + 30000; C.markT = 5; });
   ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null, m.f, !!m.h); });
   ctx.bus.on('net:loot', (m) => { if (m.to !== ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 300)) return; K.earn(n); K.toast(`+$${n} off ${String(m.w || 'him').slice(0, 14)}`, 1800); });   // you dropped a friend's robber
   K.onUpdate((dt, playing) => update(dt, playing));
@@ -79,7 +80,7 @@ export function buildChill(world, H) {
   W.mode = 'chill';
   const CH = { wasted: 0, armed: false };
   buildCrews(world, { chill: true }); C.ch = CH;
-  K.earn(40);   // $60 to start (the kit gives 20)
+  K.earn(40); K.setStartCash?.(60);   // $60 to start (the kit gives 20); respawns and Start fresh use it too
   // HUD: WASTED / ROBBED
   const el = document.createElement('div'); el.className = 'hkui zvchill';
   el.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 62px);transform:translateX(-50%);z-index:40;font:700 13px Barlow Condensed,Arial;letter-spacing:.18em;color:#ffd27a;background:rgba(8,10,14,.55);padding:4px 12px;border-left:2px solid #ffb24a;pointer-events:none;white-space:nowrap';

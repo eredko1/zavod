@@ -11,7 +11,7 @@ import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews, gunShop } from './chill.js';
 import { buildJobs, jobsTalk, startIce, finishIce } from './jobs.js';
 import { sell } from '../hangkit.js';
-import { openDurak, stats as durakStats } from './durak.js';
+import { openDurak, closeDurak, stats as durakStats } from './durak.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -309,6 +309,7 @@ function buildRoofDoors(towers) {
     return D;
   });
   ctx.bus.on('net:rdoor', (m) => { const D = H.roofDoors[m.i | 0]; if (D) setDoor(D, !!m.o, false); });
+  ctx.bus.on('worldReset', () => { closeDurak(); for (const D of H.roofDoors) if (D) { setDoor(D, false, false); D.shoves = 0; } });
   K.onUpdate((dt) => {
     for (const D of H.roofDoors) { if (!D) continue;
       const want = D.open ? -D.s * 1.75 : 0; D.ang += (want - D.ang) * Math.min(1, dt * (D.open ? 7 : 3)); D.jolt *= Math.exp(-dt * 10);

@@ -398,6 +398,11 @@ function bindMenus(H) {
       case 'loadout': openPanel(H, H.panel === 'loadout' ? null : 'loadout'); break;
       case 'settings': openPanel(H, H.panel === 'settings' ? null : 'settings'); break;
       case 'controls': openPanel(H, H.panel === 'controls' ? null : 'controls'); break;
+      case 'fresh': {   // clear the map and start everyone over (online: every player in the room); click twice to confirm
+        const b = H.root.querySelector('[data-act="fresh"]'); const now = performance.now();
+        if (!H.freshArm || now - H.freshArm > 3000) { H.freshArm = now; if (b) b.textContent = 'Really? Click again — resets everyone'; break; }
+        H.freshArm = 0; if (b) b.textContent = 'Start fresh (everyone)';
+        try { ctx.net?.send?.('fresh', {}); } catch {} ctx.bus.emit('worldReset', { by: 'me' }); ctx.hud?.toast?.('Fresh start — the block is reset for everyone', 2400); ctx.setState('playing'); break; }
       case 'menu': ctx.setState('menu'); break;
       case 'retry': ctx.restart(); break;
     }
@@ -621,7 +626,7 @@ function buildDOM() {
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
       <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
-      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('menu', 4, 'Quit to menu')}</nav>
+      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('fresh', 4, 'Start fresh (everyone)')}${mi('menu', 5, 'Quit to menu')}</nav>
     </div>
     <div class="tag-br in up" style="--i:6"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Resume</span></div>
   </div>

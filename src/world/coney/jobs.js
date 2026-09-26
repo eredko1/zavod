@@ -23,6 +23,7 @@ export function buildJobs(world) {
   W.mapJob = () => J.job && J.job.at && [J.job.at.x, J.job.at.z, J.job.label];
   K.onUpdate((dt, playing) => update(dt, playing));
   ctx.bus.on('playerDied', () => { if (J.job) fail('You went down. The job\'s off.'); });
+  ctx.bus.on('worldReset', () => { if (J.job) clear(); });
   if (typeof window !== 'undefined' && window.__game) window.__game.jobs = { state: () => J.job && { kind: J.job.kind, t: +J.job.t.toFixed(1), at: J.job.at?.toArray(), label: J.job.label }, start: (k) => start(k), done: () => J.done, finish: () => { if (J.job) complete(); } };
   return J;
 }

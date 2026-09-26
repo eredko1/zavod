@@ -115,6 +115,7 @@ export async function init(ctx) {
   ctx.bus.on('shot', (d) => { if (d && d.who === 'enemy' && d.origin && d.dir) { const o = d.origin.isVector3 ? d.origin : _v.set(d.origin[0] ?? d.origin.x, d.origin[1] ?? d.origin.y, d.origin[2] ?? d.origin.z); const dir = d.dir.isVector3 ? d.dir : _v2.set(d.dir[0] ?? d.dir.x, d.dir[1] ?? d.dir.y, d.dir[2] ?? d.dir.z); fx.enemyShot(o.clone(), dir.clone()); } });
   ctx.bus.on('playerDied', () => { S.dead = true; cancelActions(); });
   // respawn = resupplied: full mags + reserve on both guns (a picked-up merc gun stays your primary) and the grenades back
+  ctx.bus.on('worldReset', () => { S.bag = null; S.bank = {}; try { setLoadout(S.loadout || {}, { silent: true }); } catch {} });   // start fresh: just the loadout again
   ctx.bus.on('playerRespawn', () => { S.dead = false; S.bank = {}; try { setLoadout(S.loadout || {}, { silent: true }); } catch (e) { console.warn('[weapons] respawn refill', e); } S.grenadeCount = GRENADES; ctx.bus.emit('resupply', {}); });
 
   // initial loadout from the URL (?primary=&secondary=), mirrored into settings

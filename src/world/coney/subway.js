@@ -56,6 +56,7 @@ export function buildSubway(world) {
   world.updaters.push((dt) => update(dt));
   addEventListener('keydown', (e) => { if (R?.aboard && R.canAlight && e.code === 'KeyF' && !e.repeat && R.ctx.state === 'playing') { e.preventDefault(); e.stopImmediatePropagation(); alight(); } }, true);   // F at a stop: off (before the weapon's inspect grabs F)
   ctx.bus.on('playerDied', () => { if (R.aboard) alight(true); });
+  ctx.bus.on('worldReset', () => { if (R.aboard) alight(true); });
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'NEPTUNE AV STATION', x: P[P.length - 1].x, z: NEP_Z, kind: 'transit' });
   if (typeof window !== 'undefined' && window.__game) window.__game.subway = {
     state: () => ({ aboard: !!R.aboard, leg: legNow().kind, stop: legNow().stop?.id || null, head: +headS().toFixed(1), cycle: +R.cycle.toFixed(1), L: +R.L.toFixed(1), door: R.boardable ? R.doorPos.toArray().map((v) => +v.toFixed(2)) : null, pos: R.ctx.player.position.toArray().map((v) => +v.toFixed(2)) }),

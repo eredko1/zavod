@@ -695,6 +695,7 @@ export async function init(ctx) {
   };
   api.lootGun = (s) => { const d = S.dropped.find((q) => q.mesh.userData.pickup?.owner === s); if (!d) return null; const pk = d.mesh.userData.pickup;   // stab-kill: strip his gun
     return { id: pk.id, reserve: pk.reserve, take: () => { ctx.scene.remove(d.mesh); const i = S.dropped.indexOf(d); if (i > -1) S.dropped.splice(i, 1); if (S.nearPickup === d) S.nearPickup = null; } }; };
+  ctx.bus.on('worldReset', () => { for (const d of S.dropped) ctx.scene.remove(d.mesh); S.dropped.length = 0; S.nearPickup = null; api.nearPickup = null; for (const b of S.blood) b.visible = false; });   // start fresh: no guns or blood lying around
   api.blood = (x, z, scale = 0.6, y = 0) => { try { placeBlood(ctx, x, z, scale, y); } catch {} };   // melee hits / street fights (coney chill)
   ctx.ai = api; S.api = api;
   return api;
