@@ -19,7 +19,7 @@ const TILE_BAYS = 2, TILE_FLOORS = 4;
 const SILL = 0.85, WIN_H = 1.5, WIN_W = 1.12, WIN_AT = [0.28, 0.72];   // window layout inside one bay (fractions of the bay)
 const GAL = 1.7;        // lobby glass / 19th-floor vestibule line on the core faces (hangout geometry keys off this)
 const GALV = 2.5;       // visual gallery recess: dark back wall + slabs run this deep so the core self-shadows (critic r9 #2)
-const DOOR_HALF = 1.1, LOBBY_HALF = 7, WALK_HALF = 8.3;   // hangout: lobby entrance gap, lobby half-length, 19th-floor walkway half-length
+const DOOR_HALF = 1.1, LOBBY_HALF = 7, WALK_HALF = 8.3, GROUND_HI = 13;   // GROUND_HI: the ground-floor lobby runs from the elevator wall (mid − LOBBY_HALF) to mid + 13   // hangout: lobby entrance gap, lobby half-length, 19th-floor walkway half-length
 
 /** The five Luna Park Houses towers in OSM.b (tall 'tower' style buildings north of the avenue, x 60..380, z -520..-110). */
 export const isLunaTower = (b) => { if (b.s !== 'tower' || !(b.h > 50)) return false; const [x, z] = cen(b.p); return x > 60 && x < 380 && z > -520 && z < -110; };
@@ -452,11 +452,11 @@ function buildTower(L, parts, R, acs, m) {
             }
             if (yg < ST) { // ground floor at the lobby line: lit lobby glass (hangout lobby, see coreInterior) with the entrance gap, brick beyond
               const mid = f.axis === 'z' ? (p.z0 + p.z1) / 2 : (p.x0 + p.x1) / 2, lo = Math.min(a, bnd), hi = Math.max(a, bnd);
-              const cutsG = [lo, hi, mid - LOBBY_HALF, mid - DOOR_HALF, mid + DOOR_HALF, mid + LOBBY_HALF].filter((v) => v >= lo && v <= hi).sort((u, v) => u - v);
+              const cutsG = [lo, hi, mid - LOBBY_HALF, mid - DOOR_HALF, mid + DOOR_HALF, mid + GROUND_HI].filter((v) => v >= lo && v <= hi).sort((u, v) => u - v);
               for (let k = 0; k + 1 < cutsG.length; k++) {
                 const u0 = cutsG[k], u1 = cutsG[k + 1], um = (u0 + u1) / 2; if (u1 - u0 < 0.01) continue;
                 if (Math.abs(um - mid) < DOOR_HALF) { rect('hLobbyGlass', f, u0, u1, ST - 0.42, ST, -GAL, bw); continue; }   // transom over the door gap
-                if (Math.abs(um - mid) < LOBBY_HALF) {
+                if (um > mid - LOBBY_HALF && um < mid + GROUND_HI) {
                   rect('hLobbyGlass', f, u0, u1, 0, ST, -GAL, bw);
                   const nm = Math.max(1, Math.round((u1 - u0) / 1.5)); for (let j = 0; j <= nm; j++) mullion(L, f, P, u0 + (u1 - u0) * j / nm, -GAL, 0, ST);
                   continue;
@@ -703,15 +703,15 @@ function coreInterior(L, p, Ht) {
     vis('hBoom', a0, y + 0.7, cL + 0.04, a0 + 0.42, y + 0.94, cL + 0.32);
     for (let k = 0; k < 12; k++) { const t = k / 11, aa = sa1 + (A[1] - 0.5 - sa1) * t, sag = Math.sin(t * Math.PI) * 0.3; for (const cc of [cL + 0.2, cR - 0.2]) vis('hBulb', aa - 0.05, y + 2.4 - sag, cc - 0.05, aa + 0.05, y + 2.5 - sag, cc + 0.05); }
   }
-  col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1); col(mid + LOBBY_HALF, 0, i0, A[1], ST, i1);
+  col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1); col(mid + GROUND_HI, 0, i0, A[1], ST, i1);
   // lobby glass walls (colliders) with the entrance gaps
-  for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + LOBBY_HALF, ST, c + 0.06); }
+  for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); }
   // lobby dressing: 12" VCT checker floor, glazed-tile wainscot walls, a dropped ceiling with light panels, three steel cars
   // with call-button plates and lit floor indicators, a bank of aluminium mailboxes, a directory board, a bench
-  vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + LOBBY_HALF, 0.03, i1);
-  vis('hLobbyCeiling', mid - LOBBY_HALF, ST - 0.07, i0, mid + LOBBY_HALF, ST - 0.04, i1);   // clear of the slab above (it z-fought)
-  for (let a = mid - LOBBY_HALF + 1.5; a < mid + LOBBY_HALF - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.075, (i0 + i1) / 2 + 0.3);
-  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); vis('hLobbyWall', mid + LOBBY_HALF, 0, i0, mid + LOBBY_HALF + 0.05, ST, i1);
+  vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + GROUND_HI, 0.03, i1);
+  vis('hLobbyCeiling', mid - LOBBY_HALF, ST - 0.07, i0, mid + GROUND_HI, ST - 0.04, i1);   // clear of the slab above (it z-fought)
+  for (let a = mid - LOBBY_HALF + 1.5; a < mid + GROUND_HI - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.075, (i0 + i1) / 2 + 0.3);
+  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); vis('hLobbyWall', mid + GROUND_HI, 0, i0, mid + GROUND_HI + 0.05, ST, i1);
   const cars = [0, 1, 2].map((k) => i0 + (i1 - i0) * (k + 0.5) / 3);
   // the bank of 3 steel cars on the lobby end wall (a = mid - LOBBY_HALF, facing +a): ground floor and the same shafts on 19
   const bank = (y) => { const e = mid - LOBBY_HALF; for (const cc of cars) {
@@ -723,11 +723,18 @@ function coreInterior(L, p, Ht) {
     vis('hIndicator', e, y + 2.26, cc - 0.25, e + 0.06, y + 2.4, cc + 0.25);    // floor indicator
   } };
   bank(0);
-  vis('hMail', mid + LOBBY_HALF - 0.3, 0.85, i0 + 0.45, mid + LOBBY_HALF, 1.95, i1 - 0.45);          // mailboxes
-  vis('hRail', mid + LOBBY_HALF - 0.33, 0.8, i0 + 0.4, mid + LOBBY_HALF, 0.85, i1 - 0.4);
+  // the big ground-floor lobby: a row of clad columns down the middle, a security desk by the door, benches, planters
+  { const cm2 = (i0 + i1) / 2;
+    for (let a = mid + 3.5; a < mid + GROUND_HI - 2; a += 4.5) { vis('hLobbyWall', a - 0.25, 0, cm2 - 0.25, a + 0.25, ST, cm2 + 0.25); col(a - 0.25, 0, cm2 - 0.25, a + 0.25, ST, cm2 + 0.25); }
+    vis('hDirectory', mid + 2.2, 0, i1 - 1.4, mid + 3.8, 1.05, i1 - 0.8); vis('hRail', mid + 2.15, 1.05, i1 - 1.45, mid + 3.85, 1.1, i1 - 0.75); col(mid + 2.2, 0, i1 - 1.4, mid + 3.8, 1.05, i1 - 0.8);   // security desk
+    for (const a of [mid + 6.5, mid + 10.5]) { vis('hRail', a - 0.9, 0.42, i0 + 0.35, a + 0.9, 0.47, i0 + 0.8); vis('hRail', a - 0.9, 0.47, i0 + 0.3, a + 0.9, 0.9, i0 + 0.36); col(a - 0.9, 0, i0 + 0.3, a + 0.9, 0.5, i0 + 0.8); }   // benches along the glass
+    for (const a of [mid - LOBBY_HALF + 0.6, mid + GROUND_HI - 0.9]) for (const c of [i0 + 0.45, i1 - 0.45]) { vis('hDirectory', a - 0.3, 0, c - 0.3, a + 0.3, 0.6, c + 0.3); vis('hLawn', a - 0.26, 0.6, c - 0.26, a + 0.26, 0.95, c + 0.26); }   // planters
+  }
+  vis('hMail', mid + GROUND_HI - 0.3, 0.85, i0 + 0.45, mid + GROUND_HI, 1.95, i1 - 0.45);          // mailboxes
+  vis('hRail', mid + GROUND_HI - 0.33, 0.8, i0 + 0.4, mid + GROUND_HI, 0.85, i1 - 0.4);
   const nrm = (dc) => { const q = P3(0, 0, dc); return [q[0], q[2]]; };   // local normal pointing along +/-c
   const nrmA = (da) => { const q = P3(da, 0, 0); return [q[0], q[2]]; };  // local normal pointing along +/-a
-  L.sign('hDirectory', P3(mid + LOBBY_HALF - 0.02, 2.25, (i0 + i1) / 2), nrmA(-1), 1.6, 0.5);   // plaque over the boxes
+  L.sign('hDirectory', P3(mid + GROUND_HI - 0.02, 2.25, (i0 + i1) / 2), nrmA(-1), 1.6, 0.5);   // plaque over the boxes
 
   // ---- the 19th floor: a walkable loop. Two railed gallery walkways (one per long face: one looks north over Brooklyn to the
   // Manhattan skyline, the other south over the rides to the ocean) joined THROUGH the core by an enclosed elevator lobby

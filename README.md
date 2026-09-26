@@ -28,4 +28,4 @@ Query params: `?map=`, `?primary=&secondary=`, `?quality=ultra|high|medium|low`,
 - QA: `node qa/shot.mjs "http://localhost:8790/?qa=1&map=zavod&pose=hero" out.png` renders a deterministic frame headlessly on the real GPU; `window.__game` exposes hooks (`stats()`, `pose()`, `fire()`, `freezeAI()`, `killAll()`).
 - Mobile assets: `qa/build-mobile-assets.sh` regenerates the 512 px mirror in `assets-m/`.
 
-Assets: Poly Haven (CC0), three.js example soldier, Barlow (OFL). Non-commercial tech demo.
+Assets: Poly Haven (CC0), three.js example soldier, Microsoft Rocketbox avatars + animations (MIT, converted to GLB), Barlow (OFL). Non-commercial tech demo.

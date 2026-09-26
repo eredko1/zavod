@@ -2,6 +2,7 @@
 // Map content lives in ./world/maps/<id>.js (one agent per map); shared submodules in ./world/*.js.
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP } from './world/maps/index.js';
+import { loadPeople } from './world/people.js';
 
 const updaters = [];
 let W = null;
@@ -62,6 +63,7 @@ export async function init(ctx) {
   };
 
   ctx.progress(0.12, `map: ${map.meta.name}`);
+  if (['coney', 'wsp', 'sbu'].includes(mapId)) { try { await loadPeople(ctx); } catch (e) { console.warn('[world] people', e); } }   // realistic NPCs (world/people.js)
   map.build(world);
   if (!W.poses.spawn && W.playerSpawns[0]) { const s = W.playerSpawns[0]; W.poses.spawn = [s.x, s.y, s.z, 0, 0]; }
   // random-spawn variety: every map offers ≥ 6 player spawn points — borrow ground-level enemy spawns farthest from the map's own player spawns

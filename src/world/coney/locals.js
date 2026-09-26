@@ -37,7 +37,7 @@ function buildPops(world, H) {
   box(white, 1.4, 0.06, 2.0, 0, 2.05, 0.05); for (const [x, z] of [[-0.62, -0.85], [0.62, -0.85], [-0.62, 0.95], [0.62, 0.95]]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.25), chrome); p.position.set(x, 1.45, z); g.add(p); }
   for (const [x, z] of [[-0.65, -0.8], [0.65, -0.8], [-0.65, 0.8], [0.65, 0.8]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.18, 14), black); w.rotation.z = Math.PI / 2; w.position.set(x, 0.26, z); g.add(w); }
   { const sw = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 6, 16), black); sw.position.set(-0.3, 1.25, 0.55); sw.rotation.x = -0.9; g.add(sw); }
-  const pops = buildFigure({ pose: 'sit', skin: 0x8a5a3c, hair: 0xd8d8d2, beard: true, beardColor: 0xcfcfc8, shirt: 0x5b6b3a, pants: 0x3b3f4a, belly: 0.35, glasses: true, shortSleeve: false });
+  const pops = buildFigure({ avatar: 'm12', pose: 'sit', skin: 0x8a5a3c, hair: 0xd8d8d2, beard: true, beardColor: 0xcfcfc8, shirt: 0x5b6b3a, pants: 0x3b3f4a, belly: 0.35, glasses: true, shortSleeve: false });
   pops.group.position.set(-0.3, 0.4, -0.1); g.add(pops.group);   // faces +z, the cart's front
   { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, 0.07, 14), M(0x1c2a44)); cap.position.set(0, 0.92, 0.01); pops.head.add(cap); const brim = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.12), M(0x1c2a44)); brim.position.set(0, 0.89, 0.12); pops.head.add(brim); }
   const tag = nameTag('POPS'); tag.position.set(0, 2.45, 0); g.add(tag);
@@ -121,7 +121,7 @@ function popsTalk(again) {
 function buildShades(world) {
   const o = world.W.onlineStart || [220, 0, -380], nav = world.ctx.ai?.nav;
   const pts = [[14, 8], [22, -6], [14, -22], [-4, -26], [-18, -12], [-16, 6]].map(([dx, dz]) => { const q = nav?.nearestFree?.(o[0] + dx, o[2] + dz, 4, 0); return q ? [q.x, q.z] : [o[0] + dx, o[2] + dz]; });
-  buildWalker(world, K, { name: 'SHADES', talk: shadesTalk, shirt: 0xe3e3e3, pants: 0x2a2f3a, skin: 0x6b4430, path: pts, speed: 0.9 });   // laps round Table Park
+  buildWalker(world, K, { name: 'SHADES', avatar: 'm04', glasses: true, talk: shadesTalk, shirt: 0xe3e3e3, pants: 0x2a2f3a, skin: 0x6b4430, path: pts, speed: 0.9 });   // laps round Table Park
 }
 function shadesTalk(Kk, again) {
   const buy = () => {

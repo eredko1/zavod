@@ -65,7 +65,7 @@ function lobbyZone(t) {
   const uc = new THREE.Vector3(b.x - a.x, 0, b.z - a.z); const len = uc.length(); if (len < 0.5) return null; uc.multiplyScalar(1 / len);
   const ua = new THREE.Vector3(-uc.z, 0, uc.x);
   const car = t.lobby.cars[0].pos; const da = Math.abs((car.x - c.x) * ua.x + (car.z - c.z) * ua.z);
-  const hc = len / 2 + 1.25, ha = da + 1.15;
+  const hc = len / 2 + 1.25, ha = Math.max(da + 1.15, 13.2);   // the ground lobby runs to mid + 13 (housing.js GROUND_HI); the −a side is solid anyway
   const ex = Math.abs(ua.x) * ha + Math.abs(uc.x) * hc, ez = Math.abs(ua.z) * ha + Math.abs(uc.z) * hc;
   return { tower: t, c, ua, uc, ha, hc, min: new THREE.Vector3(c.x - ex - 1, -1, c.z - ez - 1), max: new THREE.Vector3(c.x + ex + 1, 3, c.z + ez + 1), doors: d.map((q) => q.outside.clone()) };
 }

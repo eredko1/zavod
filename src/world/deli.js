@@ -1,5 +1,6 @@
 // A NYC corner deli / bodega you can walk into (buildDeli) + simple low-poly people for vendors (buildFigure) + Sammy's
 // conversation (sammyTalk). Used by the coney / wsp / sbu hangouts through hangkit.js vendors.
+import { buildPerson, peopleReady } from './people.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { sell } from './hangkit.js';
@@ -11,6 +12,7 @@ import { sell } from './hangkit.js';
  * @returns { group, update(t, moving) }
  */
 export function buildFigure(o = {}) {
+  if (peopleReady() && !o.capsule) return buildPerson(o);   // realistic Rocketbox townsfolk (world/people.js); capsules are the fallback
   const mat = (c, r = 0.8) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
   const skin = mat(o.skin ?? 0xc69c72, 0.6), hair = mat(o.hair ?? 0x1c1714, 0.9), shirt = mat(o.shirt ?? 0x2d3e56), pants = mat(o.pants ?? 0x2a2a2a), shoe = mat(o.shoe ?? 0x222222, 0.6);
   const g = new THREE.Group(); const sit = o.pose === 'sit', belly = o.belly ?? 0.3;
@@ -209,7 +211,7 @@ export function buildDeli(world, o) {
     for (let s = 0; s < 5; s++) for (let k = 0; k < 6; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 7), PAL[(d + s + k) % 3 === 0 ? 3 : (d + k) % 8]); b.position.set(x0 + 0.1 + k * 0.155, 0.28 + s * 0.42, D - 0.66); root.add(b); } }
   for (let d = 0; d <= 7; d++) box(M.frame, -hx + 0.26 + d * 1.06, 0.1, D - 0.69, -hx + 0.3 + d * 1.06, 2.28, D - 0.66);
   // Sammy on his stool behind the counter, facing the aisle; the bodega cat asleep on the counter
-  const sammy = buildFigure({ pose: 'sit', skin: o.skin ?? 0xb88760, hair: o.hair ?? 0x221c18, beard: false, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0, slim: true, glasses: !!o.glasses, shortSleeve: false, bun: !!o.bun });   // thin, clean-shaven
+  const sammy = buildFigure({ avatar: o.avatar ?? (o.bun ? 'f09' : 'm20'), pose: 'sit', skin: o.skin ?? 0xb88760, hair: o.hair ?? 0x221c18, beard: false, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0, slim: true, glasses: !!o.glasses, shortSleeve: false, bun: !!o.bun });   // thin, clean-shaven
   sammy.group.position.set(3.25, 0.32, 2.6); sammy.group.rotation.y = -Math.PI / 2; root.add(sammy.group);   // on a tall stool: head clears the counter
   box(M.frame, 3.12, 0, 2.47, 3.38, 0.82, 2.73);   // stool
   const tag = nameTag(o.vendorName || 'SAMMY'); tag.position.set(0, 1.85, 0); sammy.group.add(tag);
@@ -306,7 +308,7 @@ function hideCar(world, car) { car.gone = true; for (const { im, i } of car.refs
 
 /** A vendor who walks a loop of waypoints (stops and turns to face anyone who comes close). Registers with the hangkit. */
 export function buildWalker(world, K, o) {
-  const f = buildFigure({ skin: o.skin ?? 0x5a3a28, hair: 0x1a120c, beard: true, beardColor: 0x1a120c, tam: !!o.tam, shirt: o.shirt ?? 0x6b7a3a, pants: o.pants ?? 0x4a4236, shoe: 0x6a5238, belly: 0.1, shortSleeve: true });
+  const f = buildFigure({ avatar: o.avatar, glasses: !!o.glasses, skin: o.skin ?? 0x5a3a28, hair: 0x1a120c, beard: true, beardColor: 0x1a120c, tam: !!o.tam, shirt: o.shirt ?? 0x6b7a3a, pants: o.pants ?? 0x4a4236, shoe: 0x6a5238, belly: 0.1, shortSleeve: true });
   const tag = nameTag(o.name); tag.position.set(0, 2.15, 0); f.group.add(tag);
   world.scene.add(f.group);
   const path = o.path.map(([x, z]) => new THREE.Vector3(x, 0, z)); let i = 0, seg = 1;

@@ -71,7 +71,7 @@ export function buildChill(world, H) {
   // VITEK, the handgun guy, leaning on the fence a few steps from the park gate
   const s0 = W.onlineStart || [220, 0, -380]; let vp = new THREE.Vector3(s0[0] - 12, 0, s0[2] + 9);
   try { const q = ctx.ai?.nav?.nearestFree?.(vp.x, vp.z, 6, 0); if (q) vp = new THREE.Vector3(q.x, q.y, q.z); } catch {}
-  const vf = buildFigure({ skin: 0xe0b890, hair: 0x2a2018, shirt: 0x1d1f24, pants: 0x1d1f24, shoe: 0xeeeeee, belly: 0.05, shortSleeve: false });
+  const vf = buildFigure({ avatar: 'm05', skin: 0xe0b890, hair: 0x2a2018, shirt: 0x1d1f24, pants: 0x1d1f24, shoe: 0xeeeeee, belly: 0.05, shortSleeve: false });
   const tag = nameTag('VITEK', '#9fe39a'); tag.position.set(0, 2.15, 0); vf.group.add(tag); vf.group.position.copy(vp); world.scene.add(vf.group);
   K.onUpdate((dt) => { const me = ctx.player.position; vf.group.rotation.y = Math.atan2(me.x - vp.x, me.z - vp.z); vf.update(dt, 0); });
   K.vendor({ name: 'VITEK', pos: vp, r: 2.4, talk: vitekTalk });
@@ -91,8 +91,10 @@ export function buildChill(world, H) {
 // ---------------------------------------------------------------------------------------------------------------------------
 function thugModel(name, seed, type = 'ru') {
   const T = CREWS[type] || CREWS.ru, cols = T.look[seed % T.look.length];
-  const f = buildFigure({ skin: [0xe6c3a2, 0xd9a882, 0x8a5a3c, 0x6b4430, 0x4a2e20][seed % 5], hair: name === 'BABUSHKA' ? 0xb8b4ae : 0x1a1410, bun: name === 'BABUSHKA', shirt: cols[0], pants: type === 'st' ? 0x2a3240 : type === 'mk' ? cols[1] : cols[0], shoe: type === 'mk' ? 0x3a2a20 : cols[1], belly: name === 'FINANCE BRO' || name === 'BABUSHKA' ? 0.3 : 0.05, shortSleeve: type === 'mk' ? true : false });
-  if (T.cap != null) { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.125, type === 'st' ? 0.11 : 0.07, 12), new THREE.MeshStandardMaterial({ color: T.cap })); cap.position.set(0, type === 'st' ? 0.08 : 0.1, 0); f.head.add(cap); }
+  const MK = { TOURIST: 'm01', 'FINANCE BRO': 'm08', DENTIST: 'm08', BABUSHKA: 'f09', INFLUENCER: 'f01', 'SUMMER INTERN': 'f17', HIPSTER: 'm05', 'DELIVERY GUY': 'm18' };
+  const avatar = type === 'ru' ? ['m10', 'm17', 'm05'][seed % 3] : type === 'st' ? ['m04', 'm12', 'm18'][seed % 3] : MK[name] || ['m01', 'm20', 'f17'][seed % 3];
+  const f = buildFigure({ avatar, seed, skin: [0xe6c3a2, 0xd9a882, 0x8a5a3c, 0x6b4430, 0x4a2e20][seed % 5], hair: name === 'BABUSHKA' ? 0xb8b4ae : 0x1a1410, bun: name === 'BABUSHKA', shirt: cols[0], pants: type === 'st' ? 0x2a3240 : type === 'mk' ? cols[1] : cols[0], shoe: type === 'mk' ? 0x3a2a20 : cols[1], belly: name === 'FINANCE BRO' || name === 'BABUSHKA' ? 0.3 : 0.05, shortSleeve: type === 'mk' ? true : false });
+  if (T.cap != null && !f.avatar) { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.125, type === 'st' ? 0.11 : 0.07, 12), new THREE.MeshStandardMaterial({ color: T.cap })); cap.position.set(0, type === 'st' ? 0.08 : 0.1, 0); f.head.add(cap); }
   const tag = nameTag(name, T.tag); tag.position.set(0, 2.15, 0); f.group.add(tag);
   // hitboxes: body + head (weapons' onHit hook)
   const hbm = new THREE.MeshBasicMaterial({ visible: false });

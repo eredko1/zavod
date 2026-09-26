@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
+import { buildPerson, peopleReady } from '../people.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews } from './chill.js';
 import { buildJobs, jobsTalk } from './jobs.js';
@@ -138,7 +139,8 @@ function buildIgor(world, M, pos) {
   // ---- Igor: short (1.62 m), heavy-set, buzz-cut dark hair, black t-shirt, dark jeans, white sneakers, sitting -----------
   const skin = new THREE.MeshStandardMaterial({ color: 0xe0b594, roughness: 0.6 }), shirt = new THREE.MeshStandardMaterial({ color: 0x131313, roughness: 0.9 }), jeans = new THREE.MeshStandardMaterial({ color: 0x28324a, roughness: 0.85 }), hair = new THREE.MeshStandardMaterial({ color: 0x2a211a, roughness: 0.9 }), shoe = new THREE.MeshStandardMaterial({ color: 0xe8e8e2, roughness: 0.6 });
   const igor = new THREE.Group(); igorBench.add(igor); igor.position.set(0.35, 0, 0.05);
-  const part = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, 0, rz); m.castShadow = true; igor.add(m); return m; };
+  const REAL = peopleReady();   // realistic Igor (world/people.js) replaces the capsule one
+  const part = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => { if (REAL) return null; const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, 0, rz); m.castShadow = true; igor.add(m); return m; };
   part(new THREE.SphereGeometry(0.3, 16, 12), shirt, 0, 0.82, 0.02, 1.25, 1.05, 1.15);          // big round belly + chest
   part(new THREE.SphereGeometry(0.26, 14, 10), shirt, 0, 1.1, 0.0, 1.3, 0.8, 1.0);              // shoulders
   part(new THREE.CylinderGeometry(0.1, 0.11, 0.12, 12), skin, 0, 1.3, 0.02);                   // neck (short)
@@ -159,6 +161,7 @@ function buildIgor(world, M, pos) {
     park.traverse((o) => { if (!o.isMesh) return; const g = o.geometry.clone().applyMatrix4(inv.clone().multiply(o.matrixWorld)); const gg = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(gg.attributes)) if (!['position', 'normal', 'uv'].includes(k)) gg.deleteAttribute(k); if (!gg.attributes.uv) gg.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(gg.attributes.position.count * 2), 2)); (byMat.get(o.material) || byMat.set(o.material, []).get(o.material)).push(gg); kill.push(o); });
     for (const o of kill) o.parent.remove(o);
     for (const [mat, list] of byMat) { const m = new THREE.Mesh(mergeGeometries(list, false), mat); m.castShadow = mat !== iron; m.receiveShadow = true; park.add(m); } }
+  if (REAL) { const pf = buildPerson({ avatar: 'm03', pose: 'sit', seed: 3 }); pf.group.position.set(0, -0.1, 0.12); igor.add(pf.group); world.updaters.push((dt) => pf.update(dt, 0)); }
   const ipos = igorBench.getWorldPosition(new THREE.Vector3()); ipos.y = 0;
   // name tag
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.font = '700 34px Barlow, Arial'; x.textAlign = 'center'; x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(40, 10, 176, 44); x.fillStyle = '#ffd27a'; x.fillText('IGOR', 128, 44);
@@ -283,6 +286,7 @@ function buyIgor() { const { ctx } = H; const r = igorSell(H.buys++ % 2 === 0 ? 
 export const hangoutQA = {
   state: () => { const s = K.state(); return H && s && { ...s, stash: s.inv.length, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()), deli: H.deli && { sammy: H.deli.sammy.toArray(), counter: H.deli.counter.toArray(), door: H.deli.door.toArray(), inside: H.deli.inside.toArray(), face: H.deli.face } }; },
   roof: () => { const r = H.b2?.roof?.top; return r && [...r.pos.toArray(), r.yaw]; },
+  lobbyView: () => { const c = H.b2.lobby.cars[1]; return [...c.pos.toArray(), c.yaw]; },
   roofAt: (a, c) => { const t = H.b2, k = t.core; return t.toWorld(a, k.roof.y, k.roof.c + c).toArray(); },
   buy: () => buyIgor(), use: () => K.useItem(), light: () => { K.give('weed'); K.useItem(); }, ride: (dir = 'up', k = 0) => K.callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = K.nearestParked(1e9); if (c) K.steal(c); return !!c; },
   park: () => K.pickRespawn(), wheel: () => { const WW = H.world.W.wonderWheel; if (WW) rideWheel(WW); return !!WW; }, wheelState: () => H.wheel && { i: H.wheel.i, t: +H.wheel.t.toFixed(1), y: +H.ctx.player.position.y.toFixed(1) }, choose: (i) => K.choose(i), close: () => K.closeDialog(), give: (n) => K.earn(n), drop: (n = 30) => { const p = H.ctx.player.position; K.dropCash(p.clone().add(new THREE.Vector3(3, 0, 0)), n); },
