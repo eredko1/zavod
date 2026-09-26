@@ -681,9 +681,12 @@ function coreInterior(L, p, Ht) {
   let stairB = null; const SHL = 4.6, sh0 = sa1 + 0.25, sh1 = sh0 + SHL, FL = Math.min(3, Math.floor(yF / ST) - 2), yD = yF - FL * ST, hasB = sh1 < A[1] - 0.4 && FL >= 1;
   const hw1 = sc0 - 0.06;   // hallway: c ∈ [i0, hw1], a ∈ [sa0, sh0], 2.2 m tall
   if (hasB) {
-    col(A[0], ST, i0, A[1], yD, i1); col(A[0], yD, i0, sh0, yF, i1); col(sh1, yD, i0, A[1], yF, i1);
-    col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sh1, yF, i0, A[1], Ht, i1); colF(sh0, yF + 2.4, i0, sh1, Ht, i1); colF(sa1, yF, sc0, sh0, Ht, i1);
-    colF(sa0, yF + 2.2, i0, sh0, Ht, sc0); colF(sa0, yF, hw1, sa1, yF + 2.2, sc0); colF(sa0, yF, sc1, sa1, Ht, i1);
+    // the towers are rotated: every collider becomes a world AABB per cell, so big cells bulge up to ~0.7 m past their faces —
+    // anything bordering the stairwell / hallway uses fine cells (colT for the thin walls)
+    const colT = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.2); };
+    col(A[0], ST, i0, A[1], yD, i1); col(A[0], yD, i0, sh0 - 1.2, yF, i1); colF(sh0 - 1.2, yD, i0, sh0, yF, i1); colF(sh1, yD, i0, A[1], yF, i1);
+    col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sh1, yF, i0, A[1], Ht, i1); colF(sh0, yF + 2.4, i0, sh1, Ht, i1); colF(sa1, yF, hw1 + 0.06, sh0, Ht, i1);
+    colF(sa0, yF + 2.2, i0, sh0, Ht, sc0); colT(sa0, yF, hw1, sa1, yF + 2.2, hw1 + 0.06); colF(sa0, yF, sc1, sa1, Ht, i1);
   } else { col(A[0], ST, i0, A[1], yF, i1); col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sa1, yF, i0, A[1], Ht, i1); colF(sa0, yF, i0, sa1, Ht, sc0); colF(sa0, yF, sc1, sa1, Ht, i1); }
   colF(sa0, yF + 2.2, sc0, sa0 + 0.3, Ht, sc1);   // lobby-side header over the stair door
   col(A[0], yF, i0, mid - LOBBY_HALF, yF + CEIL, i1);
@@ -714,11 +717,13 @@ function coreInterior(L, p, Ht) {
           const yb = yh - (k + 1) * rS; colF(f1 - (k + 1) * tS, yb - 0.2, laneB[0], f1 - k * tS, yb, laneB[1]); vis('hTerrazzo', f1 - (k + 1) * tS, yb - 0.2, laneB[0], f1 - k * tS, yb, laneB[1]); } }
       vis('hDoor', sh0, y, laneB[0] + 0.3, sh0 + 0.05, y + 2.05, laneB[1] - 0.1);   // each floor's (locked) corridor door
     }
-    vis('hLobbyWall', f0, yD, cmB - 0.1, f1, yF + 2.4, cmB + 0.1); colF(f0, yD, cmB - 0.1, f1, yF + 2.4, cmB + 0.1);   // scissor divider
+    vis('hLobbyWall', f0, yD, cmB - 0.1, f1, yF + 2.4, cmB + 0.1); { const [a, b2] = bx(f0, yD, cmB - 0.1, f1, yF + 2.4, cmB + 0.1); L.collide(a, b2, 0.2); }   // scissor divider
     for (const [a0, a1, c0, c1] of [[sh0, sh1, i0, i0 + 0.02], [sh0, sh1, i1 - 0.02, i1], [sh1 - 0.02, sh1, i0, i1], [sh0, sh0 + 0.02, hw1 + 0.1, i1]]) vis('hLobbyWall', a0, yD - 0.25, c0, a1, yF + 2.4, c1);   // painted block walls
     vis('hLobbyCeiling', sh0, yF + 2.38, i0, sh1, yF + 2.42, i1);
     for (let n = 0; n <= FL; n++) vis('hLobbyCeil', sh0 + 0.4, yF - n * ST + 2.2, cmB + 0.3, sh0 + 0.8, yF - n * ST + 2.24, cmB + 0.7);   // a bulb per landing
-    stairB = { top: [sh0 + 0.6, yF, (laneA[0] + laneA[1]) / 2], bottom: [sh0 + 0.6, yD, (laneB[0] + laneB[1]) / 2], floors: FL };
+    const cA = (laneA[0] + laneA[1]) / 2, cB = (laneB[0] + laneB[1]) / 2, path = [[sa0 - 1.0, yF, i0 + 0.85], [sa0 + 0.6, yF, i0 + 0.85], [sh0 - 0.4, yF, i0 + 0.85], [sh0 + 0.6, yF, cA]];
+    for (let n = 0; n < FL; n++) { const y = yF - n * ST, yh = y - ST / 2; path.push([f0 - 0.2, y, cA], [f1 + 0.7, yh, cA], [f1 + 0.7, yh, cB], [f0 - 0.6, y - ST, cB], [f0 - 0.6, y - ST, cA]); }   // walking route (QA)
+    stairB = { top: [sh0 + 0.6, yF, cA], bottom: [sh0 + 0.6, yD, cB], floors: FL, path };
   }
   // the roof hangout right outside the bulkhead door (where the stairs let you out): a couch along the rail, milk crates
   // and a boombox on the other side, string lights from the bulkhead to the parapet
@@ -769,7 +774,7 @@ function coreInterior(L, p, Ht) {
   vis('hLobbyFloor', mid - LOBBY_HALF, yF, i0, mid + LOBBY_HALF, yF + 0.03, i1);
   vis('hLobbyCeiling', mid - LOBBY_HALF, yF + CEIL - 0.07, i0, mid + LOBBY_HALF, yF + CEIL - 0.04, i1);
   for (let a = mid - LOBBY_HALF + 1.6; a < mid + LOBBY_HALF - 1; a += 2.8) vis('hLobbyCeil', a - 0.6, yF + CEIL - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, yF + CEIL - 0.075, (i0 + i1) / 2 + 0.3);
-  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); if (hasB) { vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, i0 + 0.35); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0 + 1.45, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF + 2.2, i0 + 0.35, mid + LOBBY_HALF + 0.05, yF + CEIL, i0 + 1.45); colF(sa0 - 0.02, yF, i0, sa0 + 0.05, yF + CEIL, i0 + 0.35); colF(sa0 - 0.02, yF, i0 + 1.45, sa0 + 0.05, yF + CEIL, hw1); } else vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF, sc1, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
+  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); if (hasB) { vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, i0 + 0.35); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0 + 1.45, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF + 2.2, i0 + 0.35, mid + LOBBY_HALF + 0.05, yF + CEIL, i0 + 1.45); { const [a, b2] = bx(sa0 - 0.02, yF, i0, sa0 + 0.05, yF + CEIL, i0 + 0.35); L.collide(a, b2, 0.2); const [c2, d2] = bx(sa0 - 0.02, yF, i0 + 1.45, sa0 + 0.05, yF + CEIL, hw1); L.collide(c2, d2, 0.2); } } else vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF, sc1, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
   for (const c of [sc0, sc1]) vis('hRail', mid + LOBBY_HALF - 0.04, yF, c - 0.05, mid + LOBBY_HALF + 0.06, yF + 2.2, c + 0.05); vis('hRail', mid + LOBBY_HALF - 0.04, yF + 2.15, sc0, mid + LOBBY_HALF + 0.06, yF + 2.22, sc1);   // stair door frame
   bank(yF);
   L.sign('hFloor19', P3(mid + LOBBY_HALF - 0.02, yF + 1.55, (sc1 + i1) / 2), nrmA(-1), 0.8, 0.8);                  // "19" on the far end wall, beside the roof stair
@@ -778,8 +783,8 @@ function coreInterior(L, p, Ht) {
   for (const [cOut, cIn, sg] of [[C[0], i0, 1], [C[1], i1, -1]]) {
     col(mid - WALK_HALF, yF - 0.25, cOut, mid + WALK_HALF, yF, cIn);
     // railing: 1.1 m steel rail + an invisible 2 m guard so nobody vaults or mantles off the 19th floor
-    col(mid - WALK_HALF, yF, cOut, mid + WALK_HALF, yF + 2.0, cOut + sg * 0.12);
-    col(mid - WALK_HALF - 0.3, yF, cOut, mid - WALK_HALF, yF + 2.6, cIn); col(mid + WALK_HALF, yF, cOut, mid + WALK_HALF + 0.3, yF + 2.6, cIn);
+    colF(mid - WALK_HALF, yF, cOut, mid + WALK_HALF, yF + 2.0, cOut + sg * 0.12);
+    colF(mid - WALK_HALF - 0.3, yF, cOut, mid - WALK_HALF, yF + 2.6, cIn); colF(mid + WALK_HALF, yF, cOut, mid + WALK_HALF + 0.3, yF + 2.6, cIn);   // fine cells: coarse ones bulged into the stair hallway door
     vis('hSlab', mid - WALK_HALF, yF - 0.02, cOut, mid + WALK_HALF, yF + 0.01, cIn);
     vis('hRail', mid - WALK_HALF, yF + 1.05, cOut, mid + WALK_HALF, yF + 1.12, cOut + sg * 0.08);
     for (const e of [mid - WALK_HALF - 0.05, mid + WALK_HALF + 0.05]) {   // steel gates closing the walkway ends
@@ -790,7 +795,7 @@ function coreInterior(L, p, Ht) {
     const cW = cIn + sg * WT, segs = []; let a0 = mid - WALK_HALF;
     for (const [o0, o1] of OPEN) { segs.push([a0, o0]); a0 = o1; } segs.push([a0, mid + WALK_HALF]);
     for (const [s0, s1] of segs) {
-      col(s0, yF, cIn, s1, yF + CEIL, cW); vis('hVestibule', s0, yF + 0.01, cIn, s1, yF + ST - 0.02, cW);
+      colF(s0, yF, cIn, s1, yF + CEIL, cW); vis('hVestibule', s0, yF + 0.01, cIn, s1, yF + ST - 0.02, cW);
       const q0 = Math.max(s0, mid - LOBBY_HALF), q1 = Math.min(s1, mid + LOBBY_HALF); if (q1 > q0) vis('hLobbyWall', q0, yF + 0.01, cW, q1, yF + CEIL - 0.02, cW + sg * 0.02);
     }
     for (const [o0, o1] of OPEN) {
@@ -833,6 +838,6 @@ function towerInfo(core, m, centre) {
   roof.door = { min: new THREE.Vector3(Math.min(rdA.x, rdB.x), rd.y, Math.min(rdA.z, rdB.z)), max: new THREE.Vector3(Math.max(rdA.x, rdB.x), rd.y + 2.2, Math.max(rdA.z, rdB.z)),
     hinge: toWorld(rd.a - 0.02, rd.y, rd.c0), along: ec.clone().normalize(), out: ea.clone().normalize(), width: rd.c1 - rd.c0,
     inside: toWorld(rd.a - 0.8, rd.y + (core.roof.y - rd.y), (rd.c0 + rd.c1) / 2), outside: toWorld(rd.a + 0.9, rd.y, (rd.c0 + rd.c1) / 2) };
-  const stairB = core.stairB && { top: toWorld(...core.stairB.top), bottom: toWorld(...core.stairB.bottom), floors: core.stairB.floors, up: yawOf(ea.clone()) };   // up: yaw to climb the flight off the bottom landing
+  const stairB = core.stairB && { top: toWorld(...core.stairB.top), bottom: toWorld(...core.stairB.bottom), floors: core.stairB.floors, path: core.stairB.path.map((q) => toWorld(...q)), up: yawOf(ea.clone()) };   // up: yaw to climb the flight off the bottom landing
   return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, roof, stairB, toWorld, core };
 }

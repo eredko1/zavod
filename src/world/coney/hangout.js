@@ -336,7 +336,7 @@ export const hangoutQA = {
   roof: () => { const r = H.b2?.roof?.top; return r && [...r.pos.toArray(), r.yaw]; },
   hurt: () => K.hurtState(), vendors: () => K.points().vendors, loadout: () => ({ ...H.ctx.weapons.loadout, cur: H.ctx.weapons.currentId }),
   roofDoor: (i = null) => { const D = H.roofDoors?.[i ?? H.towers.indexOf(H.b2)]; return D && { open: D.open, shoves: D.shoves, inside: D.d.inside.toArray(), outside: D.d.outside.toArray() }; },
-  stairB: () => { const b = H.b2?.stairB; return b && { top: b.top.toArray(), bottom: b.bottom.toArray(), floors: b.floors, up: b.up }; },
+  stairB: () => { const b = H.b2?.stairB; return b && { top: b.top.toArray(), bottom: b.bottom.toArray(), floors: b.floors, up: b.up, path: b.path.map((v) => v.toArray()) }; },
   lobbyView: () => { const c = H.b2.lobby.cars[1]; return [...c.pos.toArray(), c.yaw]; },
   roofAt: (a, c) => { const t = H.b2, k = t.core; return t.toWorld(a, k.roof.y, k.roof.c + c).toArray(); },
   buy: () => buyIgor(), use: () => K.useItem(), light: () => { K.give('weed'); K.useItem(); }, ride: (dir = 'up', k = 0) => K.callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = K.nearestParked(1e9); if (c) K.steal(c); return !!c; },
