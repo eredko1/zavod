@@ -27,8 +27,14 @@ async function walk(path, label) {
   }
   return { ok: true, end: await pos() };
 }
+// the stair must actually reach the ground floor, not dead-end partway up the tower (it used to stop at 16)
+ok(sb.bottom[1] < 0.6, 'fire stair reaches the ground floor', `bottom y=${sb.bottom[1].toFixed(2)} over ${sb.floors} flights`);
 const down = await walk(sb.path, 'down'); ok(down.ok, 'walk 19 → lobby door → hallway → all flights down', JSON.stringify(down));
+ok(down.ok && down.end[1] < 0.6, 'ended on the ground floor', JSON.stringify(down.end || null));
+// and you can walk out of the stairwell into the ground-floor lobby and reach the street door
+if (down.ok) { const outp = await pg.evaluate(() => window.__game.hangout.state()?.lobby?.[1] || null); ok(!!outp, 'lobby reachable from QA api'); if (outp) { const o = await walk([down.end, outp], 'exit'); ok(o.ok, 'walk out of the stairwell across the lobby to the elevators', JSON.stringify(o)); } }
 const up = await walk(sb.path.slice().reverse(), 'up'); ok(up.ok, 'walk back up to the 19th-floor lobby', JSON.stringify(up));
+ok(up.ok && Math.abs(up.end[1] - sb.top[1]) < 0.7, 'ended back on the 19th floor', JSON.stringify(up.end || null));
 // roof stair: foot of the flight in the 19th lobby → top → shoulder the door → out
 const rf = await pg.evaluate(() => { const h = window.__game.hangout; return { door: h.roofDoor(), top: h.roof() }; });
 ok(!errs.length, 'no page errors', JSON.stringify(errs.slice(0, 3)));
