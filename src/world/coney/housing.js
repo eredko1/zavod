@@ -679,13 +679,20 @@ function coreInterior(L, p, Ht) {
   const sa0 = mid + LOBBY_HALF, sf = sa0 + 0.9, sa1 = sf + nSt * tread + 0.9;   // door landing, flight, top landing   // + a top landing
   // fire stair B: a hallway beside the roof stair leads to a scissor stair (sh0..sh1) down to floor 16 — the smoking /
   // pissing stairwell. Only where the core has room past the roof stair.
-  let stairB = null; const SHL = 4.6, sh0 = sa1 + 0.25, sh1 = sh0 + SHL, FL = Math.min(3, Math.floor(yF / ST) - 2), yD = yF - FL * ST, hasB = sh1 < A[1] - 0.4 && FL >= 1;
+  let stairB = null; const SHL = 4.6, sh0 = sa1 + 0.25, sh1 = sh0 + SHL, FL = Math.max(1, Math.round(yF / ST)), yD = Math.max(0, yF - FL * ST), hasB = sh1 < A[1] - 0.4 && FL >= 1, bToGround = yD < ST - 0.01;
   const hw1 = sc0 - 0.06;   // hallway: c ∈ [i0, hw1], a ∈ [sa0, sh0], 2.2 m tall
   if (hasB) {
     // the towers are rotated: every collider becomes a world AABB per cell, so big cells bulge up to ~0.7 m past their faces —
     // anything bordering the stairwell / hallway uses fine cells (colT for the thin walls)
     const colT = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.2); };
-    col(A[0], ST, i0, A[1], yD, i1); col(A[0], yD, i0, sh0 - 1.2, yF, i1); colF(sh0 - 1.2, yD, i0, sh0, yF, i1); colF(sh1, yD, i0, A[1], yF, i1);
+    if (yD > ST) col(A[0], ST, i0, A[1], yD, i1); col(A[0], Math.max(yD, ST), i0, sh0 - 1.2, yF, i1);
+    if (bToGround) {   // the 1.2 m core wall between lobby and stairwell would seal the stair's discharge — cut a doorway through it at ground level
+      const fine = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.2); };
+      const cmB0 = (i0 + i1) / 2;   // the whole lane-A half of the wall comes out: a fire stair discharges into the lobby, it does not squeeze through a slot
+      colF(sh0 - 1.2, ST, i0, sh0, yF, i1); fine(sh0 - 1.2, 0, cmB0 + 0.35, sh0, ST, i1);
+      vis('hDoor', sh0 - 0.08, 0, i0 + 0.15, sh0 - 0.03, 2.05, i0 + 1.35);
+    } else colF(sh0 - 1.2, yD, i0, sh0, yF, i1);
+    colF(sh1, yD, i0, A[1], yF, i1);
     col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sh1, yF, i0, A[1], Ht, i1); colF(sh0, yF + 2.4, i0, sh1, Ht, i1); colF(sa1, yF, hw1 + 0.06, sh0, Ht, i1);
     colF(sa0, yF + 2.2, i0, sh0, Ht, sc0); colT(sa0, yF, hw1, sa1, yF + 2.2, hw1 + 0.06); colF(sa0, yF, sc1, sa1, Ht, i1);
   } else { col(A[0], ST, i0, A[1], yF, i1); col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sa1, yF, i0, A[1], Ht, i1); colF(sa0, yF, i0, sa1, Ht, sc0); colF(sa0, yF, sc1, sa1, Ht, i1); }
@@ -735,9 +742,19 @@ function coreInterior(L, p, Ht) {
     vis('hBoom', a0, y + 0.7, cL + 0.04, a0 + 0.42, y + 0.94, cL + 0.32);
     for (let k = 0; k < 12; k++) { const t = k / 11, aa = sa1 + (A[1] - 0.5 - sa1) * t, sag = Math.sin(t * Math.PI) * 0.3; for (const cc of [cL + 0.2, cR - 0.2]) vis('hBulb', aa - 0.05, y + 2.4 - sag, cc - 0.05, aa + 0.05, y + 2.5 - sag, cc + 0.05); }
   }
-  col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1); col(mid + GROUND_HI, 0, i0, A[1], ST, i1);
+  col(A[0], 0, i0, mid - LOBBY_HALF, ST, i1);
+  if (hasB && bToGround) {   // fire stair discharges here: leave its footprint open to the lobby.
+    // rotated towers turn every collider cell into a world AABB, so coarse cells bulge ~0.7 m past their faces and
+    // pinch the bottom landing shut — everything bordering the stairwell at ground level uses fine cells.
+    const gF = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.2); };
+    if (sh0 > mid + GROUND_HI) gF(mid + GROUND_HI, 0, i0, sh0, ST, i1);
+    const gap = Math.min(sh1 + 1.4, A[1]); gF(sh1, 0, i0, gap, ST, i1); if (gap < A[1]) col(gap, 0, i0, A[1], ST, i1);
+  }
+  else col(mid + GROUND_HI, 0, i0, A[1], ST, i1);
   // lobby glass walls (colliders) with the entrance gaps
-  for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06); col(mid + DOOR_HALF, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); }
+  for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06);
+    if (hasB && bToGround) { const nr = Math.max(mid + DOOR_HALF, sh0 - 2.5); col(mid + DOOR_HALF, 0, c - 0.06, nr, ST, c + 0.06); const [mn, mx] = bx(nr, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); L.collide(mn, mx, 0.2); }
+    else col(mid + DOOR_HALF, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); }
   // lobby dressing: 12" VCT checker floor, glazed-tile wainscot walls, a dropped ceiling with light panels, three steel cars
   // with call-button plates and lit floor indicators, a bank of aluminium mailboxes, a directory board, a bench
   vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + GROUND_HI, 0.03, i1);
