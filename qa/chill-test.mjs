@@ -28,8 +28,7 @@ for (let i = 0; i < 12; i++) {
   await pg.waitForTimeout(80); await pg.evaluate(() => window.__game.fire(1)); await pg.waitForTimeout(400);
 }
 c = await pg.evaluate(() => window.__game.chill.state()); ok(c.thugs[0]?.st === 'dead', 'knifed him', JSON.stringify(c.thugs[0]));
-const drops = await pg.evaluate(() => window.__game.hangout.state().drops); ok(drops.length >= 1, 'he drops what he took (+ his own)', JSON.stringify(drops));
-if (drops[0]) { await pg.evaluate((d) => window.__game.teleport(d[0], 0, d[2], 0, 0), drops[0]); await pg.waitForTimeout(700); }
+const cashK = await pg.evaluate(() => window.__game.hangout.state().cash); ok(cashK > cash1, 'you take his money: what he robbed + his own + a bounty', `$${cash1} → $${cashK}`);
 const cash2 = await pg.evaluate(() => window.__game.hangout.state().cash); ok(cash2 > cash1, 'money back', `${cash1} → ${cash2}`);
 // Vitek: skewer + $60 → Makarov
 await pg.evaluate(async () => { const m = await import('/src/world/hangkit.js'); m.hangkit.give('skewer'); m.hangkit.earn(60); });

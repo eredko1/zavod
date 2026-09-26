@@ -124,7 +124,7 @@ function api() {
     get peers() { return S.peers.size; }, get connected() { return anyUp(); }, get room() { return S.room; }, get name() { return S.name; }, get id() { return S.id; },
     hit: (peer, dmg, hs) => { const p = S.peers.get(peer); if (!p || p.dead || p.afk) return; send({ t: 'hit', to: peer, dmg: Math.max(0, Math.min(250, dmg | 0)), hs: !!hs }); },
     scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
-    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'rdoor', 'wv', 'wvhit', 'wvshot'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
+    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'wv', 'wvhit', 'wvshot'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
     qaPeers: () => [...S.peers.values()].map((p) => ({ veh: p.veh?.k || null, riderVisible: !!p.inst.group.visible, y: +p.inst.group.position.y.toFixed(2) })),
     peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk } : null; },
     list: () => [...S.peers.keys()],

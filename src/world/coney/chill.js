@@ -67,7 +67,8 @@ export function buildCrews(world, { chill = false } = {}) {
   K.spot({ pos: C.robPos, r: 3.3, dy: 2, when: () => !!C.robT, prompt: () => (C.robT?.dealer ? `F — TALK TO ${C.robT.name}` : `F — ROB ${C.robT?.name || ''}`), act: () => { const t = C.robT; if (!t) return; if (t.dealer) { t.talkT = -20; t.st = 'talk'; K.openDialog(t.name, gunShop(t.name, t.dealer, `${t.name}: "${t.type === 'ru' ? 'Bratan. You need something that goes bang? I have.' : 'Psst. You need a piece? I got a couple. Cash only.'}"`)); } else robVictim(t); } });   // no shakedowns for a minute after you respawn
   W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead' && t.type !== 'mk').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
-  ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null); });
+  ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null, m.f, !!m.h); });
+  ctx.bus.on('net:loot', (m) => { if (m.to !== ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 300)) return; K.earn(n); K.toast(`+$${n} off ${String(m.w || 'him').slice(0, 14)}`, 1800); });   // you dropped a friend's robber
   K.onUpdate((dt, playing) => update(dt, playing));
   if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d), calm: (ms = 0) => { C.calmUntil = performance.now() + ms; }, mark: (d = 4) => spawnGang('mk', 'mark', 1, d)[0]?.id, dealer: (d = 5) => { const t = spawnGang('st', 'talk', 2, d)[0]; if (t) t.dealer = ['m9', 'deagle']; return t?.id; }, robNear: (force = null) => (C.robT ? (robVictim(C.robT, force), C.robT.name) : null), fight: () => { const t = [...C.thugs.values()].find((x) => x.st !== 'dead' && x.type !== 'mk'); if (t) startFight(t); return t?.name; } };
   return C;
@@ -133,7 +134,7 @@ function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.rando
     let name = opts.name; if (!name) { do { name = T.names[Math.floor(Math.random() * T.names.length)]; } while (used.has(name) && used.size < T.names.length); } used.add(name);
     const id = C.nextId++; const m = thugModel(name, id, type); m.f.group.position.copy(at); world.scene.add(m.f.group);
     const t = { id, name, type, intent, m, pos: at, yaw: 0, st: 'walk', hp: HP, cash: 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.6 * i, said: false, talkT: 0, lk: lk + i, blade: !!m.blade };
-    for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir); ctx.raycastTargets.push(h); }
+    for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); ctx.raycastTargets.push(h); }
     C.thugs.set(id, t); out.push(t);
   }
   if (opts.cash != null) for (const t of out) t.cash = opts.cash;
@@ -147,14 +148,16 @@ function removeThug(t, map = C.thugs) {
   for (const h of t.m.hit) { const k = ctx.raycastTargets.indexOf(h); if (k > -1) ctx.raycastTargets.splice(k, 1); }
   map.delete(t.id);
 }
-function hurt(t, dmg, dir) {
+function hurt(t, dmg, dir, by = null, hs = false) {   // by: the friend's net id when their hit killed him (else it was you)
   if (t.st === 'dead') return;
   const { ctx } = C; t.hp -= dmg;
   if (dir) { t.pos.x += dir.x * 0.45; t.pos.z += dir.z * 0.45; }   // rocked back by the blow
   ctx.ai?.blood?.(t.pos.x, t.pos.z, 0.3 + Math.random() * 0.2, t.pos.y + 0.5);
   if (t.hp <= 0) {
     t.st = 'dead'; t.t = 0; t.fallK = 0; t.m.f.guard = false; t.m.f.hands = false; K.toast(`${t.name} is down`, 1200);
-    const n = t.cash + t.loot.reduce((a, b) => a + b, 0); if (n > 0) K.dropCash(t.pos.clone().add(new THREE.Vector3(0.6, 0, 0.3)), n);   // everything he had, including what he took off you
+    // whoever dropped him takes his money on the spot: what he carried + what he robbed + a street bounty
+    const n = t.cash + t.loot.reduce((a, b) => a + b, 0) + 5 * (1 + Math.floor(Math.random() * 3)) + (hs ? 10 : 0); t.cash = 0; t.loot = [];
+    if (by && by !== ctx.net?.id) ctx.net?.send?.('loot', { to: by, n, w: t.name }); else { K.earn(n); K.toast(`+$${n} off ${t.name}`, 1800); }
     ctx.ai?.blood?.(t.pos.x, t.pos.z, 1.1, t.pos.y + 0.5);
     try { chaseQA.crime(t.type === 'mk' ? 'kill' : 'crewKill'); } catch {}
     for (const o of C.thugs.values()) if (o !== t && o.st !== 'dead' && o.st !== 'flee' && o.pos.distanceTo(t.pos) < 25) { if (o.type !== 'mk' && Math.random() < 0.45) startFight(o); else flee(o); }   // his boys either scatter or go for you
@@ -176,7 +179,7 @@ function onRemoteThug(m) {
   const { ctx } = C; if (typeof m.f !== 'string' || !Number.isFinite(+m.x)) return;
   const key = m.f + ':' + m.i; let t = C.remote.get(key);
   if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 10), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru'); C.world.scene.add(mm.f.group); t = { key, id: key, type: m.k === 'st' || m.k === 'mk' ? m.k : 'ru', m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
-    for (const h of mm.hit) { h.userData.onHit = (dmg) => ctx.net?.send?.('thughit', { o: m.f, i: m.i, d: Math.round(dmg) }); ctx.raycastTargets.push(h); } C.remote.set(key, t); }
+    for (const h of mm.hit) { h.userData.onHit = (dmg, headshot) => ctx.net?.send?.('thughit', { o: m.f, i: m.i, d: Math.round(dmg), h: headshot ? 1 : 0 }); ctx.raycastTargets.push(h); } C.remote.set(key, t); }
   if (m.st === 'gone') { removeThug(t, C.remote); return; }
   t.target = new THREE.Vector3(+m.x, +m.y, +m.z); t.yaw = +m.r || 0; t.st = m.st; t.seen = performance.now();
 }
