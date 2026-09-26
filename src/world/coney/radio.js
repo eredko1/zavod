@@ -7,6 +7,8 @@ import { saveAudio } from '../../ctx.js';
 const TRACKS = [
   { src: './assets/audio/radio/adidas-from-donbass.mp3', title: 'Adidas from Donbass' },
   { src: './assets/audio/radio/gopnik-disneyland.mp3', title: 'Гопник-Диснейленд' },
+  { src: './assets/audio/radio/burbon-bratva-gudzon.mp3', title: 'Бурбон, братва, Гудзон' },
+  { src: './assets/audio/radio/olya-angliyskaya.mp3', title: 'Оля английская' },
 ];
 
 export function buildRadio(world) {
