@@ -113,8 +113,12 @@ export function buildGreens(world, M) {
   const tankTowers = [world.lunaTowers.find((t) => t === towers.find((x) => x.core)) , ...towers].filter(Boolean);
   const done = new Set();
   for (const t of [nearTower(cx0, cz0), towers[1]]) { if (!t || done.has(t) || !t.core) continue; done.add(t);
-    const k = t.core, y = k.roof?.y ?? 50, a = k.A ? k.A[0] + 4.5 : 0, c = k.C ? (k.C[0] + k.C[1]) / 2 : 0;
-    for (const da of [0, 5.2]) { const p = t.toWorld(a + da, y, c); const P = { x: p.x, z: p.z, yaw: 0 };
+    // the highest roof of this tower (the photo's tanks sit on top of the tallest wing): raycast down over its footprint
+    const rcu = new THREE.Raycaster(); rcu.firstHitOnly = true; let top = null;
+    for (let du = -18; du <= 18; du += 3) for (let dv = -18; dv <= 18; dv += 3) { const q = new THREE.Vector3(t.centre.x + du, 140, t.centre.z + dv); rcu.set(q, down); rcu.far = 150;
+      const h = rcu.intersectObjects(ctx.raycastTargets, false)[0]; if (h && h.point.y > 20 && (!top || h.point.y > top.y + 0.5)) top = h.point.clone(); }
+    if (!top) continue; const y = top.y, ax = axisOf(t), ux = Math.sin(ax), uz = Math.cos(ax);
+    for (const da of [-2.7, 2.7]) { const P = { x: top.x + ux * da, z: top.z + uz * da, yaw: 0 };
       for (const [lx, lz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) cyl(mats.steelDark, P, lx, y + 1.5, lz, 0.1, 0.1, 3, 6);
       box(mats.steelDark, P, 0, y + 3.05, 0, 3.6, 0.15, 3.6);
       cyl(mats.tankWood, P, 0, y + 5.2, 0, 1.9, 1.9, 4.2, 20);
