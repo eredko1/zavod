@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import { SCENARIOS,validateBaseline,validateRepeats,validateComparison,summarizeFrames } from '../benchmark/frame-report.js';
+import { createFrameProfiler } from '../benchmark/frame-profiler.js';
+import { validateArea,queryForArea,inNYC } from '../data/generator-area.js';
+import {cpuParts,activitySummary,gpuSampleNote} from '../benchmark/frame-chart-data.js';
+import {replayConfig} from '../benchmark/replay-config.js';
+const config={frames:3,repeats:2,modes:SCENARIOS},metadata={gpu:'test',browser:'test',canvas:[100,100],settings:{},featureIDs:['road'],assetHashes:{'/texture?version=1':'abc'},geometryCoverage:[{id:'road',bounds:[0,0,0,1,0,1]}]};
+const good={schema:2,status:'complete',inputHash:'fixture',config,runs:[0,1].map(repeat=>({repeat,metadata,summaries:Object.fromEntries(SCENARIOS.map(mode=>[mode,{frames:3,hiddenFrames:0,poseHash:mode}]))}))};
+validateBaseline(good,good);validateRepeats(good);validateComparison(good,good);
+for(const status of ['failed','running','cancelled'])assert.throws(()=>validateBaseline({...good,status},good),/complete/);
+for(const status of ['failed','running','cancelled'])assert.throws(()=>validateComparison(good,{...good,status}),/candidate must be complete/);
+assert.throws(()=>validateBaseline({...good,runs:[good.runs[0]]},good),/repeats/);
+const missing=structuredClone(good);missing.runs.forEach(r=>r.metadata.geometryCoverage=[]);assert.throws(()=>validateComparison(good,missing),/geometryCoverage/);validateComparison(good,missing,true);
+const drift=structuredClone(good);drift.runs[1].summaries.idle.poseHash='different';assert.throws(()=>validateRepeats(drift),/drift/);
+const p=createFrameProfiler({getContext:()=>({getExtension:()=>null,isContextLost:()=>false})});p.start();for(let i=0;i<20002;i++){p.beginFrame();p.endFrame({});}assert.equal((await p.stop()).frames.length,20002);
+const summary=await summarizeFrames({frames:[{phase:'walk-turn',rendered:true,cpu:{loop:2},gpuMs:null,gpuStatus:'unsupported',pose:{position:[0,0,0],quaternion:[0,0,0,1],yaw:0,pitch:0},resources:[],visible:true,intervalMs:null}]},'walk-turn');assert.equal(summary.gpu.samples,0);assert.equal(summary.gpu.p95,null);
+assert.throws(()=>validateArea({south:60,north:40,west:-1,east:0}),/bounds/);assert.throws(()=>validateArea({south:40,north:41,west:-1,east:0}),/5 km/);assert.equal(inNYC({south:51,north:51.001,west:0,east:.001}),false);assert.match(queryForArea({south:51,north:51.001,west:0,east:.001}),/nwr\(51,0,51.001,0.001\)/);
+console.log('PASS complete baselines, repeat identity, visible geometry comparisons, maximum replay capacity, null GPU timings and arbitrary area validation');
+const frame=(loop,ground,collision,simulation)=>({phase:'walk-turn',cpu:{loop,controls:1,ground,collision,simulation,renderSubmit:2},rendered:true,gpuMs:null});
+const samples=Array.from({length:20},(_,i)=>frame(i+8,1,2,i+3)),charts={runs:[{raw:{frames:samples}}]};
+assert.deepEqual(cpuParts(samples[0]),[1,1,2,0,2,2]);
+const bar=activitySummary(charts,'walk-turn');assert.equal(bar.cpu,26);assert.equal(bar.parts.reduce((a,b)=>a+b,0),bar.cpu,'stack adds up to one actual measured frame');assert.equal(bar.gpu.p95,null,'missing GPU is not a zero-height measurement');
+assert.equal(activitySummary(charts,'idle').cpu,null);console.log('PASS exclusive CPU stacks, representative p95 frame and missing chart timings');
+assert.throws(()=>replayConfig({modes:['idle:warmup']},{'idle:warmup':true}),/identifiers/);
+assert.throws(()=>replayConfig({modes:['first-draw']},{'first-draw':true}),/identifiers/);
+assert.throws(()=>replayConfig({frames:5000,warmup:0,modes:['a','b','c','d','e']},{a:true,b:true,c:true,d:true,e:true}),/frame count/);
+const versioned={...good,scenarioVersions:{idle:1}};assert.throws(()=>validateBaseline(versioned,{...versioned,scenarioVersions:{idle:2}}),/scenarioVersions/);
+const partial=structuredClone(good);partial.runs[0].summaries.idle.gpu={samples:2};partial.runs[0].summaries.idle.rendered=3;assert.throws(()=>validateComparison(partial,partial),/GPU sample coverage/);
+console.log('PASS versioned scenarios, reserved phase names, capture capacity and partial GPU comparison rejection');
+for(const status of ['disjoint','timeout','queue-full']){const empty=structuredClone(partial);empty.runs[0].summaries.idle.gpu={samples:0};empty.runs[0].summaries.idle.gpuStatus={[status]:3};assert.throws(()=>validateComparison(empty,empty),/GPU sample coverage/);}
+console.log('PASS zero-sample failed GPU captures cannot be compared');
+for(const [key,value] of [['viewport',[500,400]],['devicePixelRatio',2]]){
+  const changed=structuredClone(good);changed.runs.forEach(r=>r.metadata[key]=value);assert.throws(()=>validateComparison(good,changed),new RegExp(key));
+  changed.runs[1].metadata={...changed.runs[1].metadata,[key]:null};assert.throws(()=>validateRepeats(changed),new RegExp(key));
+}
+console.log('PASS viewport and pixel-ratio environment changes invalidate comparisons');
+const gpuReport=statuses=>({runs:[{raw:{frames:statuses.map(gpuStatus=>({...frame(3,0,0,0),gpuStatus,gpuMs:gpuStatus==='valid'?5:null}))}}]});
+assert.equal(gpuSampleNote(activitySummary({runs:[]},'idle')),'No redraws');
+const unsupported=activitySummary(gpuReport(['unsupported','unsupported']),'walk-turn');
+assert.equal(unsupported.gpu.p95,null);assert.match(gpuSampleNote(unsupported),/0\/2 draws timed · 2 GPU timers unsupported/);
+const partialTimers=activitySummary(gpuReport(['valid','disjoint','timeout']),'walk-turn');
+assert.equal(partialTimers.gpu.p95,5);assert.match(gpuSampleNote(partialTimers),/1\/3 draws timed · 1 GPU timer invalidated; 1 timer results timed out/);
+console.log('PASS no redraws distinguished from unsupported and failed GPU timers');

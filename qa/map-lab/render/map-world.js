@@ -1,0 +1,108 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GEOMETRY_DEFAULTS, FEATURE_GROUPS } from '../pipeline/map-pipeline.js';
+import { MOVEMENT } from './movement.js';
+import { dispose } from './osm-meshes.js';
+import { move, spawn, blocked } from './osm-walk.js';
+import { compileMap } from '../pipeline/map-build.js';
+import { objectVisible } from './map-surface-index.js';
+import { sourceVisible, setFeatureVisibility } from './feature-visibility.js';
+import { placeSurfaceProps } from './prop-placement.js';
+
+export function createMapWorld({ canvas, viewport, onInspect = () => {}, onError = () => {}, onMode = () => {} }) {
+const events = new AbortController(), listen = (target,type,fn) => target.addEventListener(type,fn,{signal:events.signal});
+let selection = {data:null,nyc:[]}, settings = {...GEOMETRY_DEFAULTS};
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xe5e9e7);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x919b92, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(-100, 200, 80); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.08, 20000), orbit = new OrbitControls(camera, canvas); orbit.enableDamping = true; orbit.maxPolarAngle = Math.PI * 0.495;
+camera.position.set(150, 220, 260); orbit.update();
+let plan = null, world = null, reference = null, mode = 'orbit', yaw = 0, pitch = 0, last = performance.now();
+let terrain = null, resolved = null, surfaces = null, needsRender = true;
+let hiddenOSM = new Set(), suspended = false, running = false;
+orbit.addEventListener('change', () => { needsRender = true; });
+const keys = new Set(), ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function rendered() { return plan?.buildings.filter(b => b.extrude && !b.suppressed && !b.failed) || []; }
+function message() { onMode(mode, mode === 'walk' ? `${document.pointerLockElement === canvas ? 'Mouse to look' : 'Click the world to look'} · WASD walk · Shift run · Esc release · Eye height 1.7 m` : 'Orbit: drag to rotate · Right drag to pan · Scroll to zoom · North is −Z'); }
+function fit(top = false) {
+  if (!plan) return; document.exitPointerLock?.(); mode = 'orbit'; keys.clear(); orbit.enabled = true;
+  const b = plan.bounds, x = (b.x0 + b.x1) / 2, z = (b.z0 + b.z1) / 2, height = Math.max(0, ...rendered().map(b => b.height.top));
+  const span = Math.max(b.x1 - b.x0, b.z1 - b.z0, height, 40), d = span / Math.min(camera.aspect, 1);
+  camera.up.set(0, 1, 0); orbit.target.set(x, 0, z); camera.position.set(x + (top ? 0 : d * 0.55), d * (top ? 1.3 : 0.85), z + (top ? 0.001 : d * 0.75)); orbit.update(); message();
+}
+function respawn() { if (!plan) return; const [x, z] = spawn(plan); camera.position.set(x, groundAt(x, z) + MOVEMENT.eye, z); yaw = 0; pitch = 0; camera.rotation.set(0, 0, 0, 'YXZ'); }
+async function lock() { try { await canvas.requestPointerLock(); } catch (e) { onError(`Mouse capture failed: ${e.message}. Click the world to retry.`); } }
+function walk({capture=true} = {}) { if (!plan) return; if (mode !== 'walk') respawn(); mode = 'walk'; orbit.enabled = false; keys.clear(); canvas.focus(); message(); if(capture)lock(); }
+function coverageSummary() { return (plan?.coverage || []).reduce((out, c) => { out[c.status] = (out[c.status] || 0) + 1; return out; }, {}); }
+function groundAt(x, z) {
+  return surfaces?.sample(x, z) ?? terrain?.sample(x, z) ?? 0;
+}
+function applyVisibility() {
+  if (!resolved || !world) return;
+  const visible = f => sourceVisible(f,selection.nyc)&&!hiddenOSM.has(f.id);
+  const active = new Set();
+  for (const key of FEATURE_GROUPS) { plan[key] = resolved[key].filter(visible); for (const f of plan[key]) active.add(f.id); }
+  setFeatureVisibility(world.group,f=>active.has(f.id));
+  plan.coverage = resolved.coverage.map(c => !active.has(c.id) && ['rendered','reference'].includes(c.status) && resolved.geometryIDs.has(c.id) ? { ...c, status: 'hidden', reason: 'Resolved geometry source is hidden; merge result is unchanged.' } : { ...c });
+  needsRender = true;
+}
+function loadResult(result, options = {}, mark = () => {}) {
+  const nextSelection={...result,nyc:result.nyc||[]},nextSettings={...GEOMETRY_DEFAULTS,...options};
+  if (!result.data?.elements?.length && !nextSelection.nyc.length) throw Error('No source data to generate.');
+  const built = compileMap(nextSelection,nextSettings,mark);
+  const {plan:next,world:mesh,reference:ref,terrain:nextTerrain,surfaces:nextSurfaces}=built;
+  if (world) { scene.remove(world.group); dispose(world.group); } if (reference) { scene.remove(reference); dispose(reference); }
+  selection=nextSelection;settings=nextSettings;hiddenOSM=new Set(result.hiddenOSM||[]);
+  plan = next; world = mesh; reference = ref; terrain = nextTerrain; surfaces = nextSurfaces; plan.groundSample = (x,z)=>api.groundAt(x,z); scene.add(world.group, reference); scene.updateMatrixWorld(true);
+  resolved = { buildings: next.buildings, roads: next.roads, details: next.details, coverage: next.coverage.map(c => ({ ...c })), geometryIDs: new Set([...next.buildings,...next.roads,...next.details].map(f => f.id)) }; applyVisibility();
+  fit(); mark('sceneSwap');
+}
+listen(document,'pointerlockchange', () => { keys.clear(); message(); }); listen(window,'blur', () => keys.clear());
+listen(document,'mousemove', e => { if (mode !== 'walk' || document.pointerLockElement !== canvas) return; yaw -= e.movementX * 0.002; pitch = Math.max(-1.5, Math.min(1.5, pitch - e.movementY * 0.002)); camera.rotation.set(pitch, yaw, 0, 'YXZ'); });
+listen(document,'keydown', e => { if (mode === 'walk' && document.pointerLockElement === canvas && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) { keys.add(e.code); e.preventDefault(); } });
+listen(document,'keyup', e => keys.delete(e.code));
+let down = null;
+listen(canvas,'pointerdown', e => { down = [e.clientX, e.clientY]; });
+listen(canvas,'click', e => {
+  if (!world) return; if (mode === 'walk') { if (document.pointerLockElement !== canvas) lock(); return; }
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+  const rect = canvas.getBoundingClientRect(); mouse.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1); ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(world.selectable.filter(objectVisible), false)[0]; if (!hit) return;
+  onInspect(hit.object.userData.features?.[hit.instanceId] || hit.object.userData.feature);
+});
+const observer = new ResizeObserver(() => { const r = viewport.getBoundingClientRect(); if (!r.width || !r.height) return; renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); needsRender = true; }); observer.observe(viewport);
+function simulate(dt, input) {
+  if (!plan) return;
+  let x = input?.x ?? (+keys.has('KeyD') - +keys.has('KeyA')), z = input?.z ?? (+keys.has('KeyS') - +keys.has('KeyW')), norm = Math.hypot(x,z);
+  if (norm) { const speed = input?.speed ?? (keys.has('ShiftLeft') || keys.has('ShiftRight') ? MOVEMENT.run : MOVEMENT.walk); x *= speed*dt/norm; z *= speed*dt/norm; move(camera.position,x*Math.cos(yaw)+z*Math.sin(yaw),-x*Math.sin(yaw)+z*Math.cos(yaw),plan,(x,z)=>api.collision(x,z,api.groundAt(x,z))); }
+  camera.position.y = api.groundAt(camera.position.x,camera.position.z)+MOVEMENT.eye;
+}
+function controls() { if(mode==='orbit')orbit.update(); }
+function draw() { renderer.render(scene,camera);needsRender=false; }
+function frame(dt,input=null) { api.controls();const movement=typeof input==='function'?input():input;if(mode==='walk'&&(movement||document.pointerLockElement===canvas))api.simulate(dt,movement);if(needsRender||mode==='walk')api.draw(); }
+function tick() {
+  if (suspended) return;
+  try {
+  const now = performance.now(), dt = Math.min((now - last) / 1000, MOVEMENT.maxDt); last = now;
+  frame(dt);
+  } catch (e) { suspended = true; onError(e.message); }
+}
+function start() { if(running)return;running=true;last=performance.now();renderer.setAnimationLoop(tick); }
+function stop() { running=false;renderer.setAnimationLoop(null); }
+const api = {
+  loadResult, applyVisibility, scene, camera, renderer, fit, walk, respawn, start, stop, frame, controls, simulate, draw,
+  collision: (x,z,ground)=>blocked(x,z,plan,undefined,ground),
+  look(angle,tilt) {yaw=angle;pitch=tilt;camera.rotation.set(pitch,yaw,0,'YXZ');},
+  capturePose: ()=>({position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),yaw,pitch}),
+  invalidate: ()=>{needsRender=true;},
+  get plan() { return plan; }, get settings() {return settings;}, get selection() {return selection;},
+  stats: () => ({ buildings:rendered().length, roads:plan?.roads.length || 0, details:plan?.details.length || 0, coverage:coverageSummary(), merge:plan?.merge?.summary || null, errors:plan?.issues.filter(i=>i.severity==='error').length || 0, mode, position:camera.position.toArray(), drawCalls:renderer.info.render.calls, nyc:Object.fromEntries(selection.nyc.map(s=>[s.sourceId,{features:s.data.features.length,visible:s.visible!==false}])), terrain:terrain ? {active:terrain.active,samples:terrain.samples.length,datum:terrain.datum,min:terrain.min,max:terrain.max}:null }),
+  getTerrain: () => terrain, groundAt, getWorld: () => world,
+  setSourceVisible(id, value) { const s=selection.nyc.find(s=>s.sourceId===id); if(s&&s.visible!==value){s.visible=value;applyVisibility();if(['nyc-roadbed','nyc-sidewalk','nyc-median'].includes(id))placeSurfaceProps(world.group,terrain,surfaces,plan.issues);} },
+  setPosition(x,z,angle=0) {camera.position.set(x,groundAt(x,z)+MOVEMENT.eye,z);yaw=angle;pitch=0;camera.rotation.set(0,yaw,0,'YXZ');},
+  suspend(value) { suspended=value; keys.clear(); if(value && document.pointerLockElement===canvas)document.exitPointerLock(); if(!value){last=performance.now();needsRender=true;} },
+  dispose() { stop();events.abort(); observer.disconnect(); orbit.dispose(); if(world)dispose(world.group); if(reference)dispose(reference); renderer.dispose(); },
+};
+start();return api;
+}

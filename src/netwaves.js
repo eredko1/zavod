@@ -63,7 +63,7 @@ export async function init(ctx) {
   bus.on('net:wvhit', (m) => onHit(m));
   bus.on('net:wvshot', (m) => onShot(m));
   bus.on('net:wvkill', (m) => onKill(m));
-  bus.on('net:wvmsg', (m) => { if (m?.x === 'clear') ctx.hud?.toast?.('ALL WAVES CLEARED — THEY REGROUP', 3000); });
+  bus.on('net:wvmsg', (m) => { if (m?.f === N.hostId && m.x === 'clear') ctx.hud?.toast?.('ALL WAVES CLEARED — THEY REGROUP', 3000); });
   bus.on('netEnemyKilled', (d) => { if (N.host && d?.soldier?.wid) broadcastKill(d.soldier.wid, d.by, d.headshot); });
   bus.on('enemyKilled', (d) => { if (N.host && d?.wave && d.soldier?.wid) { N.killsSeen.add(d.soldier.wid); broadcastKill(d.soldier.wid, net.id, d.headshot, true); } });
   bus.on('playerRespawn', () => {
@@ -341,6 +341,7 @@ function broadcastKill(wid, by, hs, hostLocal = false) {
 function onWv(m) {
   if (!N || !m || !ID_RE.test(m.f) || !Array.isArray(m.s)) return;
   const now = performance.now(), f = m.f;
+  if (!eligible(f) || (!N.host && hostFresh(now) && f !== N.hostId)) return;
   if (N.host) { if (f < N.net.id && eligible(f)) resign('yield to ' + f); else return; }
   if (N.hostId !== f) console.log('[netwaves] host is', f);
   N.hostId = f; N.hostSeen = now; N.lastWv = now;
@@ -376,21 +377,22 @@ function hitPuppet(wid, dmg, hs) {
 }
 function onHit(m) {
   if (!N?.host || !m || !ID_RE.test(m.f)) return;
+  const p = N.net.peer(m.f); if (!p || p.dead || p.afk) return;
   const s = N.byWid.get(m.id); if (!s || s.dead) return;
   const dmg = Math.max(0, Math.min(250, +m.dmg || 0)); if (!dmg) return;
-  const p = N.net.peer(m.f); const tgt = p && !p.dead ? proxyFor(m.f) : null; if (tgt && p) tgt.position.copy(p.pos);
+  const tgt = proxyFor(m.f); if (tgt) tgt.position.copy(p.pos);
   N.ai.netDamage(s, dmg, !!m.hs, m.f, tgt);
 }
 function onShot(m) {
-  if (!N || !m || m.to !== N.net.id || !(m.f === N.hostId || N.net.peer(m.f))) return;
+  if (!N || !m || m.to !== N.net.id || m.f !== N.hostId) return;
   const me = N.ctx.player; if (!me || me.dead || localAfk() || performance.now() < N.protUntil) return;
   const dmg = Math.max(0, Math.min(200, +m.dmg || 0)); if (!dmg) return;
-  const p = Array.isArray(m.p) ? m.p.map((v) => num(v, 20000)) : null;
+  const p = Array.isArray(m.p) && m.p.length === 3 ? m.p.map((v) => num(v, 20000)) : null;
   N.shotsTaken++; N.dmgTaken += dmg;
   me.damage(dmg, p && !p.some(Number.isNaN) ? new THREE.Vector3(p[0], p[1], p[2]) : null);
 }
 function onKill(m) {
-  if (!N || !m) return; const wid = m.id | 0; if (!wid || N.killsSeen.has(wid)) return; N.killsSeen.add(wid);
+  if (!N || !m || m.f !== N.hostId) return; const wid = m.id | 0; if (!wid || N.killsSeen.has(wid)) return; N.killsSeen.add(wid);
   if (N.killsSeen.size > 800) N.killsSeen = new Set([...N.killsSeen].slice(-400));
   const k = ID_RE.test(m.k) ? m.k : null, hs = !!m.hs, ctx = N.ctx, me = N.net.id;
   N.killLog.push({ id: wid, k, hs }); if (N.killLog.length > 60) N.killLog.shift();

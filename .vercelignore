@@ -1,5 +1,7 @@
 node_modules
-qa/shots
-qa/blind
-qa/refs
+.tmp/
+qa/shots/
+qa/blind/
+qa/refs/
+qa/map-lab/tests/fixtures/
 .git
