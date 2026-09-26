@@ -464,8 +464,8 @@ function buildSettings(H) {
   slider('Sensitivity', 0.5, 15, 0.1, () => Math.round(S.sensitivity / 0.00044 * 10) / 10, (v) => { S.sensitivity = v * 0.00044; }, (v) => v.toFixed(1));
   slider('ADS sensitivity', 0.2, 1.5, 0.05, () => S.adsSensitivityMul, (v) => { S.adsSensitivityMul = v; }, (v) => `${v.toFixed(2)}×`);
   h4('Graphics');
-  for (const [key, label] of [['shadows', 'Shadows'], ['rain', 'Rain'], ['motionBlur', 'Motion blur'], ['ssr', 'Reflections (SSR)'], ['ao', 'Ambient occlusion'], ['bloom', 'Bloom'], ['dof', 'Depth of field'], ['filmGrain', 'Film grain']])
-    cycle(label, [false, true], () => !!S[key], (v) => { S[key] = v; ctx.bus.emit('setting', { key, value: v }); }, true);
+  for (const [key, label] of [['shadows', 'Shadows'], ['rain', 'Rain'], ['motionBlur', 'Motion blur'], ['ssr', 'Reflections (SSR)'], ['ao', 'Ambient occlusion'], ['bloom', 'Bloom'], ['dof', 'Depth of field'], ['filmGrain', 'Film grain'], ['filmLook', 'Film look (Luna Park)']])
+    cycle(label, [false, true], () => (key === 'filmLook' ? S[key] !== false : !!S[key]), (v) => { S[key] = v; ctx.bus.emit('setting', { key, value: v }); }, true);
   const tod = ctx.world?.tod;
   if (tod) { h4('World'); cycle('Time of day', tod.options, () => tod.get(), (v) => tod.set(v), false); }
   h4('Audio');

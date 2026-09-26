@@ -174,6 +174,7 @@ export function reset(ctx) {
 
 const GRADES = {
   night: { contrast: 1.08, saturation: 0.95, lift: [0.005, 0.009, 0.015], gain: [1.0, 0.99, 0.97], shadowTint: [0.86, 0.96, 1.10], highlightTint: [1.08, 1.0, 0.90], split: 0.55, vignette: 0.3, grain: 0.035, ca: 0.006, bloomThreshold: 1.6, bloomStrength: 0.45, ao: 0.85 },
+  lunafilm: { contrast: 0.9, saturation: 0.84, lift: [0.05, 0.04, 0.038], gain: [1.05, 1.0, 0.94], shadowTint: [1.02, 0.97, 0.95], highlightTint: [1.09, 1.0, 0.9], split: 0.4, vignette: 0.24, grain: 0.03, ca: 0.004, bloomThreshold: 1.5, bloomStrength: 0.46, ao: 0.95 },   // the aerial photo: warm, hazy, milky blacks
   day:   { contrast: 1.06, saturation: 1.04, lift: [0.0, 0.0, 0.0],       gain: [1.0, 1.0, 1.0],     shadowTint: [0.97, 0.99, 1.03], highlightTint: [1.03, 1.0, 0.96], split: 0.22, vignette: 0.16, grain: 0.02, ca: 0.004, bloomThreshold: 2.2, bloomStrength: 0.3, ao: 1.0 },
 };
 function applyGrade(S, name) {
@@ -247,7 +248,7 @@ function render(S, dt, ctx) {
   S.dof.enabled = dofAmt > 0.02; S.dofU.uAmount.value = dofAmt;
 
   // ---- grade preset per map (night: teal/sodium split-tone; day: neutral filmic) ----
-  const wantGrade = ctx.world?.grade || 'night';
+  const wantGrade = (ctx.settings.filmLook !== false && ctx.world?.filmGrade) || ctx.world?.grade || 'night';
   if (S.gradeName !== wantGrade) { S.gradeName = wantGrade; applyGrade(S, wantGrade); }
   // ---- grade dynamics ----
   const g = S.gU;

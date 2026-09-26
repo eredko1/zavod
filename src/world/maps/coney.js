@@ -15,6 +15,7 @@ import { buildHangout, hangoutQA } from '../coney/hangout.js';
 import { buildChase } from '../coney/chase.js';
 import { buildBelt } from '../coney/belt.js';
 import { buildSubway } from '../coney/subway.js';
+import { buildGreens } from '../coney/greens.js';
 import { buildRadio } from '../coney/radio.js';
 import { OSM, PLAY } from '../coney/osm.js';
 import { bbox, segDist, pip } from '../osmkit.js';
@@ -44,7 +45,9 @@ export function build(world) {
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
   try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
-  try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
+  try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
+  Object.defineProperty(W, 'filmGrade', { get: () => (/night|dusk/i.test(W.tod?.get?.() || '') ? null : 'lunafilm'), configurable: true });   // the aerial-photo grade by day (Settings → Film look)
+  try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
   try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
   // the map (src/minimap.js): street centrelines, street names, points of interest
   W.mapRoads = OSM.r.map((r) => ({ p: r.p, w: r.w }));
