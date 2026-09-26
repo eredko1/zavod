@@ -623,7 +623,7 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
       const np = Math.max(1, Math.round((s1 - s0) / 2.4));
       for (let k = 0; k <= np; k++) { const a = s0 + (s1 - s0) * k / np; const p0 = Pp(a - 0.035, 0), p1 = Pp(a + 0.035, 1.12); loc.box('hRail', [Math.min(p0[0], p1[0]) - (r.axis === 'z' ? 0.035 : 0), 0, Math.min(p0[2], p1[2]) - (r.axis === 'x' ? 0.035 : 0)], [Math.max(p0[0], p1[0]) + (r.axis === 'z' ? 0.035 : 0), 1.12, Math.max(p0[2], p1[2]) + (r.axis === 'x' ? 0.035 : 0)], { collide: false }); }
       const c0 = Pp(s0, 0), c1 = Pp(s1, 1.05); const w = 0.06;
-      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)], 0.3);   // fine cells: coarse ones bulged across the openings
+      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)], 1.0);   // 1 m cells: coarse (4 m) ones bulged across the openings
     }
   }
   // fences + grass go to the ground batch (fence geometry is alpha, keep it out of shadows too)

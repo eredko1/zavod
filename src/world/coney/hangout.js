@@ -356,13 +356,18 @@ function buildDurakPark() {
   add(new THREE.BoxGeometry(1.9, 0.06, 0.45), M(0x2e5a3a, 0.8), 3.2, 0.45, -2.6); add(new THREE.BoxGeometry(1.9, 0.4, 0.06), M(0x2e5a3a, 0.8), 3.2, 0.7, -2.82);   // a bench
   add(new THREE.CylinderGeometry(0.07, 0.1, 4.6, 8), M(0x1c1c1c, 0.5, 0.6), -3.6, 2.3, -3.2); add(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshStandardMaterial({ color: 0xfff2d0, emissive: 0xffe0a0, emissiveIntensity: 0.7 }), -3.6, 4.7, -3.2);
   for (const [x, z] of [[-3.4, 3], [3.6, 2.8]]) { add(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 7), M(0x4a3a2a, 1), x, 1.1, z); add(new THREE.SphereGeometry(1.4, 10, 8), M(0x3f5f30, 1), x, 3.1, z); }
+  { // draw calls: bake the park's static pieces into one mesh per material
+    const by = new Map(); for (const ch of [...g.children]) { if (!ch.isMesh) continue; ch.updateMatrix(); const geo = (ch.geometry.index ? ch.geometry.toNonIndexed() : ch.geometry.clone()).applyMatrix4(ch.matrix);
+      if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+      (by.get(ch.material) || by.set(ch.material, []).get(ch.material)).push(geo); g.remove(ch); }
+    for (const [m, list] of by) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; me.receiveShadow = true; g.add(me); } }
   g.updateMatrixWorld(true);
   { const w = c; world.box([w.x - 0.55, 0, w.z - 0.55], [w.x + 0.55, 0.8, w.z + 0.55]); }
   // ARKASHA: late 30s, black hair, blue eyes, glasses — on the far stool, facing the table
   const pf = buildPerson({ avatar: 'm02', pose: 'sit', glasses: 'clear', seed: 2 }); g.add(pf.group); pf.group.position.set(0, 0, -1.05); pf.group.rotation.y = 0;
   world.updaters.push((dt) => pf.update(dt, 0));
   // his Manhattan (a coupe of amber rye with a cherry) on the table, and a lit spliff between his fingers
-  { const glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transmission: 0.9, transparent: true, opacity: 0.35, thickness: 0.2 });
+  { const glass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.3, depthWrite: false });   // NOT transmission: that re-renders the whole scene every frame
     const stem = add(new THREE.CylinderGeometry(0.004, 0.004, 0.09, 8), glass, 0.22, 0.83, -0.42); stem.castShadow = false;
     add(new THREE.CylinderGeometry(0.03, 0.03, 0.004, 16), glass, 0.22, 0.787, -0.42);
     add(new THREE.CylinderGeometry(0.052, 0.01, 0.05, 16, 1, true), glass, 0.22, 0.9, -0.42);

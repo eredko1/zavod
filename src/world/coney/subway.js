@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { OSM } from './osm.js';
 import { W8 } from './w8th.js';
 import { hangkit as K } from '../hangkit.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const CAR = 18.4, NCAR = 6, LEN = CAR * NCAR, RAIL = 7.5, FLOOR = 1.1;   // car floor = platform height above top of rail
 const VMAX = 13, ACC = 1.1, DWELL = { STW: 30, W8: 20, NEP: 30 };
@@ -151,7 +152,15 @@ function buildTrain(scene) {
       for (const sx of [-1, 1]) { add(new THREE.CircleGeometry(0.12, 12), hl, sx * 0.95, FLOOR + 0.55, e + Math.sign(e) * 0.03, true).rotation.y = e > 0 ? 0 : Math.PI;
         add(new THREE.CircleGeometry(0.06, 10), new THREE.MeshStandardMaterial({ color: 0x44ff66, emissive: 0x33ff55, emissiveIntensity: 1.2 }), sx * 1.2, FLOOR + 2.95, e + Math.sign(e) * 0.03, true).rotation.y = e > 0 ? 0 : Math.PI; }
       const sgn = add(new THREE.PlaneGeometry(1.5, 0.32), new THREE.MeshStandardMaterial({ map: destTex(), emissive: 0xffffff, emissiveMap: destTex(), emissiveIntensity: 0.9 }), 0.2, FLOOR + 2.5, e + Math.sign(e) * 0.03, true); sgn.rotation.y = e > 0 ? 0 : Math.PI; }
-    g.userData.doors = []; g.traverse((o) => { if (o.userData.door) g.userData.doors.push(o); });
+    g.userData.doors = [];
+    // draw calls: bake every static piece into one mesh per material, the door leaves into four sliding groups (side × direction)
+    { const stat = new Map(), doors = new Map(); g.updateMatrix();
+      for (const ch of [...g.children]) { if (!ch.isMesh) continue; ch.updateMatrix(); const geo = (ch.geometry.index ? ch.geometry.toNonIndexed() : ch.geometry.clone()).applyMatrix4(ch.matrix);
+        if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+        const key = ch.userData.door ? `${ch.userData.door.sx}|${ch.userData.door.dir}` : null; const map = key ? doors : stat, k = key || ch.material.uuid;
+        if (!map.has(k)) map.set(k, { m: ch.material, list: [], door: ch.userData.door, shadow: ch.castShadow }); map.get(k).list.push(geo); g.remove(ch); }
+      for (const { m, list, shadow } of stat.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.receiveShadow = true; g.add(me); }
+      for (const { m, list, door } of doors.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; me.userData.door = { sx: door.sx, dir: door.dir, z: 0 }; g.add(me); g.userData.doors.push(me); } }
     cars.push(g);
   }
   return cars;
@@ -286,10 +295,12 @@ function buildNeptune(world, P, sNep) {
   (W.zones || (W.zones = [])).push({ x0: Math.min(c0.x, c1.x) - 160, x1: Math.max(c0.x, c1.x) + 160, z0: c0.z - 180, z1: c0.z + 400, name: 'NEPTUNE AV · SHELL RD', hint: 'the F back to Coney' });
   const S = (c, r = 0.8, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
   const conc = S(0xa9a59c, 0.9), edge = S(0xf2c418, 0.7), steel = S(0x3f5a47, 0.6, 0.4), roofM = S(0x5b6168, 0.5, 0.6), asph = S(0x39393b, 0.95), walk = S(0x9d998f, 0.9);
-  // a rotated box: a mesh + collider cells (0.5 m) so the rotated floors stay walkable and the gaps stay open
-  const rbox = (m, a0, a1, o0, o1, y0, y1, { collide = true, walkable = false } = {}) => {
-    const g = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0); const me = new THREE.Mesh(g, m); me.position.copy(at((a0 + a1) / 2, (o0 + o1) / 2, (y0 + y1) / 2)); me.rotation.y = ang; me.castShadow = true; me.receiveShadow = true; scene.add(me);
-    if (!collide) return me;
+  // a rotated box: merged geometry + collider cells (0.5 m) so the rotated floors stay walkable and the gaps stay open
+  const GM = new Map();
+  const rbox = (m, a0, a1, o0, o1, y0, y1, { collide = true, walkable = false, coarse = false } = {}) => {
+    const g = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0).toNonIndexed(); g.rotateY(ang); const c = at((a0 + a1) / 2, (o0 + o1) / 2, (y0 + y1) / 2); g.translate(c.x, c.y, c.z); (GM.get(m) || GM.set(m, []).get(m)).push(g);   // merged per material below
+    const me = null; if (!collide) return me;
+    if (coarse) { const cs = [at(a0, o0, 0), at(a1, o0, 0), at(a0, o1, 0), at(a1, o1, 0)]; world.box([Math.min(...cs.map((q) => q.x)), y0, Math.min(...cs.map((q) => q.z))], [Math.max(...cs.map((q) => q.x)), y1, Math.max(...cs.map((q) => q.z))]); return me; }   // buildings: one box, nobody walks inside
     const cell = 0.6, na = Math.max(1, Math.ceil((a1 - a0) / cell)), no = Math.max(1, Math.ceil((o1 - o0) / cell));
     for (let i = 0; i < na; i++) for (let j = 0; j < no; j++) { const pa = at(a0 + (i + 0.5) * (a1 - a0) / na, o0 + (j + 0.5) * (o1 - o0) / no, 0), h = 0.36; const mn = [pa.x - h, y0, pa.z - h], mx = [pa.x + h, y1, pa.z + h]; walkable ? world.walkable(mn, mx) : world.box(mn, mx); }
     return me;
@@ -313,8 +324,9 @@ function buildNeptune(world, P, sNep) {
   const plane = (m, a0, a1, o0, o1, yy) => { const g = new THREE.PlaneGeometry(o1 - o0, a1 - a0); g.rotateX(-Math.PI / 2); const me = new THREE.Mesh(g, m); me.position.copy(at((a0 + a1) / 2, (o0 + o1) / 2, yy)); me.rotation.y = ang; me.receiveShadow = true; scene.add(me); };
   plane(asph, -260, 260, -10, 10, 0.03); plane(walk, -260, 260, -14, -10, 0.05); plane(walk, -260, 260, 10, 14, 0.05);
   { const g = new THREE.PlaneGeometry(260, 18); g.rotateX(-Math.PI / 2); const me = new THREE.Mesh(g, asph); me.position.set(c0.x, 0.035, NEP_Z); me.receiveShadow = true; scene.add(me); }   // Neptune Ave (E–W)
-  const fac = facadeTex();
-  for (const s of [-1, 1]) for (let a = -200; a < 220; a += 13 + ((a * 7) % 5)) { if (Math.abs(at(a, 0, 0).z - NEP_Z) < 16) continue; const h = 7 + ((a * 13) % 7); rbox(new THREE.MeshStandardMaterial({ map: fac, color: [0xb88a70, 0xd8c7a6, 0x9c5a44, 0xc9c1b0][((a / 13) | 0) & 3], roughness: 0.9 }), a, a + 12, s * 15, s * 27, 0, h); }
+  const fac = facadeTex(), facM = [0xb88a70, 0xd8c7a6, 0x9c5a44, 0xc9c1b0].map((c) => new THREE.MeshStandardMaterial({ map: fac, color: c, roughness: 0.9 }));
+  for (const s of [-1, 1]) for (let a = -200; a < 220; a += 13 + ((a * 7) % 5)) { if (Math.abs(at(a, 0, 0).z - NEP_Z) < 16) continue; const h = 7 + ((a * 13) % 7); rbox(facM[((a / 13) | 0) & 3], a, a + 12, s * 15, s * 27, 0, h, { coarse: true }); }
+  for (const [m, list] of GM) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; me.receiveShadow = true; scene.add(me); }
   // arrival: coming up the stairs at street level shows the POI; a subtle lamp at each stair foot
   R.nep = { at, plat, O0, O1 };
 }

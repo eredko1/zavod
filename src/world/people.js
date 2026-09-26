@@ -55,7 +55,7 @@ function cleanClip(c) {
 function prepAvatar(gltf, ctx) {
   const root = gltf.scene;
   root.traverse((o) => {
-    if (!o.isMesh) return; o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+    if (!o.isMesh) return; o.castShadow = !ctx.isTouch; o.receiveShadow = true; o.frustumCulled = true;   // culled off-screen (padded sphere below); no shadow casting on phones
     const m = o.material; m.roughness = 0.78; m.metalness = 0; m.envMapIntensity = 0.55;
     if (/opacity/i.test(m.name)) { m.transparent = false; m.alphaTest = 0.45; m.side = THREE.DoubleSide; m.depthWrite = true; }   // hair cards, lashes
   });
@@ -87,6 +87,7 @@ export function buildPerson(o = {}) {
   const group = new THREE.Group(); group.name = 'person';
   const inner = new THREE.Group(); inner.rotation.y = -A.yawFix; inner.position.y = -A.footY; group.add(inner);
   const model = SkeletonUtils.clone(A.root); inner.add(model);
+  model.traverse((o) => { if (o.isSkinnedMesh) { try { o.computeBoundingSphere(); o.boundingSphere.radius = Math.max(1.4, o.boundingSphere.radius * 1.6); } catch { o.frustumCulled = false; } } });   // animated limbs stay inside
   const bones = {}; model.traverse((b) => { if (b.isBone) bones[b.name.replace(/^Bip01_?/, '').replace(/_/g, ' ').trim()] = b; });
   const B = (n) => bones[n] || bones[n.replace(/ /g, '')];
   const arm = (s) => ({ up: B(`${s} UpperArm`), fore: B(`${s} Forearm`), hand: B(`${s} Hand`), cl: B(`${s} Clavicle`) });
