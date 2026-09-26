@@ -478,7 +478,7 @@ function buildSettings(H) {
   }
   H.panels.settings.querySelector('.reset').addEventListener('click', () => {
     Object.assign(S, { fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6, shadows: true, rain: true, motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true, masterVolume: 1, sfxVolume: 1, footVolume: 0.45, ambVolume: 0.8, radioVolume: 0.7, quality: 'ultra' }); saveAudio(S);
-    ctx.bus.emit('quality', 'ultra'); H.syncers.forEach(f => f());
+    ctx.bus.emit('quality', 'ultra'); ctx.bus.emit('setting', { key: 'shadows', value: S.shadows }); H.syncers.forEach(f => f());
   });
 }
 

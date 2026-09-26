@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { hideParkedCar } from './carkit.js';
 
 const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 3, SHARE_R = 4;
+const CASH_GIFT = 10, GIFT_RANGE = 3, GIFT_RECEIVE_RANGE = GIFT_RANGE + 1; // allow for interpolated peer positions
 export const ITEMS = {
   weed: { icon: '🌿', name: 'bag of weed' },
   bottle: { icon: '🍾', name: 'bottle of liquor', drunk: 0.8, dur: 150 },
@@ -105,7 +106,13 @@ function bindOnce(ctx) {
   });
   ctx.bus.on('net:piss', (m) => { if (!V || !Array.isArray(m.p)) return; puddle(new THREE.Vector3(m.p[0], m.p[1], m.p[2])); const me = V.ctx.player.position; if (Math.hypot(me.x - m.p[0], me.z - m.p[2]) < 25) V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Somebody'} is taking a leak. Classy.`, 1800); });
   ctx.bus.on('net:horn', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player.position; const d = Math.hypot(me.x - m.p[0], me.z - m.p[2]); if (d < 160) horn(Math.max(0.08, 1 - d / 160)); });
-  ctx.bus.on('net:cash', (m) => { if (!V || m.to !== V.ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 50)) return; api.earn(n); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} gave you $${n}`, 2000); });
+  ctx.bus.on('net:cash', (m) => {
+    if (!V || !m || m.to !== V.ctx.net?.id || m.n !== CASH_GIFT) return;
+    const peer = V.ctx.net?.peer?.(m.f), me = V.ctx.player;
+    // Balances still belong to clients; a received message cannot prove a remote debit.
+    if (!peer?.pos || peer.dead || peer.afk || !me || me.dead || !(peer.pos.distanceTo(me.position) <= GIFT_RECEIVE_RANGE)) return;
+    api.earn(CASH_GIFT); V.ctx.hud?.toast?.(`${peer.name || 'A friend'} gave you $${CASH_GIFT}`, 2000);
+  });
   // bonus cash: every wave you get through pays everyone $15
   ctx.bus.on('wave', (w) => { if (!V || !(w?.n > 1) || w.n === V.lastWave) return; const was = V.lastWave; V.lastWave = w.n; if (was) { api.earn(15); V.ctx.hud?.toast?.('Wave survived · +$15', 1800); } });
 }
@@ -351,11 +358,11 @@ function horn(vol) {
     for (const f of [415, 523]) { const o = _ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const lp = _ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800; o.connect(lp); lp.connect(g); o.start(t); o.stop(t + 0.52); } } catch {}
 }
 function giveCash() {
-  const net = V.ctx.net; if (!net?.list) return; const me = V.ctx.player.position; let best = null, bd = 3;
-  for (const id of net.list()) { const q = net.peer(id); if (!q?.pos || q.dead) continue; const d = Math.hypot(q.pos.x - me.x, q.pos.z - me.z); if (d < bd) { bd = d; best = { id, name: q.name }; } }
+  const net = V.ctx.net; if (!net?.list || V.ctx.player.dead) return; const me = V.ctx.player.position; let best = null, bd = GIFT_RANGE;
+  for (const id of net.list()) { const q = net.peer(id); if (!q?.pos || q.dead || q.afk) continue; const d = q.pos.distanceTo(me); if (d < bd) { bd = d; best = { id, name: q.name }; } }
   if (!best) { V.ctx.hud?.toast?.('Get closer to a friend to give cash (N)', 1600); return; }
-  if (!api.pay(10)) { V.ctx.hud?.toast?.('You need $10', 1400); return; }
-  net.send('cash', { to: best.id, n: 10 }); V.ctx.hud?.toast?.(`Gave ${best.name || 'your friend'} $10`, 1600);
+  if (!api.pay(CASH_GIFT)) { V.ctx.hud?.toast?.(`You need $${CASH_GIFT}`, 1400); return; }
+  net.send('cash', { to: best.id, n: CASH_GIFT }); V.ctx.hud?.toast?.(`Gave ${best.name || 'your friend'} $${CASH_GIFT}`, 1600);
 }
 let _cashTex = null;
 function dropCash(at, n) {

@@ -1,6 +1,6 @@
 # ZAVOD
 
-A browser first-person shooter built in Three.js (r186, WebGL 2) — no engine, no build step. Single-player vs AI squads across five maps.
+A browser first-person shooter built in Three.js (r186, WebGL 2) — no engine, no build step. Single-player vs AI squads across the maps below.
 
 **Play:** https://zavod-chi.vercel.app (desktop Chrome/Firefox/Safari; phones get touch controls and a lighter asset set — iOS 16.4+).
 
@@ -12,6 +12,7 @@ A browser first-person shooter built in Three.js (r186, WebGL 2) — no engine, 
 | Central Station | Beaux-Arts rail terminal: main concourse, balconies, waiting hall, dining concourse, subway (`?map=terminal`) |
 | City Square | Downtown park + surrounding blocks: memorial arch, fountain plaza, row houses, village streets (`?map=wsp`) |
 | University | State-university campus: library tower, academic mall, student center, arts plaza (`?map=sbu`) |
+| Coney Island | Boardwalk, beach, rides and Luna Park towers (`?map=coney`; `&mode=chill` for hangout mode) |
 
 ## Controls
 WASD move · Shift sprint · Space jump (3 quick jumps → super jump) · C/Ctrl crouch · LMB fire · RMB or E aim · R reload · G grenade · 1/2 weapons · walk into a ladder to climb · Esc pause · Tab scoreboard.

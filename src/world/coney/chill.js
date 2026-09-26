@@ -176,7 +176,9 @@ function startFight(t, quiet = false) {
 }
 function flee(t) { t.st = 'flee'; t.t = 0; t.m.f.guard = false; t.m.f.hands = false; }
 function onRemoteThug(m) {
-  const { ctx } = C; if (typeof m.f !== 'string' || !Number.isFinite(+m.x)) return;
+  if (!C || !m || !/^[a-z0-9]{8}$/.test(m.f) || !Number.isSafeInteger(m.i) || m.i < 0 || m.i > 2147483647) return;
+  if (![m.x, m.y, m.z].every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 20000) || (m.r != null && !Number.isFinite(m.r))) return;
+  const { ctx } = C;
   const key = m.f + ':' + m.i; let t = C.remote.get(key);
   if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 10), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru'); C.world.scene.add(mm.f.group); t = { key, id: key, type: m.k === 'st' || m.k === 'mk' ? m.k : 'ru', m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
     for (const h of mm.hit) { h.userData.onHit = (dmg, headshot) => ctx.net?.send?.('thughit', { o: m.f, i: m.i, d: Math.round(dmg), h: headshot ? 1 : 0 }); ctx.raycastTargets.push(h); } C.remote.set(key, t); }

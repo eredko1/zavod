@@ -68,26 +68,33 @@ export async function init(ctx) {
   root.addEventListener('touchend', onEnd); root.addEventListener('touchcancel', onEnd);
 
   // ---- buttons
-  const hold = (el, on, off, { look = false } = {}) => {
-    el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); el.classList.add('down'); on(); if (look) startLook(e); }, { passive: false });
+  const hold = (el, on, off) => {
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); el.classList.add('down'); on(); }, { passive: false });
     const end = (e) => { el.classList.remove('down'); off(); };
     el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
   };
   const tap = (el, fn) => el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 120); fn(); }, { passive: false });
   const press = (code) => { input.keys.add(code); input.pressed.add(code); setTimeout(() => input.keys.delete(code), 120); };
-  for (const sel of ['.fire', '.fireL']) hold(q(sel), () => { T.fire = true; input.pressed.add('Mouse0'); }, () => { T.fire = false; }, { look: sel === '.fire' });
+  const fireTouches = new Set();
+  S.clearFire = () => { fireTouches.clear(); T.fire = false; for (const sel of ['.fire', '.fireL']) q(sel).classList.remove('down'); };
+  for (const sel of ['.fire', '.fireL']) {
+    const el = q(sel);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); for (const t of e.changedTouches) fireTouches.add(t.identifier); el.classList.add('down'); T.fire = true; input.pressed.add('Mouse0'); if (sel === '.fire') startLook(e); }, { passive: false });
+    const end = (e) => { for (const t of e.changedTouches) fireTouches.delete(t.identifier); el.classList.toggle('down', Array.from(e.targetTouches).some(t => fireTouches.has(t.identifier))); T.fire = fireTouches.size > 0; };
+    el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
+  }
   const adsEl = q('.ads'); const setAds = (v) => { T.ads = !!v; adsEl.classList.toggle('on', T.ads); }; S.setAds = setAds;
   tap(adsEl, () => setAds(!T.ads));
   const crEl = q('.crouch'); tap(crEl, () => { const on = !input.keys.has('KeyC'); if (on) input.keys.add('KeyC'); else input.keys.delete('KeyC'); crEl.classList.toggle('on', on); });
   hold(q('.jump'), () => { input.keys.add('Space'); input.pressed.add('Space'); }, () => input.keys.delete('Space'));
   tap(q('.reload'), () => press('KeyR'));
-  tap(q('.swap'), () => { const slot = ctx.weapons?.current?.slot ?? 0; press(slot === 0 ? 'Digit2' : 'Digit1'); input.mouse.wheel += 1; });
+  tap(q('.swap'), () => { const slot = ctx.weapons?.current?.slot ?? 0; press(slot === 0 ? 'Digit2' : 'Digit1'); });
   tap(q('.nade'), () => press('KeyG'));
   S.act = q('.act'); tap(S.act, () => { input.pressed.add('KeyF'); }); // contextual: pick up weapon / mount / dismount (same F both systems read)
   tap(q('.pause'), () => ctx.setState('paused'));
 
-  const show = (v) => { root.classList.toggle('hidden', !v); root.classList.toggle('on', v); if (!v) { clearStick(); S.looks.clear(); T.fire = false; setAds(false); } };
-  ctx.bus.on('playerDied', () => { T.fire = false; setAds(false); });
+  const show = (v) => { root.classList.toggle('hidden', !v); root.classList.toggle('on', v); if (!v) { clearStick(); S.looks.clear(); S.clearFire(); setAds(false); } };
+  ctx.bus.on('playerDied', () => { S.clearFire(); setAds(false); });
   ctx.bus.on('state', ({ state }) => show(state === 'playing'));
   show(ctx.state === 'playing');
   // QA hooks
@@ -103,7 +110,7 @@ export async function init(ctx) {
 export function update(dt, ctx) {
   if (!S || !S.act) return;
   const m = ctx.player?.mounted, stowed = !!(m && (m.elevator || m.passenger || m.spec?.car));
-  if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { ctx.input.touch.fire = false; S.setAds?.(false); } }
+  if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { S.clearFire(); S.setAds?.(false); } }
   // fire buttons say what they do (the left one is a second trigger for the left thumb)
   const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? 'SLASH' : 'FIRE';
   if (ft !== S.fireTxt) { S.fireTxt = ft; S.root.querySelector('.fire').textContent = ft; S.root.querySelector('.fireL').textContent = ft; }
@@ -112,4 +119,4 @@ export function update(dt, ctx) {
   const label = mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;
   if (label !== S.actLabel) { S.actLabel = label; S.act.textContent = label || ''; S.act.classList.toggle('show', !!label && ctx.state === 'playing'); }
 }
-export function reset(ctx) { if (S) { ctx.input.touch.fire = false; if (S.setAds) S.setAds(false); else ctx.input.touch.ads = false; } }
+export function reset(ctx) { if (S) { S.clearFire(); if (S.setAds) S.setAds(false); else ctx.input.touch.ads = false; } }
