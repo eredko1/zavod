@@ -1,4 +1,5 @@
 node_modules/
+.tmp/
 qa/shots/
 qa/blind/
 qa/refs/
