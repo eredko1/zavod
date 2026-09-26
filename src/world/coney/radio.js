@@ -15,13 +15,18 @@ export function buildRadio(world) {
   const { ctx, W } = world; const S = ctx.settings;
   const R = { els: TRACKS.map((t) => { const a = new Audio(); a.preload = 'metadata'; a.src = t.src; a.crossOrigin = 'anonymous'; return a; }), dur: TRACKS.map(() => 0), cur: -1, skip: 0, on: false, lastTitle: '' };
   R.els.forEach((a, i) => a.addEventListener('loadedmetadata', () => { R.dur[i] = a.duration || 0; }));
-  W.radio = { cue: (title) => { const i = TRACKS.findIndex((t) => t.title === title); const total = R.dur.reduce((a, b) => a + b, 0); if (i < 0 || !(total > 0)) return false; const start = R.dur.slice(0, i).reduce((a, b) => a + b, 0); R.skip = start - (Date.now() / 1000 % total) + 0.05; R.cur = -1; return true; },   // durak mode: jump (just for you) to the start of a track
+  W.radio = { cue: (title) => { const i = TRACKS.findIndex((t) => t.title === title); const total = R.dur.reduce((a, b) => a + b, 0); if (i < 0 || !(total > 0)) return false; const now = Date.now() / 1000 + R.skip, pass = Math.floor(now / total); let start = 0; for (const k of order(pass)) { if (k === i) break; start += R.dur[k]; } R.skip += pass * total + start - now + 0.05; R.cur = -1; return true; },   // durak mode: jump (just for you) to the start of a track
     tracks: TRACKS.map((t) => t.title), get now() { return R.cur >= 0 ? TRACKS[R.cur].title : null; }, qa: () => R.els.map((a) => ({ playing: !a.paused, t: +a.currentTime.toFixed(1), vol: +a.volume.toFixed(2) })) };
   // where the station is right now: [track, offset]
+  // shuffled: every pass through the playlist plays in a new random order, seeded by which pass it is on the wall clock —
+  // so it's random, but friends still hear the same song at the same moment (no back-to-back repeats across passes)
+  const shuffle = (pass) => { const idx = TRACKS.map((_, k) => k); let a = (pass * 2654435761) >>> 0 || 1; const rnd = () => { a ^= a << 13; a >>>= 0; a ^= a >>> 17; a ^= a << 5; a >>>= 0; return a / 4294967296; };
+    for (let k = idx.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [idx[k], idx[j]] = [idx[j], idx[k]]; } return idx; };
+  const order = (pass) => { const idx = shuffle(pass); if (idx.length > 1 && idx[0] === shuffle(pass - 1).at(-1)) [idx[0], idx[1]] = [idx[1], idx[0]]; return idx; };   // no song twice in a row across passes
   const at = () => {
     const total = R.dur.reduce((a, b) => a + b, 0); if (!(total > 0)) return [0, 0];
-    let t = ((Date.now() / 1000 + R.skip) % total + total) % total;
-    for (let i = 0; i < R.dur.length; i++) { if (t < R.dur[i]) return [i, t]; t -= R.dur[i]; }
+    const T = Date.now() / 1000 + R.skip, pass = Math.floor(T / total); let t = T - pass * total;
+    for (const i of order(pass)) { if (t < R.dur[i]) return [i, t]; t -= R.dur[i]; }
     return [0, 0];
   };
   const stop = () => { for (const a of R.els) if (!a.paused) a.pause(); R.on = false; R.cur = -1; };
