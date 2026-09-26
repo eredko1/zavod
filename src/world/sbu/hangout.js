@@ -42,7 +42,7 @@ export function buildSbuHangout(world) {
   // ---- the deli by the SAC plaza --------------------------------------------------------------------------------------------
   try {
     const spot = findDeliSpot(world, [{ x: -118, z: -26, yaw: Math.PI }, { x: -120, z: 60, yaw: Math.PI / 2 }, { x: -60, z: -24, yaw: Math.PI }, { x: 20, z: 20, yaw: 0 }], 40);
-    if (spot) { const D = buildDeli(world, { ...spot, name: "SAMMY'S CAMPUS DELI", vendorName: 'SAMMY', shirt: 0x2f4a38 }); K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY', { cousin: true }) }); W.deli = D; }
+    if (spot) { const D = buildDeli(world, { ...spot, name: "SAMMY'S CAMPUS DELI", vendorName: 'SAMMY', shirt: 0x2f4a38 }); K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, fig: D.fig, talk: sammyTalk('SAMMY', { cousin: true }) }); W.deli = D; }
     else console.warn('[sbu] no free spot for the deli');
   } catch (e) { console.warn('[sbu] deli', e); }
 

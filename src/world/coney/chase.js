@@ -46,6 +46,7 @@ export function buildChase(world) {
   const bus = ctx.bus;
   // online wave fights (netwaves.js) are self-defence: shooting at / killing wave mercs doesn't bring the cops
   bus.on('shot', (e) => { if (e && e.who === 'player' && !e.melee && !ctx.netwaves?.busy) crime('shot', e.origin || ctx.player?.position); });
+  bus.on('npcHurt', (d) => crime(d?.dead ? 'kill' : 'shot', d?.position));   // stabbing / shooting the locals (hangkit hurtable NPCs)
   bus.on('vehicle', (e) => { if (e?.stage === 'mount' && e.bike?.spec?.car) crime('steal', e.bike.pos || ctx.player?.position); });
   bus.on('enemyKilled', (d) => { if (!d || d.qa || (d.wave && ctx.netwaves)) return; crime(d.chase === 'cop' ? 'copKill' : d.chase === 'crew' ? 'crewKill' : 'kill', d.position || ctx.player?.position); });
   bus.on('playerDied', () => wasted());

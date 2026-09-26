@@ -27,7 +27,7 @@ export const kit = () => V;
 export function buildKit(world, o = {}) {
   const { ctx } = world;
   V = { world, ctx, cash: o.cash ?? 20, startCash: o.cash ?? 20, inv: [], drunk: 0, drunkT: -1, high: 0, highT: -1, smokeT: 0, puffT: 0, puffs: [], riding: null, passenger: null,
-    shafts: [], spots: [], vendors: [], drops: [], dialog: null, promptT: 0, lastPrompt: '', respawn: o.respawn || null, respawnPick: false, talked: new Set(), onUpdate: [] };
+    shafts: [], spots: [], vendors: [], hurtables: [], drops: [], dialog: null, promptT: 0, lastPrompt: '', respawn: o.respawn || null, respawnPick: false, talked: new Set(), onUpdate: [] };
   buildUI(o); buildPuffs();
   if (!ctx.__hangkitBound) { ctx.__hangkitBound = true; bindOnce(ctx); }
   world.updaters.push((dt) => { if (V?.world === world) update(dt); });
@@ -48,7 +48,8 @@ const api = {
   /** interaction point: { pos: Vector3 (may move), r, dy, prompt: string | () => string, act: () => void, when?: () => bool } */
   spot(s) { V.spots.push({ r: 2, dy: 1.3, ...s }); return s; },
   /** vendor: { name, pos: Vector3 (may move), r, talk: () => node }  node = { text, choices: [{ label, go: node | () => node | null }] } */
-  vendor(v) { const e = { r: 2.2, ...v }; V.vendors.push(e); return e; },
+  vendor(v) { const e = { r: 2.2, ...v }; V.vendors.push(e); if (v.fig) e.hurt = hurtable(v.fig, { name: v.name, vendor: e }); return e; },
+  hurtable: (fig, o) => hurtable(fig, o),
   removeVendor(e) { if (!V) return; const i = V.vendors.indexOf(e); if (i > -1) V.vendors.splice(i, 1); if (V.dialog?.vendor === e) closeDialog(); },
   /** elevator / stair shaft: { kind: 'elevator' | 'stairs', floors, label, lobby: { cars: [{ pos, yaw }] }, tops: [{ cars: [{ pos, yaw }], face }] } */
   shaft(s) { V.shafts.push({ kind: 'elevator', floors: 10, ...s }); return V.shafts.length - 1; },
@@ -59,6 +60,7 @@ const api = {
   openDialog: (name, node) => openDialog(name, node), closeDialog: () => closeDialog(), choose: (i) => choose(i), dropCash: (at, n) => dropCash(at, n),
   /** QA: where the interaction points are */
   points: () => V && { shafts: V.shafts.map((t) => ({ kind: t.kind, label: t.label, lobby: t.lobby.cars.map((c) => c.pos.toArray()), top: t.tops[0].cars.map((c) => c.pos.toArray()) })), vendors: V.vendors.map((v) => ({ name: v.name, pos: v.pos.toArray() })), cars: (V.world.parkedCars || []).filter((c) => !c.gone).length, start: V.world.W?.onlineStart },
+  hurtState: () => V && V.hurtables.map((H) => ({ name: H.o.name, hp: Math.round(H.hp), down: H.down })),
   state: () => V && { cash: V.cash, inv: V.inv.slice(), item: V.inv[V.inv.length - 1] || null, drunk: +(V.drunk || 0).toFixed(2), high: +V.high.toFixed(2), riding: !!V.riding, passenger: !!V.passenger,
     dialog: V.dialog ? { name: V.dialog.name, text: V.dialog.node.text, choices: (V.dialog.node.choices || []).map((c) => c.label) } : null, drops: V.drops.map((d) => [+d.pos.x.toFixed(1), +d.pos.y.toFixed(1), +d.pos.z.toFixed(1), d.n]) },
 };
@@ -70,8 +72,8 @@ export const kitQA = { state: () => ({ ...api.state(), ...api.points() }), ride:
 function bindOnce(ctx) {
   ctx.bus.on('net:elev', (m) => V && onRemoteElev(m));
   ctx.bus.on('net:steal', (m) => V && stealLocal(m.i, false));
-  ctx.bus.on('net:smoke', (m) => { if (!V || !Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = V.ctx.player; if (me && !me.dead && at.distanceTo(me.position) < SHARE_R + 1) { V.high = Math.min(1, V.high + 0.18); V.highT = Math.max(V.highT, 150); } });
-  ctx.bus.on('net:drink', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player; if (!me || me.dead || new THREE.Vector3(...m.p).distanceTo(me.position) >= SHARE_R + 1) return;
+  ctx.bus.on('net:smoke', (m) => { if (!V || !Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = V.ctx.player; if (me && !me.dead && (sameCar(m) || at.distanceTo(me.position) < SHARE_R + 1)) { V.high = Math.min(1, V.high + 0.18); V.highT = Math.max(V.highT, 150); } });
+  ctx.bus.on('net:drink', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player; if (!me || me.dead || (!sameCar(m) && new THREE.Vector3(...m.p).distanceTo(me.position) >= SHARE_R + 1)) return;
     const it = ITEMS[m.k] || ITEMS.bottle; drink(false, it); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} passed you the ${m.k === 'forty' ? '40' : 'bottle'}`, 1800); });
   ctx.bus.on('net:buy', (m) => V && V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Someone'} bought ${ITEMS[m.k]?.name ? 'a ' + ITEMS[m.k].name : 'something'} from ${String(m.v || 'the man').slice(0, 16)}`, 1800));
   ctx.bus.on('playerDied', () => { if (!V) return; endRide(true); leavePassenger(); closeDialog(); });
@@ -134,10 +136,35 @@ function puddle(at) {
     for (let i = 0; i < 12; i++) { const mm = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xd9c23a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.5, depthWrite: false })); mm.visible = false; mm.renderOrder = 2; V.world.scene.add(mm); V.puddles.push(mm); } }
   const mm = V.puddles[V.puddleN++ % V.puddles.length]; mm.position.set(at.x, at.y + 0.015, at.z); mm.scale.set(1 + Math.random() * 0.5, 1, 0.7 + Math.random() * 0.4); mm.rotation.y = Math.random() * 6; mm.visible = true;
 }
+// ---- anybody can get stabbed / shot: named NPCs take hits, go down (dropping some cash), get back up ~90 s later ----
+const OUCH = ['AAH! Are you crazy?!', 'Ow! What is wrong with you?!', 'Help! He\'s got a knife!', 'Yo, chill! CHILL!', 'Bozhe moi!'];
+function hurtable(fig, o = {}) {
+  const { ctx } = V; const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.75, 8), new THREE.MeshBasicMaterial({ visible: false }));
+  hb.position.y = 0.9; hb.userData.surface = 'flesh'; fig.group.add(hb); ctx.raycastTargets.push(hb);
+  const H = { fig, o, hp: 100, down: false, t: 0, k: 0, said: 0 };
+  hb.userData.onHit = (dmg, head, point) => hurtNpc(H, dmg * (head ? 1.6 : 1), point);
+  V.hurtables.push(H); return H;
+}
+function hurtNpc(H, dmg, point) {
+  const { ctx } = V; if (H.down) return; H.hp -= dmg; H.fig.play?.('hit');
+  const at = H.fig.group.getWorldPosition(new THREE.Vector3()); ctx.ai?.blood?.(at.x, at.z, 0.35 + Math.random() * 0.3, at.y + 0.5);
+  if (performance.now() - H.said > 1500) { H.said = performance.now(); ctx.hud?.toast?.(`${H.o.name || 'Someone'}: "${OUCH[Math.floor(Math.random() * OUCH.length)]}"`, 1500); }
+  const dead = H.hp <= 0; ctx.bus.emit('npcHurt', { name: H.o.name, dead, position: at });
+  if (dead) { H.down = true; H.t = 0; if (H.o.vendor) { H.o.vendor.off = true; if (V.dialog?.vendor === H.o.vendor) closeDialog(); }
+    dropCash(at.clone().add(new THREE.Vector3(0.6, 0, 0.4)), 10 + Math.floor(Math.random() * 5) * 5); ctx.hud?.toast?.(`${H.o.name || 'They'} went down.`, 1800); }
+}
+function updateHurt(dt) {
+  for (const H of V.hurtables) {
+    if (!H.down && H.k <= 0) continue;
+    if (H.down) { H.t += dt; H.k = Math.min(1, H.k + dt * 2.4); if (H.t > 90) { H.down = false; H.hp = 100; if (H.o.vendor) H.o.vendor.off = false; V.ctx.hud?.toast?.(`${H.o.name} is back on their feet — and holding a grudge.`, 1800); } }
+    else H.k = Math.max(0, H.k - dt * 1.5);
+    const b = H.fig.body || H.fig.group; b.rotation.x = -Math.PI / 2 * (1 - (1 - H.k) ** 2);   // crumple backwards / get back up
+  }
+}
 function update(dt) {
   const { ctx } = V; const p = ctx.player; if (!p) return;
   const playing = ctx.state === 'playing' && !p.dead;
-  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDrops(dt, playing); updatePiss(dt);
+  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDrops(dt, playing); updatePiss(dt); updateHurt(dt);
   for (const fn of V.onUpdate) { try { fn(dt, playing); } catch (e) { if (ctx.time.frame % 300 === 1) console.warn('[hangkit] map update', e); } }
   if (V.dialog) { if (!playing) closeDialog(); else { ctx.interactNear = true; faceVendor(dt); } return; }
   if (playing && ctx.input?.pressed?.has?.('KeyB') && (V.riding || V.passenger || ctx.vehicles?.mounted)) { ctx.input.pressed.delete('KeyB'); useItem(); }
@@ -151,7 +178,7 @@ function update(dt) {
   if (!ctx.vehicles?.mounted) {
     // the closest vendor / interaction point wins (walkers pass by the mangal, the deli counter, …)
     let bd = Infinity; const dist = (v) => Math.hypot(v.x - pos.x, v.z - pos.z);
-    for (const v of V.vendors) if (near(v.pos, v.r) && dist(v.pos) < bd) { bd = dist(v.pos); prompt = `F — TALK TO ${v.name}`; act = () => talk(v); }
+    for (const v of V.vendors) if (!v.off && near(v.pos, v.r) && dist(v.pos) < bd) { bd = dist(v.pos); prompt = `F — TALK TO ${v.name}`; act = () => talk(v); }
     for (const s of V.spots) if ((!s.when || s.when()) && near(s.pos, s.r, s.dy) && dist(s.pos) < bd) { bd = dist(s.pos); prompt = typeof s.prompt === 'function' ? s.prompt() : s.prompt; act = s.act; }
     for (let i = 0; i < V.shafts.length && !act; i++) {
       const t = V.shafts[i], up = t.kind === 'stairs' ? 'F — CLIMB ▲' : `F — ELEVATOR ▲ ${t.floors}`, dn = t.kind === 'stairs' ? 'F — GO DOWN ▼' : 'F — ELEVATOR ▼ LOBBY';
@@ -171,6 +198,9 @@ function update(dt) {
 
 // ---- stash ----------------------------------------------------------------------------------------------------------------
 /** B: use the newest thing you hold. Weed = lifted/blurry (~2.5 min), liquor / 40 = drowsy; friends within a few metres share it. */
+/** the car you're in, named by its driver's net id — everyone in one car shares, however laggy the positions are at 100 km/h */
+function carId() { const ctx = V.ctx; return ctx.vehicles?.mounted?.spec?.car ? ctx.net?.id || null : V.passenger?.id || null; }
+function sameCar(m) { const c = carId(); return !!(m.c && c && m.c === c); }
 function useItem() {
   const { ctx } = V; const k = V.inv.map((x) => !ITEMS[x]?.keep).lastIndexOf(true);
   if (k < 0) { ctx.hud?.toast?.(V.inv.length ? 'Raw meat — grill it at Table Park' : 'Nothing on you', 1400); return; }
@@ -181,7 +211,7 @@ function useItem() {
 function drink(mine, spec = ITEMS.bottle, kind = 'bottle') {
   const { ctx } = V; V.drunk = Math.min(1, (V.drunk || 0) + spec.drunk); V.drunkT = Math.max(V.drunkT, spec.dur);
   if (!mine) return;
-  const p = ctx.player.position; ctx.net?.send?.('drink', { k: kind, p: [+p.x.toFixed(2), +(p.y + 1.5).toFixed(2), +p.z.toFixed(2)] });
+  const p = ctx.player.position; ctx.net?.send?.('drink', { k: kind, p: [+p.x.toFixed(2), +(p.y + 1.5).toFixed(2), +p.z.toFixed(2)], c: carId() });
   ctx.hud?.toast?.(kind === 'forty' ? '*glug glug glug* …that malt hits' : '*glug glug*', 1600);
   const m = bottleModel(kind);
   ctx.camera.add(m); m.visible = true; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = false;
@@ -229,7 +259,7 @@ function updateJoint(dt) {
     if (car) {   // in the whip: the smoke rolls out of the driver's window (not off the chase camera) and the car hotboxes
       const h = car.heading; at = car.pos.clone().add(new THREE.Vector3(-Math.cos(h) * 0.95 - Math.sin(h) * 0.2, car.spec?.car ? 1.25 : 1.5, Math.sin(h) * 0.95 - Math.cos(h) * 0.2)); hotbox = !!car.spec?.car;
     }
-    puff(at); ctx.net?.send?.('smoke', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)] });
+    puff(at); ctx.net?.send?.('smoke', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], c: carId() });
     V.high = Math.min(1, V.high + (hotbox ? 0.3 : 0.22)); V.highT = 150;
   }
   if (V.smokeT <= 0) { if (V.joint) V.joint.g.visible = false; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = true; ctx.hud?.toast?.('…everything is glowing.', 2400); }

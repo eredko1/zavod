@@ -8,7 +8,7 @@ import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { buildLocals, sammyLotion } from './locals.js';
-import { buildChill, buildCrews } from './chill.js';
+import { buildChill, buildCrews, gunShop } from './chill.js';
 import { buildJobs, jobsTalk } from './jobs.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
@@ -17,7 +17,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const B2 = new THREE.Vector3(163, 0, -445);      // OSM "Luna Park Houses 2" centre (map frame)
 const START_CASH = 20, PRICE = 10;
 
-let H = null;
+let H = null, igorFig = null;
 
 export function buildHangout(world, M) {
   const { ctx, W } = world; const towers = world.lunaTowers || [];
@@ -48,7 +48,8 @@ export function buildHangout(world, M) {
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
     help: 'Igor has side jobs (F → Got any work?)<br>F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>P · take a leak · Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby (shoulder the door) · stairwell down: side door<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
-  K.spot({ pos: H.igor, r: 2.4, prompt: 'F — TALK TO IGOR', act: talkIgor });
+  if (igorFig) H.igorHurt = K.hurtable(igorFig, { name: 'IGOR' });
+  K.spot({ pos: H.igor, r: 2.4, when: () => !H.igorHurt?.down, prompt: 'F — TALK TO IGOR', act: talkIgor });
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
@@ -87,7 +88,7 @@ function placeDeli(world) {
       for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; const dx = c.x - fx, dz = c.z - fz, a = dx * u.x + dz * u.y, d = dx * n.x + dz * n.y; if (Math.abs(a) < 6 && d > -4 && d < 13) K.stealLocal(i, false); }   // clear the kerb
       const D = buildDeli(world, { x: fx, z: fz, yaw, name: "SAMMY'S DELI & GROCERY" });
       H.deli = D; (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: "SAMMY'S DELI", x: D.door.x, z: D.door.z, kind: 'shop' });
-      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY', { extra: sammyLotion }) });
+      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, fig: D.fig, talk: sammyTalk('SAMMY', { extra: sammyLotion }) });
       return;
     }
   }
@@ -162,7 +163,7 @@ function buildIgor(world, M, pos) {
     park.traverse((o) => { if (!o.isMesh) return; const g = o.geometry.clone().applyMatrix4(inv.clone().multiply(o.matrixWorld)); const gg = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(gg.attributes)) if (!['position', 'normal', 'uv'].includes(k)) gg.deleteAttribute(k); if (!gg.attributes.uv) gg.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(gg.attributes.position.count * 2), 2)); (byMat.get(o.material) || byMat.set(o.material, []).get(o.material)).push(gg); kill.push(o); });
     for (const o of kill) o.parent.remove(o);
     for (const [mat, list] of byMat) { const m = new THREE.Mesh(mergeGeometries(list, false), mat); m.castShadow = mat !== iron; m.receiveShadow = true; park.add(m); } }
-  if (REAL) { const pf = buildPerson({ avatar: 'm03', pose: 'sit', seed: 3 }); pf.group.position.set(0, -0.1, 0.12); igor.add(pf.group); world.updaters.push((dt) => pf.update(dt, 0)); }
+  if (REAL) { const pf = buildPerson({ avatar: 'm03', pose: 'sit', seed: 3 }); pf.group.position.set(0, -0.1, 0.12); igor.add(pf.group); igorFig = pf; world.updaters.push((dt) => pf.update(dt, 0)); }
   const ipos = igorBench.getWorldPosition(new THREE.Vector3()); ipos.y = 0;
   // name tag
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d'); x.font = '700 34px Barlow, Arial'; x.textAlign = 'center'; x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(40, 10, 176, 44); x.fillStyle = '#ffd27a'; x.fillText('IGOR', 128, 44);
@@ -276,6 +277,7 @@ function talkIgor() {
       { label: `A bag — $${PRICE}`, go: () => igorSell('weed') },
       { label: `A bottle — $${PRICE}`, go: () => igorSell('bottle') },
       { label: 'Got any work?', go: () => jobsTalk() },
+      { label: 'Need a piece', go: () => gunShop('IGOR', ['m9', 'r870', 'ak74'], 'IGOR: "Shh. Not so loud. Under the bench I have… options. Cash only, no questions, no refunds."') },
       { label: 'What\'s the word?', go: () => ({ text: `IGOR: "${IGOR_GOSSIP[Math.floor(Math.random() * IGOR_GOSSIP.length)]}"`, choices: [{ label: 'Heard', go: null }] }) },
       { label: 'Later', go: null },
     ],
@@ -287,7 +289,7 @@ function buyIgor() { const { ctx } = H; const r = igorSell(H.buys++ % 2 === 0 ? 
 const SHOVES = 4, DOOR_OPEN_S = 150;
 function buildRoofDoors(towers) {
   const { world, ctx } = H; const mat = new THREE.MeshStandardMaterial({ color: 0x59616a, roughness: 0.5, metalness: 0.65 }), bar = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.3, metalness: 0.9 });
-  H.doors = towers.map((t, i) => {
+  H.roofDoors = towers.map((t, i) => {
     const d = t.roof?.door; if (!d) return null;
     const pivot = new THREE.Group(); pivot.position.copy(d.hinge); pivot.rotation.y = Math.atan2(-d.along.z, d.along.x); world.scene.add(pivot);
     const zW = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), pivot.rotation.y), s = Math.sign(zW.dot(d.out)) || 1;
@@ -301,9 +303,9 @@ function buildRoofDoors(towers) {
     K.spot({ pos: d.outside, r: 1.5, dy: 2.2, when: () => !D.open, prompt: () => `F — YANK THE DOOR (${D.shoves}/${SHOVES})`, act });
     return D;
   });
-  ctx.bus.on('net:rdoor', (m) => { const D = H.doors[m.i | 0]; if (D) setDoor(D, !!m.o, false); });
+  ctx.bus.on('net:rdoor', (m) => { const D = H.roofDoors[m.i | 0]; if (D) setDoor(D, !!m.o, false); });
   K.onUpdate((dt) => {
-    for (const D of H.doors) { if (!D) continue;
+    for (const D of H.roofDoors) { if (!D) continue;
       const want = D.open ? -D.s * 1.75 : 0; D.ang += (want - D.ang) * Math.min(1, dt * (D.open ? 7 : 3)); D.jolt *= Math.exp(-dt * 10);
       D.swing.rotation.y = D.ang + D.jolt;
       if (D.open && performance.now() > D.until) { const p = ctx.player.position; if (!(p.x > D.box.min.x - 0.6 && p.x < D.box.max.x + 0.6 && p.z > D.box.min.z - 0.6 && p.z < D.box.max.z + 0.6 && Math.abs(p.y - D.d.min.y) < 2)) setDoor(D, false, false); }
@@ -332,7 +334,8 @@ function setDoor(D, open, send) {
 export const hangoutQA = {
   state: () => { const s = K.state(); return H && s && { ...s, stash: s.inv.length, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()), deli: H.deli && { sammy: H.deli.sammy.toArray(), counter: H.deli.counter.toArray(), door: H.deli.door.toArray(), inside: H.deli.inside.toArray(), face: H.deli.face } }; },
   roof: () => { const r = H.b2?.roof?.top; return r && [...r.pos.toArray(), r.yaw]; },
-  roofDoor: (i = null) => { const D = H.doors?.[i ?? H.towers.indexOf(H.b2)]; return D && { open: D.open, shoves: D.shoves, inside: D.d.inside.toArray(), outside: D.d.outside.toArray() }; },
+  hurt: () => K.hurtState(), vendors: () => K.points().vendors, loadout: () => ({ ...H.ctx.weapons.loadout, cur: H.ctx.weapons.currentId }),
+  roofDoor: (i = null) => { const D = H.roofDoors?.[i ?? H.towers.indexOf(H.b2)]; return D && { open: D.open, shoves: D.shoves, inside: D.d.inside.toArray(), outside: D.d.outside.toArray() }; },
   stairB: () => { const b = H.b2?.stairB; return b && { top: b.top.toArray(), bottom: b.bottom.toArray(), floors: b.floors, up: b.up }; },
   lobbyView: () => { const c = H.b2.lobby.cars[1]; return [...c.pos.toArray(), c.yaw]; },
   roofAt: (a, c) => { const t = H.b2, k = t.core; return t.toWorld(a, k.roof.y, k.roof.c + c).toArray(); },

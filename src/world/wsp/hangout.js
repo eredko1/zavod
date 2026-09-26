@@ -45,7 +45,7 @@ export function buildWspHangout(world) {
     ], 36, { exclude: [{ x0: PARK.x0 - 2, x1: PARK.x1 + 2, z0: PARK.z0 - 2, z1: PARK.z1 + 2 }] });
     if (spot) {
       const D = buildDeli(world, { ...spot, name: "SAMMY'S DELI & GROCERY", vendorName: 'SAMMY', shirt: 0x5a2f2f, glasses: true });
-      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, talk: sammyTalk('SAMMY', { cousin: true }) });
+      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, fig: D.fig, talk: sammyTalk('SAMMY', { cousin: true }) });
       world.W.deli = D;
     } else console.warn('[wsp] no free frontage for the deli');
   } catch (e) { console.warn('[wsp] deli', e); }

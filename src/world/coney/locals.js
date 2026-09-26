@@ -59,7 +59,7 @@ function buildPops(world, H) {
   const P = L.pops = { g, fig: pops, flash, pos: new THREE.Vector3(), yaw: 0, leader: null, until: 0, fireT: 1, kills: 0, talking: false, stopUntil: 0, lastPos: new THREE.Vector3(), rambled: false };
   along(0, P.pos); g.position.copy(P.pos);
   const SPEED = 4.2, gy = (x, z, y) => { const f = world.W.groundHeight ? world.W.groundHeight(x, z) : 0; return Number.isFinite(f) && Math.abs(f - y) < 3 ? f : y; };
-  K.vendor({ name: 'POPS', pos: P.pos, r: 3.0, talk: (Kk, again) => popsTalk(again) });
+  K.vendor({ name: 'POPS', pos: P.pos, r: 3.0, fig: pops, talk: (Kk, again) => popsTalk(again) });
   K.onUpdate((dt) => {
     const now = performance.now(); const me = ctx.player;
     const riding = P.leader && now < P.until; if (!riding && P.leader) { if (P.leader === 'me' || P.leader === ctx.net?.id) ctx.hud?.toast?.('POPS: "Alright, my stories are on. I\'m out."', 2200); P.leader = null; }
@@ -158,7 +158,7 @@ function buildMarket(world, H) {
     for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; if (Math.hypot(c.x - spot[0], c.z - spot[1]) < 12) K.stealLocal(i, false); }
     const D = buildDeli(world, { x: spot[0], z: spot[1], yaw, name: 'NET GOST · ПРОДУКТЫ · MARKET', style: 'ru', vendorName: 'OLGA', shirt: 0x7a2a4a, bun: true, hair: 0xb58a4a, skin: 0xe8c2a0 });
     L.market = D; (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'NET GOST MARKET', x: D.door.x, z: D.door.z, kind: 'shop' });
-    K.vendor({ name: 'OLGA', pos: D.sammy, r: 2.3, talk: (Kk, again) => ({
+    K.vendor({ name: 'OLGA', pos: D.sammy, r: 2.3, fig: D.fig, talk: (Kk, again) => ({
       text: again ? 'OLGA: "Again you? OK. What?"' : 'OLGA: "Zdravstvuyte. Shashlik is marinated since yesterday — pork, onion, a little vinegar. Twelve dollar. Kvass, three."',
       choices: [
         { label: 'Shashlik — $12', go: () => ({ text: 'OLGA: "' + sell('meat', 12, 'OLGA', { ok: 'Here. Grill it on the mangal in the park. Not in the microwave. I will know.', broke: 'Twelve dollar. Is not charity.', full: 'Your hands are full. Put something down.' }) + '"', choices: [{ label: 'Spasibo', go: null }] }) },
@@ -216,7 +216,7 @@ function buildVisitors(world) {
     const name = RASTAS[Math.floor(hash(ci + 7) * RASTAS.length)];
     const f = buildFigure({ tam: true, skin: [0x5a3a28, 0x4a2e20, 0x6b4430][ci % 3], hair: 0x1a120c, beard: true, beardColor: 0x1a120c, shirt: [0x2e6b34, 0xc9a52c, 0x7a2a22, 0xe8e2d0][ci % 4], pants: 0x3c3a30, shoe: 0x6a5238, belly: 0.1 });
     const tag = nameTag(name); tag.position.set(0, 2.15, 0); f.group.add(tag); scene.add(f.group);
-    const pos = pts[0].clone(); const v = K.vendor({ name, pos, r: 2.4, talk: rastaTalk(name) });
+    const pos = pts[0].clone(); const v = K.vendor({ name, pos, r: 2.4, talk: rastaTalk(name), fig: f });
     return { ci, f, pts, cum, pos, v, yaw: 0 };
   };
   const at = (c, d, out) => { const L = c.cum[c.cum.length - 1]; d = Math.max(0, Math.min(L, d)); let i = 0; while (i < c.cum.length - 2 && c.cum[i + 1] < d) i++; const seg = c.cum[i + 1] - c.cum[i]; return out.copy(c.pts[i]).lerp(c.pts[i + 1], seg > 0 ? (d - c.cum[i]) / seg : 0); };

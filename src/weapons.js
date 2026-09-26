@@ -320,6 +320,13 @@ function ejectFor(w, p) {
   S.fx.ejectBrass(ej, _v, w.spec.brassScale ?? (w.spec.slot === 0 ? 1 : 0.8));
 }
 
+/** V — a quick knife stab with whatever you're holding (the knife itself just swings) */
+function quickStab() {
+  S.stabT = S.time; const cur = S.weapons[S.cur], ks = REGISTRY.knife?.spec; if (!cur || !ks) return;
+  if (cur.spec.melee) return fireShot(cur);
+  fireShot({ spec: { ...ks, id: 'stab' }, parts: { muzzle: cur.parts.muzzle, eject: cur.parts.eject }, shots: 0, lastShot: -9, ammo: 1, cur: cur.cur });
+  S.rpv.z -= 9; S.rrv.x -= 5; S.rrv.z += 4;   // the gun lunges forward with the stab
+}
 function fireShot(w, opts = {}) {
   const ctx = S.ctx, sp = w.spec, cam = ctx.camera, p = ctx.player, rng = ctx.rng;
   const now = S.time;
@@ -451,6 +458,7 @@ export function update(dt, ctx) {
         const base = 1 / (S.weapons[S.cur].spec.adsFovMul ?? ADS_FOV_MUL); ctx.hud?.toast?.(`${(base * S.zoomMul).toFixed(1)}×`, 600);
       } else startSwap(1 - S.cur);
     }
+    if (input.consume('KeyV') && !S.swap && !S.throwing && S.time - (S.stabT ?? -9) > 0.6) quickStab();   // V: stab / jab whatever's in front of you, any weapon
     if (input.consume('KeyR')) startReload();
     if (input.consume('KeyG')) startThrow();
     if ((!ctx.ai?.nearPickup && !ctx.vehicles?.nearBike && !ctx.interactNear && input.consume('KeyF'))) startInspect();   // interactNear: a map interaction (hangout) owns F

@@ -226,7 +226,7 @@ export function buildDeli(world, o) {
     for (const e of kill) root.remove(e);
     for (const [m, list] of byMat) { const mesh = new THREE.Mesh(mergeGeometries(list, false), m); mesh.castShadow = !m.transparent && m !== M.tube && m !== M.fridge; mesh.receiveShadow = true; root.add(mesh); ctx.raycastTargets?.push(mesh); } }
   world.updaters?.push((dt) => sammy.update(dt));
-  return { sammy: L(3.25, 2.6), counter: L(1.3, 2.6), door: L(0, -1.6), inside: L(0, 1.4), face: o.yaw + Math.PI, group: root };
+  return { fig: sammy, sammy: L(3.25, 2.6), counter: L(1.3, 2.6), door: L(0, -1.6), inside: L(0, 1.4), face: o.yaw + Math.PI, group: root };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -313,7 +313,7 @@ export function buildWalker(world, K, o) {
   world.scene.add(f.group);
   const path = o.path.map(([x, z]) => new THREE.Vector3(x, 0, z)); let i = 0, seg = 1;
   const pos = path[0].clone(); f.group.position.copy(pos);
-  const vendor = K.vendor({ name: o.name, pos, r: 2.4, talk: o.talk });
+  const vendor = K.vendor({ name: o.name, pos, r: 2.4, talk: o.talk, fig: f });
   const gy = (x, z) => { const g = world.groundHeight ? world.groundHeight(x, z) : 0; return Number.isFinite(g) ? g : 0; };
   let wait = 0, yaw = 0;
   K.onUpdate((dt) => {

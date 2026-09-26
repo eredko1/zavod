@@ -33,6 +33,22 @@ const HP = 100;
 const FIGHT = ['You want smoke? You got smoke!', 'Oh, now you done it.', 'Bratan, big mistake.', 'Get him!', 'Hold my semechki.'];
 let C = null;
 
+// ---- guns off the books: IGOR (under the bench) and now and then a tough in a crew that rolls up to talk ----
+const GUNS = { m9: { name: 'Makarov', price: 40, slot: 1 }, deagle: { name: 'Desert Eagle', price: 120, slot: 1 }, r870: { name: 'Sawed-off pump', price: 90, slot: 0 }, mp5: { name: 'MP5', price: 110, slot: 0 }, ak74: { name: 'AK', price: 160, slot: 0 } };
+export function gunShop(seller, ids, pitch) {
+  return { text: pitch, choices: [...ids.map((id) => ({ label: `${GUNS[id].name} — $${GUNS[id].price}`, go: () => buyGun(seller, id) })), { label: 'Just looking', go: null }] };
+}
+function buyGun(seller, id) {
+  const w = C?.ctx?.weapons, g = GUNS[id];
+  if (!w?.setLoadout) return { text: `${seller}: "Not today."`, choices: [{ label: '…', go: null }] };
+  if (!K.pay(g.price)) return { text: `${seller}: "${g.price}. Cash. I don't take IOUs."`, choices: [{ label: 'Later', go: null }] };
+  const lo = w.loadout || {};
+  if (g.slot === 1) { w.lock?.(1, false); w.setLoadout({ primary: lo.primary, secondary: id }); if (C?.ch) C.ch.armed = true; setTimeout(() => w.swap?.(1), 50); }
+  else { w.setLoadout({ primary: id, secondary: lo.secondary }); setTimeout(() => w.swap?.(0), 50); }
+  K.toast(`Bought a ${g.name}. V still stabs.`, 2400);
+  return { text: `${seller}: "${['Clean. Mostly.', 'You didn\'t get it from me.', 'Point it away from Igor.', 'Serial number? What serial number.'][Math.floor(Math.random() * 4)]}"`, choices: [{ label: 'Pleasure doing business', go: null }] };
+}
+
 /** jobs (coney/jobs.js): a named person at a spot, e.g. a debtor */
 export function spawnPerson(at, name, cash = 40, type = 'mk') { if (!C) return null; const t = spawnGang(type, 'mark', 1, null, { at, name, cash })[0] || null; if (t) t.keep = true; return t; }
 export const crewsAlive = (t) => !!(C && t && C.thugs.get(t.id) === t);
@@ -48,12 +64,12 @@ export function buildCrews(world, { chill = false } = {}) {
     const os = C.world.W.onlineStart; if (os) ctx.player.teleport?.(os[0], os[1] || 0, os[2], os[3] || 0, 0);
     C.calmUntil = performance.now() + 60000;
   });
-  K.spot({ pos: C.robPos, r: 3.3, dy: 2, when: () => !!C.robT, prompt: () => `F — ROB ${C.robT?.name || ''}`, act: () => C.robT && robVictim(C.robT) });   // no shakedowns for a minute after you respawn
+  K.spot({ pos: C.robPos, r: 3.3, dy: 2, when: () => !!C.robT, prompt: () => (C.robT?.dealer ? `F — TALK TO ${C.robT.name}` : `F — ROB ${C.robT?.name || ''}`), act: () => { const t = C.robT; if (!t) return; if (t.dealer) { t.talkT = -20; t.st = 'talk'; K.openDialog(t.name, gunShop(t.name, t.dealer, `${t.name}: "${t.type === 'ru' ? 'Bratan. You need something that goes bang? I have.' : 'Psst. You need a piece? I got a couple. Cash only.'}"`)); } else robVictim(t); } });   // no shakedowns for a minute after you respawn
   W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead' && t.type !== 'mk').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
   ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null); });
   K.onUpdate((dt, playing) => update(dt, playing));
-  if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d), calm: (ms = 0) => { C.calmUntil = performance.now() + ms; }, mark: (d = 4) => spawnGang('mk', 'mark', 1, d)[0]?.id, robNear: (force = null) => (C.robT ? (robVictim(C.robT, force), C.robT.name) : null), fight: () => { const t = [...C.thugs.values()].find((x) => x.st !== 'dead' && x.type !== 'mk'); if (t) startFight(t); return t?.name; } };
+  if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d), calm: (ms = 0) => { C.calmUntil = performance.now() + ms; }, mark: (d = 4) => spawnGang('mk', 'mark', 1, d)[0]?.id, dealer: (d = 5) => { const t = spawnGang('st', 'talk', 2, d)[0]; if (t) t.dealer = ['m9', 'deagle']; return t?.id; }, robNear: (force = null) => (C.robT ? (robVictim(C.robT, force), C.robT.name) : null), fight: () => { const t = [...C.thugs.values()].find((x) => x.st !== 'dead' && x.type !== 'mk'); if (t) startFight(t); return t?.name; } };
   return C;
 }
 
@@ -74,7 +90,7 @@ export function buildChill(world, H) {
   const vf = buildFigure({ avatar: 'm05', skin: 0xe0b890, hair: 0x2a2018, shirt: 0x1d1f24, pants: 0x1d1f24, shoe: 0xeeeeee, belly: 0.05, shortSleeve: false });
   const tag = nameTag('VITEK', '#9fe39a'); tag.position.set(0, 2.15, 0); vf.group.add(tag); vf.group.position.copy(vp); world.scene.add(vf.group);
   K.onUpdate((dt) => { const me = ctx.player.position; vf.group.rotation.y = Math.atan2(me.x - vp.x, me.z - vp.z); vf.update(dt, 0); });
-  K.vendor({ name: 'VITEK', pos: vp, r: 2.4, talk: vitekTalk });
+  K.vendor({ name: 'VITEK', pos: vp, r: 2.4, talk: vitekTalk, fig: vf });
   CH.vitek = vp; (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'VITEK (guns)', x: vp.x, z: vp.z, kind: 'danger' });
   // loadout: the knife; the handgun slot is locked until Vitek comes through
   const arm = () => { const w = ctx.weapons; if (!w?.setLoadout) return false; w.setLoadout({ primary: 'knife', secondary: 'm9' }); w.lock?.(1, !CH.armed, 'No gun yet — VITEK (by the park gate) sells one'); return true; };
@@ -121,6 +137,7 @@ function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.rando
     C.thugs.set(id, t); out.push(t);
   }
   if (opts.cash != null) for (const t of out) t.cash = opts.cash;
+  if (intent === 'talk' && type !== 'mk' && out.length && Math.random() < 0.4) { const t = out[0]; const pool = ['m9', 'deagle', 'mp5', 'r870', 'ak74'].sort(() => Math.random() - 0.5); t.dealer = pool.slice(0, 2); }   // this one's holding
   if (n > 1) K.toast(`${type === 'ru' ? 'A crew of gopniks' : 'Some guys from the block'} ${intent === 'rob' ? 'are coming your way — watch your pockets' : 'are rolling up'}`, 2400);
   return out;
 }

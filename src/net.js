@@ -388,7 +388,7 @@ function onEvent(m) {
       const i = int(m.i, 0, 255), k = int(m.k, 0, 15), s = int(m.s ?? 0, 0, 7), p = vec(m.p); if (i === null || k === null || s === null || !p || (m.d !== 'up' && m.d !== 'down')) return;
       ctx.bus.emit('net:elev', { t: 'elev', f, i, k, s, d: m.d, p }); return;
     }
-    case 'smoke': { if (document.hidden) return; const p = vec(m.p); if (p) ctx.bus.emit('net:smoke', { t: 'smoke', f, p }); return; }
+    case 'smoke': { if (document.hidden) return; const p = vec(m.p); if (p) ctx.bus.emit('net:smoke', { t: 'smoke', f, p, c: ID_RE.test(m.c) ? m.c : null }); return; }   // c: the car it was smoked in (everyone in it shares)
   }
   ctx.bus.emit('net:' + m.t, m);   // other game-mode events (coney hangout: igor …)
 }
