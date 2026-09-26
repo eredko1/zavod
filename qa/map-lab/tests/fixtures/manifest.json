@@ -1,0 +1,95 @@
+{
+  "file": "coney.json.gz",
+  "sha256": "a440a60f29828ecbf7bb04e9b38784afae7ea394757f6bb73ba8bde778c753cf",
+  "osm": {
+    "endpoint": "https://overpass-api.de/api/interpreter",
+    "query": "[out:json][timeout:45];\n(\n  node(poly:\"40.579450 -73.979610 40.579729 -73.977128 40.579758 -73.976291 40.579285 -73.976332 40.576222 -73.976605 40.575317 -73.976604 40.575543 -73.979650\");\n  way(poly:\"40.579450 -73.979610 40.579729 -73.977128 40.579758 -73.976291 40.579285 -73.976332 40.576222 -73.976605 40.575317 -73.976604 40.575543 -73.979650\");\n);\nout geom;\nrel(poly:\"40.579450 -73.979610 40.579729 -73.977128 40.579758 -73.976291 40.579285 -73.976332 40.576222 -73.976605 40.575317 -73.976604 40.575543 -73.979650\");\nout geom(40.5752,-73.9798,40.5799,-73.9760);",
+    "fetchedAt": "2026-09-26T06:25:43.355Z",
+    "osmBase": "2026-09-26T06:24:06Z",
+    "elements": 1037
+  },
+  "nyc": [
+    {
+      "sourceId": "nyc-roadbed",
+      "dataset": "i36f-5ih7",
+      "fetchedAt": "2026-09-26T06:58:37.983Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/i36f-5ih7.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=source_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 25
+    },
+    {
+      "sourceId": "nyc-sidewalk",
+      "dataset": "52n9-sdep",
+      "fetchedAt": "2026-09-26T06:58:39.215Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/52n9-sdep.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=source_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 14
+    },
+    {
+      "sourceId": "nyc-median",
+      "dataset": "ees7-4ufv",
+      "fetchedAt": "2026-09-26T06:58:39.917Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/ees7-4ufv.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=source_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 12
+    },
+    {
+      "sourceId": "nyc-curbs",
+      "dataset": "5xvt-8cbk",
+      "fetchedAt": "2026-09-26T06:58:42.962Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/5xvt-8cbk.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=source_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 57
+    },
+    {
+      "sourceId": "nyc-pavement",
+      "dataset": "vs44-rznx",
+      "fetchedAt": "2026-09-26T06:58:53.779Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/vs44-rznx.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=source_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 39
+    },
+    {
+      "sourceId": "nyc-buildings",
+      "dataset": "5zhs-2jue",
+      "fetchedAt": "2026-09-26T06:58:54.367Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/5zhs-2jue.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=doitt_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 34
+    },
+    {
+      "sourceId": "nyc-trees",
+      "dataset": "hn5i-inap",
+      "fetchedAt": "2026-09-26T06:58:55.133Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/hn5i-inap.geojson?%24where=intersects%28location%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=objectid&%24limit=1000&%24offset=0"
+      ],
+      "features": 109
+    },
+    {
+      "sourceId": "nyc-elevation",
+      "dataset": "9uxf-ng6q",
+      "fetchedAt": "2026-09-26T06:58:56.568Z",
+      "urls": [
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=source_id&%24limit=1000&%24offset=0"
+      ],
+      "features": 175
+    },
+    {
+      "sourceId": "nyc-lion",
+      "dataset": "LION",
+      "fetchedAt": "2026-09-26T13:03:47.168Z",
+      "urls": [
+        "https://services5.arcgis.com/GfwWNkhOj9bNBqoJ/arcgis/rest/services/LION/FeatureServer/0/query?where=1%3D1&geometry=%7B%22xmin%22%3A-73.9798%2C%22ymin%22%3A40.5752%2C%22xmax%22%3A-73.976%2C%22ymax%22%3A40.5799%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=false&f=json&returnIdsOnly=true",
+        "https://services5.arcgis.com/GfwWNkhOj9bNBqoJ/arcgis/rest/services/LION/FeatureServer/0/query?where=1%3D1&geometry=%7B%22xmin%22%3A-73.9798%2C%22ymin%22%3A40.5752%2C%22xmax%22%3A-73.976%2C%22ymax%22%3A40.5799%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=true&f=geojson&objectIds=41718%2C42170%2C42212%2C44088%2C45561%2C47802%2C47898%2C47899%2C49437%2C49452%2C49463%2C49469%2C49898%2C49899%2C49900%2C51431%2C51680%2C53417%2C53444%2C53445%2C53462%2C53504%2C53505%2C53506%2C53507%2C55675%2C55754%2C55755%2C59354%2C59468%2C59658%2C61235%2C63557%2C63631%2C65100%2C65101%2C65151%2C65152%2C67275%2C67276%2C69323%2C70618%2C71224%2C71225%2C77960%2C77961%2C77962%2C77963%2C77964%2C77965%2C77966%2C77967%2C77968%2C77969%2C77970%2C77971%2C77972%2C77973%2C77974%2C77975%2C77976%2C77977%2C77978%2C77984%2C77985%2C77986%2C77987%2C77988%2C77989%2C78889%2C79777%2C79778%2C79779%2C79780%2C79781%2C79782%2C79783%2C79876%2C79877%2C79878%2C79879%2C79880%2C79881%2C79882%2C79883%2C79884%2C79885%2C79886%2C79887%2C79888%2C79889%2C79890%2C79891%2C79892%2C79893%2C79894%2C79895%2C79896%2C79897%2C79898%2C79899%2C79900%2C80995%2C81196%2C81197%2C86040%2C86041%2C86370%2C87505%2C87506%2C87508%2C87510%2C87511%2C87512%2C87918%2C88197%2C88198%2C88199%2C88200%2C88201%2C88202%2C88203%2C88204%2C88205%2C88530%2C88531%2C88780%2C89569%2C89570%2C90592%2C92191%2C92192%2C92697%2C92699%2C92700%2C92902%2C92903"
+      ],
+      "features": 137
+    }
+  ]
+}

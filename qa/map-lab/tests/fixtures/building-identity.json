@@ -1,0 +1,588 @@
+{
+  "bounds": {
+    "south": 40.5758193084,
+    "west": -73.9467981178,
+    "north": 40.5805193084,
+    "east": -73.9429980826
+  },
+  "provenance": {
+    "description": "Subset of the user-reported doubled building outlines near Hampton Avenue and Hastings Street.",
+    "capturedAt": "2026-09-26T20:41:49.959Z",
+    "osmEndpoint": "https://overpass-api.de/api/interpreter",
+    "osmQuery": "[out:json][timeout:45];\nnwr(40.5758193084,-73.9467981178,40.5805193084,-73.9429980826);\nout geom(40.5758193084,-73.9467981178,40.5805193084,-73.9429980826);"
+  },
+  "data": {
+    "version": 0.6,
+    "generator": "Overpass API 0.7.62.11 87bfad18",
+    "osm3s": {
+      "timestamp_osm_base": "2026-09-26T20:33:02Z",
+      "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+    },
+    "elements": [
+      {
+        "type": "way",
+        "id": 248531787,
+        "bounds": {
+          "minlat": 40.580314,
+          "minlon": -73.9448071,
+          "maxlat": 40.5804138,
+          "maxlon": -73.9445546
+        },
+        "nodes": [
+          2553005464,
+          2553005474,
+          2553005434,
+          2553005431,
+          2553005391,
+          2553005378,
+          2553005360,
+          2553005353,
+          2553005364,
+          2553005349,
+          2553005446,
+          2553005481,
+          2553005464
+        ],
+        "geometry": [
+          {
+            "lat": 40.5804081,
+            "lon": -73.9445931
+          },
+          {
+            "lat": 40.5804119,
+            "lon": -73.9445605
+          },
+          {
+            "lat": 40.5803822,
+            "lon": -73.9445546
+          },
+          {
+            "lat": 40.5803784,
+            "lon": -73.9445872
+          },
+          {
+            "lat": 40.5803384,
+            "lon": -73.9445793
+          },
+          {
+            "lat": 40.5803276,
+            "lon": -73.9446736
+          },
+          {
+            "lat": 40.5803203,
+            "lon": -73.9446722
+          },
+          {
+            "lat": 40.5803144,
+            "lon": -73.9447232
+          },
+          {
+            "lat": 40.5803217,
+            "lon": -73.9447246
+          },
+          {
+            "lat": 40.580314,
+            "lon": -73.9447922
+          },
+          {
+            "lat": 40.5803894,
+            "lon": -73.9448071
+          },
+          {
+            "lat": 40.5804138,
+            "lon": -73.9445942
+          },
+          {
+            "lat": 40.5804081,
+            "lon": -73.9445931
+          }
+        ],
+        "tags": {
+          "addr:housenumber": "1003",
+          "addr:postcode": "11235",
+          "addr:street": "Hampton Avenue",
+          "building": "yes",
+          "height": "7.6",
+          "nycdoitt:bin": "3246402"
+        }
+      },
+      {
+        "type": "way",
+        "id": 248531886,
+        "bounds": {
+          "minlat": 40.5803155,
+          "minlon": -73.9462629,
+          "maxlat": 40.5804254,
+          "maxlon": -73.9460445
+        },
+        "nodes": [
+          2553005463,
+          2553005480,
+          2553005404,
+          2553005395,
+          2553005374,
+          2553005354,
+          2553005383,
+          2553005373,
+          2553005465,
+          2553005501,
+          2553005463
+        ],
+        "geometry": [
+          {
+            "lat": 40.5804077,
+            "lon": -73.9461103
+          },
+          {
+            "lat": 40.5804137,
+            "lon": -73.9460571
+          },
+          {
+            "lat": 40.5803486,
+            "lon": -73.9460445
+          },
+          {
+            "lat": 40.5803423,
+            "lon": -73.9461005
+          },
+          {
+            "lat": 40.580327,
+            "lon": -73.9460976
+          },
+          {
+            "lat": 40.5803155,
+            "lon": -73.9461996
+          },
+          {
+            "lat": 40.5803308,
+            "lon": -73.9462025
+          },
+          {
+            "lat": 40.5803258,
+            "lon": -73.9462469
+          },
+          {
+            "lat": 40.5804086,
+            "lon": -73.9462629
+          },
+          {
+            "lat": 40.5804254,
+            "lon": -73.9461138
+          },
+          {
+            "lat": 40.5804077,
+            "lon": -73.9461103
+          }
+        ],
+        "tags": {
+          "addr:housenumber": "40",
+          "addr:postcode": "11235",
+          "addr:street": "Girard Street",
+          "building": "yes",
+          "height": "8.8",
+          "nycdoitt:bin": "3246383"
+        }
+      },
+      {
+        "type": "way",
+        "id": 248534592,
+        "bounds": {
+          "minlat": 40.5782624,
+          "minlon": -73.9440622,
+          "maxlat": 40.5783111,
+          "maxlon": -73.9439856
+        },
+        "nodes": [
+          2553023780,
+          2553023986,
+          2553024037,
+          2553023821,
+          2553023780
+        ],
+        "geometry": [
+          {
+            "lat": 40.5782624,
+            "lon": -73.9440538
+          },
+          {
+            "lat": 40.5783029,
+            "lon": -73.9440622
+          },
+          {
+            "lat": 40.5783111,
+            "lon": -73.9439939
+          },
+          {
+            "lat": 40.5782707,
+            "lon": -73.9439856
+          },
+          {
+            "lat": 40.5782624,
+            "lon": -73.9440538
+          }
+        ],
+        "tags": {
+          "building": "garage",
+          "height": "3.4",
+          "nycdoitt:bin": "3377918"
+        }
+      },
+      {
+        "type": "way",
+        "id": 248534731,
+        "bounds": {
+          "minlat": 40.5792001,
+          "minlon": -73.9452972,
+          "maxlat": 40.5792644,
+          "maxlon": -73.9452089
+        },
+        "nodes": [
+          2553029904,
+          2553030287,
+          2553030345,
+          2553029965,
+          2553029904
+        ],
+        "geometry": [
+          {
+            "lat": 40.5792001,
+            "lon": -73.9452868
+          },
+          {
+            "lat": 40.5792559,
+            "lon": -73.9452972
+          },
+          {
+            "lat": 40.5792644,
+            "lon": -73.9452193
+          },
+          {
+            "lat": 40.5792085,
+            "lon": -73.9452089
+          },
+          {
+            "lat": 40.5792001,
+            "lon": -73.9452868
+          }
+        ],
+        "tags": {
+          "building": "garage",
+          "height": "5.0",
+          "nycdoitt:bin": "3000000"
+        }
+      }
+    ]
+  },
+  "nyc": [
+    {
+      "sourceId": "nyc-buildings",
+      "dataset": "5zhs-2jue",
+      "bounds": {
+        "south": 40.5758193084,
+        "west": -73.9467981178,
+        "north": 40.5805193084,
+        "east": -73.9429980826
+      },
+      "urls": [
+        "https://data.cityofnewyork.us/resource/5zhs-2jue.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9467981178+40.5758193084%2C+-73.9429980826+40.5758193084%2C+-73.9429980826+40.5805193084%2C+-73.9467981178+40.5805193084%2C+-73.9467981178+40.5758193084%29%29%27%29&%24order=doitt_id%2C%3Aid&%24limit=1000&%24offset=0"
+      ],
+      "fetchedAt": "2026-09-26T20:34:50.865Z",
+      "metadata": {
+        "name": "BUILDING",
+        "dataUpdatedAt": "2026-09-21T06:40:23.000Z",
+        "metadataUpdatedAt": "2026-07-08T15:52:04.000Z"
+      },
+      "metadataError": null,
+      "data": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [
+                      -73.944595629351,
+                      40.580422060496
+                    ],
+                    [
+                      -73.944594500233,
+                      40.580416349727
+                    ],
+                    [
+                      -73.944561881082,
+                      40.580420097284
+                    ],
+                    [
+                      -73.944556009697,
+                      40.580390389756
+                    ],
+                    [
+                      -73.944588630015,
+                      40.580386642201
+                    ],
+                    [
+                      -73.944580726214,
+                      40.58034665601
+                    ],
+                    [
+                      -73.944675024562,
+                      40.580335821322
+                    ],
+                    [
+                      -73.944673577876,
+                      40.580328502064
+                    ],
+                    [
+                      -73.944698984511,
+                      40.580325583089
+                    ],
+                    [
+                      -73.944724614394,
+                      40.5803226381
+                    ],
+                    [
+                      -73.944726061085,
+                      40.580329958258
+                    ],
+                    [
+                      -73.944793649885,
+                      40.580322192213
+                    ],
+                    [
+                      -73.944808553257,
+                      40.580397596671
+                    ],
+                    [
+                      -73.944789053833,
+                      40.580399836813
+                    ],
+                    [
+                      -73.944595629351,
+                      40.580422060496
+                    ]
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "name": null,
+              "base_bbl": "3087470152",
+              "shape_area": "290.3203125",
+              "construction_year": "1960",
+              "ground_elevation": "7",
+              "mappluto_bbl": "3087470152",
+              "objectid": "683387",
+              "feature_code": "2100",
+              "shape_length": "79.811127081552371",
+              "height_roof": "24.87",
+              "last_status_type": "Constructed",
+              "bin": "3246402",
+              "last_edited_date": "2017-08-22T15:44:16.000Z",
+              "geom_source": "Photogrammetric",
+              "doitt_id": "271901"
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [
+                      -73.943993290335,
+                      40.57827813497
+                    ],
+                    [
+                      -73.944066294844,
+                      40.578271570591
+                    ],
+                    [
+                      -73.94407321619,
+                      40.578316314718
+                    ],
+                    [
+                      -73.944000211631,
+                      40.578322880002
+                    ],
+                    [
+                      -73.943993290335,
+                      40.57827813497
+                    ]
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "name": null,
+              "base_bbl": "3087510441",
+              "shape_area": "54.0390625",
+              "construction_year": "1940",
+              "ground_elevation": "8",
+              "mappluto_bbl": "3087510441",
+              "objectid": "77820",
+              "feature_code": "5110",
+              "shape_length": "29.573456484793752",
+              "height_roof": "11.21",
+              "last_status_type": "Constructed",
+              "bin": "3377918",
+              "last_edited_date": "2017-08-17T16:48:52.000Z",
+              "geom_source": "Photogrammetric",
+              "doitt_id": "920804"
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [
+                      -73.945210309955,
+                      40.579216727858
+                    ],
+                    [
+                      -73.945288254996,
+                      40.579208282963
+                    ],
+                    [
+                      -73.945298667674,
+                      40.579264159156
+                    ],
+                    [
+                      -73.94522072257,
+                      40.579272604059
+                    ],
+                    [
+                      -73.945210309955,
+                      40.579216727858
+                    ]
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "name": null,
+              "base_bbl": "3087500389",
+              "shape_area": "72.4921875",
+              "construction_year": "1920",
+              "ground_elevation": "6",
+              "mappluto_bbl": "3087500389",
+              "objectid": "629715",
+              "feature_code": "5110",
+              "shape_length": "34.071867396178661",
+              "height_roof": "16.27",
+              "last_status_type": "Constructed",
+              "bin": "3411828",
+              "last_edited_date": "2017-08-17T16:28:33.000Z",
+              "geom_source": "Photogrammetric",
+              "doitt_id": "1177558"
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [
+                      -73.946224532491,
+                      40.580364640753
+                    ],
+                    [
+                      -73.946039110273,
+                      40.580384259091
+                    ],
+                    [
+                      -73.946030071301,
+                      40.580334595433
+                    ],
+                    [
+                      -73.946215494565,
+                      40.58031497801
+                    ],
+                    [
+                      -73.946224532491,
+                      40.580364640753
+                    ]
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "name": null,
+              "base_bbl": "3087450078",
+              "shape_area": "153.14453125",
+              "construction_year": "2020",
+              "ground_elevation": "7",
+              "mappluto_bbl": "3087450078",
+              "objectid": "756558",
+              "feature_code": "2100",
+              "shape_length": "56.3776997113597",
+              "height_roof": "29",
+              "last_status_type": "Constructed",
+              "bin": "3246383",
+              "last_edited_date": "2021-01-14T19:12:53.000Z",
+              "geom_source": "Other (Manual)",
+              "doitt_id": "1293773"
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [
+                      -73.946039110273,
+                      40.580384259091
+                    ],
+                    [
+                      -73.946224532491,
+                      40.580364640753
+                    ],
+                    [
+                      -73.946233142408,
+                      40.580411946622
+                    ],
+                    [
+                      -73.946047720061,
+                      40.580431564974
+                    ],
+                    [
+                      -73.946039110273,
+                      40.580384259091
+                    ]
+                  ]
+                ]
+              ]
+            },
+            "properties": {
+              "name": null,
+              "base_bbl": "3087450077",
+              "shape_area": "145.875",
+              "construction_year": "2020",
+              "ground_elevation": "7",
+              "mappluto_bbl": "3087450077",
+              "objectid": "996179",
+              "feature_code": "2100",
+              "shape_length": "55.680042412533759",
+              "height_roof": "29",
+              "last_status_type": "Constructed",
+              "bin": "3425940",
+              "last_edited_date": "2021-01-14T19:13:23.000Z",
+              "geom_source": "Other (Manual)",
+              "doitt_id": "1293774"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
