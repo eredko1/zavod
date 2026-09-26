@@ -16,158 +16,14 @@
 // and once the deck is empty (perfect information) he plays the endgame out by search.
 import { hangkit as K } from '../hangkit.js';
 
-const SUITS = ['♠', '♣', '♥', '♦'], RED = [false, false, true, true], RANK = { 6: '6', 7: '7', 8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
-const id = (c) => c.r * 4 + c.s, eq = (a, b) => a.r === b.r && a.s === b.s;
-const beats = (d, a, tr) => (d.s === a.s && d.r > a.r) || (d.s === tr && a.s !== tr);
-
-// ------------------------------------------------------------------ engine (pure-ish: state objects, clone for search)
-export function newGame(rng = Math.random, mode = 'perevodnoy') {
-  const deck = []; for (let s = 0; s < 4; s++) for (let r = 6; r <= 14; r++) deck.push({ r, s });
-  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
-  const hands = [[], []]; for (let k = 0; k < 6; k++) { hands[0].push(deck.pop()); hands[1].push(deck.pop()); }
-  const trumpCard = deck[0], tr = trumpCard.s;
-  const lowT = (h) => Math.min(...h.filter((c) => c.s === tr).map((c) => c.r), 99);
-  const l0 = lowT(hands[0]), l1 = lowT(hands[1]); const att = l0 === l1 ? (rng() < 0.5 ? 0 : 1) : l0 < l1 ? 0 : 1;
-  const G = { deck, trumpCard, tr, hands, table: [], att, def: 1 - att, taking: false, discard: [], firstBout: true, boutCap: 0, over: false, result: null, seen: new Set(), mode, shown: [] };
-  G.boutCap = cap(G); return G;
-}
-function cap(G) { return Math.min(G.firstBout ? 5 : 6, G.hands[G.def].length); }   // cards the defender can be asked to face this bout
-export const ranksOnTable = (G) => new Set(G.table.flatMap((p) => (p.d ? [p.a.r, p.d.r] : [p.a.r])));
-const unbeaten = (G) => G.table.filter((p) => !p.d).length;
-export function canThrow(G, c) {
-  if (G.over) return false;
-  if (!G.table.length) return !G.taking;   // leading a new bout
-  if (G.table.length >= G.boutCap) return false;
-  if (!G.taking && unbeaten(G) >= G.hands[G.def].length) return false;   // he couldn't cover another
-  return ranksOnTable(G).has(c.r);
-}
-/** transfer (переводной): only before any card on the table is beaten, same rank as the attack, and the other player can face it */
-export function canTransfer(G, c, show = false) {
-  if (G.mode !== 'perevodnoy' || G.taking || !G.table.length || G.table.some((p) => p.d)) return false;
-  const r = G.table[0].a.r; if (c.r !== r || G.table.some((p) => p.a.r !== r)) return false;
-  if (show && (c.s !== G.tr || G.shown.some((x) => eq(x, c)))) return false;
-  const n = G.table.length + (show ? 0 : 1); return n <= (G.firstBout ? 5 : 6) && G.hands[G.att].length >= n && (!show || n >= 1);
-}
-export function legalMoves(G) {   // for whoever is to act: { who, kind: 'play'|'beat'|'take'|'bito'|'done', c?, i? }
-  if (G.over) return [];
-  const A = G.att, D = G.def, out = [];
-  if (G.taking) { for (const c of G.hands[A]) if (canThrow(G, c)) out.push({ who: A, kind: 'play', c }); out.push({ who: A, kind: 'done' }); return out; }
-  if (!G.table.length) { for (const c of G.hands[A]) out.push({ who: A, kind: 'play', c }); return out; }
-  const open = G.table.findIndex((p) => !p.d);
-  if (open >= 0) { for (const c of G.hands[D]) if (beats(c, G.table[open].a, G.tr)) out.push({ who: D, kind: 'beat', c, i: open });
-    for (const c of G.hands[D]) { if (canTransfer(G, c)) out.push({ who: D, kind: 'transfer', c }); if (canTransfer(G, c, true)) out.push({ who: D, kind: 'show', c }); }
-    out.push({ who: D, kind: 'take' }); return out; }
-  for (const c of G.hands[A]) if (canThrow(G, c)) out.push({ who: A, kind: 'play', c }); out.push({ who: A, kind: 'bito' });
-  return out;
-}
-export const toAct = (G) => (G.over ? -1 : G.taking || !G.table.length || G.table.every((p) => p.d) ? G.att : G.def);
-const take1 = (h, c) => { const k = h.findIndex((x) => eq(x, c)); if (k > -1) h.splice(k, 1); };
-export function apply(G, m, search = false) {
-  const A = G.att, D = G.def;
-  if (m.kind === 'play') { take1(G.hands[A], m.c); G.table.push({ a: m.c, d: null }); if (!search) G.seen.add(id(m.c)); }
-  else if (m.kind === 'beat') { take1(G.hands[D], m.c); G.table[m.i].d = m.c; if (!search) G.seen.add(id(m.c)); }
-  else if (m.kind === 'take') { G.taking = true; }
-  else if (m.kind === 'transfer' || m.kind === 'show') {   // перевод: the attack (plus this card) goes back the other way
-    if (m.kind === 'transfer') { take1(G.hands[D], m.c); G.table.push({ a: m.c, d: null }); if (!search) G.seen.add(id(m.c)); } else G.shown.push(m.c);
-    G.att = D; G.def = A; G.boutCap = Math.min(G.firstBout ? 5 : 6, G.hands[G.def].length + 0, Math.max(G.table.length, G.hands[G.def].length)); if (!search) G.lastTransfer = { who: D, show: m.kind === 'show' };
-    checkOver(G); return;
-  }
-  else if (m.kind === 'done') { const got = G.table.flatMap((p) => (p.d ? [p.a, p.d] : [p.a])); G.hands[D].push(...got); if (!search) G.pickedUp = { who: D, cards: got }; endBout(G, false); return; }
-  else if (m.kind === 'bito') { G.discard.push(...G.table.flatMap((p) => [p.a, p.d])); endBout(G, true); return; }
-  // automatic ends: the attacker can't add anything more (or the defender is out) once everything's beaten / taken
-  if (!G.taking && G.table.length && G.table.every((p) => p.d) && (G.hands[D].length === 0 || G.hands[A].length === 0 || G.table.length >= G.boutCap) && G.deck.length === 0) { apply(G, { kind: 'bito' }, search); return; }
-  if (G.taking && (G.hands[A].length === 0 || G.table.length >= G.boutCap)) { apply(G, { kind: 'done' }, search); return; }
-  checkOver(G);
-}
-function endBout(G, beaten) {
-  G.table = []; G.taking = false; G.firstBout = false; G.shown = [];
-  for (const w of [G.att, G.def]) while (G.hands[w].length < 6 && G.deck.length) G.hands[w].push(G.deck.pop());   // attacker refills first
-  if (beaten) { const a = G.att; G.att = G.def; G.def = a; }
-  checkOver(G);
-  if (!G.over) { if (!G.hands[G.att].length) { const a = G.att; G.att = G.def; G.def = a; } G.boutCap = cap(G); }
-}
-function checkOver(G) {
-  if (G.deck.length || G.table.length) return;
-  const e0 = !G.hands[0].length, e1 = !G.hands[1].length;
-  if (e0 || e1) { G.over = true; G.result = e0 && e1 ? 'draw' : e0 ? 1 : 0; }   // result: index of the DURAK (or 'draw')
-}
-function clone(G) { return { deck: G.deck.slice(), trumpCard: G.trumpCard, tr: G.tr, hands: [G.hands[0].slice(), G.hands[1].slice()], table: G.table.map((p) => ({ a: p.a, d: p.d })), att: G.att, def: G.def, taking: G.taking, discard: G.discard.slice(), firstBout: G.firstBout, boutCap: G.boutCap, over: G.over, result: G.result, seen: G.seen, mode: G.mode, shown: G.shown.slice() }; }
-
-// ------------------------------------------------------------------ Arkasha
-const val = (c, tr) => (c.r - 6) + (c.s === tr ? 9 : 0);   // 0 (6 off-suit) … 17 (ace of trumps)
-/** what Arkasha knows of your hand: cards you picked up that you haven't played since */
-export function makeMemory() { return { yours: new Map() }; }
-export function remember(M, G) {
-  if (G.pickedUp && G.pickedUp.who === 0) { for (const c of G.pickedUp.cards) M.yours.set(id(c), c); }
-  G.pickedUp = null; for (const k of [...M.yours.keys()]) if (!G.hands[0].some((c) => id(c) === k)) M.yours.delete(k);
-}
-export function aiMove(G, M, me = 1) {
-  const moves = legalMoves(G).filter((m) => m.who === me); if (moves.length <= 1) return moves[0];
-  if (G.deck.length === 0) { const best = solve(G, me); if (best) return best; }   // perfect information: search it out
-  const tr = G.tr, late = G.deck.length <= 6, opp = G.hands[1 - me].length;
-  // ---- defending
-  if (G.def === me && !G.taking && G.table.some((p) => !p.d)) {
-    const open = G.table.filter((p) => !p.d).map((p) => p.a);
-    const plan = cheapestCover(open, G.hands[me], tr);
-    // перевод: showing the trump costs nothing; laying a cheap same-rank card beats paying for a defence
-    const show = moves.find((m) => m.kind === 'show'); if (show && (!plan || !late || opp >= G.table.length + 2)) return show;
-    const tx = moves.filter((m) => m.kind === 'transfer').sort((a, b) => val(a.c, tr) - val(b.c, tr))[0];
-    if (tx) { const costD = plan ? plan.reduce((q, c) => q + val(c, tr) + (c.s === tr ? 3 : 0), 0) : 99, costT = val(tx.c, tr) + (tx.c.s === tr ? 6 : 0);
-      if (!plan || costT + 1 < costD || (late && tx.c.s !== tr)) return tx; }
-    if (!plan) return moves.find((m) => m.kind === 'take');
-    const cost = plan.reduce((s, c) => s + val(c, tr), 0), tableJunk = G.table.every((p) => p.a.s !== tr && p.a.r <= 10);
-    const highTrump = plan.some((c) => c.s === tr && c.r >= (late ? 13 : 11));
-    if (!late && highTrump && tableJunk && G.hands[me].length <= 6 && G.deck.length > 10) return moves.find((m) => m.kind === 'take');   // don't burn a big trump on 6s and 7s
-    if (!late && cost >= 20 && tableJunk) return moves.find((m) => m.kind === 'take');
-    const want = plan[0]; return moves.find((m) => m.kind === 'beat' && eq(m.c, want)) || moves[0];
-  }
-  // ---- attacking / throwing in
-  const plays = moves.filter((m) => m.kind === 'play');
-  if (!G.table.length) {   // leading: cheapest card, and ranks we hold twice so we can keep pressing
-    const cnt = {}; for (const c of G.hands[me]) cnt[c.r] = (cnt[c.r] || 0) + 1;
-    const known = [...M.yours.values()];
-    const score = (c) => val(c, tr) - (cnt[c.r] - 1) * 1.6 - (known.some((k) => k.s === c.s && k.r > c.r) || (c.s !== tr && known.some((k) => k.s === tr)) ? 0 : 0.8) + (c.s === tr && !late ? 6 : 0);
-    return plays.sort((a, b) => score(a.c) - score(b.c))[0];
-  }
-  const stop = moves.find((m) => m.kind === 'bito' || m.kind === 'done');
-  if (!plays.length) return stop;
-  const giving = G.taking;   // he's taking: dump what we don't need, keep what hurts him later
-  const ok = plays.filter((m) => { const v = val(m.c, tr); if (giving) return m.c.s !== tr ? v <= (late ? 8 : 5) : late && v <= 11 && opp > 3; return m.c.s !== tr && (late ? v <= 8 : v <= 4); });
-  if (!ok.length) return stop;
-  return ok.sort((a, b) => val(a.c, tr) - val(b.c, tr))[0];
-}
-/** cheapest way to cover every open attack card (tiny brute force: ≤ 6 × ≤ 12) */
-function cheapestCover(open, hand, tr) {
-  let best = null, bestCost = 1e9;
-  const rec = (i, used, picks, cost) => {
-    if (cost >= bestCost) return;
-    if (i === open.length) { best = picks.slice(); bestCost = cost; return; }
-    for (let k = 0; k < hand.length; k++) { if (used & (1 << k)) continue; const c = hand[k]; if (!beats(c, open[i], tr)) continue; picks.push(c); rec(i + 1, used | (1 << k), picks, cost + val(c, tr) * 1 + (c.s === tr ? 3 : 0)); picks.pop(); }
-  };
-  rec(0, 0, [], 0); return best;
-}
-/** deck empty: full-information minimax (alpha-beta + memo, node budget); returns the best move or null if out of budget */
-function solve(G, me) {
-  let nodes = 0; const LIMIT = 90000, memo = new Map();
-  const key = (S) => S.hands.map((h) => h.map(id).sort((a, b) => a - b).join('.')).join('|') + '/' + S.table.map((p) => id(p.a) + ':' + (p.d ? id(p.d) : '')).join(',') + '/' + S.att + (S.taking ? 't' : '') + S.boutCap;
-  const evalS = (S) => { const h0 = S.hands[1 - me].length, h1 = S.hands[me].length; return Math.tanh((h0 - h1) * 0.15); };   // heuristic when the budget runs out
-  function mm(S, depth, a, b) {
-    if (S.over) return S.result === 'draw' ? 0 : S.result === me ? -1 : 1;
-    if (++nodes > LIMIT || depth > 40) return evalS(S);
-    const k = key(S); const hit = memo.get(k); if (hit !== undefined) return hit;
-    const who = toAct(S), max = who === me; let v = max ? -2 : 2;
-    const ms = orderMoves(legalMoves(S), S.tr);
-    for (const m of ms) { const T = clone(S); apply(T, m, true); const r = mm(T, depth + 1, a, b);
-      if (max) { if (r > v) v = r; if (v > a) a = v; } else { if (r < v) v = r; if (v < b) b = v; } if (a >= b) break; }
-    if (nodes <= LIMIT) memo.set(k, v); return v;
-  }
-  let best = null, bv = -3; const root = orderMoves(legalMoves(G).filter((m) => m.who === me), G.tr);
-  for (const m of root) { const T = clone(G); apply(T, m, true); const r = mm(T, 1, -2, 2); if (r > bv) { bv = r; best = m; } if (nodes > LIMIT) break; }
-  return nodes > LIMIT && bv < 0.99 ? null : best;
-}
-function orderMoves(ms, tr) { return ms.sort((a, b) => (a.c ? val(a.c, tr) : 30) - (b.c ? val(b.c, tr) : 30)); }
+import { SUITS, RED, RANK, id, eq, beats, newGame, ranksOnTable, canThrow, canTransfer, legalMoves, toAct, apply, makeMemory, remember, aiMove } from './durak-engine.js';
+export { newGame, ranksOnTable, canThrow, canTransfer, legalMoves, toAct, apply, makeMemory, remember, aiMove, active, next, toJSON, fromJSON } from './durak-engine.js';   // the rules + Arkasha live in durak-engine.js (2–4 players)
 
 // ------------------------------------------------------------------ the table UI
+// One render path for both tables: solo vs ARKASHA (seat 0 = you, seat 1 = him, his moves run here) and the shared table
+// over the net (openDurak(ctx, { mp }) — durak-mp.js owns the state and the AI seats; this only draws it seat-relative:
+// your seat at the bottom, everyone else across the top clockwise, and only YOUR hand face up).
+import { next as nextSeat } from './durak-engine.js';
 let U = null;
 const LINES = {   // «Бурбон, братва, Гудзон»
   hello: ['Бурбон, братва, Гудзон! Садись, раздаю.', 'Карты на стол — узнаем, кто дурак.', 'Садись. Медведь по козырям — ещё какой мастак.', 'Ты сдавай — бурбон я сам налью.'],
@@ -180,20 +36,30 @@ const LINES = {   // «Бурбон, братва, Гудзон»
   think: ['Хм…', 'Шейкер, лёд, вермут, бурбон…', 'Так-так…'],
 };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-export function openDurak(ctx, { stake = 0, onEnd, mode = 'perevodnoy' } = {}) {
-  if (U) return;
-  const G = newGame(Math.random, mode), M = makeMemory();
-  const root = document.createElement('div'); root.className = 'hkui durak'; document.body.appendChild(root);
+export function openDurak(ctx, { stake = 0, onEnd, mode = 'perevodnoy', mp = null } = {}) {
+  if (U) return false;
+  const G = mp ? null : newGame(Math.random, mode), M = mp ? null : makeMemory();
+  const root = document.createElement('div'); root.className = 'hkui durak' + (ctx.isTouch ? ' touch' : ''); document.body.appendChild(root);
   if (!document.getElementById('durak-css')) { const st = document.createElement('style'); st.id = 'durak-css'; st.textContent = CSS; document.head.appendChild(st); }
-  U = { ctx, G, M, root, stake, onEnd, mode, busy: false, say: pick(LINES.hello), sel: null, choose: null }; ctx.durakOpen = true;   // radio.js plays Luna Park Radio at the table
+  U = { ctx, G, M, root, stake, onEnd, mode, busy: false, say: mp ? '' : pick(LINES.hello), sel: null, choose: null, mp, me: 0, names: ['ТЫ', 'АРКАША'], v: null, deal: -1 }; ctx.durakOpen = true;   // radio.js plays Luna Park Radio at the table
   try { document.exitPointerLock?.(); } catch {}
   if (ctx.player) ctx.player.mounted = { dialog: true };
   try { ctx.world?.radio?.cue?.('Бурбон, братва, Гудзон'); } catch {}   // durak mode: the table's song from the top
   root.addEventListener('click', onClick); addEventListener('keydown', onKey, true);
-  render(); setTimeout(step, 700);
+  if (mp) syncMP(); render(); if (!mp) setTimeout(step, 700);
+  return true;
 }
 export function closeDurak() { if (U) close('reset'); }   // start fresh from the pause menu
+/** shared table: durak-mp.js calls this after every state it adopts (and with a line to say) */
+export function durakSync(say) { if (!U?.mp) return; if (say) U.say = say; syncMP(); render(); }
+export const durakOpen = () => !!U, durakMine = () => !!U?.mp;
+function syncMP() {
+  const v = U.mp.view(); U.v = v; U.G = v.G; U.me = v.me; U.names = v.names; U.stake = v.stake; U.busy = false;
+  if (v.deal !== U.deal) { U.deal = v.deal; U.done = false; U.choose = null; }
+  if (U.G?.over && !U.done) finish();
+}
 function close(result) {
   if (!U) return; const { ctx, root, onEnd } = U;
   removeEventListener('keydown', onKey, true); root.remove(); if (ctx.player?.mounted?.dialog) ctx.player.mounted = null; ctx.durakOpen = false;
@@ -202,42 +68,48 @@ function close(result) {
 }
 function onKey(e) {
   if (!U) return;
-  if (e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (U.G.over) close(U.G.result); else if (confirmQuit()) close('quit'); return; }
+  if (e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (!U.G || U.G.over || U.me < 0) close(U.G?.over ? U.G.result : 'quit'); else if (confirmQuit()) close('quit'); return; }
   if (e.code === 'KeyL') { e.preventDefault(); e.stopImmediatePropagation(); const S = U.ctx.settings; S.radio = S.radio === 'off' ? 'car' : 'off'; U.say = S.radio === 'off' ? 'Радио выключил.' : '📻 Luna Park Radio — погромче!'; render(); return; }
   if (e.code === 'Period') { return; }   // radio.js: next track
   if (/^Digit[1-9]$|^Numpad[1-9]$|^Key[FBVNPXQTMH]$|^Space$/.test(e.code)) { e.preventDefault(); e.stopImmediatePropagation();
+    if (U.mp && !U.G) { if ((e.code === 'Space' || e.code === 'KeyF') && U.v?.host) U.mp.deal(); return; }   // the lobby: the host deals
     const n = +e.code.replace(/\D/g, ''); if (n) { const c = sortedHand()[n - 1]; if (c) playCard(c); }
-    if (e.code === 'Space' || e.code === 'KeyF') { const mv = legalMoves(U.G).find((m) => m.who === 0 && (m.kind === 'bito' || m.kind === 'done' || m.kind === 'take')); if (mv) doMove(mv); } }
+    if (e.code === 'Space' || e.code === 'KeyF') { const mv = myMoves().find((m) => m.kind === 'bito' || m.kind === 'done' || m.kind === 'take'); if (mv) doMove(mv); } }
 }
-function confirmQuit() { if (U.quitArm && performance.now() - U.quitArm < 2500) return true; U.quitArm = performance.now(); U.say = 'Сдаёшься? Ещё раз Esc — и ты дурак.'; render(); return false; }
-function sortedHand() { const G = U.G; return G.hands[0].slice().sort((a, b) => (a.s === G.tr) - (b.s === G.tr) || a.s - b.s || a.r - b.r); }
+function confirmQuit() { if (U.quitArm && performance.now() - U.quitArm < 2500) return true; U.quitArm = performance.now(); U.say = U.mp ? 'Встаёшь? Ещё раз Esc — за тебя доиграет Саша (ставка сгорит).' : 'Сдаёшься? Ещё раз Esc — и ты дурак.'; render(); return false; }
+function sortedHand() { const G = U.G; if (!G || U.me < 0) return []; return G.hands[U.me].slice().sort((a, b) => (a.s === G.tr) - (b.s === G.tr) || a.s - b.s || a.r - b.r); }
+function myMoves() { const G = U.G; if (!G || U.me < 0 || G.over || toAct(G) !== U.me) return []; return legalMoves(G).filter((m) => m.who === U.me); }
 function onClick(e) {
   const t = e.target.closest('[data-act]'); if (!t || !U) return; const act = t.dataset.act;
   if (act === 'card') { const c = sortedHand()[+t.dataset.k]; if (c) playCard(c); }
   else if (act === 'pick') { const m = U.choose?.ms.find((x) => x.kind === t.dataset.k); if (m) doMove(m); }
   else if (act === 'cancel') { U.choose = null; render(); }
-  else if (act === 'take' || act === 'bito' || act === 'done') { const mv = legalMoves(U.G).find((m) => m.who === 0 && m.kind === act); if (mv) doMove(mv); }
-  else if (act === 'again') { const s = U.stake, cb = U.onEnd; U.onEnd = null; const r = U.G.result; close(r); cb?.(r, true); }
-  else if (act === 'leave') close(U.G.over ? U.G.result : 'quit');
+  else if (act === 'take' || act === 'bito' || act === 'done') { const mv = myMoves().find((m) => m.kind === act); if (mv) doMove(mv); }
+  else if (act === 'deal') U.mp?.deal();
+  else if (act === 'seats') U.mp?.seats(+t.dataset.k);
+  else if (act === 'again') { if (U.mp) { U.mp.again(); U.say = U.v?.host ? '' : 'Ждём раздачу…'; render(); return; } const cb = U.onEnd; U.onEnd = null; const r = U.G.result; close(r); cb?.(r, true); }
+  else if (act === 'leave') close(U.G?.over ? U.G.result : 'quit');
 }
 function playCard(c) {
-  const G = U.G; if (U.busy || toAct(G) !== 0) return;
-  const ms = legalMoves(G).filter((m) => m.who === 0 && m.c && eq(m.c, c));
-  if (!ms.length) { U.say = G.def === 0 && !G.taking && G.table.some((p) => !p.d) ? 'Этим не побьёшь.' : 'Так нельзя — только те ранги, что на столе.'; flash(c); render(); return; }
+  const G = U.G; if (!G || U.busy || U.me < 0 || toAct(G) !== U.me) return;
+  const ms = myMoves().filter((m) => m.c && eq(m.c, c));
+  if (!ms.length) { U.say = G.def === U.me && !G.taking && G.table.some((p) => !p.d) ? 'Этим не побьёшь.' : 'Так нельзя — только те ранги, что на столе.'; flash(c); render(); return; }
   const kinds = [...new Set(ms.map((m) => m.kind))];
   if (kinds.length > 1) { U.choose = { c, ms }; render(); return; }   // it could beat OR transfer: ask
   doMove(ms[0]);
 }
 function doMove(m) {
-  const G = U.G; U.choose = null; apply(G, m); remember(U.M, G);
+  U.choose = null;
+  try { U.ctx.audio?.play?.('ui_click'); } catch {}
+  if (U.mp) { U.busy = true; render(); U.mp.move(m); return; }   // the host applies it (ours or over the net) and hands us back the table
+  const G = U.G; apply(G, m); remember(U.M, G);
   if (m.kind === 'transfer' || m.kind === 'show') U.say = pick(['Ах ты ж… перевёл!', 'Перевод, значит. Ну-ну.', 'Хитро.']);
   if (m.kind === 'take' && m.who === 0) U.say = pick(LINES.youTake);
   if (m.kind === 'bito' && m.who === 0) U.say = pick(['Бито.', 'Ага, бито.']);
-  try { U.ctx.audio?.play?.('ui_click'); } catch {}
   render(); if (G.over) return finish(); setTimeout(step, 350);
 }
 function step() {
-  if (!U) return; const G = U.G; if (G.over) return finish();
+  if (!U || U.mp) return; const G = U.G; if (G.over) return finish();
   if (toAct(G) !== 1) { render(); return; }
   U.busy = true; render();
   setTimeout(() => {
@@ -250,8 +122,10 @@ function step() {
 }
 function finish() {
   const G = U.G; if (U.done) return; U.done = true;
-  const r = G.result; U.say = r === 'draw' ? pick(LINES.draw) : r === 0 ? pick(LINES.win) : pick(LINES.lose);
-  if (r === 0) { const sz = document.createElement('div'); sz.className = 'dk-sausage'; sz.textContent = '🌭'; U.root.appendChild(sz); setTimeout(() => sz.remove(), 1600); try { U.ctx.audio?.play?.('impact_flesh', { volume: 1.2 }); } catch {} }   // «получай сосиской в лоб!»
+  const r = G.result;
+  if (!U.mp) U.say = r === 'draw' ? pick(LINES.draw) : r === 0 ? pick(LINES.win) : pick(LINES.lose);
+  if (r === U.me) { const sz = document.createElement('div'); sz.className = 'dk-sausage'; sz.textContent = '🌭'; U.root.appendChild(sz); setTimeout(() => sz.remove(), 1600); try { U.ctx.audio?.play?.('impact_flesh', { volume: 1.2 }); } catch {} }   // «получай сосиской в лоб!»
+  if (U.mp) return;   // the shared table: durak-mp.js pays out; Arkasha's head-to-head score is his own
   const st = stats(); if (r === 'draw') st.d++; else if (r === 0) st.l++; else st.w++; saveStats(st);
   if (U.stake) { if (r === 1) { K.earn(U.stake * 2); } else if (r === 'draw') K.earn(U.stake); }
   render();
@@ -259,43 +133,86 @@ function finish() {
 export function stats() { try { return { w: 0, l: 0, d: 0, ...JSON.parse(localStorage.getItem('zavod.durak') || '{}') }; } catch { return { w: 0, l: 0, d: 0 }; } }
 function saveStats(s) { try { localStorage.setItem('zavod.durak', JSON.stringify(s)); } catch {} }
 function flash(c) { U.flash = id(c); setTimeout(() => { if (U) { U.flash = null; render(); } }, 400); }
+/** each winner's cut: the pot (stake × every seat, AI seats included) split by everyone but the durak */
+export const potShare = (stake, n) => Math.floor((stake * n) / Math.max(1, n - 1));
+const passedSet = (G) => new Set(Array.isArray(G.passed) ? G.passed : G.passed instanceof Set ? [...G.passed] : []);   // who has let the throw-in token go (engine field, if it keeps one)
 
 function cardHTML(c, extra = '', attrs = '') {
   const tr = U.G.tr === c.s ? ' trump' : '';
   return `<div class="dk-card${RED[c.s] ? ' red' : ''}${tr}${extra}" ${attrs}><span class="tl">${RANK[c.r]}<br>${SUITS[c.s]}</span><span class="mid">${SUITS[c.s]}</span><span class="br">${RANK[c.r]}<br>${SUITS[c.s]}</span></div>`;
 }
+function seatHTML(G, s, n) {
+  const out = (G.out || []).includes(s), turn = !G.over && toAct(G) === s, cnt = G.hands[s].length, small = n > 2;
+  const backs = Array.from({ length: Math.min(cnt, small ? 7 : 36) }, (_, k) => `<div class="dk-back${small ? ' sm' : ''}" style="--i:${k}"></div>`).join('');
+  const b = [];
+  if (!G.over && !out) { if (s === G.att) b.push('<em class="att">АТАКА</em>'); if (s === G.def) b.push(G.taking ? '<em class="take">БЕРЁТ</em>' : '<em class="def">ЗАЩИТА</em>'); if (passedSet(G).has(s)) b.push('<em class="ok">✓ ПАС</em>'); }
+  if (out) b.push('<em class="out">ВЫШЕЛ</em>');
+  const ai = U.mp && U.v?.ai?.[s] ? ' <i>AI</i>' : '';
+  return `<div class="dk-seat${turn ? ' turn' : ''}${out ? ' gone' : ''}" data-seat="${s}">${U.mp || small ? `<div class="nm">${esc(U.names[s])}${ai}${small ? ` <b>${cnt}</b>` : ''}</div>` : ''}<div class="dk-opp">${backs}</div><div class="bd">${b.join('')}</div></div>`;
+}
 function render() {
-  if (!U) return; const G = U.G, me = toAct(G) === 0 && !U.busy, st = stats();
-  const legal = new Set(legalMoves(G).filter((m) => m.who === 0 && m.c).map((m) => id(m.c))), txs = new Set(legalMoves(G).filter((m) => m.who === 0 && (m.kind === 'transfer' || m.kind === 'show')).map((m) => id(m.c)));
-  const hand = sortedHand().map((c, k) => cardHTML(c, (me && legal.has(id(c)) ? ' ok' : '') + (me && txs.has(id(c)) ? ' tx' : '') + (U.flash === id(c) ? ' bad' : ''), `data-act="card" data-k="${k}" style="--i:${k}"`)).join('');
-  const opp = G.hands[1].map((_, k) => `<div class="dk-back" style="--i:${k}"></div>`).join('');
+  if (!U) return; const G = U.G;
+  if (!G) return renderLobby();
+  const me = U.me, n = G.n || G.hands.length, mine = U.busy ? [] : myMoves(), myTurn = mine.length > 0, st = stats();
+  const legal = new Set(mine.filter((m) => m.c).map((m) => id(m.c))), txs = new Set(mine.filter((m) => m.kind === 'transfer' || m.kind === 'show').map((m) => id(m.c)));
+  const hs = sortedHand(), cw = innerWidth < 620 ? 52 : 74, W = Math.min(innerWidth - 24, 900), ov = hs.length > 1 ? Math.max(-(cw - 16), Math.min(-Math.round(cw * 0.35), (W - cw * hs.length) / (hs.length - 1))) : 0;
+  const hand = hs.map((c, k) => cardHTML(c, (legal.has(id(c)) ? ' ok' : '') + (txs.has(id(c)) ? ' tx' : '') + (U.flash === id(c) ? ' bad' : ''), `data-act="card" data-k="${k}" style="--i:${k}"`)).join('');
+  const others = me >= 0 ? Array.from({ length: n - 1 }, (_, k) => (me + 1 + k) % n) : Array.from({ length: n }, (_, k) => k);
+  const seats = others.map((s) => seatHTML(G, s, n)).join('');
   const table = G.table.map((p) => `<div class="dk-pair">${cardHTML(p.a)}${p.d ? cardHTML(p.d, ' def') : ''}</div>`).join('');
   const deck = G.deck.length ? `<div class="dk-deck">${G.deck.length > 1 ? '<div class="dk-back stack"></div>' : ''}${cardHTML(G.trumpCard, ' turned')}<b>${G.deck.length}</b></div>` : `<div class="dk-deck empty">козырь <span class="${RED[G.tr] ? 'red' : ''}">${SUITS[G.tr]}</span></div>`;
-  const moves = legalMoves(G).filter((m) => m.who === 0);
-  const btn = (k, t) => (moves.some((m) => m.kind === k) && me ? `<button data-act="${k}">${t}</button>` : '');
-  const status = G.over ? '' : U.busy ? 'Аркаша думает…' : toAct(G) === 0 ? (G.def === 0 && !G.taking ? (txs.size ? 'Отбивайся, переводи — или бери' : 'Отбивайся — или бери') : G.taking ? 'Он берёт — подкидывай или хватит' : G.table.length ? 'Подкидывай — или бито' : 'Твой ход — заходи') : '';
-  const KN = { beat: 'Бить', transfer: 'Перевести', show: 'Показать козыря (перевод)' };
+  const tgt = me >= 0 && txs.size ? nextSeat(G, me) : -1, tgtName = tgt >= 0 && n > 2 ? ` → ${esc(U.names[tgt])}` : '';
+  const iAtt = me === G.att, btn = (k, t) => (mine.some((m) => m.kind === k) ? `<button data-act="${k}">${t}</button>` : '');
+  const who = toAct(G), whoName = esc(U.names[who] || '');
+  const status = G.over ? '' : me < 0 ? `Смотришь — сядешь со следующей раздачи · ходит ${whoName}` : U.busy ? (U.mp ? 'Ход отправлен…' : 'Аркаша думает…') : myTurn ? (G.def === me && !G.taking ? (txs.size ? `Отбивайся, переводи${tgtName} — или бери` : 'Отбивайся — или бери') : G.taking ? `${n > 2 ? esc(U.names[G.def]) : 'Он'} берёт — подкидывай или хватит` : G.table.length ? (iAtt ? 'Подкидывай — или бито' : 'Подкидывай — или пас') : 'Твой ход — заходи') : U.mp ? `${U.v?.ai?.[who] ? 'Думает' : 'Ходит'} ${whoName}…` : '';
+  const KN = { beat: 'Бить', transfer: `Перевести${tgtName}`, show: `Показать козыря (перевод${tgtName})` };
   const choose = U.choose ? `<div class="dk-choose">${U.choose.ms.map((m) => `<button data-act="pick" data-k="${m.kind}">${KN[m.kind] || m.kind}</button>`).join('')}<button data-act="cancel" class="ghost">Отмена</button></div>` : '';
   const radio = U.ctx.world?.radio?.now && U.ctx.settings?.radio !== 'off' ? `<div class="dk-radio">📻 ${U.ctx.world.radio.now} · L — выкл · . — дальше</div>` : `<div class="dk-radio off">📻 L — радио</div>`;
-  const end = G.over ? `<div class="dk-end"><h2>${G.result === 'draw' ? 'НИЧЬЯ' : G.result === 0 ? 'ТЫ ДУРАК' : 'АРКАША — ДУРАК'}</h2><p>${G.result === 1 && U.stake ? `+$${U.stake * 2}` : G.result === 0 && U.stake ? `−$${U.stake}` : ''}</p><button data-act="again">Ещё партию</button><button data-act="leave">Встать из-за стола</button></div>` : '';
+  let end = '';
+  if (G.over) {
+    const r = G.result, share = potShare(U.stake, n), money = !U.stake || me < 0 ? '' : r === 'draw' ? (U.mp ? `ставка $${U.stake} назад` : '') : r === me ? `−$${U.stake}` : `+$${share}`;
+    end = `<div class="dk-end"><h2>${r === 'draw' ? 'НИЧЬЯ' : r === me ? 'ТЫ ДУРАК' : `${esc(U.names[r])} — ДУРАК`}</h2><p>${money}</p>${U.mp && U.say ? `<p class="say">${esc(U.say)}</p>` : ''}<button data-act="again">Ещё партию</button><button data-act="leave">Встать из-за стола</button></div>`;
+  }
+  const title = U.mp ? `ОБЩИЙ СТОЛ <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${n} за столом · ${U.stake ? '$' + U.stake + ' с каждого' : 'на интерес'}</small>` : `АРКАША <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${st.w}–${st.l}${st.d ? '–' + st.d : ''} · ${U.stake ? '$' + U.stake + ' на кону' : 'на интерес'}</small>`;
+  const meB = U.mp && me >= 0 && !G.over ? ((G.out || []).includes(me) ? ' · ты вышел' : me === G.att ? ' · ты в атаке' : me === G.def ? ' · ты отбиваешься' : '') : '';
   U.root.innerHTML = `
-    <div class="dk-top"><div class="dk-who">АРКАША <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${st.w}–${st.l}${st.d ? '–' + st.d : ''} · ${U.stake ? '$' + U.stake + ' на кону' : 'на интерес'}</small></div><div class="dk-say">${U.say || ''}</div><div class="dk-opp">${opp}</div></div>
+    <div class="dk-top"><div class="dk-who">${title}</div><div class="dk-say">${esc(U.say || '')}</div><div class="dk-seats n${n}">${seats}</div></div>
     <div class="dk-mid">${deck}<div class="dk-table">${table}</div><div class="dk-bito">${G.discard.length ? `<div class="dk-back pile"></div><small>бито ${G.discard.length}</small>` : ''}</div></div>
-    <div class="dk-status">${status}</div>
-    <div class="dk-hand">${hand}</div>
-    <div class="dk-btns">${btn('take', 'Беру (F)')}${btn('bito', 'Бито (F)')}${btn('done', 'Хватит (F)')}</div>
-    <div class="dk-help">клик / 1–9 — карта · синяя рамка — можно перевести · F / пробел — беру · бито · L — радио · Esc — встать</div>${radio}${choose}${end}`;
+    <div class="dk-status${me >= 0 && who === me && !G.over ? ' mine' : ''}">${status}${meB}</div>
+    <div class="dk-hand" style="--ov:${Math.round(ov)}px">${hand}</div>
+    <div class="dk-btns">${btn('take', 'Беру (F)')}${btn('bito', iAtt ? 'Бито (F)' : 'Пас (F)')}${btn('done', 'Хватит (F)')}</div>
+    <div class="dk-help">${U.ctx.isTouch ? 'тап — карта · синяя рамка — можно перевести' : 'клик / 1–9 — карта · синяя рамка — можно перевести · F / пробел — беру · бито · пас · L — радио · Esc — встать'}</div>${radio}${choose}${end}`;
+}
+function renderLobby() {
+  const v = U.v || {}, seats = (v.seats || []).map((s) => `<li class="${s.ai ? 'ai' : ''}${s.me ? ' me' : ''}">${esc(s.n)}${s.ai ? ' <i>AI</i>' : ''}${s.me ? ' <i>ты</i>' : ''}</li>`).join('');
+  const cnt = [2, 3, 4].map((k) => `<button data-act="seats" data-k="${k}" class="${k === v.want ? '' : 'ghost'}"${k < (v.humans || 1) ? ' disabled' : ''}>${k}</button>`).join('');
+  const wait = v.wait?.length ? `<p>Ждут следующей раздачи: ${v.wait.map(esc).join(', ')}</p>` : '';
+  U.root.innerHTML = `
+    <div class="dk-top"><div class="dk-who">ОБЩИЙ СТОЛ <small>${v.mode === 'podkidnoy' ? 'подкидной' : 'переводной'} · ${v.stake ? '$' + v.stake + ' с каждого' : 'на интерес'}</small></div><div class="dk-say">${esc(U.say || 'ARKASHA: «Садитесь, братва. Места всем хватит.»')}</div></div>
+    <div class="dk-lobby"><h2>ЗА СТОЛОМ</h2><ol>${seats}</ol>${wait}
+      ${v.host ? `<div class="dk-cnt">мест: ${cnt}</div><button data-act="deal">Раздать (F)</button>` : `<p>Ждём, пока ${esc(v.hostName || 'хозяин стола')} раздаст…</p>`}
+      <button data-act="leave" class="ghost">Встать</button></div>`;
 }
 const CSS = `
-.durak{position:fixed;inset:0;z-index:60;background:radial-gradient(ellipse at 50% 45%,#2e6b45 0%,#1d4a31 55%,#0f2a1c 100%);color:#f2efe6;font:500 15px Barlow,Arial;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 12px 10px;user-select:none}
+.durak{position:fixed;inset:0;z-index:60;background:radial-gradient(ellipse at 50% 45%,#2e6b45 0%,#1d4a31 55%,#0f2a1c 100%);color:#f2efe6;font:500 15px Barlow,Arial;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 12px 10px;user-select:none;overflow:hidden}
 .durak .dk-top{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
-.durak .dk-who{font:700 18px 'Barlow Condensed',Arial;letter-spacing:.18em}.durak .dk-who small{font:500 12px Barlow;letter-spacing:.05em;opacity:.7;margin-left:8px}
-.durak .dk-say{min-height:22px;background:rgba(0,0,0,.35);padding:4px 12px;border-radius:14px;font-style:italic}
+.durak .dk-who{font:700 18px 'Barlow Condensed',Arial;letter-spacing:.18em;text-align:center}.durak .dk-who small{font:500 12px Barlow;letter-spacing:.05em;opacity:.7;margin-left:8px}
+.durak .dk-say{min-height:22px;background:rgba(0,0,0,.35);padding:4px 12px;border-radius:14px;font-style:italic;max-width:94%;text-align:center}
+.durak .dk-seats{display:flex;justify-content:center;gap:10px;width:100%}
+.durak .dk-seat{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 6px;border-radius:10px;min-width:0;flex:0 1 auto}
+.durak .dk-seats.n3 .dk-seat,.durak .dk-seats.n4 .dk-seat{flex:1 1 0;max-width:220px;background:rgba(0,0,0,.18)}
+.durak .dk-seat .nm{font:700 13px 'Barlow Condensed',Arial;letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.durak .dk-seat .nm b{background:rgba(0,0,0,.4);border-radius:8px;padding:0 6px;margin-left:4px}
+.durak .dk-seat i,.durak .dk-lobby i{font:600 10px Barlow;opacity:.6;font-style:normal}
+.durak .dk-seat.turn{box-shadow:0 0 0 2px #ffd23b,0 0 18px rgba(255,210,59,.55)}.durak .dk-seat.gone{opacity:.5}
+.durak .dk-seat .bd{display:flex;gap:4px;min-height:16px;flex-wrap:wrap;justify-content:center}.durak .dk-seat em{font:700 10px Barlow;font-style:normal;letter-spacing:.08em;padding:1px 6px;border-radius:8px;background:#444}
+.durak em.att{background:#c3121b}.durak em.def{background:#1f5fa8}.durak em.take{background:#b8860b}.durak em.ok{background:#2e7d32}.durak em.out{background:#555}
 .durak .dk-opp,.durak .dk-hand{display:flex;justify-content:center;min-height:118px;align-items:flex-end}
-.durak .dk-opp{min-height:92px}
-.durak .dk-back{width:62px;height:88px;border-radius:7px;background:repeating-linear-gradient(45deg,#8a1c24 0 6px,#a8262f 6px 12px);border:3px solid #f2efe6;box-shadow:0 2px 6px rgba(0,0,0,.4);margin-left:-34px}
+.durak .dk-opp{min-height:92px}.durak .dk-seats.n3 .dk-opp,.durak .dk-seats.n4 .dk-opp{min-height:44px}
+.durak .dk-back{width:62px;height:88px;border-radius:7px;background:repeating-linear-gradient(45deg,#8a1c24 0 6px,#a8262f 6px 12px);border:3px solid #f2efe6;box-shadow:0 2px 6px rgba(0,0,0,.4);margin-left:-34px;flex:none}
+.durak .dk-back.sm{width:26px;height:38px;border-width:2px;border-radius:4px;margin-left:-17px}
 .durak .dk-opp .dk-back:first-child,.durak .dk-hand .dk-card:first-child{margin-left:0}
 .durak .dk-card{position:relative;width:74px;height:106px;border-radius:8px;background:#fbfaf5;color:#1a1a1a;box-shadow:0 3px 8px rgba(0,0,0,.45);margin-left:-26px;cursor:pointer;transition:transform .12s,box-shadow .12s;flex:none}
+.durak .dk-hand .dk-card{margin-left:var(--ov,-26px)}
 .durak .dk-card.red{color:#c3121b}.durak .dk-card.trump{background:linear-gradient(#fbfaf5,#f5ecd0)}
 .durak .dk-card .tl,.durak .dk-card .br{position:absolute;font:700 15px/1.05 Georgia,serif;text-align:center}.durak .dk-card .tl{top:5px;left:6px}.durak .dk-card .br{bottom:5px;right:6px;transform:rotate(180deg)}
 .durak .dk-card .mid{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px}
@@ -306,20 +223,33 @@ const CSS = `
 .durak .dk-table{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:640px;min-width:200px}
 .durak .dk-pair{position:relative;width:86px;height:124px}.durak .dk-pair .dk-card{position:absolute;left:0;top:0;margin:0;cursor:default}
 .durak .dk-pair .dk-card.def{left:12px;top:16px;transform:rotate(12deg)}
-.durak .dk-deck{position:relative;width:110px;height:120px}.durak .dk-deck .dk-back.stack{position:absolute;left:0;top:10px;margin:0;z-index:2}
+.durak .dk-deck{position:relative;width:110px;height:120px;flex:none}.durak .dk-deck .dk-back.stack{position:absolute;left:0;top:10px;margin:0;z-index:2}
 .durak .dk-deck .dk-card.turned{position:absolute;left:26px;top:20px;transform:rotate(90deg);margin:0;cursor:default;z-index:1}
 .durak .dk-deck b{position:absolute;left:18px;top:-8px;font:700 13px Barlow;opacity:.8;z-index:3}.durak .dk-deck.empty{display:flex;align-items:center;justify-content:center;font:600 14px Barlow;opacity:.8}
 .durak .dk-deck.empty span{font-size:30px;margin-left:6px}.durak .red{color:#ff6a6a}
-.durak .dk-bito{width:90px;display:flex;flex-direction:column;align-items:center;gap:4px;opacity:.85}.durak .dk-back.pile{margin:0;transform:rotate(-14deg)}
-.durak .dk-status{font:700 14px 'Barlow Condensed';letter-spacing:.14em;color:#ffd27a;min-height:18px;text-transform:uppercase}
+.durak .dk-bito{width:90px;display:flex;flex-direction:column;align-items:center;gap:4px;opacity:.85;flex:none}.durak .dk-back.pile{margin:0;transform:rotate(-14deg)}
+.durak .dk-status{font:700 14px 'Barlow Condensed';letter-spacing:.14em;color:#ffd27a;min-height:18px;text-transform:uppercase;text-align:center}.durak .dk-status.mine{color:#fff3b0;text-shadow:0 0 10px rgba(255,210,59,.7)}
 .durak .dk-btns{display:flex;gap:10px;min-height:40px}.durak button{font:700 15px 'Barlow Condensed',Arial;letter-spacing:.12em;padding:9px 20px;border:0;border-radius:6px;background:#ffd23b;color:#1a1a1a;cursor:pointer}
-.durak .dk-help{font-size:12px;opacity:.55}
+.durak button:disabled{opacity:.35;cursor:default}
+.durak .dk-help{font-size:12px;opacity:.55;text-align:center}
 .durak .dk-sausage{position:absolute;left:50%;top:40%;font-size:40px;z-index:70;animation:dksaus 1.5s ease-in forwards;pointer-events:none}
 @keyframes dksaus{0%{transform:translate(260px,-240px) rotate(-60deg) scale(.6)}55%{transform:translate(-50%,-20%) rotate(20deg) scale(4.5)}62%{transform:translate(-50%,-10%) rotate(10deg) scale(4.2)}100%{transform:translate(-50%,160%) rotate(90deg) scale(3);opacity:0}}
 .durak .dk-hand .dk-card.tx{box-shadow:0 0 0 3px #4aa3ff,0 6px 12px rgba(0,0,0,.5)}
-.durak .dk-choose{position:absolute;left:50%;bottom:170px;transform:translateX(-50%);display:flex;gap:8px;background:rgba(0,0,0,.6);padding:10px;border-radius:10px}.durak button.ghost{background:#ddd}
+.durak .dk-choose{position:absolute;left:50%;bottom:170px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:8px;background:rgba(0,0,0,.6);padding:10px;border-radius:10px;max-width:94vw}.durak button.ghost{background:#ddd}
 .durak .dk-radio{position:absolute;right:14px;top:12px;font:600 12px Barlow;opacity:.8;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:12px}.durak .dk-radio.off{opacity:.45}
-.durak .dk-end{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
-.durak .dk-end h2{font:800 52px 'Barlow Condensed',Arial;letter-spacing:.12em;margin:0;color:#ffd23b}.durak .dk-end button{min-width:220px}
-@media (max-height:560px){.durak .dk-card{width:58px;height:84px}.durak .dk-back{width:48px;height:68px}.durak .dk-pair{width:70px;height:98px}.durak .dk-mid{min-height:120px}}
+.durak .dk-end{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:0 12px}
+.durak .dk-end h2{font:800 52px 'Barlow Condensed',Arial;letter-spacing:.12em;margin:0;color:#ffd23b}.durak .dk-end button{min-width:220px}.durak .dk-end .say{font-style:italic;opacity:.85;margin:0}
+.durak .dk-lobby{display:flex;flex-direction:column;align-items:center;gap:10px;margin:auto 0;background:rgba(0,0,0,.35);padding:16px 22px;border-radius:14px;max-width:94vw}
+.durak .dk-lobby h2{font:800 30px 'Barlow Condensed',Arial;letter-spacing:.14em;margin:0;color:#ffd23b}.durak .dk-lobby ol{margin:0;padding-left:22px;font:600 17px Barlow;line-height:1.6}.durak .dk-lobby li.ai{opacity:.7}.durak .dk-lobby li.me{color:#ffd23b}
+.durak .dk-lobby p{margin:0;opacity:.8;text-align:center}.durak .dk-cnt{display:flex;gap:6px;align-items:center}.durak .dk-cnt button{padding:6px 14px}
+.durak.touch button{padding:12px 20px;min-height:44px}
+@media (max-height:560px){.durak .dk-card{width:58px;height:84px}.durak .dk-back{width:48px;height:68px}.durak .dk-back.sm{width:22px;height:32px}.durak .dk-pair{width:70px;height:98px}.durak .dk-mid{min-height:120px}}
+@media (max-width:860px){.durak .dk-radio{display:none}}
+@media (max-width:620px){.durak{padding:8px 6px 6px;font-size:13px}.durak .dk-card{width:52px;height:76px;border-radius:6px}.durak .dk-card .tl,.durak .dk-card .br{font-size:12px}.durak .dk-card .mid{font-size:24px}
+  .durak .dk-back{width:44px;height:64px;margin-left:-28px}.durak .dk-back.sm{width:20px;height:30px;margin-left:-14px}.durak .dk-opp{min-height:66px}.durak .dk-hand{min-height:92px}
+  .durak .dk-seats{gap:4px}.durak .dk-seat{padding:3px 2px}.durak .dk-seat .nm{font-size:11px}.durak .dk-seat em{font-size:9px;padding:1px 4px}
+  .durak .dk-mid{gap:6px;min-height:130px}.durak .dk-table{gap:6px;min-width:0;flex:1 1 auto}.durak .dk-pair{width:60px;height:88px}.durak .dk-pair .dk-card.def{left:8px;top:11px}
+  .durak .dk-deck{width:64px;height:90px}.durak .dk-deck .dk-card.turned{left:12px;top:8px}.durak .dk-bito{width:48px}.durak .dk-deck.empty{flex-direction:column;font-size:11px}.durak .dk-deck.empty span{font-size:22px;margin:0}.durak .dk-back.pile{margin:0}
+  .durak .dk-status{font-size:12px;letter-spacing:.08em}.durak .dk-btns{gap:6px;flex-wrap:wrap;justify-content:center}.durak .dk-help{font-size:10px}
+  .durak .dk-end h2{font-size:34px}.durak .dk-radio{display:none}.durak .dk-who{font-size:14px}.durak .dk-who small{display:block;margin:0}.durak .dk-choose{bottom:130px}}
 `;

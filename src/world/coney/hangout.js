@@ -12,6 +12,7 @@ import { buildChill, buildCrews, gunShop } from './chill.js';
 import { buildJobs, jobsTalk, startIce, finishIce } from './jobs.js';
 import { sell } from '../hangkit.js';
 import { openDurak, closeDurak, stats as durakStats } from './durak.js';
+import { initDurakMP, tableChoices as durakTableChoices, tableLine as durakTableLine } from './durak-mp.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -381,6 +382,7 @@ function buildDurakPark() {
   H.arkady = { pos: c.clone(), seat: seatYou, fig: pf };
   try { tableRegulars(g, c); } catch (e) { console.warn('[hangout] regulars', e); }
   K.vendor({ name: 'ARKASHA', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
+  try { initDurakMP(ctx, { pos: () => H.arkady?.pos }); } catch (e) { console.warn('[hangout] durak-mp', e); }   // the shared table online (coney/durak-mp.js)
   (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: 'DURAK · ARKASHA', x: c.x, z: c.z, kind: 'shop' });
 }
 function playDurak(stake, mode = 'perevodnoy') {
@@ -398,9 +400,10 @@ function serveManhattan() {
 function arkadyTalk(Kk, again) {
   const st = durakStats();
   return {
-    text: again ? `ARKASHA: "Ну что, реванш? Счёт ${st.w}:${st.l} — в мою пользу, между прочим." *затягивается, отпивает манхэттен*` : 'ARKASHA: "Здорово. Дурака раскинем? Переводной — по-взрослому. Или подкидной, если боишься. Я не мухлюю — мне не надо." *отпивает манхэттен*',
+    text: (again ? `ARKASHA: "Ну что, реванш? Счёт ${st.w}:${st.l} — в мою пользу, между прочим." *затягивается, отпивает манхэттен*` : 'ARKASHA: "Здорово. Дурака раскинем? Переводной — по-взрослому. Или подкидной, если боишься. Я не мухлюю — мне не надо." *отпивает манхэттен*') + durakTableLine(),
     choices: [
       ...(K.has('ice') ? [{ label: `Вот лёд от Сэмми (${Math.round(K.state()?.iceLeft ?? 100)}%)`, go: () => serveManhattan() }] : [{ label: 'Налей Манхэттен', go: () => ({ text: 'ARKASHA: "Мне для «Манхэттена» лёд нужен — а лёд у Сэмми на W 8th. Сгоняй? Только бегом — пока несёшь, тает. Я же медведь культурный."', choices: [{ label: 'Сгоняю', go: () => { const d = H.deli?.door; if (d && H.arkady) startIce(d, H.arkady.pos); return { text: 'ARKASHA: "Давай. И если Сэмми спросит про «сзади» — не отвечай."', choices: [{ label: 'Ok', go: null }] }; } }, { label: 'Потом', go: null }] }) }]),
+      ...durakTableChoices(),   // online: open / join the shared table (2–4 humans, AI in the empty seats)
       { label: 'Переводной — for fun', go: () => playDurak(0, 'perevodnoy') },
       { label: 'Переводной — $20, winner takes $40', cost: 20, go: () => (K.pay(20) ? playDurak(20, 'perevodnoy') : { text: 'ARKASHA: "Двадцатки нет? Сыграем на интерес."', choices: [{ label: 'Давай', go: () => playDurak(0, 'perevodnoy') }, { label: 'Потом', go: null }] }) },
       { label: 'Подкидной — for fun', go: () => playDurak(0, 'podkidnoy') },
