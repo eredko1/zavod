@@ -490,7 +490,7 @@ function dropGun(ctx, s, hit) {
   const av = new THREE.Vector3(ctx.rng() - 0.5, ctx.rng() - 0.5, ctx.rng() - 0.5).multiplyScalar(9);
   const vel = new THREE.Vector3((s.vel?.x || 0) * 0.5 + (ctx.rng() - 0.5) * 1.5, 1.2 + ctx.rng(), (s.vel?.z || 0) * 0.5 + (ctx.rng() - 0.5) * 1.5);
   if (hit?.dir) vel.addScaledVector(hit.dir, 1.5);
-  m.userData.pickup = { id: g.id, reserve: irange(ctx, g.reserve) };
+  m.userData.pickup = { id: g.id, reserve: irange(ctx, g.reserve), owner: s };
   S.dropped.push({ mesh: m, vel, av, t: 0, landed: false });
 }
 const GUN_NAME = { ak74: 'AK-74M', m4a1: 'M4A1', mp5: 'MP5', r870: 'SHOTGUN', m24: 'M24 SNIPER' };
@@ -693,6 +693,8 @@ export async function init(ctx) {
       return out;
     },
   };
+  api.lootGun = (s) => { const d = S.dropped.find((q) => q.mesh.userData.pickup?.owner === s); if (!d) return null; const pk = d.mesh.userData.pickup;   // stab-kill: strip his gun
+    return { id: pk.id, reserve: pk.reserve, take: () => { ctx.scene.remove(d.mesh); const i = S.dropped.indexOf(d); if (i > -1) S.dropped.splice(i, 1); if (S.nearPickup === d) S.nearPickup = null; } }; };
   api.blood = (x, z, scale = 0.6, y = 0) => { try { placeBlood(ctx, x, z, scale, y); } catch {} };   // melee hits / street fights (coney chill)
   ctx.ai = api; S.api = api;
   return api;
@@ -774,10 +776,10 @@ export function update(dt, ctx) {
     const pp = ctx.player.position; let near = null, nd = 1.7 * 1.7;
     for (const d of S.dropped) { if (!d.landed || !d.mesh.userData.pickup) continue; const m = d.mesh.position; const dx = m.x - pp.x, dz = m.z - pp.z, dy = m.y - pp.y; const q = dx * dx + dz * dz + dy * dy * 0.25; if (q < nd) { nd = q; near = d; } }
     const prim = ctx.weapons?.primary; const take = (d) => { ctx.scene.remove(d.mesh); S.dropped.splice(S.dropped.indexOf(d), 1); if (S.nearPickup === d) S.nearPickup = null; };
-    if (near && prim && near.mesh.userData.pickup.id === prim.id) {   // same gun as yours: its ammo, just by walking over it
-      if (nd < 1.25 * 1.25) { const pk = near.mesh.userData.pickup; if (ctx.weapons.pickup(pk.id, pk.reserve)) { ctx.hud?.toast?.(`+${pk.reserve} ${GUN_NAME[pk.id] || pk.id.toUpperCase()} ammo`, 1400); take(near); } }
-      near = null;
-    }
+    if (near && ctx.weapons?.collect && nd < 1.25 * 1.25) {   // walk over any gun: new ones go in your bag (keys 1–9), owned ones give ammo
+      const pk = near.mesh.userData.pickup, r = ctx.weapons.collect(pk.id, pk.reserve);
+      if (r) { if (r === 'ammo') ctx.hud?.toast?.(`+${pk.reserve} ${GUN_NAME[pk.id] || pk.id.toUpperCase()} ammo`, 1400); take(near); near = null; }
+    } else if (near && prim && near.mesh.userData.pickup.id === prim.id) near = null;
     if (near !== S.nearPickup) { S.nearPickup = near; if (near) ctx.hud?.toast?.(`F — SWAP FOR ${GUN_NAME[near.mesh.userData.pickup.id] || near.mesh.userData.pickup.id.toUpperCase()}`, 2500); }
     api.nearPickup = near ? near.mesh.userData.pickup : null;
     if (near && ctx.input.pressed.has('KeyF')) {

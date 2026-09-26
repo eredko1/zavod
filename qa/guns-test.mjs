@@ -28,11 +28,10 @@ const cur = await pg.evaluate(() => window.__ctx.weapons.primary.id);
 const other = drops.find((d) => d.id !== cur);
 await pg.evaluate((p) => window.__game.teleport(p[0] + 0.6, 0, p[2], 0, -0.6), other.pos); await pg.waitForTimeout(700);
 await pg.screenshot({ path: `${out}/guns-swap-prompt.png` });
-await pg.keyboard.press('KeyF'); await pg.waitForTimeout(800);
-const cur2 = await pg.evaluate(() => window.__ctx.weapons.primary.id);
-ok(cur2 === other.id, `F swaps for the merc's ${other.id}`, `${cur} → ${cur2}`);
+await pg.waitForTimeout(500);
+const bag = await pg.evaluate(() => window.__ctx.weapons.bag);
+ok(bag.includes(other.id), `walking over the merc's ${other.id} puts it in your bag (keys 1–9)`, JSON.stringify(bag));
 drops = await pg.evaluate(() => window.__ctx.ai.qaDrops());
-ok(drops.some((d) => d.id === cur), 'your old gun lies where his was', JSON.stringify(drops.map((d) => d.id)));
 ok(await pg.evaluate(() => { window.__ctx.ai; return true; }), 'drops last 5 min (timer)', '300 s');
 await pg.close();
 // ---- 2. coney: respawn resupply + sniper wheel zoom + the Wonder Wheel ----

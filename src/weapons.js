@@ -115,7 +115,7 @@ export async function init(ctx) {
   ctx.bus.on('shot', (d) => { if (d && d.who === 'enemy' && d.origin && d.dir) { const o = d.origin.isVector3 ? d.origin : _v.set(d.origin[0] ?? d.origin.x, d.origin[1] ?? d.origin.y, d.origin[2] ?? d.origin.z); const dir = d.dir.isVector3 ? d.dir : _v2.set(d.dir[0] ?? d.dir.x, d.dir[1] ?? d.dir.y, d.dir[2] ?? d.dir.z); fx.enemyShot(o.clone(), dir.clone()); } });
   ctx.bus.on('playerDied', () => { S.dead = true; cancelActions(); });
   // respawn = resupplied: full mags + reserve on both guns (a picked-up merc gun stays your primary) and the grenades back
-  ctx.bus.on('playerRespawn', () => { S.dead = false; try { setLoadout(S.loadout || {}, { silent: true }); } catch (e) { console.warn('[weapons] respawn refill', e); } S.grenadeCount = GRENADES; ctx.bus.emit('resupply', {}); });
+  ctx.bus.on('playerRespawn', () => { S.dead = false; S.bank = {}; try { setLoadout(S.loadout || {}, { silent: true }); } catch (e) { console.warn('[weapons] respawn refill', e); } S.grenadeCount = GRENADES; ctx.bus.emit('resupply', {}); });
 
   // initial loadout from the URL (?primary=&secondary=), mirrored into settings
   const qs = ctx.qs || new URLSearchParams(location.search);
@@ -137,6 +137,7 @@ export async function init(ctx) {
     get loadout() { return { ...S.loadout }; },
     get stats() { return arsenalEntry(S.weapons[S.cur].spec).stats; },
     setLoadout: (lo) => setLoadout(lo),
+    collect: (id, reserve) => collectGun(id, reserve), selectBag: (i) => selectBag(i), get bag() { bagSync(); return S.bag.slice(); },
     /** Pick up a dropped weapon: same id as the current primary → +reserve ammo; otherwise it replaces the primary (with a full mag + the given reserve). */
     pickup: (id = 'ak74', reserve = 60) => {
       const cur = S.weapons[0]; if (!REGISTRY[id] || REGISTRY[id].spec.slot !== 0) return false;
@@ -244,6 +245,39 @@ function resetWeapon(w) {
   if (w.parts.boltHandle) { w.parts.boltHandle.position.copy(w.parts.boltHandle.userData.home); w.parts.boltHandle.rotation.set(0, 0, 0); }
   if (w.parts.shell) w.parts.shell.visible = false;
   for (const a of [w.parts.armL, w.parts.armR]) if (a) { a.position.copy(a.userData.home.pos); a.rotation.set(0, 0, 0); }
+}
+// ------------------------------------------------------------------ the bag: every gun you've collected (max 9, keys 1–9 /
+// numpad); the two equipped ones are live weapons, the rest wait in S.bank with the ammo they had
+const BAG_MAX = 9;
+function bagSync() { S.bag = S.bag || []; S.bank = S.bank || {}; for (const id of [S.loadout?.primary, S.loadout?.secondary]) if (id && REGISTRY[id] && !S.bag.includes(id)) S.bag.push(id); }
+function bankW(w) { if (w?.id) S.bank[w.id] = { ammo: w.ammo, reserve: w.reserve }; }
+function unbankW(w) { const b = w && S.bank[w.id]; if (b) { w.ammo = Math.min(b.ammo, w.spec.mag); w.reserve = b.reserve; w.cur.ammo = w.ammo; w.cur.reserve = w.reserve; } }
+const gunName = (id) => REGISTRY[id]?.spec?.name || String(id).toUpperCase();
+function bagLine() { bagSync(); return S.bag.map((id, i) => `${i + 1} ${gunName(id)}`).join(' · '); }
+function selectBag(i) {
+  bagSync(); const id = S.bag[i]; if (!id) return; const sp = REGISTRY[id]?.spec; if (!sp) return;
+  const slot = sp.slot === 1 ? 1 : 0;
+  if (S.locked?.has(slot)) { S.ctx.hud?.toast?.(S.lockMsg || 'Locked', 1400); return; }
+  if (S.weapons[slot]?.id === id) { startSwap(slot); return; }
+  S.weapons.forEach(bankW);
+  setLoadout(slot ? { primary: S.loadout.primary, secondary: id } : { primary: id, secondary: S.loadout.secondary }, { silent: true, keepBag: true });
+  S.weapons.forEach(unbankW);
+  if (slot === 1) { S.cur = 1; S.weapons[0].group.visible = false; S.weapons[1].group.visible = true; }
+  S.ctx.hud?.toast?.(`${i + 1} · ${sp.name}   —   ${bagLine()}`, 1800);
+}
+/** a gun comes your way (walk over it, strip a merc you stabbed): new → into the bag, owned → its ammo. false = bag full. */
+function collectGun(id, reserve = 30) {
+  bagSync(); const reg = REGISTRY[id]; if (!reg) return false;
+  const live = S.weapons.find((w) => w.id === id);
+  if (S.bag.includes(id)) {
+    if (live) { live.reserve += reserve; live.cur.reserve = live.reserve; if (live.ammo <= 0 && !S.reload && live === S.weapons[S.cur]) startReload(); }
+    else { const b = S.bank[id] || (S.bank[id] = { ammo: reg.spec.mag, reserve: 0 }); b.reserve += reserve; }
+    S.ctx.bus.emit('pickup', { id, ammo: true }); return 'ammo';
+  }
+  if (S.bag.length >= BAG_MAX) return false;
+  S.bag.push(id); S.bank[id] = { ammo: reg.spec.mag, reserve };
+  S.ctx.hud?.toast?.(`+ ${reg.spec.name} → press ${S.bag.length}   —   ${bagLine()}`, 2600); S.ctx.bus.emit('pickup', { id, ammo: false });
+  return 'new';
 }
 function setLoadout(lo = {}, opts = {}) {
   const ctx = S.ctx;
@@ -390,6 +424,7 @@ function fireShot(w, opts = {}) {
     const headshot = rays > 1 ? acc.head * 2 >= rays : acc.head > 0;
     const dmg = Math.round(acc.dmg); if (dmg <= 0) continue;
     try { ctx.ai?.damage?.(soldier, dmg, acc.point.clone(), headshot); } catch (e) { console.warn('[weapons] ai.damage', e); }
+    if (sp.melee && soldier.dead) { const pk = ctx.ai?.lootGun?.(soldier); if (pk && collectGun(pk.id, pk.reserve)) pk.take(); }   // stabbed him: his gun is yours
     ctx.bus.emit('hit', { soldier, damage: dmg, headshot, point: acc.point.clone(), pellets: acc.n });
   }
   for (const [peer, acc] of remoteHits) {
@@ -446,12 +481,10 @@ export function update(dt, ctx) {
 
   // ---------- input ----------
   if (playing && dt > 0 && !S.dead && stowed) {
-    if (input.consume('Digit1')) startSwap(0);
-    if (input.consume('Digit2')) startSwap(1);
+    for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { selectBag(n - 1); break; }   // 1–9 / numpad: your collected guns
     S.triggerHeld = false; S.triggerPressed = false; S.adsTarget = 0; if (S.qaAds != null) S.adsTarget = 0;
   } else if (playing && dt > 0 && !S.dead) {
-    if (input.consume('Digit1')) startSwap(0);
-    if (input.consume('Digit2')) startSwap(1);
+    for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { selectBag(n - 1); break; }   // 1–9 / numpad: your collected guns
     if (input.mouse.wheel) {
       if (S.weapons[S.cur]?.spec?.scope && S.adsTarget) {   // sniper aimed: the wheel steps the scope zoom (x0.5 … x3 of its base magnification)
         S.zoomMul = clamp((S.zoomMul || 1) * (input.mouse.wheel < 0 ? 1.25 : 0.8), 0.5, 3);
