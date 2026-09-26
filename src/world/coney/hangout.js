@@ -367,7 +367,7 @@ function buildDurakPark() {
   const spliff = new THREE.Group(); { const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.008, 0.09, 8), new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.9 })); paper.rotation.z = Math.PI / 2; spliff.add(paper);
     const ember = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a1a })); ember.position.x = 0.047; spliff.add(ember); spliff.userData.ember = ember; }
   spliff.position.set(0.02, -0.03, 0.05); pf.handR.add(spliff);
-  let puffT = 2; world.updaters.push((dt) => { const e = spliff.userData.ember; e.material.color.setHSL(0.04, 1, 0.45 + 0.15 * Math.sin(performance.now() / 260)); if ((puffT -= dt) <= 0) { puffT = 4 + Math.random() * 4; try { K.puff?.(spliff.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.35, 0.9, 0.2))); } catch {}   // drifts up past his head, not in his face } });
+  let puffT = 2; world.updaters.push((dt) => { const e = spliff.userData.ember; e.material.color.setHSL(0.04, 1, 0.45 + 0.15 * Math.sin(performance.now() / 260)); if ((puffT -= dt) <= 0) { puffT = 4 + Math.random() * 4; try { K.puff?.(spliff.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.35, 0.9, 0.2))); } catch {} } });   // the puff drifts up past his head, not in his face
   const seatYou = new THREE.Vector3(0, 0, 1.3).applyMatrix4(g.matrixWorld);
   H.arkady = { pos: c.clone(), seat: seatYou, fig: pf };
   K.vendor({ name: 'ARKASHA', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
