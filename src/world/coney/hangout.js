@@ -46,7 +46,7 @@ export function buildHangout(world, M) {
   }
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'LUNA PARK HOUSES', x: b2.centre.x, z: b2.centre.z - 30, kind: 'landmark' });
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
-    help: 'Igor has side jobs (F → Got any work?)<br>F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>P · take a leak · Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy → JFK: north end of W 8th St<br>Roof: stairs at the end of the 19th-floor lobby (shoulder the door) · stairwell down: side door<br>Sammy\'s deli: W 8th St, across from the towers',
+    help: 'Igor has side jobs (F → Got any work?)<br>F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>P · take a leak · Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy loop: drive north up W 8th St<br>Roof: stairs at the end of the 19th-floor lobby (shoulder the door) · stairwell down: side door<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
   if (igorFig) H.igorHurt = K.hurtable(igorFig, { name: 'IGOR' });
   K.spot({ pos: H.igor, r: 2.4, when: () => !H.igorHurt?.down, prompt: 'F — TALK TO IGOR', act: talkIgor });

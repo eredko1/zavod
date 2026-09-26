@@ -55,7 +55,7 @@ export function build(world) {
     const os = W.onlineStart; if (os) P('TABLE PARK', os[0], os[2], 'park');
     P('WONDER WHEEL', LM.wheel.x, LM.wheel.z, 'ride'); P('CYCLONE', 194, -2, 'ride'); P('PARACHUTE JUMP', LM.pj.x, LM.pj.z, 'ride'); P('THUNDERBOLT', -189, 75, 'ride');
     P('STILLWELL AVE STATION', (LM.terminal.x0 + LM.terminal.x1) / 2, (LM.terminal.z0 + LM.terminal.z1) / 2, 'transit'); P('BALLPARK', (LM.ballpark.x0 + LM.ballpark.x1) / 2, (LM.ballpark.z0 + LM.ballpark.z1) / 2, 'landmark'); P('AQUARIUM', 370, 15, 'landmark');
-    P('BELT PKWY → JFK', 407, -548, 'road'); }   // the Belt Parkway run to JFK (its own zone, coney/belt.js)
+    P('BELT PKWY LOOP', 407, -548, 'road'); }   // the elevated Belt Parkway loop (its own zone, coney/belt.js)
   ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
   ctx.progress(0.23, 'coney: park'); buildPark(world, M);
 
