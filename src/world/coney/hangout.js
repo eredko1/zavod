@@ -10,6 +10,7 @@ import { buildPerson, peopleReady } from '../people.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews, gunShop } from './chill.js';
 import { buildJobs, jobsTalk } from './jobs.js';
+import { openDurak, stats as durakStats } from './durak.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -55,7 +56,8 @@ export function buildHangout(world, M) {
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
   try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
   try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
-  try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
+  try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
+  try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }   // ARKADY's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);
@@ -330,10 +332,60 @@ function setDoor(D, open, send) {
   if (send) ctx.net?.send?.('rdoor', { i: D.i, o: open ? 1 : 0 });
 }
 
+// ---- ARKADY's card table: a little paved park off building 1's lobby, a stone table, two stools; durak on F ----
+const B1 = new THREE.Vector3(137, 0, -293);   // Luna Park Houses building 1 (the tower south of building 2)
+function buildDurakPark() {
+  const { world, ctx } = H; if (!peopleReady()) return;
+  let t1 = null; for (const t of H.towers) if (t !== H.b2 && (!t1 || t.centre.distanceTo(B1) < t1.centre.distanceTo(B1))) t1 = t; if (!t1) return;
+  const door = t1.lobby.doors[0], dir = door.outside.clone().sub(door.inside).setY(0).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
+  const c = door.outside.clone().addScaledVector(dir, 6).addScaledVector(side, 7); c.y = 0;
+  const q = ctx.ai?.nav?.nearestFree?.(c.x, c.z, 8, 0); if (q) c.set(q.x, 0, q.z);
+  const g = new THREE.Group(); g.position.copy(c); g.rotation.y = Math.atan2(side.x, side.z); world.scene.add(g);
+  const M = (col, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: col, roughness: r, metalness: m });
+  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
+  add(new THREE.BoxGeometry(9, 0.06, 8), M(0x8d8a83, 0.95), 0, 0.03, 0);   // pavers
+  const stone = M(0xb9b4aa, 0.7); add(new THREE.CylinderGeometry(0.16, 0.22, 0.72, 12), stone, 0, 0.36, 0); add(new THREE.CylinderGeometry(0.55, 0.55, 0.06, 24), stone, 0, 0.75, 0);   // the table
+  { const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d'); x.fillStyle = '#c9c3b6'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2) { x.fillStyle = '#6b665c'; x.fillRect(32 + i * 24, 32 + j * 24, 24, 24); }
+    const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; const top = add(new THREE.CircleGeometry(0.54, 32), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 }), 0, 0.782, 0); top.rotation.x = -Math.PI / 2; }
+  for (const k of [-3, -1, 1, 2]) { const cd = add(new THREE.BoxGeometry(0.063, 0.003, 0.09), M(0xfbfaf5, 0.6), k * 0.07, 0.79, 0.05 * k); cd.rotation.y = k * 0.3; }   // a few cards face down
+  for (const sz of [-1, 1]) add(new THREE.CylinderGeometry(0.19, 0.21, 0.45, 12), stone, 0, 0.225, sz * 0.95);   // stools
+  add(new THREE.BoxGeometry(1.9, 0.06, 0.45), M(0x2e5a3a, 0.8), 3.2, 0.45, -2.6); add(new THREE.BoxGeometry(1.9, 0.4, 0.06), M(0x2e5a3a, 0.8), 3.2, 0.7, -2.82);   // a bench
+  add(new THREE.CylinderGeometry(0.07, 0.1, 4.6, 8), M(0x1c1c1c, 0.5, 0.6), -3.6, 2.3, -3.2); add(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshStandardMaterial({ color: 0xfff2d0, emissive: 0xffe0a0, emissiveIntensity: 0.7 }), -3.6, 4.7, -3.2);
+  for (const [x, z] of [[-3.4, 3], [3.6, 2.8]]) { add(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 7), M(0x4a3a2a, 1), x, 1.1, z); add(new THREE.SphereGeometry(1.4, 10, 8), M(0x3f5f30, 1), x, 3.1, z); }
+  g.updateMatrixWorld(true);
+  { const w = c; world.box([w.x - 0.55, 0, w.z - 0.55], [w.x + 0.55, 0.8, w.z + 0.55]); }
+  // ARKADY: late 30s, black hair, blue eyes, glasses — on the far stool, facing the table
+  const pf = buildPerson({ avatar: 'm02', pose: 'sit', glasses: 'clear', seed: 2 }); g.add(pf.group); pf.group.position.set(0, 0, -1.05); pf.group.rotation.y = 0;
+  world.updaters.push((dt) => pf.update(dt, 0));
+  const seatYou = new THREE.Vector3(0, 0, 1.3).applyMatrix4(g.matrixWorld);
+  H.arkady = { pos: c.clone(), seat: seatYou, fig: pf };
+  K.vendor({ name: 'ARKADY', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
+  (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: 'DURAK · ARKADY', x: c.x, z: c.z, kind: 'shop' });
+}
+function playDurak(stake) {
+  const { ctx } = H;
+  const start = () => openDurak(ctx, { stake, onEnd: (r, again) => { if (again) { if (stake && !K.pay(stake)) { K.toast('ARKADY: "Денег нет — играем на интерес."', 2200); setTimeout(() => playDurak(0), 50); } else setTimeout(() => playDurak(stake), 50); } } });
+  setTimeout(start, 30);   // after the dialog closes (it clears the seated flag)
+  return null;
+}
+function arkadyTalk(Kk, again) {
+  const st = durakStats();
+  return {
+    text: again ? `ARKADY: "Ну что, реванш? Счёт ${st.w}:${st.l} — в мою пользу, между прочим."` : 'ARKADY: "Здорово. Дурака раскинем? Подкидной, тридцать шесть карт, всё по-честному — я не мухлюю, мне не надо."',
+    choices: [
+      { label: 'Deal me in (for fun)', go: () => playDurak(0) },
+      { label: 'Play for $20 — winner takes $40', cost: 20, go: () => (K.pay(20) ? playDurak(20) : { text: 'ARKADY: "Двадцатки нет? Сыграем на интерес."', choices: [{ label: 'Давай', go: () => playDurak(0) }, { label: 'Потом', go: null }] }) },
+      { label: 'Remind me the rules', go: () => ({ text: 'ARKADY: "Козырь внизу колоды. Заходишь любой, я бью старшей той же масти или козырем. Подкидывать — только то, что уже на столе. Не можешь побить — берёшь. Колода кончилась — кто первый скинул, тот вышел. Остался с картами — дурак."', choices: [{ label: 'Раздавай', go: () => playDurak(0) }, { label: 'Потом', go: null }] }) },
+      { label: 'Later', go: null },
+    ],
+  };
+}
+
 /** QA hooks (window.__game.hangout) */
 export const hangoutQA = {
   state: () => { const s = K.state(); return H && s && { ...s, stash: s.inv.length, igor: H.igor?.toArray(), start: H.world.W.onlineStart, b2: H.b2?.centre.toArray(), lobby: H.b2?.lobby.cars.map((c) => c.pos.toArray()), top: H.b2?.top[0].cars.map((c) => c.pos.toArray()), deli: H.deli && { sammy: H.deli.sammy.toArray(), counter: H.deli.counter.toArray(), door: H.deli.door.toArray(), inside: H.deli.inside.toArray(), face: H.deli.face } }; },
   roof: () => { const r = H.b2?.roof?.top; return r && [...r.pos.toArray(), r.yaw]; },
+  arkady: () => H.arkady && { pos: H.arkady.pos.toArray(), seat: H.arkady.seat.toArray() },
   hurt: () => K.hurtState(), vendors: () => K.points().vendors, loadout: () => ({ ...H.ctx.weapons.loadout, cur: H.ctx.weapons.currentId }),
   roofDoor: (i = null) => { const D = H.roofDoors?.[i ?? H.towers.indexOf(H.b2)]; return D && { open: D.open, shoves: D.shoves, inside: D.d.inside.toArray(), outside: D.d.outside.toArray() }; },
   stairB: () => { const b = H.b2?.stairB; return b && { top: b.top.toArray(), bottom: b.bottom.toArray(), floors: b.floors, up: b.up, path: b.path.map((v) => v.toArray()) }; },

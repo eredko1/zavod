@@ -12,8 +12,9 @@ export const AVATARS = {
   m01: { g: 'm', tag: 'tourist' }, m03: { g: 'm', tag: 'older' }, m04: { g: 'm', dark: true }, m05: { g: 'm' }, m08: { g: 'm', tag: 'suit' },
   m10: { g: 'm', tag: 'track' }, m12: { g: 'm', dark: true }, m17: { g: 'm', tag: 'track' }, m18: { g: 'm', dark: true, tag: 'hood' }, m20: { g: 'm' },
   f01: { g: 'f' }, f09: { g: 'f', tag: 'older' }, f17: { g: 'f' },
+  m02: { g: 'm', solo: true },   // ARKADY (black hair, blue eyes — recoloured head texture); only when asked for by name
 };
-const MOBILE_SET = ['m03', 'm04', 'm10', 'm12', 'm20', 'm08', 'f09', 'f17'];
+const MOBILE_SET = ['m02', 'm03', 'm04', 'm10', 'm12', 'm20', 'm08', 'f09', 'f17'];
 const P = { ready: false, av: {}, clips: { m: {}, f: {} } };
 export const peopleReady = () => P.ready;
 export const peopleDebug = () => P;
@@ -73,7 +74,7 @@ function pickAvatar(o, seed) {
   const have = Object.keys(P.av); if (o.avatar && P.av[o.avatar]) return o.avatar;
   const lum = (c) => (((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11) / 255;
   const female = !!o.bun || !!o.female;
-  let pool = have.filter((id) => AVATARS[id].g === (female ? 'f' : 'm'));
+  let pool = have.filter((id) => AVATARS[id].g === (female ? 'f' : 'm') && !AVATARS[id].solo);
   if (!female && o.skin != null) { const dark = lum(o.skin) < 0.45; const p2 = pool.filter((id) => !!AVATARS[id].dark === dark); if (p2.length) pool = p2; }
   if (!pool.length) pool = have;
   return pool[Math.abs(seed) % pool.length];
@@ -149,7 +150,14 @@ export function buildPerson(o = {}) {
   const mat = (c, r = 0.9) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
   if (o.tam) { [0x1f7a33, 0xe0b422, 0xb4221c].forEach((c, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.125 - i * 0.01, 0.13 - i * 0.01, 0.05, 16), mat(c)); m.position.set(0, 0.02 + i * 0.045, -0.02); head.add(m); });
     const top = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(0x1f7a33)); top.scale.set(1.05, 0.7, 1.1); top.position.set(0, 0.14, -0.02); head.add(top); }
-  if (o.glasses) { const gm = mat(0x0a0a0a, 0.2); const bar = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.035, 0.012), gm); bar.position.set(0, -0.05, 0.1); head.add(bar); }
+  if (o.glasses) {   // thin dark rims: two lens frames, a bridge, temples back to the ears (o.glasses === 'clear' → see-through lenses)
+    const gm = mat(0x151515, 0.3), lens = new THREE.MeshStandardMaterial({ color: o.glasses === 'clear' ? 0xdfe8ee : 0x0a0a0a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: o.glasses === 'clear' ? 0.18 : 0.85 });
+    const G = new THREE.Group(); G.position.set(0, -0.045 + (o.glassesY || 0), 0.098 + (o.glassesZ || 0)); head.add(G);
+    for (const sx of [-1, 1]) { const f = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0028, 6, 20), gm); f.scale.set(1.25, 0.9, 1); f.position.set(sx * 0.033, 0, 0); G.add(f);
+      const l = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), lens); l.scale.set(1.25, 0.9, 1); l.position.set(sx * 0.033, 0, -0.001); G.add(l);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.004, 0.1), gm); t.position.set(sx * 0.064, 0.004, -0.05); G.add(t); }
+    const br = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.003, 0.003), gm); br.position.set(0, 0.006, 0); G.add(br);
+  }
   F.update(0.001, 0); F._mixer = mixer; F._act = act;
   return F;
 }
