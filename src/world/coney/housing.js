@@ -676,8 +676,15 @@ function coreInterior(L, p, Ht) {
   // roof stair: from the 19th-floor lobby's far end straight up through the core to a brick bulkhead on the roof
   const cm = (i0 + i1) / 2, SW = 0.75, sc0 = cm - SW, sc1 = cm + SW, nSt = Math.max(2, Math.ceil((Ht - yF) / 0.27)), rise = (Ht - yF) / nSt, tread = 0.3;   // rise <= 0.27 m: comfortably under the player step-up (0.45)
   const sa0 = mid + LOBBY_HALF, sf = sa0 + 0.9, sa1 = sf + nSt * tread + 0.9;   // door landing, flight, top landing   // + a top landing
-  col(A[0], ST, i0, A[1], yF, i1);
-  col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sa1, yF, i0, A[1], Ht, i1); colF(sa0, yF, i0, sa1, Ht, sc0); colF(sa0, yF, sc1, sa1, Ht, i1);
+  // fire stair B: a hallway beside the roof stair leads to a scissor stair (sh0..sh1) down to floor 16 — the smoking /
+  // pissing stairwell. Only where the core has room past the roof stair.
+  let stairB = null; const SHL = 4.6, sh0 = sa1 + 0.25, sh1 = sh0 + SHL, FL = Math.min(3, Math.floor(yF / ST) - 2), yD = yF - FL * ST, hasB = sh1 < A[1] - 0.4 && FL >= 1;
+  const hw1 = sc0 - 0.06;   // hallway: c ∈ [i0, hw1], a ∈ [sa0, sh0], 2.2 m tall
+  if (hasB) {
+    col(A[0], ST, i0, A[1], yD, i1); col(A[0], yD, i0, sh0, yF, i1); col(sh1, yD, i0, A[1], yF, i1);
+    col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sh1, yF, i0, A[1], Ht, i1); colF(sh0, yF + 2.4, i0, sh1, Ht, i1); colF(sa1, yF, sc0, sh0, Ht, i1);
+    colF(sa0, yF + 2.2, i0, sh0, Ht, sc0); colF(sa0, yF, hw1, sa1, yF + 2.2, sc0); colF(sa0, yF, sc1, sa1, Ht, i1);
+  } else { col(A[0], ST, i0, A[1], yF, i1); col(A[0], yF + CEIL, i0, sa0, Ht, i1); colF(sa1, yF, i0, A[1], Ht, i1); colF(sa0, yF, i0, sa1, Ht, sc0); colF(sa0, yF, sc1, sa1, Ht, i1); }
   colF(sa0, yF + 2.2, sc0, sa0 + 0.3, Ht, sc1);   // lobby-side header over the stair door
   col(A[0], yF, i0, mid - LOBBY_HALF, yF + CEIL, i1);
   for (let k = 0; k < nSt; k++) colF(sf + k * tread, yF, sc0, sa1, yF + (k + 1) * rise, sc1);
@@ -694,6 +701,25 @@ function coreInterior(L, p, Ht) {
     vis('hBrickPlain', sa1 - 0.1, Ht + 2.2, sc0, sa1, Ht + BH, sc1);   // door head
     for (const c of [sc0 + 0.04, sc1 - 0.04]) vis('hRail', sa1 - 0.08, Ht, c - 0.04, sa1, Ht + 2.2, c + 0.04);
     vis('hLobbyCeil', sa0 + 1.2, Ht + BH - 0.06, cm - 0.25, sa0 + 1.8, Ht + BH - 0.02, cm + 0.25); vis('hLobbyCeil', sa0 + 1.4, yF + CEIL - 0.05, cm - 0.2, sa0 + 1.9, yF + CEIL - 0.02, cm + 0.2); }
+  if (hasB) {   // ---- fire stair B geometry ----
+    const cmB = (i0 + i1) / 2, laneA = [i0 + 0.05, cmB - 0.1], laneB = [cmB + 0.1, i1 - 0.05], f0 = sh0 + 1.2, f1 = f0 + 1.8, nS = 6, rS = ST / 2 / nS, tS = (f1 - f0) / nS;
+    vis('hTerrazzo', sa0, yF, i0, sh0, yF + 0.02, hw1); vis('hLobbyCeil', sa0 + 2, yF + 2.15, i0 + 0.6, sa0 + 2.6, yF + 2.18, i0 + 1.1);    // hallway floor + light
+    for (const c of [i0 + 0.02, hw1]) vis('hLobbyWall', sa0, yF, c - 0.02, sh0, yF + 2.2, c + 0.02);
+    vis('hDoor', sh0 - 0.05, yF, i0 + 0.3, sh0, yF + 2.1, i0 + 1.4);   // propped-open fire door (a leaf against the wall)
+    for (let n = 0; n <= FL; n++) {   // landings: near (full floor) and far (half floor), slabs so the flight below stays clear
+      const y = yF - n * ST; colF(sh0, y - 0.25, i0, f0, y, i1); vis('hTerrazzo', sh0, y - 0.25, i0, f0, y, i1);
+      if (n < FL) { const yh = y - ST / 2; colF(f1, yh - 0.25, i0, sh1, yh, i1); vis('hTerrazzo', f1, yh - 0.25, i0, sh1, yh, i1);
+        for (let k = 0; k < nS; k++) {   // lane A: down along +a from the floor to the half landing; lane B: back along −a to the next floor
+          const ya = y - (k + 1) * rS; colF(f0 + k * tS, ya - 0.2, laneA[0], f0 + (k + 1) * tS, ya, laneA[1]); vis('hTerrazzo', f0 + k * tS, ya - 0.2, laneA[0], f0 + (k + 1) * tS, ya, laneA[1]);
+          const yb = yh - (k + 1) * rS; colF(f1 - (k + 1) * tS, yb - 0.2, laneB[0], f1 - k * tS, yb, laneB[1]); vis('hTerrazzo', f1 - (k + 1) * tS, yb - 0.2, laneB[0], f1 - k * tS, yb, laneB[1]); } }
+      vis('hDoor', sh0, y, laneB[0] + 0.3, sh0 + 0.05, y + 2.05, laneB[1] - 0.1);   // each floor's (locked) corridor door
+    }
+    vis('hLobbyWall', f0, yD, cmB - 0.1, f1, yF + 2.4, cmB + 0.1); colF(f0, yD, cmB - 0.1, f1, yF + 2.4, cmB + 0.1);   // scissor divider
+    for (const [a0, a1, c0, c1] of [[sh0, sh1, i0, i0 + 0.02], [sh0, sh1, i1 - 0.02, i1], [sh1 - 0.02, sh1, i0, i1], [sh0, sh0 + 0.02, hw1 + 0.1, i1]]) vis('hLobbyWall', a0, yD - 0.25, c0, a1, yF + 2.4, c1);   // painted block walls
+    vis('hLobbyCeiling', sh0, yF + 2.38, i0, sh1, yF + 2.42, i1);
+    for (let n = 0; n <= FL; n++) vis('hLobbyCeil', sh0 + 0.4, yF - n * ST + 2.2, cmB + 0.3, sh0 + 0.8, yF - n * ST + 2.24, cmB + 0.7);   // a bulb per landing
+    stairB = { top: [sh0 + 0.6, yF, (laneA[0] + laneA[1]) / 2], bottom: [sh0 + 0.6, yD, (laneB[0] + laneB[1]) / 2], floors: FL };
+  }
   // the roof hangout right outside the bulkhead door (where the stairs let you out): a couch along the rail, milk crates
   // and a boombox on the other side, string lights from the bulkhead to the parapet
   if (A[1] - sa1 > 4) { const y = Ht, a0 = sa1 + 1.4, a1 = Math.min(A[1] - 0.7, sa1 + 3.6), cR = C[1] - 0.45, cL = C[0] + 0.45;
@@ -743,11 +769,11 @@ function coreInterior(L, p, Ht) {
   vis('hLobbyFloor', mid - LOBBY_HALF, yF, i0, mid + LOBBY_HALF, yF + 0.03, i1);
   vis('hLobbyCeiling', mid - LOBBY_HALF, yF + CEIL - 0.07, i0, mid + LOBBY_HALF, yF + CEIL - 0.04, i1);
   for (let a = mid - LOBBY_HALF + 1.6; a < mid + LOBBY_HALF - 1; a += 2.8) vis('hLobbyCeil', a - 0.6, yF + CEIL - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, yF + CEIL - 0.075, (i0 + i1) / 2 + 0.3);
-  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF, sc1, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
+  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, yF, i0, mid - LOBBY_HALF, yF + CEIL, i1); if (hasB) { vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, i0 + 0.35); vis('hLobbyWall', mid + LOBBY_HALF, yF, i0 + 1.45, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF + 2.2, i0 + 0.35, mid + LOBBY_HALF + 0.05, yF + CEIL, i0 + 1.45); colF(sa0 - 0.02, yF, i0, sa0 + 0.05, yF + CEIL, i0 + 0.35); colF(sa0 - 0.02, yF, i0 + 1.45, sa0 + 0.05, yF + CEIL, hw1); } else vis('hLobbyWall', mid + LOBBY_HALF, yF, i0, mid + LOBBY_HALF + 0.05, yF + CEIL, sc0); vis('hLobbyWall', mid + LOBBY_HALF, yF, sc1, mid + LOBBY_HALF + 0.05, yF + CEIL, i1);
   for (const c of [sc0, sc1]) vis('hRail', mid + LOBBY_HALF - 0.04, yF, c - 0.05, mid + LOBBY_HALF + 0.06, yF + 2.2, c + 0.05); vis('hRail', mid + LOBBY_HALF - 0.04, yF + 2.15, sc0, mid + LOBBY_HALF + 0.06, yF + 2.22, sc1);   // stair door frame
   bank(yF);
   L.sign('hFloor19', P3(mid + LOBBY_HALF - 0.02, yF + 1.55, (sc1 + i1) / 2), nrmA(-1), 0.8, 0.8);                  // "19" on the far end wall, beside the roof stair
-  vis('hDoor', mid + LOBBY_HALF - 0.04, yF + 0.03, i0 + 0.35, mid + LOBBY_HALF, yF + 1.3, i0 + 0.95);             // compactor-chute hatch
+  vis('hDoor', mid + LOBBY_HALF - 0.04, yF + 0.03, i1 - 0.95, mid + LOBBY_HALF, yF + 1.3, i1 - 0.35);             // compactor-chute hatch
   const walks = [];
   for (const [cOut, cIn, sg] of [[C[0], i0, 1], [C[1], i1, -1]]) {
     col(mid - WALK_HALF, yF - 0.25, cOut, mid + WALK_HALF, yF, cIn);
@@ -778,7 +804,7 @@ function coreInterior(L, p, Ht) {
     walks.push({ cOut, cIn, sg });
   }
   const topCars = cars.map((cc) => ({ a: mid - LOBBY_HALF + 1.1, c: cc }));
-  return { ax, A, C, mid, i0, i1, cars, topCars, yF, walks, roof: { y: Ht, a: sa1 + 1.2, c: cm }, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF, open: OPEN };
+  return { ax, A, C, mid, i0, i1, cars, topCars, yF, walks, roof: { y: Ht, a: sa1 + 1.2, c: cm, door: { a: sa1 - 0.05, c0: sc0, c1: sc1, y: Ht } }, stairB, lobbyHalf: LOBBY_HALF, doorHalf: DOOR_HALF, walkHalf: WALK_HALF, open: OPEN };
 }
 
 /** World-space registry entry for one complex (used by coney/hangout.js). */
@@ -802,5 +828,11 @@ function towerInfo(core, m, centre) {
   }));
   // roof: the stair foot in the 19th-floor lobby (facing up the flight) and the roof spot outside the bulkhead door
   const roof = { foot: { pos: toWorld(core.mid + core.lobbyHalf - 0.8, core.yF, core.roof.c), yaw: yawOf(ea.clone()) }, top: { pos: toWorld(core.roof.a, core.roof.y, core.roof.c), yaw: yawOf(ea.clone()) } };
-  return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, roof, toWorld, core };
+  // the roof bulkhead door (hangout.js makes it a stuck door you shoulder open) + fire stair B endpoints
+  const rd = core.roof.door, rdA = toWorld(rd.a - 0.07, rd.y, rd.c0), rdB = toWorld(rd.a + 0.03, rd.y + 2.2, rd.c1);
+  roof.door = { min: new THREE.Vector3(Math.min(rdA.x, rdB.x), rd.y, Math.min(rdA.z, rdB.z)), max: new THREE.Vector3(Math.max(rdA.x, rdB.x), rd.y + 2.2, Math.max(rdA.z, rdB.z)),
+    hinge: toWorld(rd.a - 0.02, rd.y, rd.c0), along: ec.clone().normalize(), out: ea.clone().normalize(), width: rd.c1 - rd.c0,
+    inside: toWorld(rd.a - 0.8, rd.y + (core.roof.y - rd.y), (rd.c0 + rd.c1) / 2), outside: toWorld(rd.a + 0.9, rd.y, (rd.c0 + rd.c1) / 2) };
+  const stairB = core.stairB && { top: toWorld(...core.stairB.top), bottom: toWorld(...core.stairB.bottom), floors: core.stairB.floors, up: yawOf(ea.clone()) };   // up: yaw to climb the flight off the bottom landing
+  return { centre: new THREE.Vector3(centre[0], 0, centre[1]), yF: core.yF, lobby, top, roof, stairB, toWorld, core };
 }

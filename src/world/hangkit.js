@@ -99,7 +99,9 @@ function bindOnce(ctx) {
     if (!V || e.repeat || V.ctx.state !== 'playing' || V.dialog) return;
     if (e.code === 'KeyQ' && V.ctx.vehicles?.mounted?.spec?.car) { const p = V.ctx.vehicles.mounted.pos; horn(1); V.ctx.net?.send?.('horn', { p: [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); }
     if (e.code === 'KeyN') giveCash();
+    if (e.code === 'KeyP' && !V.ctx.vehicles?.mounted && !V.riding && !V.passenger && !V.piss) startPiss();
   });
+  ctx.bus.on('net:piss', (m) => { if (!V || !Array.isArray(m.p)) return; puddle(new THREE.Vector3(m.p[0], m.p[1], m.p[2])); const me = V.ctx.player.position; if (Math.hypot(me.x - m.p[0], me.z - m.p[2]) < 25) V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Somebody'} is taking a leak. Classy.`, 1800); });
   ctx.bus.on('net:horn', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player.position; const d = Math.hypot(me.x - m.p[0], me.z - m.p[2]); if (d < 160) horn(Math.max(0.08, 1 - d / 160)); });
   ctx.bus.on('net:cash', (m) => { if (!V || m.to !== V.ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 50)) return; api.earn(n); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} gave you $${n}`, 2000); });
   // bonus cash: every wave you get through pays everyone $15
@@ -107,10 +109,35 @@ function bindOnce(ctx) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
+// ---- P: take a leak (a stream, then a puddle friends can see). Somebody nearby usually has an opinion. ----
+const PISS_T = 3.2, SNARK = ['"Yo! Not on my block!"', '"Animal! In my day we used the Aquarium!"', '"Bro. BRO."', '"I\'m telling the super."', '"Classic stairwell move."'];
+function startPiss() {
+  const { ctx } = V; const p = ctx.player; if (!p || p.dead) return;
+  if (!V.stream) { const m = new THREE.InstancedMesh(new THREE.SphereGeometry(0.012, 5, 4), new THREE.MeshStandardMaterial({ color: 0xe8d44a, roughness: 0.1, transparent: true, opacity: 0.8 }), 26); m.frustumCulled = false; V.world.scene.add(m); V.stream = m; }
+  const fx = -Math.sin(p.yaw || 0), fz = -Math.cos(p.yaw || 0);
+  V.piss = { t: 0, o: new THREE.Vector3(p.position.x + fx * 0.18, p.position.y + 0.92, p.position.z + fz * 0.18), f: new THREE.Vector3(fx, 0, fz), done: false };
+  V.stream.visible = true; ctx.hud?.toast?.('Ahhh…', 1400);
+}
+const _pm = new THREE.Matrix4();
+function updatePiss(dt) {
+  const P = V.piss; if (!P) return; P.t += dt; const m = V.stream;
+  const k = Math.min(1, P.t / 0.4) * (P.t > PISS_T - 0.5 ? Math.max(0, (PISS_T - P.t) / 0.5) : 1), v0 = 1.5 * k;   // arc builds up, dribbles out
+  for (let i = 0; i < 26; i++) { const t = ((i / 26) + P.t * 2.2) % 1 * 0.55; const x = P.o.x + P.f.x * v0 * t, z = P.o.z + P.f.z * v0 * t, y = P.o.y + 0.5 * t * v0 * 0.4 - 4.9 * t * t; _pm.makeTranslation(x, Math.max(P.o.y - 0.9, y), z); m.setMatrixAt(i, _pm); }
+  m.instanceMatrix.needsUpdate = true;
+  if (!P.done && P.t > 1.2) { P.done = true; const at = new THREE.Vector3(P.o.x + P.f.x * 0.55, P.o.y - 0.9, P.o.z + P.f.z * 0.55); puddle(at); V.ctx.net?.send?.('piss', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)] });
+    const me = V.ctx.player.position; const near = (V.ctx.world?.mapThugs?.() || []).some(([x, z]) => Math.hypot(x - me.x, z - me.z) < 8) || V.vendors.some((v) => v.pos.distanceTo(me) < 8);
+    if (near) V.ctx.hud?.toast?.(SNARK[Math.floor(Math.random() * SNARK.length)], 2200); }
+  if (P.t >= PISS_T) { V.piss = null; m.visible = false; }
+}
+function puddle(at) {
+  if (!V.puddles) { V.puddles = []; V.puddleN = 0; const g = new THREE.CircleGeometry(0.34, 18); g.rotateX(-Math.PI / 2);
+    for (let i = 0; i < 12; i++) { const mm = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xd9c23a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.5, depthWrite: false })); mm.visible = false; mm.renderOrder = 2; V.world.scene.add(mm); V.puddles.push(mm); } }
+  const mm = V.puddles[V.puddleN++ % V.puddles.length]; mm.position.set(at.x, at.y + 0.015, at.z); mm.scale.set(1 + Math.random() * 0.5, 1, 0.7 + Math.random() * 0.4); mm.rotation.y = Math.random() * 6; mm.visible = true;
+}
 function update(dt) {
   const { ctx } = V; const p = ctx.player; if (!p) return;
   const playing = ctx.state === 'playing' && !p.dead;
-  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDrops(dt, playing);
+  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDrops(dt, playing); updatePiss(dt);
   for (const fn of V.onUpdate) { try { fn(dt, playing); } catch (e) { if (ctx.time.frame % 300 === 1) console.warn('[hangkit] map update', e); } }
   if (V.dialog) { if (!playing) closeDialog(); else { ctx.interactNear = true; faceVendor(dt); } return; }
   if (playing && ctx.input?.pressed?.has?.('KeyB') && (V.riding || V.passenger || ctx.vehicles?.mounted)) { ctx.input.pressed.delete('KeyB'); useItem(); }
