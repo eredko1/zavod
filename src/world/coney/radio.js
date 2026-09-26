@@ -33,7 +33,7 @@ export function buildRadio(world) {
   world.updaters.push(() => {
     if (ctx.world !== W) return;
     const car = !!ctx.vehicles?.mounted, mode = S.radio || 'car';
-    const want = (ctx.state === 'playing' || ctx.state === 'paused') && (mode === 'always' || (mode === 'car' && car));
+    const want = (ctx.state === 'playing' || ctx.state === 'paused') && (mode === 'always' || (mode === 'car' && (car || ctx.durakOpen)));   // plays at Arkasha's card table too
     if (!want) { if (R.on) stop(); return; }
     if (!(R.dur.every((d) => d > 0))) { for (const a of R.els) if (a.preload !== 'auto') { a.preload = 'auto'; a.load(); } return; }   // wait for durations
     const [i, off] = at();

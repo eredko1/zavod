@@ -57,7 +57,7 @@ export function buildHangout(world, M) {
   try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
   try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
-  try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }   // ARKADY's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
+  try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }   // ARKASHA's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);
@@ -332,7 +332,7 @@ function setDoor(D, open, send) {
   if (send) ctx.net?.send?.('rdoor', { i: D.i, o: open ? 1 : 0 });
 }
 
-// ---- ARKADY's card table: a little paved park off building 1's lobby, a stone table, two stools; durak on F ----
+// ---- ARKASHA's card table: a little paved park off building 1's lobby, a stone table, two stools; durak on F ----
 const B1 = new THREE.Vector3(137, 0, -293);   // Luna Park Houses building 1 (the tower south of building 2)
 function buildDurakPark() {
   const { world, ctx } = H; if (!peopleReady()) return;
@@ -354,28 +354,40 @@ function buildDurakPark() {
   for (const [x, z] of [[-3.4, 3], [3.6, 2.8]]) { add(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 7), M(0x4a3a2a, 1), x, 1.1, z); add(new THREE.SphereGeometry(1.4, 10, 8), M(0x3f5f30, 1), x, 3.1, z); }
   g.updateMatrixWorld(true);
   { const w = c; world.box([w.x - 0.55, 0, w.z - 0.55], [w.x + 0.55, 0.8, w.z + 0.55]); }
-  // ARKADY: late 30s, black hair, blue eyes, glasses — on the far stool, facing the table
+  // ARKASHA: late 30s, black hair, blue eyes, glasses — on the far stool, facing the table
   const pf = buildPerson({ avatar: 'm02', pose: 'sit', glasses: 'clear', seed: 2 }); g.add(pf.group); pf.group.position.set(0, 0, -1.05); pf.group.rotation.y = 0;
   world.updaters.push((dt) => pf.update(dt, 0));
+  // his Manhattan (a coupe of amber rye with a cherry) on the table, and a lit spliff between his fingers
+  { const glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transmission: 0.9, transparent: true, opacity: 0.35, thickness: 0.2 });
+    const stem = add(new THREE.CylinderGeometry(0.004, 0.004, 0.09, 8), glass, 0.22, 0.83, -0.42); stem.castShadow = false;
+    add(new THREE.CylinderGeometry(0.03, 0.03, 0.004, 16), glass, 0.22, 0.787, -0.42);
+    add(new THREE.CylinderGeometry(0.052, 0.01, 0.05, 16, 1, true), glass, 0.22, 0.9, -0.42);
+    add(new THREE.CylinderGeometry(0.046, 0.012, 0.036, 16), new THREE.MeshStandardMaterial({ color: 0x8a3a10, roughness: 0.1, transparent: true, opacity: 0.85 }), 0.22, 0.895, -0.42);
+    add(new THREE.SphereGeometry(0.009, 10, 8), new THREE.MeshStandardMaterial({ color: 0x7a0a14, roughness: 0.3 }), 0.215, 0.91, -0.415); }
+  const spliff = new THREE.Group(); { const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.008, 0.09, 8), new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.9 })); paper.rotation.z = Math.PI / 2; spliff.add(paper);
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a1a })); ember.position.x = 0.047; spliff.add(ember); spliff.userData.ember = ember; }
+  spliff.position.set(0.02, -0.03, 0.05); pf.handR.add(spliff);
+  let puffT = 2; world.updaters.push((dt) => { const e = spliff.userData.ember; e.material.color.setHSL(0.04, 1, 0.45 + 0.15 * Math.sin(performance.now() / 260)); if ((puffT -= dt) <= 0) { puffT = 4 + Math.random() * 4; try { K.puff?.(spliff.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.35, 0.9, 0.2))); } catch {}   // drifts up past his head, not in his face } });
   const seatYou = new THREE.Vector3(0, 0, 1.3).applyMatrix4(g.matrixWorld);
   H.arkady = { pos: c.clone(), seat: seatYou, fig: pf };
-  K.vendor({ name: 'ARKADY', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
-  (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: 'DURAK · ARKADY', x: c.x, z: c.z, kind: 'shop' });
+  K.vendor({ name: 'ARKASHA', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
+  (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: 'DURAK · ARKASHA', x: c.x, z: c.z, kind: 'shop' });
 }
-function playDurak(stake) {
+function playDurak(stake, mode = 'perevodnoy') {
   const { ctx } = H;
-  const start = () => openDurak(ctx, { stake, onEnd: (r, again) => { if (again) { if (stake && !K.pay(stake)) { K.toast('ARKADY: "Денег нет — играем на интерес."', 2200); setTimeout(() => playDurak(0), 50); } else setTimeout(() => playDurak(stake), 50); } } });
+  const start = () => openDurak(ctx, { stake, mode, onEnd: (r, again) => { if (again) { if (stake && !K.pay(stake)) { K.toast('ARKASHA: "Денег нет — играем на интерес."', 2200); setTimeout(() => playDurak(0, mode), 50); } else setTimeout(() => playDurak(stake, mode), 50); } } });
   setTimeout(start, 30);   // after the dialog closes (it clears the seated flag)
   return null;
 }
 function arkadyTalk(Kk, again) {
   const st = durakStats();
   return {
-    text: again ? `ARKADY: "Ну что, реванш? Счёт ${st.w}:${st.l} — в мою пользу, между прочим."` : 'ARKADY: "Здорово. Дурака раскинем? Подкидной, тридцать шесть карт, всё по-честному — я не мухлюю, мне не надо."',
+    text: again ? `ARKASHA: "Ну что, реванш? Счёт ${st.w}:${st.l} — в мою пользу, между прочим." *затягивается, отпивает манхэттен*` : 'ARKASHA: "Здорово. Дурака раскинем? Переводной — по-взрослому. Или подкидной, если боишься. Я не мухлюю — мне не надо." *отпивает манхэттен*',
     choices: [
-      { label: 'Deal me in (for fun)', go: () => playDurak(0) },
-      { label: 'Play for $20 — winner takes $40', cost: 20, go: () => (K.pay(20) ? playDurak(20) : { text: 'ARKADY: "Двадцатки нет? Сыграем на интерес."', choices: [{ label: 'Давай', go: () => playDurak(0) }, { label: 'Потом', go: null }] }) },
-      { label: 'Remind me the rules', go: () => ({ text: 'ARKADY: "Козырь внизу колоды. Заходишь любой, я бью старшей той же масти или козырем. Подкидывать — только то, что уже на столе. Не можешь побить — берёшь. Колода кончилась — кто первый скинул, тот вышел. Остался с картами — дурак."', choices: [{ label: 'Раздавай', go: () => playDurak(0) }, { label: 'Потом', go: null }] }) },
+      { label: 'Переводной — for fun', go: () => playDurak(0, 'perevodnoy') },
+      { label: 'Переводной — $20, winner takes $40', cost: 20, go: () => (K.pay(20) ? playDurak(20, 'perevodnoy') : { text: 'ARKASHA: "Двадцатки нет? Сыграем на интерес."', choices: [{ label: 'Давай', go: () => playDurak(0, 'perevodnoy') }, { label: 'Потом', go: null }] }) },
+      { label: 'Подкидной — for fun', go: () => playDurak(0, 'podkidnoy') },
+      { label: 'Remind me the rules', go: () => ({ text: 'ARKASHA: "Козырь внизу колоды. Заходишь любой, я бью старшей той же масти или козырем. Подкидывать — только то, что на столе. Не побил — берёшь. В переводном, пока ничего не побито, можешь положить такую же карту и перевести всё на меня — если у меня карт хватает. Или просто показать козыря той же масти — тоже перевод. Колода кончилась: кто первый скинул — вышел. Остался с картами — дурак."', choices: [{ label: 'Раздавай', go: () => playDurak(0, 'perevodnoy') }, { label: 'Потом', go: null }] }) },
       { label: 'Later', go: null },
     ],
   };

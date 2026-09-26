@@ -12,11 +12,11 @@ const r = await pg.evaluate(async () => {
     const play = ms.filter((m) => m.kind === 'play').sort((a, b) => v(a.c) - v(b.c)); if (play.length && (!G.table.length || v(play[0].c) < 6)) return play[0];
     return ms.find((m) => m.kind === 'bito' || m.kind === 'done' || m.kind === 'take') || ms[0]; };
   const out = {};
-  for (const [name, opp] of [['random', rnd], ['greedy', greedy]]) {
+  for (const [name, opp, mode] of [['random', rnd, 'podkidnoy'], ['greedy', greedy, 'podkidnoy'], ['random·perevod', rnd, 'perevodnoy'], ['greedy·perevod', greedy, 'perevodnoy']]) {
     let ark = 0, you = 0, draw = 0, stuck = 0, moves = 0, t0 = performance.now();
     for (let g = 0; g < 150; g++) {
-      const G = D.newGame(), M = D.makeMemory(); let n = 0;
-      while (!G.over && n < 600) { const who = D.toAct(G); const m = who === 1 ? D.aiMove(G, M, 1) : opp(G, 0); if (!m) { stuck++; break; } D.apply(G, m); D.remember(M, G); n++; }
+      const G = D.newGame(Math.random, mode), M = D.makeMemory(); let n = 0; let tx = 0;
+      while (!G.over && n < 600) { const who = D.toAct(G); const m = who === 1 ? D.aiMove(G, M, 1) : opp(G, 0); if (!m) { stuck++; break; } if (m.kind === 'transfer' || m.kind === 'show') out.transfers = (out.transfers || 0) + 1; D.apply(G, m); D.remember(M, G); n++; }
       moves += n; if (!G.over) stuck++; else if (G.result === 'draw') draw++; else if (G.result === 0) ark++; else you++;
       const all = G.hands[0].length + G.hands[1].length + G.deck.length + G.discard.length + G.table.flatMap((p) => [p.a, p.d]).filter(Boolean).length; if (all !== 36) { stuck++; out.badCount = all; }
     }
