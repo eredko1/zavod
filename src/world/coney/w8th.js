@@ -98,7 +98,7 @@ function buildTrains(world, S, u, n, at) {
   const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, 2 * NCAR); m.castShadow = true; m.frustumCulled = false; scene.add(m); return m; };
   const I = [mk(body, new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.35, metalness: 0.85 })), mk(win, new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff0c0, emissiveIntensity: 0.9 }))];
   const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(u.x, u.y)), one = new THREE.Vector3(1, 1, 1), m4 = new THREE.Matrix4();
-  const T = [{ lv: S.UP, o: -S.halfTrack, off: 0, k: 0 }, { lv: S.LO, o: S.halfTrack, off: 80, k: 1 }];
+  const T = [{ lv: S.LO, o: S.halfTrack, off: 80, k: 1 }];   // the Q below; the F upstairs is the rideable one (coney/subway.js)
   const CYC = 160, IN = 28, DW = 25, OUT = 28, STOP = S.L - 4, FAR = 190;   // along the elevated only (the Culver/Brighton alignment)
   const zero = new THREE.Vector3(0, 0, 0);
   world.updaters.push(() => {
