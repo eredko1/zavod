@@ -507,6 +507,7 @@ export async function init(ctx) {
     qaSpawn(x, z, yaw = 0, y = ctx.player?.position.y ?? 0) { S.grid.sync(ctx.colliders); const b = makeBike(x, z, yaw, y); S.grid.build(ctx.colliders); ctx.player?.rebuildColliders?.(); return b; },
     qaMount() { const b = nearestBike(); if (!b) return false; return mount(b); },
     /** Drive with fixed inputs for `seconds`; resolves when done. throttle: -1..1 (negative = brake/reverse), steer: -1..1 (+ = right), opts {hard} */
+    qaJump(charge = 0.6) { const b = S.mounted; if (!b || b.spec?.car || b.air) return false; b.air = true; b.vy = 4.2 + 3.8 * Math.min(1, charge / 0.6) + Math.min(1, Math.abs(b.fwdSpeed || 0) / 22) * 1.8; return true; },
     qaDrive(throttle = 1, steer = 0, seconds = 3, opts = {}) { if (!S.mounted) api.qaMount(); if (!S.mounted) return Promise.resolve(false); if (S.qa) S.qa.res(false); return new Promise((res) => { S.qa = { thr: throttle, steer, t: seconds, hard: !!opts.hard, res }; }); },
     qaState() { const b = S.mounted; return b ? { x: b.pos.x, y: b.pos.y, z: b.pos.z, heading: b.heading, speed: b.speed, fwd: b.fwdSpeed, lean: b.lean, steer: b.steer, skid: b.skid, air: b.air, surf: Object.keys(SURF).find((k) => SURF[k] === b.surf), car: !!b.spec.car, chase: S.chase } : null; },
     /** Deterministic replay at a fixed frame rate from the current state (restored afterwards): {fps, seconds, thr, steer, hard} → end pose + max per-frame pos jerk. */
@@ -578,6 +579,11 @@ export function update(dt, ctx) {
     if (want && S.nitro > 0.02) { S.nitro = Math.max(0, S.nitro - dt / 4); bike.boost = damp(bike.boost || 0, 1, 8, dt); if (!S.nitroOn) { S.nitroOn = true; ctx.hud?.toast?.('NITRO', 700); } }
     else { S.nitro = Math.min(1, S.nitro + dt / 12); bike.boost = damp(bike.boost || 0, 0, 5, dt); S.nitroOn = false; }
     nitroBar(S.nitro, bike.boost);
+    if (!bike.spec?.car) {   // bikes: Space jumps — hold to load the suspension, release to hop (higher with speed)
+      if (hard && !bike.air) { bike.jumpCharge = Math.min(0.6, (bike.jumpCharge || 0) + dt); bike.suspV -= dt * 3; }
+      else if (!hard && bike.jumpCharge > 0) { if (!bike.air) { const k = bike.jumpCharge / 0.6; bike.air = true; bike.vy = 4.2 + 3.8 * k + Math.min(1, Math.abs(bike.fwdSpeed || 0) / 22) * 1.8; bike.groundVy = 0; try { ctx.audio?.play?.('impact', { position: bike.pos, volume: 0.25 }); } catch {} } bike.jumpCharge = 0; }
+      hard = false;
+    }
   }
   simulate(bike, dt, thr, brake, hard, steer);
   runOver(bike, dt);

@@ -48,7 +48,7 @@ export function buildHangout(world, M) {
   }
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'LUNA PARK HOUSES', x: b2.centre.x, z: b2.centre.z - 30, kind: 'landmark' });
   buildKit(world, { cash: START_CASH, title: 'CONEY — CONTROLS',
-    help: 'Igor has side jobs (F → Got any work?)<br>F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>P · take a leak · Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy loop: drive north up W 8th St<br>Roof: stairs at the end of the 19th-floor lobby (shoulder the door) · stairwell down: side door<br>Sammy\'s deli: W 8th St, across from the towers',
+    help: 'Igor has side jobs (F → Got any work?)<br>F · talk (Igor, Sammy) / elevator / steal car / hop in / rob a passer-by<br>B · blaze or drink (stand close to share)<br>P · take a leak · Kills pay cash · N · give a friend $10 · X · swipe car GPS units (SHADES buys)<br>Driving: Shift nitro · Q horn · V camera · Space handbrake (car) / JUMP (bike — hold, release)<br>M · map · L · Luna Park Radio · . next track<br>Belt Pkwy loop: drive north up W 8th St<br>Roof: stairs at the end of the 19th-floor lobby (shoulder the door) · stairwell down: side door<br>Sammy\'s deli: W 8th St, across from the towers',
     respawn: { label: 'Table Park', at: () => W.onlineStart } });
   if (igorFig) H.igorHurt = K.hurtable(igorFig, { name: 'IGOR' });
   K.spot({ pos: H.igor, r: 2.4, when: () => !H.igorHurt?.down, prompt: 'F — TALK TO IGOR', act: talkIgor });
@@ -120,9 +120,11 @@ function buildIgor(world, M, pos) {
   // black picket fence (1.2 m) around the pad, 2.5 m gate gap facing the building (+z local = toward building 2 after the yaw)
   const fence = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0); for (const y of [0.25, 1.1]) add(new THREE.BoxGeometry(L, 0.04, 0.04), iron, (x0 + x1) / 2, y, (z0 + z1) / 2, 0, -a); for (let k = 0; k <= L / 0.13; k++) { const t = k * 0.13 / L; add(new THREE.BoxGeometry(0.02, 1.22, 0.02), iron, x0 + (x1 - x0) * t, 0.61, z0 + (z1 - z0) * t); } const n = 12; for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n; wbox(Math.min(x0 + (x1 - x0) * t0, x0 + (x1 - x0) * t1) - 0.06, 0, Math.min(z0 + (z1 - z0) * t0, z0 + (z1 - z0) * t1) - 0.06, Math.max(x0 + (x1 - x0) * t0, x0 + (x1 - x0) * t1) + 0.06, 1.2, Math.max(z0 + (z1 - z0) * t0, z0 + (z1 - z0) * t1) + 0.06); } };
   const hx = Wd / 2, hz = Dd / 2;
-  fence(-hx, -hz, hx, -hz); fence(-hx, -hz, -hx, hz); fence(hx, -hz, hx, hz); fence(-hx, hz, -1.3, hz); fence(1.3, hz, hx, hz);
-  for (const x of [-1.3, 1.3]) add(new THREE.BoxGeometry(0.08, 1.5, 0.08), iron, x, 0.75, hz);
+  // wide openings on every side (6.4 m at the front gate, 5 m back and sides) — ride a bike straight through
+  fence(-hx, -hz, -2.5, -hz); fence(2.5, -hz, hx, -hz); fence(-hx, -hz, -hx, -2.5); fence(-hx, 2.5, -hx, hz); fence(hx, -hz, hx, -2.5); fence(hx, 2.5, hx, hz); fence(-hx, hz, -3.2, hz); fence(3.2, hz, hx, hz);
+  for (const [x, z] of [[-3.2, hz], [3.2, hz], [-2.5, -hz], [2.5, -hz], [-hx, -2.5], [-hx, 2.5], [hx, -2.5], [hx, 2.5]]) add(new THREE.BoxGeometry(0.08, 1.5, 0.08), iron, x, 0.75, z);
   H.gate = new THREE.Vector3(0, 0, hz + 3).applyAxisAngle(new THREE.Vector3(0, 1, 0), toB2).add(pos);   // just outside the gate
+  H.park = { pos: pos.clone(), yaw: toB2, hx, hz };
   // rundown picnic tables: faded slats, one missing plank, one knocked askew
   const table = (x, z, ry, broken) => { const g = new THREE.Group(); g.position.set(x, 0.1, z); g.rotation.y = ry; park.add(g);
     const slats = broken ? [0, 1, 3, 4] : [0, 1, 2, 3, 4];
@@ -130,7 +132,7 @@ function buildIgor(world, M, pos) {
     for (const sz of [-1, 1]) { const m = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.045, 0.26), woodOld); m.position.set(0, 0.44, sz * 0.72); m.castShadow = true; g.add(m); }
     for (const sx of [-0.75, 0.75]) for (const s2 of [-1, 1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, 0.08), iron); leg.position.set(sx, 0.4, s2 * 0.4); leg.rotation.x = s2 * 0.62; g.add(leg); }
     const c = Math.abs(Math.cos(ry)) > 0.7; wbox(x - (c ? 1 : 0.95), 0, z - (c ? 0.95 : 1), x + (c ? 1 : 0.95), 0.8, z + (c ? 0.95 : 1)); };
-  table(-6.5, -3.5, 0.05, false); table(-6, 2.8, -0.1, true); table(0.5, -4.5, 0.02, false); table(6.8, -2.5, 0.35, false);
+  table(-6.5, -3.5, 0.05, false); table(-6, 2.8, -0.1, true); table(-3.1, -1.9, 0.02, false);   /* moved off the back opening */ table(6.8, -2.5, 0.35, false);
   // two green NYC slat benches along the fence; Igor sits on the one by the gate
   const bench = (x, z, ry) => { const g = new THREE.Group(); g.position.set(x, 0.1, z); g.rotation.y = ry; park.add(g);
     for (let k = 0; k < 3; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.045, 0.12), benchGreen); m.position.set(0, 0.45, -0.18 + k * 0.15); g.add(m); }
@@ -443,6 +445,7 @@ export const hangoutQA = {
   hurt: () => K.hurtState(), vendors: () => K.points().vendors, loadout: () => ({ ...H.ctx.weapons.loadout, cur: H.ctx.weapons.currentId }),
   roofDoor: (i = null) => { const D = H.roofDoors?.[i ?? H.towers.indexOf(H.b2)]; return D && { open: D.open, shoves: D.shoves, inside: D.d.inside.toArray(), outside: D.d.outside.toArray() }; },
   stairB: () => { const b = H.b2?.stairB; return b && { top: b.top.toArray(), bottom: b.bottom.toArray(), floors: b.floors, up: b.up, path: b.path.map((v) => v.toArray()) }; },
+  gate: () => H.gate?.toArray(), parkInfo: () => H.park && { pos: H.park.pos.toArray(), yaw: H.park.yaw, hx: H.park.hx, hz: H.park.hz },
   lobbyView: () => { const c = H.b2.lobby.cars[1]; return [...c.pos.toArray(), c.yaw]; },
   roofAt: (a, c) => { const t = H.b2, k = t.core; return t.toWorld(a, k.roof.y, k.roof.c + c).toArray(); },
   buy: () => buyIgor(), use: () => K.useItem(), light: () => { K.give('weed'); K.useItem(); }, ride: (dir = 'up', k = 0) => K.callElevator(H.towers.indexOf(H.b2), k, dir), steal: () => { const c = K.nearestParked(1e9); if (c) K.steal(c); return !!c; },

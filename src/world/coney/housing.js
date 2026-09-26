@@ -614,7 +614,8 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
   for (const r of runs) {
     let a0 = r.a0 + 0.3, a1 = r.a1 - 0.3; const len = a1 - a0; if (len < 1.5) continue;
     // a gate gap in long runs
-    const segs = len > 24 ? [[a0, a0 + len / 2 - 0.9], [a0 + len / 2 + 0.9, a1]] : [[a0, a1]];
+    // 5 m openings every ~16 m (bikes cut across the lawns), short runs stay closed
+    const segs = []; if (len < 12) segs.push([a0, a1]); else { let q = a0; while (q < a1 - 0.5) { let e = Math.min(q + 11, a1); if (a1 - e < 3) e = a1; segs.push([q, e]); q = e + 5; } }
     for (const [s0, s1] of segs) {
       const Pp = (a, y) => r.axis === 'z' ? [r.c, y, a] : [a, y, r.c];
       const u1 = (s1 - s0) / 2.4;
@@ -622,7 +623,7 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
       const np = Math.max(1, Math.round((s1 - s0) / 2.4));
       for (let k = 0; k <= np; k++) { const a = s0 + (s1 - s0) * k / np; const p0 = Pp(a - 0.035, 0), p1 = Pp(a + 0.035, 1.12); loc.box('hRail', [Math.min(p0[0], p1[0]) - (r.axis === 'z' ? 0.035 : 0), 0, Math.min(p0[2], p1[2]) - (r.axis === 'x' ? 0.035 : 0)], [Math.max(p0[0], p1[0]) + (r.axis === 'z' ? 0.035 : 0), 1.12, Math.max(p0[2], p1[2]) + (r.axis === 'x' ? 0.035 : 0)], { collide: false }); }
       const c0 = Pp(s0, 0), c1 = Pp(s1, 1.05); const w = 0.06;
-      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)]);
+      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)], 0.3);   // fine cells: coarse ones bulged across the openings
     }
   }
   // fences + grass go to the ground batch (fence geometry is alpha, keep it out of shadows too)
