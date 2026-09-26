@@ -9,7 +9,8 @@ import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews, gunShop } from './chill.js';
-import { buildJobs, jobsTalk } from './jobs.js';
+import { buildJobs, jobsTalk, startIce, finishIce } from './jobs.js';
+import { sell } from '../hangkit.js';
 import { openDurak, stats as durakStats } from './durak.js';
 import { OSM } from './osm.js';
 import { cen, pip } from '../osmkit.js';
@@ -90,7 +91,7 @@ function placeDeli(world) {
       for (const [i, c] of (world.parkedCars || []).entries()) { if (c.gone) continue; const dx = c.x - fx, dz = c.z - fz, a = dx * u.x + dz * u.y, d = dx * n.x + dz * n.y; if (Math.abs(a) < 6 && d > -4 && d < 13) K.stealLocal(i, false); }   // clear the kerb
       const D = buildDeli(world, { x: fx, z: fz, yaw, name: "SAMMY'S DELI & GROCERY" });
       H.deli = D; (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: "SAMMY'S DELI", x: D.door.x, z: D.door.z, kind: 'shop' });
-      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, fig: D.fig, talk: sammyTalk('SAMMY', { extra: sammyLotion }) });
+      K.vendor({ name: 'SAMMY', pos: D.sammy, r: 2.3, fig: D.fig, talk: sammyTalk('SAMMY', { extra: (Kk, after) => [...sammyLotion(Kk, after), ...sammyBar(after)] }) });
       return;
     }
   }
@@ -370,6 +371,7 @@ function buildDurakPark() {
   let puffT = 2; world.updaters.push((dt) => { const e = spliff.userData.ember; e.material.color.setHSL(0.04, 1, 0.45 + 0.15 * Math.sin(performance.now() / 260)); if ((puffT -= dt) <= 0) { puffT = 4 + Math.random() * 4; try { K.puff?.(spliff.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.35, 0.9, 0.2))); } catch {} } });   // the puff drifts up past his head, not in his face
   const seatYou = new THREE.Vector3(0, 0, 1.3).applyMatrix4(g.matrixWorld);
   H.arkady = { pos: c.clone(), seat: seatYou, fig: pf };
+  try { tableRegulars(g, c); } catch (e) { console.warn('[hangout] regulars', e); }
   K.vendor({ name: 'ARKASHA', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
   (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: 'DURAK · ARKASHA', x: c.x, z: c.z, kind: 'shop' });
 }
@@ -379,11 +381,18 @@ function playDurak(stake, mode = 'perevodnoy') {
   setTimeout(start, 30);   // after the dialog closes (it clears the seated flag)
   return null;
 }
+function serveManhattan() {
+  const { ctx } = H; K.take('ice'); finishIce();
+  if (!K.full()) K.give('manhattan');
+  const p = ctx.player.position; ctx.net?.send?.('drink', { k: 'manhattan', p: [+p.x.toFixed(2), +(p.y + 1.5).toFixed(2), +p.z.toFixed(2)] });   // he pours for the whole table
+  return { text: 'ARKASHA: "Шейкер, лёд, вермут, бурбон — получай свой Wunderbar!" *наливает всем за столом* "Бурбон, братва, Гудзон!"', choices: [{ label: 'Раздавай', go: () => playDurak(0, 'perevodnoy') }, { label: 'За тебя, Аркаша', go: null }] };
+}
 function arkadyTalk(Kk, again) {
   const st = durakStats();
   return {
     text: again ? `ARKASHA: "Ну что, реванш? Счёт ${st.w}:${st.l} — в мою пользу, между прочим." *затягивается, отпивает манхэттен*` : 'ARKASHA: "Здорово. Дурака раскинем? Переводной — по-взрослому. Или подкидной, если боишься. Я не мухлюю — мне не надо." *отпивает манхэттен*',
     choices: [
+      ...(K.has('ice') ? [{ label: `Вот лёд от Сэмми (${Math.round(K.state()?.iceLeft ?? 100)}%)`, go: () => serveManhattan() }] : [{ label: 'Налей Манхэттен', go: () => ({ text: 'ARKASHA: "Мне для «Манхэттена» лёд нужен — а лёд у Сэмми на W 8th. Сгоняй? Только бегом — пока несёшь, тает. Я же медведь культурный."', choices: [{ label: 'Сгоняю', go: () => { const d = H.deli?.door; if (d && H.arkady) startIce(d, H.arkady.pos); return { text: 'ARKASHA: "Давай. И если Сэмми спросит про «сзади» — не отвечай."', choices: [{ label: 'Ok', go: null }] }; } }, { label: 'Потом', go: null }] }) }]),
       { label: 'Переводной — for fun', go: () => playDurak(0, 'perevodnoy') },
       { label: 'Переводной — $20, winner takes $40', cost: 20, go: () => (K.pay(20) ? playDurak(20, 'perevodnoy') : { text: 'ARKASHA: "Двадцатки нет? Сыграем на интерес."', choices: [{ label: 'Давай', go: () => playDurak(0, 'perevodnoy') }, { label: 'Потом', go: null }] }) },
       { label: 'Подкидной — for fun', go: () => playDurak(0, 'podkidnoy') },
@@ -391,6 +400,39 @@ function arkadyTalk(Kk, again) {
       { label: 'Later', go: null },
     ],
   };
+}
+
+// ---- «Бурбон, братва, Гудзон»: Sammy's ice (and zebra milk), the table regulars around Arkasha ----
+function sammyBar(after) {
+  return [
+    { label: 'Bag of ice — $3', go: () => ({ text: 'SAMMY: "Ice? Ice is in the back… and speaking of the back — you and your girlfriend, the anal, yes? Hahaha. Here. $3. Run, it melts!"', choices: [{ label: 'Сэмми, я за льдом зашёл, а не сдавать тебе отчёт', go: () => after(sell('ice', 3, 'SAMMY', { ok: 'OK, OK, for the bear. Go, go — it melts!', broke: 'Three dollar, habibi. Even the ice is not free.', full: 'Your hands are full, my friend.' })) }] }) },
+    { label: 'Zebra milk — $4', go: () => after(sell('zebra', 4, 'SAMMY', { ok: 'Zebra milk. For your friend Redko. Don\'t ask me where I get it.', broke: 'Four dollar. The zebra has expenses.', full: 'Hands full.' })) },
+  ];
+}
+function tableRegulars(g, c) {
+  const { world } = H; const put = (fig, x, z, ry) => { g.add(fig.group); fig.group.position.set(x, 0, z); fig.group.rotation.y = ry; world.updaters.push((dt) => fig.update(dt, 0)); };
+  const wpos = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(g.matrixWorld);
+  // SASHA: on the bench, always loses — «Бей!» … «Беру!»
+  const sasha = buildPerson({ avatar: 'm17', pose: 'sit', seed: 5 }); put(sasha, 3.2, -2.35, Math.PI);
+  K.vendor({ name: 'SASHA', pos: wpos(3.2, -2.35), r: 2.4, fig: sasha, talk: (Kk, again) => ({
+    text: again ? 'SASHA: "Я правила зубрил, понимаешь? Зубрил! А он козырем — хлоп." *доедает сосиску*' : 'SASHA: "Ты с Аркашей играть? Совет: не кричи «Бей!». Я кричал «Бей!», потом кричал «Беру!». Теперь у меня вся колода."',
+    choices: [{ label: 'Сосиску будешь? — угостишь?', go: () => (K.full() ? { text: 'SASHA: "Руки заняты у тебя."', choices: [{ label: 'Ok', go: null }] } : (K.give('sausage'), { text: 'SASHA: "Держи. Виски-шмиски, вот сосиски — вся закуска наша!"', choices: [{ label: 'Спасибо, Саша', go: null }] })) },
+      { label: 'Как он всегда выигрывает?', go: { text: 'SASHA: "Медведь по козырям — ещё какой мастак. Он все карты помнит. И переводит, гад, переводит!"', choices: [{ label: 'Ясно', go: null }] } }, { label: 'Later', go: null }] }) });
+  // McGUINNESS: by the lamp with a crate of Guinness — «Guinness будешь?» — «За тебя!»
+  const mcg = buildPerson({ avatar: 'm01', seed: 8 }); put(mcg, -2.9, 1.9, 2.2);
+  K.vendor({ name: 'McGUINNESS', pos: wpos(-2.9, 1.9), r: 2.4, fig: mcg, talk: (Kk, again) => ({
+    text: again ? 'McGUINNESS: "Another? Go on, go on, go on."' : 'McGUINNESS: "Guinness будешь? Proper pint, poured slow. Arkasha takes his with bourbon, God help him."',
+    choices: [{ label: '«За тебя!» — давай пинту', go: () => (K.full() ? { text: 'McGUINNESS: "Finish what you\'re holding first."', choices: [{ label: 'Sláinte', go: null }] } : (K.give('guinness'), { text: 'McGUINNESS: "Sláinte! B to drink — and share it, it\'s rude not to."', choices: [{ label: 'Sláinte', go: null }] })) },
+      { label: '«За тебя, но я-то пас»', go: { text: 'McGUINNESS: "Ah, a bourbon man. Suit yourself."', choices: [{ label: 'Later', go: null }] } }] }) });
+  // THE ELF: short, green hat — Jameson, and a spliff rolled like a magic scroll
+  const elf = buildPerson({ avatar: 'm05', seed: 9 }); elf.group.scale.setScalar(0.84); put(elf, 2.6, 2.3, -2.4);
+  { const hat = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.34, 14), new THREE.MeshStandardMaterial({ color: 0x1f7a33, roughness: 0.8 })); hat.position.set(0, 0.2, -0.02); hat.rotation.x = -0.25; elf.head.add(hat);
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xe0b422, metalness: 0.8, roughness: 0.3 })); bell.position.set(0, 0.35, -0.1); elf.head.add(bell); }
+  K.vendor({ name: 'THE ELF', pos: wpos(2.6, 2.3), r: 2.4, fig: elf, talk: (Kk, again) => ({
+    text: again ? 'THE ELF: "Ещё фокус?" *шуршит бумагой*' : 'THE ELF: "Jameson? Или… фокус? Я сворачиваю бумажный свиток — и готово. Заклинаний не надо."',
+    choices: [{ label: 'Jameson', go: () => (K.full() ? { text: 'THE ELF: "Руки заняты."', choices: [{ label: '…', go: null }] } : (K.give('jameson'), { text: 'THE ELF: "Sláinte по-эльфийски. B — выпить."', choices: [{ label: 'За тебя', go: null }] })) },
+      { label: 'Фокус (a spliff) — $10', go: () => ({ text: 'THE ELF: "' + sell('spliff', 10, 'THE ELF', { ok: 'Вот и фокус мой готов. «Заклинанье?» — «Затянись.»', broke: 'Магия стоит десятку.', full: 'Руки заняты, волшебник.' }) + '"', choices: [{ label: 'Колдуй', go: null }] }) },
+      { label: 'Сигарету?', go: { text: 'THE ELF: "Табаку закрыт проход. Только с травкой — пусть за ручку проведёт."', choices: [{ label: 'Уважаю', go: null }] } }] }) });
 }
 
 /** QA hooks (window.__game.hangout) */

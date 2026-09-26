@@ -27,6 +27,13 @@ export function buildJobs(world) {
   return J;
 }
 
+/** ARKASHA's ice run («Бурбон, братва, Гудзон»): Sammy's for a bag of ice, then back to the card table before it melts */
+export function startIce(deliDoor, arkPos) {
+  if (!J || J.job) return false;
+  J.job = { kind: 'ice', stage: 0, at: deliDoor.clone(), home: arkPos.clone(), t: 240, pay: 10, label: 'Ice for Arkasha: Sammy\'s on W 8th' };
+  arm(); return true;
+}
+export function finishIce() { if (J?.job?.kind === 'ice') { complete(' — «Получай свой Wunderbar!»'); return true; } return false; }
 /** IGOR's dialog branch */
 export function jobsTalk() {
   if (!J) return { text: 'IGOR: "No work today."', choices: [{ label: 'OK', go: null }] };
@@ -94,6 +101,11 @@ function update(dt, playing) {
   const mm = Math.max(0, Math.floor(j.t / 60)), ss = Math.max(0, Math.floor(j.t % 60)).toString().padStart(2, '0');
   J.hud.textContent = `JOB · ${j.label} · ${Math.round(d)} m · ${mm}:${ss}`;
   if (j.t <= 0) return fail(j.kind === 'deliver' ? 'too slow. Igor\'s friend ate the sandwich himself.' : j.kind === 'collect' ? `${j.label.replace('Collect from ', '')} got away.` : 'the chop shop closed up.');
+  if (j.kind === 'ice') {   // stage 0: get the ice at Sammy's · stage 1: race it back (it melts in ~2 min)
+    if (j.stage === 0 && K.has('ice')) { j.stage = 1; j.at = j.home.clone(); j.label = 'Bring the ice to Arkasha — it\'s melting!'; J.beam.position.copy(j.at); K.toast('Лёд есть. Бегом к Аркаше — тает!', 2200); }
+    else if (j.stage === 1 && !K.has('ice')) return fail('the ice melted. «Весь растаял. Я за новым.»');
+    return;
+  }
   if (j.kind === 'deliver' && d < 3.5 && Math.abs(j.at.y - me.y) < 3) complete(' — "Tell Igor we\'re square."');
   else if (j.kind === 'collect') {
     const t = j.who; if (!crewsAlive(t) && t.cash > 0 && t.st !== 'dead') return fail('he slipped away.');

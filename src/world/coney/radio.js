@@ -15,7 +15,8 @@ export function buildRadio(world) {
   const { ctx, W } = world; const S = ctx.settings;
   const R = { els: TRACKS.map((t) => { const a = new Audio(); a.preload = 'metadata'; a.src = t.src; a.crossOrigin = 'anonymous'; return a; }), dur: TRACKS.map(() => 0), cur: -1, skip: 0, on: false, lastTitle: '' };
   R.els.forEach((a, i) => a.addEventListener('loadedmetadata', () => { R.dur[i] = a.duration || 0; }));
-  W.radio = { tracks: TRACKS.map((t) => t.title), get now() { return R.cur >= 0 ? TRACKS[R.cur].title : null; }, qa: () => R.els.map((a) => ({ playing: !a.paused, t: +a.currentTime.toFixed(1), vol: +a.volume.toFixed(2) })) };
+  W.radio = { cue: (title) => { const i = TRACKS.findIndex((t) => t.title === title); const total = R.dur.reduce((a, b) => a + b, 0); if (i < 0 || !(total > 0)) return false; const start = R.dur.slice(0, i).reduce((a, b) => a + b, 0); R.skip = start - (Date.now() / 1000 % total) + 0.05; R.cur = -1; return true; },   // durak mode: jump (just for you) to the start of a track
+    tracks: TRACKS.map((t) => t.title), get now() { return R.cur >= 0 ? TRACKS[R.cur].title : null; }, qa: () => R.els.map((a) => ({ playing: !a.paused, t: +a.currentTime.toFixed(1), vol: +a.volume.toFixed(2) })) };
   // where the station is right now: [track, offset]
   const at = () => {
     const total = R.dur.reduce((a, b) => a + b, 0); if (!(total > 0)) return [0, 0];

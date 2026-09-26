@@ -11,7 +11,9 @@ await pg.evaluate(() => { window.__game.setState('playing'); window.__ctx.camera
 const A = await pg.evaluate(() => window.__game.hangout.arkady()); ok(!!A, 'Arkady\'s table exists by building 1', JSON.stringify(A));
 await pg.evaluate((a) => { const s = a.seat, p = a.pos; window.__game.teleport(s[0], 0, s[2], Math.atan2(-(p[0] - s[0]), -(p[2] - s[2])), -0.12); }, A); await pg.waitForTimeout(1500);
 await pg.screenshot({ path: `${out}/arkady.png` });
-await pg.keyboard.press('KeyF'); await pg.waitForTimeout(400); await pg.keyboard.press('Digit1'); await pg.waitForTimeout(1500);
+await pg.keyboard.press('KeyF'); await pg.waitForTimeout(400);
+const k = await pg.evaluate(() => [...document.querySelectorAll('.hkch')].findIndex((x) => /Переводной — for fun/.test(x.textContent)));
+await pg.keyboard.press('Digit' + (k + 1)); await pg.waitForTimeout(1500);
 ok(await pg.evaluate(() => !!document.querySelector('.durak')), 'the durak table opens');
 await pg.screenshot({ path: `${out}/durak-open.png` });
 // play: whenever it's our move, click a highlighted card if any, else the action button

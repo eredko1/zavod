@@ -169,15 +169,15 @@ function orderMoves(ms, tr) { return ms.sort((a, b) => (a.c ? val(a.c, tr) : 30)
 
 // ------------------------------------------------------------------ the table UI
 let U = null;
-const LINES = {
-  hello: ['Ну что, сыграем? Раздаю.', 'Садись. Только не плачь потом.', 'Давай, по-быстрому. Козыри смотри.'],
-  iTake: ['Ладно… беру.', 'Беру-беру, не радуйся.', 'Хитрый какой. Беру.'],
-  youTake: ['Бери, бери, не стесняйся.', 'Держи ещё, чтоб не скучал.', 'На, на здоровье.'],
-  bito: ['Бито.', 'Бито. Твой ход.', 'Отбился, молодец.'],
-  win: ['Ну ты дурак! Ещё партию?', 'Дурак, дурак! Погоны вешать?', 'Не твой день, брат.'],
-  lose: ['Эх… ладно, повезло тебе.', 'Всё, я дурак. Отыграюсь.', 'Ну ты даёшь. Реванш?'],
-  draw: ['Ничья. Бывает.', 'Ничья — оба молодцы.'],
-  think: ['Хм…', 'Так-так…', 'Секунду…'],
+const LINES = {   // «Бурбон, братва, Гудзон»
+  hello: ['Бурбон, братва, Гудзон! Садись, раздаю.', 'Карты на стол — узнаем, кто дурак.', 'Садись. Медведь по козырям — ещё какой мастак.', 'Ты сдавай — бурбон я сам налью.'],
+  iTake: ['Ладно… беру. Медведь не жадный.', 'Беру-беру, не радуйся.', 'Хитрый какой. Беру.'],
+  youTake: ['«Бей!» кричал сначала, а потом «Беру!» кричал. Как Саша.', 'Бери, бери — Саша тоже стопку копил.', 'Держи ещё, чтоб не скучал.'],
+  bito: ['Бито. Дай огня, аккордеон!', 'Бито. Твой ход.', 'Отбился, молодец. Ещё бурбона?'],
+  win: ['Вот так, ты дурак — получай сосиской в лоб!', 'Я без карт, а вы при картах — вся колода ваша!', 'Пуст стакан, пуста рука — а ты дурак.'],
+  lose: ['Эх… ладно. Наливай, реванш.', 'Всё, я дурак. Саше не говори.', 'Ну ты даёшь. Бурбон за мной.'],
+  draw: ['Ничья. Бывает. Наливай.', 'Ничья — оба молодцы. Бурбон, братва, Гудзон!'],
+  think: ['Хм…', 'Шейкер, лёд, вермут, бурбон…', 'Так-так…'],
 };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -189,6 +189,7 @@ export function openDurak(ctx, { stake = 0, onEnd, mode = 'perevodnoy' } = {}) {
   U = { ctx, G, M, root, stake, onEnd, mode, busy: false, say: pick(LINES.hello), sel: null, choose: null }; ctx.durakOpen = true;   // radio.js plays Luna Park Radio at the table
   try { document.exitPointerLock?.(); } catch {}
   if (ctx.player) ctx.player.mounted = { dialog: true };
+  try { ctx.world?.radio?.cue?.('Бурбон, братва, Гудзон'); } catch {}   // durak mode: the table's song from the top
   root.addEventListener('click', onClick); addEventListener('keydown', onKey, true);
   render(); setTimeout(step, 700);
 }
@@ -249,6 +250,7 @@ function step() {
 function finish() {
   const G = U.G; if (U.done) return; U.done = true;
   const r = G.result; U.say = r === 'draw' ? pick(LINES.draw) : r === 0 ? pick(LINES.win) : pick(LINES.lose);
+  if (r === 0) { const sz = document.createElement('div'); sz.className = 'dk-sausage'; sz.textContent = '🌭'; U.root.appendChild(sz); setTimeout(() => sz.remove(), 1600); try { U.ctx.audio?.play?.('impact_flesh', { volume: 1.2 }); } catch {} }   // «получай сосиской в лоб!»
   const st = stats(); if (r === 'draw') st.d++; else if (r === 0) st.l++; else st.w++; saveStats(st);
   if (U.stake) { if (r === 1) { K.earn(U.stake * 2); } else if (r === 'draw') K.earn(U.stake); }
   render();
@@ -311,6 +313,8 @@ const CSS = `
 .durak .dk-status{font:700 14px 'Barlow Condensed';letter-spacing:.14em;color:#ffd27a;min-height:18px;text-transform:uppercase}
 .durak .dk-btns{display:flex;gap:10px;min-height:40px}.durak button{font:700 15px 'Barlow Condensed',Arial;letter-spacing:.12em;padding:9px 20px;border:0;border-radius:6px;background:#ffd23b;color:#1a1a1a;cursor:pointer}
 .durak .dk-help{font-size:12px;opacity:.55}
+.durak .dk-sausage{position:absolute;left:50%;top:40%;font-size:40px;z-index:70;animation:dksaus 1.5s ease-in forwards;pointer-events:none}
+@keyframes dksaus{0%{transform:translate(260px,-240px) rotate(-60deg) scale(.6)}55%{transform:translate(-50%,-20%) rotate(20deg) scale(4.5)}62%{transform:translate(-50%,-10%) rotate(10deg) scale(4.2)}100%{transform:translate(-50%,160%) rotate(90deg) scale(3);opacity:0}}
 .durak .dk-hand .dk-card.tx{box-shadow:0 0 0 3px #4aa3ff,0 6px 12px rgba(0,0,0,.5)}
 .durak .dk-choose{position:absolute;left:50%;bottom:170px;transform:translateX(-50%);display:flex;gap:8px;background:rgba(0,0,0,.6);padding:10px;border-radius:10px}.durak button.ghost{background:#ddd}
 .durak .dk-radio{position:absolute;right:14px;top:12px;font:600 12px Barlow;opacity:.8;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:12px}.durak .dk-radio.off{opacity:.45}

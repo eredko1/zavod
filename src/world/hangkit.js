@@ -15,6 +15,14 @@ export const ITEMS = {
   meat: { icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },
   skewer: { icon: '🍢', name: 'hot shashlik skewer', keep: true },
   gps: { icon: '📟', name: 'stolen GPS', keep: true },   // SHADES buys them   // not for B: grill it at the mangal
+  // «Бурбон, братва, Гудзон» — Arkasha's table
+  manhattan: { icon: '🍸', name: 'Manhattan (bourbon, vermouth, Sammy\'s ice)', drunk: 0.6, dur: 170, glass: 'coupe' },
+  guinness: { icon: '🍺', name: 'pint of Guinness', drunk: 0.35, dur: 120, glass: 'pint' },
+  jameson: { icon: '🥃', name: 'Jameson', drunk: 0.5, dur: 130, glass: 'shot' },
+  sausage: { icon: '🌭', name: 'сосиска', food: 30 },
+  zebra: { icon: '🦓', name: 'zebra milk', food: 12, milk: true },
+  spliff: { icon: '🍃', name: 'the Elf\'s spliff', magic: true },
+  ice: { icon: '🧊', name: 'bag of ice (melting!)', keep: true, melt: 110 },
 };
 
 let V = null;
@@ -61,7 +69,7 @@ const api = {
   /** QA: where the interaction points are */
   points: () => V && { shafts: V.shafts.map((t) => ({ kind: t.kind, label: t.label, lobby: t.lobby.cars.map((c) => c.pos.toArray()), top: t.tops[0].cars.map((c) => c.pos.toArray()) })), vendors: V.vendors.map((v) => ({ name: v.name, pos: v.pos.toArray() })), cars: (V.world.parkedCars || []).filter((c) => !c.gone).length, start: V.world.W?.onlineStart },
   hurtState: () => V && V.hurtables.map((H) => ({ name: H.o.name, hp: Math.round(H.hp), down: H.down })),
-  state: () => V && { cash: V.cash, inv: V.inv.slice(), item: V.inv[V.inv.length - 1] || null, drunk: +(V.drunk || 0).toFixed(2), high: +V.high.toFixed(2), riding: !!V.riding, passenger: !!V.passenger,
+  state: () => V && { iceLeft: V.iceT != null ? V.iceT / ITEMS.ice.melt * 100 : null, cash: V.cash, inv: V.inv.slice(), item: V.inv[V.inv.length - 1] || null, drunk: +(V.drunk || 0).toFixed(2), high: +V.high.toFixed(2), riding: !!V.riding, passenger: !!V.passenger,
     dialog: V.dialog ? { name: V.dialog.name, text: V.dialog.node.text, choices: (V.dialog.node.choices || []).map((c) => c.label) } : null, drops: V.drops.map((d) => [+d.pos.x.toFixed(1), +d.pos.y.toFixed(1), +d.pos.z.toFixed(1), d.n]) },
 };
 export const hangkit = api;
@@ -74,7 +82,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:steal', (m) => V && stealLocal(m.i, false));
   ctx.bus.on('net:smoke', (m) => { if (!V || !Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = V.ctx.player; if (me && !me.dead && (sameCar(m) || at.distanceTo(me.position) < SHARE_R + 1)) { V.high = Math.min(1, V.high + 0.18); V.highT = Math.max(V.highT, 150); } });
   ctx.bus.on('net:drink', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player; if (!me || me.dead || (!sameCar(m) && new THREE.Vector3(...m.p).distanceTo(me.position) >= SHARE_R + 1)) return;
-    const it = ITEMS[m.k] || ITEMS.bottle; drink(false, it); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} passed you the ${m.k === 'forty' ? '40' : 'bottle'}`, 1800); });
+    const it = ITEMS[m.k] || ITEMS.bottle; drink(false, it); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} passed you the ${m.k === 'forty' ? '40' : ITEMS[m.k]?.glass ? ITEMS[m.k].name.split(' (')[0] : 'bottle'}`, 1800); });
   ctx.bus.on('net:buy', (m) => V && V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Someone'} bought ${ITEMS[m.k]?.name ? 'a ' + ITEMS[m.k].name : 'something'} from ${String(m.v || 'the man').slice(0, 16)}`, 1800));
   ctx.bus.on('playerDied', () => { if (!V) return; endRide(true); leavePassenger(); closeDialog(); });
   // mercenary cash: solo / host kills arrive as enemyKilled, an online client's own kills as mercKilled (netwaves)
@@ -161,10 +169,17 @@ function updateHurt(dt) {
     const b = H.fig.body || H.fig.group; b.rotation.x = -Math.PI / 2 * (1 - (1 - H.k) ** 2);   // crumple backwards / get back up
   }
 }
+function updateIce(dt) {
+  if (!V.inv.includes('ice')) { V.iceT = null; return; }
+  if (V.iceT == null) V.iceT = ITEMS.ice.melt;
+  if (V.ctx.state === 'playing') V.iceT -= dt;
+  if (V.iceT <= 0) { V.iceT = null; const k = V.inv.indexOf('ice'); if (k > -1) V.inv.splice(k, 1); renderCash(); V.ctx.hud?.toast?.('Лёд растаял. В пакете — лужа. «Брат, а где обещанный лёд?»', 3200); return; }
+  const pct = Math.round(V.iceT / ITEMS.ice.melt * 100); if (pct !== V.icePct) { V.icePct = pct; renderCash(); }
+}
 function update(dt) {
   const { ctx } = V; const p = ctx.player; if (!p) return;
   const playing = ctx.state === 'playing' && !p.dead;
-  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDrops(dt, playing); updatePiss(dt); updateHurt(dt);
+  updateHigh(dt); updatePuffs(dt); updateJoint(dt); updateDrops(dt, playing); updatePiss(dt); updateHurt(dt); updateIce(dt);
   for (const fn of V.onUpdate) { try { fn(dt, playing); } catch (e) { if (ctx.time.frame % 300 === 1) console.warn('[hangkit] map update', e); } }
   if (V.dialog) { if (!playing) closeDialog(); else { ctx.interactNear = true; faceVendor(dt); } return; }
   if (playing && ctx.input?.pressed?.has?.('KeyB') && (V.riding || V.passenger || ctx.vehicles?.mounted)) { ctx.input.pressed.delete('KeyB'); useItem(); }
@@ -206,6 +221,9 @@ function useItem() {
   if (k < 0) { ctx.hud?.toast?.(V.inv.length ? 'Raw meat — grill it at Table Park' : 'Nothing on you', 1400); return; }
   const it = V.inv.splice(k, 1)[0]; renderCash();
   if (it === 'weed') return lightUp();
+  if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
+  const spec = ITEMS[it];
+  if (spec?.food) { ctx.player?.heal?.(spec.food); ctx.hud?.toast?.(spec.milk ? 'Зебровое молоко. Редко одобряет. (+' + spec.food + ' HP)' : '*хрум* Виски-шмиски, вот сосиски! (+' + spec.food + ' HP)', 2000); return; }
   drink(true, ITEMS[it], it);
 }
 function drink(mine, spec = ITEMS.bottle, kind = 'bottle') {
@@ -221,7 +239,15 @@ const _models = {};
 function bottleModel(kind) {
   if (_models[kind]) return _models[kind];
   const g = new THREE.Group();
-  if (kind === 'forty') {   // 40 oz in a brown paper bag
+  const G2 = ITEMS[kind]?.glass;
+  if (G2) {   // coupe (Manhattan, cherry), pint (Guinness, cream head), shot (Jameson)
+    const gl = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.35 });
+    const liq = new THREE.MeshStandardMaterial({ color: G2 === 'pint' ? 0x1a0d06 : G2 === 'coupe' ? 0x8a3a10 : 0xb86a18, roughness: 0.1, transparent: true, opacity: 0.9 });
+    if (G2 === 'coupe') { g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.08, 8), gl)); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.01, 0.045, 16, 1, true), gl); cup.position.y = 0.06; g.add(cup); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.012, 0.03, 16), liq); l.position.y = 0.055; g.add(l); const ch = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshStandardMaterial({ color: 0x7a0a14 })); ch.position.set(0.01, 0.072, 0); g.add(ch); }
+    else if (G2 === 'pint') { const pg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.034, 0.15, 16, 1, true), gl); g.add(pg); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.033, 0.12, 16), liq); l.position.y = -0.012; g.add(l); const hd = new THREE.Mesh(new THREE.CylinderGeometry(0.039, 0.038, 0.022, 16), new THREE.MeshStandardMaterial({ color: 0xf2e6c8, roughness: 0.8 })); hd.position.y = 0.058; g.add(hd); }
+    else { const sg = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.055, 12, 1, true), gl); g.add(sg); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.019, 0.03, 12), liq); l.position.y = -0.01; g.add(l); }
+    g.position.set(0.1, -0.13, -0.3);
+  } else if (kind === 'forty') {   // 40 oz in a brown paper bag
     const bag = new THREE.MeshStandardMaterial({ color: 0x9a7650, roughness: 1 }), glass = new THREE.MeshPhysicalMaterial({ color: 0x3a2208, roughness: 0.1, transparent: true, opacity: 0.85 });
     const b = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.04, 0.2, 10), bag); b.scale.set(1, 1, 0.8); g.add(b);
     const n = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.1, 10), glass); n.position.y = 0.14; g.add(n);
@@ -236,8 +262,8 @@ function bottleModel(kind) {
 }
 
 // ---- smoking + the high ---------------------------------------------------------------------------------------------------------
-function lightUp() {
-  const { ctx } = V; V.smokeT = 11; V.puffT = 0.6;
+function lightUp(magic = false) {
+  const { ctx } = V; V.smokeT = magic ? 16 : 11; V.puffT = 0.6; if (magic) { V.high = Math.min(1, V.high + 0.35); V.highT = Math.max(V.highT, 180); }
   ctx.hud?.toast?.('…', 1200);
   if (!V.joint) {
     const g = new THREE.Group();
@@ -272,10 +298,11 @@ function updateHigh(dt) {
   if (V.status?.crabs && ctx.state === 'playing' && ctx.player && !ctx.player.dead) { V.itchT = (V.itchT ?? 3) - dt; if (V.itchT <= 0) { V.itchT = 2.5 + Math.random() * 4; ctx.player.yaw += (Math.random() - 0.5) * 0.35; ctx.player.pitch += (Math.random() - 0.5) * 0.2; if (Math.random() < 0.4) ctx.hud?.toast?.(['*scratch scratch*', 'why is it so itchy down there', '*SCRATCH*', 'Sammy has lotion…'][Math.floor(Math.random() * 4)], 1100); } }
   if (k <= 0.001 && d <= 0.001) { const sh = V.status?.shades ? 'brightness(0.82) contrast(1.08) sepia(0.18)' : ''; if (cv.style.filter !== sh) { cv.style.filter = sh; cv.style.transform = ''; } return; }
   const t = performance.now() / 1000;
+  if (V.magicT > 0) V.magicT -= dt;
   // weed: soft blur, saturated, slow hue drift + gentle wobble · liquor: heavy-lidded (darker, desaturated), double vision, big slow sway
   const blur = 2.6 * k + 3.4 * d * (0.55 + 0.45 * Math.sin(t * 0.7));
   const ghost = d > 0.05 ? ` drop-shadow(${(22 * d * Math.sin(t * 0.9)).toFixed(1)}px ${(7 * d * Math.cos(t * 0.6)).toFixed(1)}px 0 rgba(255,255,255,${(0.4 * d).toFixed(2)}))` : '';
-  cv.style.filter = `blur(${blur.toFixed(2)}px) saturate(${(1 + 0.45 * k - 0.35 * d).toFixed(2)}) brightness(${(1 - 0.32 * d * (0.7 + 0.3 * Math.sin(t * 0.4))).toFixed(2)}) contrast(${(1 - 0.06 * k).toFixed(3)}) hue-rotate(${(Math.sin(t * 0.3) * 8 * k).toFixed(1)}deg)${ghost}`;
+  cv.style.filter = `blur(${blur.toFixed(2)}px) saturate(${(1 + 0.45 * k - 0.35 * d).toFixed(2)}) brightness(${(1 - 0.32 * d * (0.7 + 0.3 * Math.sin(t * 0.4))).toFixed(2)}) contrast(${(1 - 0.06 * k).toFixed(3)}) hue-rotate(${(V.magicT > 0 ? (t * 40) % 360 * Math.min(1, V.magicT / 20) + Math.sin(t * 0.3) * 8 * k : Math.sin(t * 0.3) * 8 * k).toFixed(1)}deg)${ghost}`;
   cv.style.transform = `rotate(${(Math.sin(t * 0.55) * 0.8 * k + Math.sin(t * 0.33) * 6 * d).toFixed(3)}deg) scale(${(1 + 0.025 * k + 0.07 * d + Math.sin(t * 0.9) * 0.012 * (k + d)).toFixed(4)}) translate(${(Math.sin(t * 0.37) * 14 * d).toFixed(1)}px, ${(Math.sin(t * 0.5) * 12 * d).toFixed(1)}px)`;
   // drunk: the view drifts on its own and your aim swims — you fight it with the mouse
   const p = ctx.player; if (d > 0.05 && p && !p.dead && ctx.state === 'playing') { p.yaw += Math.sin(t * 0.62) * 0.35 * d * dt; p.pitch += Math.sin(t * 0.47 + 1.3) * 0.12 * d * dt; }
@@ -538,6 +565,6 @@ function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the
 }
 function renderCash() {
   if (!V?.ui) return;
-  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => ITEMS[i]?.icon || '?').join(' ') + ' (B)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
+  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => (ITEMS[i]?.icon || '?') + (i === 'ice' && V.iceT != null ? Math.round(V.iceT / ITEMS.ice.melt * 100) + '%' : '')).join(' ') + ' (B)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
   if (V.ui.use) V.ui.use.style.display = V.inv.length ? 'block' : 'none';
 }
