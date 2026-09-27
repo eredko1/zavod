@@ -7,6 +7,8 @@
 // bus 'vehicleHit' {peerId, speed, damage, point} for remote players (net.js turns it into a hit).
 import * as THREE from 'three';
 import { buildBike, buildRider, WHEEL_R, WHEELBASE, FRONT_Z, REAR_Z } from './vehicles/bike.js';
+import { buildJetski } from './vehicles/jetski.js';
+import { createWaterFX } from './vehicles/waterfx.js';
 import { BoxGrid, resolveCircle, rectBlocked, segmentHit } from './vehicles/collide.js';
 import { carGeometries, carMaterials, carSpec, carEye, carInterior } from './world/carkit.js';
 
@@ -23,6 +25,14 @@ const BIKE_SPEC = {
   wheelbase: WHEELBASE, circles: [FRONT_Z, REAR_Z], bodyR: 0.42, band: 0.5, stepUp: 0.5, h: 1.25, leanK: 1,
   eyeH: 1.43, eyeBack: 0.34, eyeSide: 0, reach: 1.2, hx: 0.45, hz: 1.05, boxH: 1.1, lookYaw: 60 * DEG,
   chaseD: 4.4, chaseH: 0.32, chaseLook: 1.45, hitMul: 8, hitSlow: 0.75, engineBrake: 0.6,
+};
+// jet ski: bike-style lean + throttle + Space charge-jump, but floats on the ocean's waveHeight (buoyancy spring), jet-thrust
+// steering (little bite off the throttle), slides like a boat, stalls when the intake runs out of water (beached).
+const JETSKI_SPEC = {
+  car: false, kind: 'jetski', water: true, max: 21, revMax: 3.5, accel: 8.5, brake: 7, hard: 0, hardYaw: 0, grip: 2.6, hardGrip: 1, latG: 0.95, steerLow: 0.5,
+  wheelbase: 1.6, circles: [-0.95, 0, 0.95], bodyR: 0.55, band: 0.2, stepUp: 0.3, h: 1.3, leanK: 1.5,
+  eyeH: 1.45, eyeBack: 0.45, eyeSide: 0, reach: 1.6, hx: 0.6, hz: 1.6, boxH: 1.0, lookYaw: 70 * DEG,
+  chaseD: 5.2, chaseH: 0.3, chaseLook: 1.3, hitMul: 7, hitSlow: 0.75, engineBrake: 0, draft: 0.12,
 };
 const CAR_BASE = {
   car: true, max: 30, revMax: 7, accel: 9, brake: 13, hard: 5.5, hardYaw: 1.3, grip: 13, hardGrip: 1.1, latG: 1.05, steerLow: 0.6,
@@ -83,6 +93,17 @@ function makeBike(x, z, yaw, yRef = 0) {
   S.bikes.push(bike);
   return bike;
 }
+/** A jet ski floating at (x, z) (moored in the shallows / off the pier). */
+function makeJetski(x, z, yaw, i = 0) {
+  const parts = buildJetski(C, null, i), O = C.world?.ocean;
+  const y = O ? O.waveHeight(x, z) - JETSKI_SPEC.draft : 0;
+  const ski = { ...parts, ...baseState(x, z, yaw, y), spec: JETSKI_SPEC, rider: null };
+  ski.pos.y = y; ski.home.y = y;
+  ski.group.position.copy(ski.pos); ski.group.rotation.y = yaw;
+  for (const m of ski.meshes) { m.userData.vehicle = ski; C.raycastTargets.push(m); }
+  C.scene.add(ski.group); parkBox(ski); C.colliders.push(ski.box); S.bikes.push(ski);
+  return ski;
+}
 /** A drivable car from the shared car kit (geometry faces +x in the kit; vehicles face -z, so the kit is turned +90 deg). */
 function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
   if (!carSpec(kind)) kind = 'sedan';
@@ -132,7 +153,7 @@ function spotFree(x, z, yRef = 0, ignoreBox = null) {
 function placeBikes() {
   const W = C.world; S.grid.build(C.colliders);
   const spots = Array.isArray(W?.vehicleSpots) ? W.vehicleSpots : null;
-  if (spots && spots.length) { for (const s of spots.slice(0, W.vehicleMax || 5)) makeBike(s.x, s.z, s.yaw ?? 0, s.y ?? 0); if (S.bikes.length >= 3) return; }   // maps may raise the cap via W.vehicleMax
+  if (spots && spots.length) { for (const s of spots.slice(0, W.vehicleMax || 5)) makeBike(s.x, s.z, s.yaw ?? 0, s.y ?? 0); if (S.bikes.length >= 3) return placeJetskis(); }   // maps may raise the cap via W.vehicleMax
   const spawns = (W?.playerSpawns?.length ? W.playerSpawns : [new THREE.Vector3(0, 0, 0)]);
   const want = 5, R = C.rng, MIN_APART = 25;
   // candidates = every walkable anchor the map exposes (player spawns, enemy spawns, cover points) → bikes dispersed over the whole map
@@ -147,7 +168,10 @@ function placeBikes() {
     if (!best) break; pool.splice(pool.indexOf(best), 1); if (bd < MIN_APART) continue; tryAt(best.x, best.z, best.y);
   }
   for (let d = 3; S.bikes.length < 3 && d < 30; d += 1.5) for (let i = 0; i < 16 && S.bikes.length < 3; i++) { const a = i / 16 * Math.PI * 2; const x = s0.x + Math.cos(a) * d, z = s0.z + Math.sin(a) * d; if (spotFree(x, z, s0.y)) makeBike(x, z, a, s0.y || 0); }
+  placeJetskis();
 }
+
+function placeJetskis() { const L = C.world?.jetskiSpots; if (!C.world?.ocean || !Array.isArray(L)) return; L.forEach((s, i) => makeJetski(s.x, s.z, s.yaw ?? Math.PI, i)); }
 
 // ---------- mount / dismount ----------
 function setRaycastable(v, on) {
@@ -167,7 +191,8 @@ function mount(bike) {
   if (w?.swap) { const cur = w.current?.slot ?? w.slot ?? 0; if (cur !== 1) { try { if (w.swap(1)) S.prevSlot = cur; } catch {} } }
   try { C.audio?.play?.('bike_idle', { position: bike.pos, volume: 0.6 }); } catch {}
   C.bus.emit('vehicle', { stage: 'mount', bike });
-  C.hud?.toast?.(bike.spec.car ? 'F — GET OUT · W/S GAS/BRAKE · A/D STEER · SPACE HANDBRAKE · V CAMERA' : 'F — DISMOUNT · W/S THROTTLE · SPACE BRAKE · V CAMERA', 2600);
+  C.hud?.toast?.(bike.spec.car ? 'F — GET OUT · W/S GAS/BRAKE · A/D STEER · SPACE HANDBRAKE · V CAMERA' : bike.spec.water ? 'F — GET OFF · W THROTTLE · S BRAKE/REVERSE · A/D STEER · SPACE (HOLD) JUMP · V CAMERA' : 'F — DISMOUNT · W/S THROTTLE · SPACE BRAKE · V CAMERA', 2600);
+  if (bike.spec.water) { fx().engine(true); }
   applyView(0);
   return true;
 }
@@ -189,6 +214,14 @@ function dismount() {
     p.teleport(x, gy, z, bike.heading + S.lookYaw, S.lookPitch); placed = true; break;
   }
   if (!placed) p.teleport(bike.pos.x - _r.x * sx0, y, bike.pos.z - _r.z * sx0, bike.heading + S.lookYaw, S.lookPitch);
+  if (sp.water) {
+    fx().stop();
+    const O = C.world?.ocean, pp = p.position, B = C.world?.bounds;
+    if (O && (O.waveHeight(pp.x, pp.z) - pp.y > 1.2 || (B && pp.z > B.max.z - 1))) {   // out of your depth: swim to the nearest beach
+      const bx = B ? clamp(pp.x, B.min.x + 3, B.max.x - 3) : pp.x, bz = O.shoreZ(bx) - 3;
+      p.teleport(bx, groundY(bx, bz), bz, bike.heading + S.lookYaw, 0); C.hud?.toast?.('SWAM ASHORE', 1600);
+    }
+  }
   p.mounted = null; S.mounted = null; S.qa = null;
   bike.vel.set(0, 0, 0); bike.speed = bike.fwdSpeed = 0; bike.throttle = 0; bike.vy = 0; bike.air = false; bike.parked = true;
   setRaycastable(bike, true);
@@ -219,6 +252,7 @@ function surfaceUnder(v) {
 function simulate(v, dt, thr, brk, hard, steer) {
   const n = Math.max(1, Math.ceil(dt / MAX_STEP - 1e-6)), h = dt / n;
   v.surfT -= dt; if (v.surfT <= 0) { v.surfT = 0.1; v.surf = surfaceUnder(v); }
+  if (v.spec.water && C.world?.ocean) { for (let i = 0; i < n; i++) stepWater(v, h, thr, brk, steer); visualsWater(v, dt); return; }
   for (let i = 0; i < n; i++) stepVeh(v, h, thr, brk, hard, steer);
   visuals(v, dt, thr, brk, hard);
 }
@@ -307,6 +341,89 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
   v.spin += fsN / WHEEL_R * dt;
   v.hitT = Math.max(0, v.hitT - dt);
 }
+// ---------- jet ski on the ocean ----------
+const WATER_BOX = { x0: -985, x1: 885, z0: 163, z1: 900 };
+/** One water sub-step: jet thrust (only while the intake is wet), hull drag, jet steering, boat-like slide, buoyancy on the
+ *  swell (spring, but it can't pull the hull down faster than gravity → it leaves the crest at speed), beaching on sand. */
+function stepWater(v, dt, thr, brk, steer) {
+  const O = C.world.ocean, p = v.pos, vel = v.vel, sp = v.spec;
+  fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x);
+  let fs = vel.x * _f.x + vel.z * _f.z, ls = vel.x * _r.x + vel.z * _r.z; const fs0 = fs;
+  const wy = O.waveHeight(p.x, p.z), gy = groundY(p.x, p.z), depth = wy - gy;
+  const hullIn = !v.air && p.y < wy + 0.12, intake = hullIn && depth > 0.25, beached = depth < 0.2 && p.y <= gy + 0.14;
+  v.wet = hullIn; v.beached = beached; v.depth = depth;
+  const nb = v.boost || 0, max = sp.max * (1 + 0.35 * nb);
+  v.throttle = damp(v.throttle, thr, 6, dt);
+  if (intake) {
+    if (thr > 0 && fs >= -0.5) { const k = clamp(fs / max, 0, 1); fs += sp.accel * (1 + 0.6 * nb) * thr * (1 - k * k) * dt; }
+    if (thr > 0 && fs < -0.5) fs = Math.min(0, fs + sp.brake * thr * dt);
+    if (brk > 0) fs = fs > 0.3 ? Math.max(0, fs - sp.brake * brk * dt) : Math.max(-sp.revMax, fs - sp.accel * 0.4 * brk * dt);   // reverse bucket
+  }
+  if (hullIn || beached) { fs -= fs * Math.abs(fs) * 0.0045 * dt; fs -= Math.sign(fs) * Math.min(Math.abs(fs), (0.3 + (thr === 0 ? 1.1 : 0)) * dt); }
+  if (beached) { fs -= Math.sign(fs) * Math.min(Math.abs(fs), 14 * dt); ls *= Math.exp(-7 * dt); }
+  const af = Math.abs(fs), thrK = intake ? clamp(0.2 + 0.8 * v.throttle + 0.3 * brk, 0, 1) : 0;
+  v.steer = damp(v.steer, steer * sp.steerLow, steer !== 0 ? 6 : 8, dt);
+  let yawRate = 0;
+  if (hullIn && !beached) { const rate = Math.min(1.9, sp.latG * 9.81 / Math.max(af, 2.5)) * clamp(af / 1.5 + 0.35 * thrK, 0, 1); yawRate = -(v.steer / sp.steerLow) * rate * (0.25 + 0.75 * thrK) * (fs < -0.3 ? -1 : 1); }
+  const wx = _f.x * fs + _r.x * ls, wz = _f.z * fs + _r.z * ls;
+  v.heading += yawRate * dt;
+  fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x);
+  fs = wx * _f.x + wz * _f.z; ls = wx * _r.x + wz * _r.z;
+  const grip = hullIn ? sp.grip * (0.6 + 0.8 * thrK) + (af < 3 ? 2 : 0) : 0.15;
+  ls *= Math.exp(-grip * dt);
+  v.skid = damp(v.skid, clamp(Math.abs(ls) / 4, 0, 1), 5, dt);
+  vel.set(_f.x * fs + _r.x * ls, 0, _f.z * fs + _r.z * ls);
+  let px = p.x + vel.x * dt, pz = p.z + vel.z * dt, hitN = null;
+  const y0 = p.y + sp.band, y1 = p.y + sp.h;
+  for (let i = 0; i < sp.circles.length; i++) {
+    const az = sp.circles[i]; const ax = px - _f.x * az, azz = pz - _f.z * az;
+    if (resolveCircle(S.grid, ax, azz, sp.bodyR, y0, y1, v.box, _res)) { px += _res.x - ax; pz += _res.z - azz; if (!hitN || _res.depth > hitN.depth) hitN = { nx: _res.nx, nz: _res.nz, depth: _res.depth }; }
+  }
+  if (hitN) { const vn = vel.x * hitN.nx + vel.z * hitN.nz; if (vn < 0) { const sev = clamp(-vn / 8, 0, 1); vel.x -= hitN.nx * vn * (1 + BOUNCE); vel.z -= hitN.nz * vn * (1 + BOUNCE); vel.multiplyScalar(1 - HIT_LOSS * sev); v.hitT = Math.max(v.hitT, 0.25 * sev + 0.05); if (sev > 0.25 && v === S.mounted) { try { C.audio?.play?.('impact', { position: p, volume: sev }); } catch {} } } }
+  // the dry beach: a hull can skid a little way up the wet sand, never across the beach
+  const dN = O.waveHeight(px, pz) - groundY(px, pz);
+  if (dN < -0.1 && dN < depth - 0.004) { px = p.x; pz = p.z; vel.multiplyScalar(Math.exp(-10 * dt)); }
+  if (px < WATER_BOX.x0) { px = WATER_BOX.x0; vel.x = Math.abs(vel.x) * BOUNCE; } if (px > WATER_BOX.x1) { px = WATER_BOX.x1; vel.x = -Math.abs(vel.x) * BOUNCE; }
+  if (pz < WATER_BOX.z0) { pz = WATER_BOX.z0; vel.z = Math.abs(vel.z) * BOUNCE; } if (pz > WATER_BOX.z1) { pz = WATER_BOX.z1; vel.z = -Math.abs(vel.z) * BOUNCE; }
+  p.x = px; p.z = pz;
+  // buoyancy: ride the surface (a little higher when planing), rest on the sand when beached
+  const wy2 = O.waveHeight(px, pz), gy2 = groundY(px, pz), planing = clamp((Math.abs(fs) - 4) / 10, 0, 1);
+  const rest = Math.max(wy2 - sp.draft + 0.08 * planing, gy2 + 0.06);
+  v.surfY = wy2;
+  if (v.air) {
+    v.vy -= GRAV * dt; p.y += v.vy * dt;
+    if (p.y <= rest) { const k = clamp(-v.vy / 6, 0, 1.5); v.splash = Math.max(v.splash || 0, k); v.suspV += v.vy * 0.2; p.y = rest; v.vy = -v.vy * 0.1; v.air = false; vel.multiplyScalar(1 - 0.12 * Math.min(1, k)); }
+  } else {
+    const acc = 75 * (rest - p.y) - 10 * v.vy; v.vy += Math.max(-GRAV, acc) * dt; p.y += v.vy * dt;
+    if (p.y > wy2 + 0.28 && v.vy > 0.5) v.air = true;                         // launched off a crest / a breaking face
+    if (p.y < gy2 + 0.06) { p.y = gy2 + 0.06; v.vy = Math.max(0, v.vy); }
+  }
+  fwdOf(v.heading, _f);
+  const fsN = vel.x * _f.x + vel.z * _f.z; v.fwdSpeed = fsN; v.speed = vel.length();
+  v.aLong = damp(v.aLong, (fsN - fs0) / dt, 8, dt); v.yawRate = yawRate;
+  v.suspV += (-60 * v.susp - 8 * v.suspV) * dt; v.susp = clamp(v.susp + v.suspV * dt, -0.1, 0.08);
+  v.hitT = Math.max(0, v.hitT - dt);
+}
+/** pitch / roll from the swell under bow, stern and both sides + bow-up under throttle + lean into the turn */
+function visualsWater(v, dt) {
+  const O = C.world.ocean, sp = v.spec, p = v.pos;
+  fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x);
+  const leanT = clamp(-((v.yawRate || 0) * v.fwdSpeed) / 9.81, -1, 1) * LEAN_MAX * 1.8;
+  v.lean = damp(v.lean, clamp(leanT, -LEAN_MAX * 2, LEAN_MAX * 2) * (v.wet ? 1 : 0.4), 5, dt);
+  let tp = v.tPitch, tr = 0;
+  if (v.air) tp = damp(v.tPitch, clamp(v.vy * 0.05, -0.35, 0.3), 2.5, dt);
+  else {
+    const L = 1.3, Wd = 0.55, g = (x, z) => Math.max(O.waveHeight(x, z), groundY(x, z));
+    const yf = g(p.x + _f.x * L, p.z + _f.z * L), yb = g(p.x - _f.x * L, p.z - _f.z * L), yr = g(p.x + _r.x * Wd, p.z + _r.z * Wd), yl = g(p.x - _r.x * Wd, p.z - _r.z * Wd);
+    const af = Math.abs(v.fwdSpeed), hump = Math.exp(-(((af - 6) / 4) ** 2));
+    tp = Math.atan2(yf - yb, 2 * L) + (v.beached ? 0 : 0.11 * v.throttle * hump + 0.025 * clamp((af - 6) / 8, 0, 1)); tr = Math.atan2(yr - yl, 2 * Wd);
+  }
+  v.tPitch = damp(v.tPitch, clamp(tp, -0.5, 0.5), 8, dt); v.tRoll = damp(v.tRoll, clamp(tr, -0.4, 0.4), 8, dt);
+  v.group.position.copy(p); v.group.rotation.set(0, v.heading, 0);
+  v.body.position.y = v.susp; v.body.rotation.set(v.tPitch - v.suspV * 0.03, 0, -v.lean + v.tRoll, 'YXZ');
+  v.fork.rotation.y = -v.steer * 1.1;
+}
+
 /** Per-frame visual pose: lean / body roll, terrain pitch+roll, suspension, fork + wheels, steering wheel, lights. */
 function visuals(v, dt, thr, brk, hard) {
   const sp = v.spec, p = v.pos;
@@ -414,7 +531,7 @@ function applyChase(v, dt) {
   S.chaseD = want < S.chaseD ? want : damp(S.chaseD, want, 3, k);   // snap in, ease out
   const d = S.chaseD;
   _v.set(tx - fx * Math.cos(elev) * d, ty + Math.sin(elev) * d, tz - fz * Math.cos(elev) * d);
-  { const gy = groundY(_v.x, _v.z); if (_v.y < gy + 0.4) _v.y = gy + 0.4; }
+  { let gy = groundY(_v.x, _v.z); if (v.spec.water && C.world?.ocean) gy = Math.max(gy, C.world.ocean.waveHeight(_v.x, _v.z)); if (_v.y < gy + 0.4) _v.y = gy + 0.4; }
   const shake = v.hitT * 0.15;
   if (shake) { _v.x += (Math.random() - 0.5) * shake; _v.y += (Math.random() - 0.5) * shake; }
   // aim a little above and ahead of the vehicle so the crosshair sits over the roof, not on it
@@ -427,7 +544,7 @@ function applyChase(v, dt) {
 function setChase(on) {
   S.chase = !!on;
   const v = S.mounted;
-  if (v) { S.chaseYaw = v.heading; S.chaseY = v.pos.y; S.chaseD = v.spec.chaseD; if (S.chase && !v.spec.car && !v.rider) { v.rider = buildRider(); v.body.add(v.rider); } }
+  if (v) { S.chaseYaw = v.heading; S.chaseY = v.pos.y; S.chaseD = v.spec.chaseD; if (S.chase && !v.spec.car && !v.rider) { v.rider = buildRider(); v.body.add(v.rider); if (v.spec.water) v.rider.position.set(0, -0.22, 0.12); } }
   S.lookYaw = 0; S.lookPitch = 0;
   if (S.ui) S.ui.cam.classList.toggle('on', S.chase);
   return S.chase;
@@ -439,7 +556,7 @@ function nearestBike() {
   for (const b of S.bikes) {
     if (b === S.mounted) continue;
     const sp = b.spec, dx = p.position.x - b.pos.x, dz = p.position.z - b.pos.z;
-    if (Math.abs(p.position.y - b.pos.y) > 1.6) continue;
+    if (Math.abs(p.position.y - b.pos.y) > (sp.water ? 3.2 : 1.6)) continue;   // jet skis: hop down off the pier / wade out
     const c = Math.cos(b.heading), s = Math.sin(b.heading);
     const lx = dx * c - dz * s, lz = dx * s + dz * c;   // into the vehicle frame (right, back)
     const d = Math.hypot(Math.max(0, Math.abs(lx) - sp.hx), Math.max(0, Math.abs(lz) - sp.hz));
@@ -489,6 +606,20 @@ function updateUI(ctx) {
   if (act) { const t = act.textContent || ''; act.classList.toggle('vhdup', !!label && (t === 'RIDE' || t === 'GET OFF') && (!!S.mounted || !!S.api.nearBike)); }
 }
 
+let _fx = null; const fx = () => _fx || (_fx = createWaterFX(C));
+/** moored / abandoned jet skis ride the swell; spray + wake + engine for the one you're on */
+function waterFrame(dt) {
+  const O = C.world?.ocean; if (!O || dt <= 0) return;
+  for (const v of S.bikes) {
+    if (!v.spec.water || v === S.mounted) continue;
+    const wy = O.waveHeight(v.pos.x, v.pos.z), rest = Math.max(wy - v.spec.draft, groundY(v.pos.x, v.pos.z) + 0.06);
+    v.pos.y = damp(v.pos.y, rest, 6, dt); v.wet = true; v.air = false; v.throttle = 0; v.fwdSpeed = v.speed = 0; v.yawRate = 0; visualsWater(v, dt);
+  }
+  const m = S.mounted;
+  if (m?.spec.water) { fx().ride(m, dt); if (m.splash > 0.15) { fx().burst(m, m.splash); try { C.audio?.play?.('impact_water', { position: m.pos, volume: Math.min(1.2, m.splash) }); } catch {} } m.splash = 0; }
+  if (_fx) _fx.update(dt);
+}
+
 // ---------- module ----------
 export async function init(ctx) {
   C = ctx;
@@ -506,10 +637,14 @@ export async function init(ctx) {
     spawnCar: (x, z, yaw, kind, color, y) => makeCar(x, z, yaw, kind, color, y ?? ctx.player?.position.y ?? 0),
     qaSpawn(x, z, yaw = 0, y = ctx.player?.position.y ?? 0) { S.grid.sync(ctx.colliders); const b = makeBike(x, z, yaw, y); S.grid.build(ctx.colliders); ctx.player?.rebuildColliders?.(); return b; },
     qaMount() { const b = nearestBike(); if (!b) return false; return mount(b); },
+    /** jet skis: list + stand next to one (from the beach side) */
+    get jetskis() { return S.bikes.filter((b) => b.spec.water); },
+    qaJetskis() { return S.bikes.filter((b) => b.spec.water).map((b) => ({ x: +b.pos.x.toFixed(2), y: +b.pos.y.toFixed(2), z: +b.pos.z.toFixed(2), heading: +b.heading.toFixed(3), mounted: b === S.mounted })); },
+    qaFx() { return _fx ? { spray: _fx.pts.visible, wake: _fx.wake.visible } : null; },
     /** Drive with fixed inputs for `seconds`; resolves when done. throttle: -1..1 (negative = brake/reverse), steer: -1..1 (+ = right), opts {hard} */
     qaJump(charge = 0.6) { const b = S.mounted; if (!b || b.spec?.car || b.air) return false; b.air = true; b.vy = 4.2 + 3.8 * Math.min(1, charge / 0.6) + Math.min(1, Math.abs(b.fwdSpeed || 0) / 22) * 1.8; return true; },
     qaDrive(throttle = 1, steer = 0, seconds = 3, opts = {}) { if (!S.mounted) api.qaMount(); if (!S.mounted) return Promise.resolve(false); if (S.qa) S.qa.res(false); return new Promise((res) => { S.qa = { thr: throttle, steer, t: seconds, hard: !!opts.hard, res }; }); },
-    qaState() { const b = S.mounted; return b ? { x: b.pos.x, y: b.pos.y, z: b.pos.z, heading: b.heading, speed: b.speed, fwd: b.fwdSpeed, lean: b.lean, steer: b.steer, skid: b.skid, air: b.air, surf: Object.keys(SURF).find((k) => SURF[k] === b.surf), car: !!b.spec.car, chase: S.chase } : null; },
+    qaState() { const b = S.mounted; return b ? { x: b.pos.x, y: b.pos.y, z: b.pos.z, heading: b.heading, speed: b.speed, fwd: b.fwdSpeed, lean: b.lean, steer: b.steer, skid: b.skid, air: b.air, surf: Object.keys(SURF).find((k) => SURF[k] === b.surf), car: !!b.spec.car, chase: S.chase, kind: b.spec.kind, pitch: b.tPitch, roll: b.tRoll, water: b.surfY ?? null, depth: b.depth ?? null, beached: !!b.beached } : null; },
     /** Deterministic replay at a fixed frame rate from the current state (restored afterwards): {fps, seconds, thr, steer, hard} → end pose + max per-frame pos jerk. */
     qaSim({ fps = 60, seconds = 3, thr = 1, steer = 0, hard = false } = {}) {
       const v = S.mounted; if (!v) return null;
@@ -534,6 +669,7 @@ export function update(dt, ctx) {
   const p = ctx.player; if (!p) return;
   const input = ctx.input;
   S.grid.sync(ctx.colliders);
+  try { waterFrame(dt); } catch (e) { if (!S.wErr) { S.wErr = 1; console.warn('[vehicles] water', e); } }
   const playing = ctx.state === 'playing' && !p.dead;
   if (S.mounted && p.dead) { dismount(); updateUI(ctx); return; }
   // F is only consumed when it means something to us (mounted, or a vehicle in reach that is closer than a weapon pickup) — ai.js / hangout read it after us

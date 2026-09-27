@@ -107,9 +107,9 @@ export function update(dt, ctx) {
   // fire buttons say what they do (the left one is a second trigger for the left thumb)
   const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? 'SLASH' : 'FIRE';
   if (ft !== S.fireTxt) { S.fireTxt = ft; S.root.querySelector('.fire').textContent = ft; S.root.querySelector('.fireL').textContent = ft; }
-  // contextual action button: weapon pickup or motorcycle mount/dismount
+  // contextual action button: weapon pickup or motorcycle mount/dismount; a map may name its own F action (ctx.actionLabel: BOARD F / GET OFF)
   const pk = ctx.ai?.nearPickup, bike = ctx.vehicles?.nearBike, mounted = ctx.vehicles?.mounted || ctx.player?.mounted;
-  const label = mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;
+  const label = ctx.actionLabel ? ctx.actionLabel : mounted?.train ? null : mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;
   if (label !== S.actLabel) { S.actLabel = label; S.act.textContent = label || ''; S.act.classList.toggle('show', !!label && ctx.state === 'playing'); }
 }
 export function reset(ctx) { if (S) { ctx.input.touch.fire = false; if (S.setAds) S.setAds(false); else ctx.input.touch.ads = false; } }

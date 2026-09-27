@@ -107,6 +107,9 @@ function drawMarkers(g, P, scale, rot = 0, big = false) {
   const dot = (x, z, r, fill, stroke = 'rgba(0,0,0,.6)') => { const [u, v] = P(x, z); g.beginPath(); g.arc(u, v, r, 0, Math.PI * 2); g.fillStyle = fill; g.fill(); g.lineWidth = 1.5; g.strokeStyle = stroke; g.stroke(); return [u, v]; };
   const label = (u, v, t, col, fs) => { g.save(); g.font = `700 ${fs}px Barlow Condensed, Arial`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t, u, v); g.fillStyle = col; g.fillText(t, u, v); g.restore(); };
   const k = big ? 1 : 2;   // minimap canvas is 2x
+  // subway: station icons on the minimap too (the big map bakes them with the POIs) + the F train itself, an orange bar
+  if (!big) for (const q of ctx.world?.mapPOIs || []) { if (q.kind !== 'transit') continue; const [u, v] = P(q.x, q.z); g.beginPath(); g.arc(u, v, 8 * k, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,.7)'; g.fill(); g.lineWidth = 2 * k; g.strokeStyle = '#8ac7ff'; g.stroke(); g.font = `700 ${11 * k}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#8ac7ff'; g.fillText('Ⓜ', u, v + 0.5); }
+  const tr = ctx.subway?.train?.(); if (tr) { const [u0, v0] = P(tr[0], tr[1]), [u1, v1] = P(tr[2], tr[3]); g.save(); g.lineCap = 'round'; g.lineWidth = 5 * k; g.strokeStyle = 'rgba(0,0,0,.6)'; g.beginPath(); g.moveTo(u0, v0); g.lineTo(u1, v1); g.stroke(); g.lineWidth = 3 * k; g.strokeStyle = '#ff6319'; g.stroke(); g.restore(); }
   for (const [x, z, car] of mk.bikes) { const [u, v] = P(x, z); g.fillStyle = car ? '#6fd08a' : '#9fe39a'; g.fillRect(u - 3 * k, v - 3 * k, 6 * k, 6 * k); }
   for (const [x, z, n] of mk.vendors) { const [u, v] = dot(x, z, 4.5 * k, '#ffd27a'); if (big) label(u, v - 9, n, '#ffd27a', 12); }
   for (const [x, z, cop, far] of mk.enemies) { g.globalAlpha = far ? 0.35 : 1; dot(x, z, 4 * k, cop ? '#b36bff' : '#ff4a3a', '#2a0000'); } g.globalAlpha = 1;
