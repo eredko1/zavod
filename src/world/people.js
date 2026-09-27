@@ -14,7 +14,7 @@ export const AVATARS = {
   f01: { g: 'f' }, f09: { g: 'f', tag: 'older' }, f17: { g: 'f' },
   m02: { g: 'm', solo: true },   // ARKADY (black hair, blue eyes — recoloured head texture); only when asked for by name
 };
-const MOBILE_SET = ['m02', 'm03', 'm04', 'm10', 'm12', 'm20', 'm08', 'f09', 'f17'];
+const MOBILE_SET = ['m02', 'm03', 'm04', 'm10', 'm12', 'm20', 'm08', 'm01', 'f09', 'f17'];
 const P = { ready: false, av: {}, clips: { m: {}, f: {} } };
 export const peopleReady = () => P.ready;
 export const peopleDebug = () => P;
