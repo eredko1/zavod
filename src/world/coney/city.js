@@ -285,16 +285,20 @@ function viaducts(world, M) {
   const W8u = [0.970, 0.242];   // W 8 St station axis (coney/w8th.js): its own two-level structure
   const inW8 = (x, z) => { const dx = x - 274.5, dz = z + 153, a = dx * W8u[0] + dz * W8u[1], o = -dx * W8u[1] + dz * W8u[0]; return a > -12 && a < 200 && Math.abs(o) < 11; };
   const inTerminal = (x, z) => (x > -90 && x < -22 && z > -446 && z < -255) || inW8(x, z);   // the Stillwell terminal + W 8 St build their own decks + tracks
+  // columns stay out of the carriageways (the girders span the street, as on the real el) and parallel tracks share columns
+  const segDist2 = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2; };
+  const inRoad = (x, z) => OSM.r.some((r) => { const h = r.w / 2 - 0.2; for (let i = 0; i + 1 < r.p.length; i++) if (segDist2(x, z, r.p[i], r.p[i + 1]) < h * h) return true; return false; });
+  const cols = new Map(), colOK = (x, z) => { const k = `${Math.round(x / 3)},${Math.round(z / 3)}`; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const [qx, qz] of cols.get(`${Math.round(x / 3) + i},${Math.round(z / 3) + j}`) || []) if ((qx - x) ** 2 + (qz - z) ** 2 < 6.25) return false;
+    if (inRoad(x, z)) return false; (cols.get(k) || cols.set(k, []).get(k)).push([x, z]); return true; };
   for (const l of OSM.rl) {
     if (!l.el) continue;
     const pts = l.p; if (pts.length < 2) continue;
     walk(pts, 12, (x, z, dx, dz) => { // bents: two columns + cap girder across the track (+ knee braces in play)
       if (inTerminal(x, z)) return;
       const ang = Math.atan2(dx, dz);
-      for (const s of [-2.4, 2.4]) { const g = boxGeo([-0.25, 0, -0.25], [0.25, Y - 1.1, 0.25]); g.translate(s, 0, 0); g.rotateY(ang); g.translate(x, 0, z); V.add('elGirder', g); }
+      for (const s of [-2.4, 2.4]) { const cx = x + Math.cos(ang) * s, cz = z - Math.sin(ang) * s; if (!colOK(cx, cz)) continue; const g = boxGeo([-0.25, 0, -0.25], [0.25, Y - 1.1, 0.25]); g.translate(s, 0, 0); g.rotateY(ang); g.translate(x, 0, z); V.add('elGirder', g); world.box([cx - 0.3, 0, cz - 0.3], [cx + 0.3, Y - 1, cz + 0.3]); }
       const cap = boxGeo([-3.0, Y - 1.3, -0.35], [3.0, Y - 0.9, 0.35]); cap.rotateY(ang); cap.translate(x, 0, z); V.add('elGirder', cap);
       if (near(x, z)) for (const s of [-1, 1]) { const g = new THREE.BoxGeometry(0.16, 1.7, 0.2); g.rotateZ(s * 0.75); g.translate(s * 1.85, Y - 1.85, 0); g.rotateY(ang); g.translate(x, 0, z); V.add('elGirder', g); }
-      world.box([x - 0.4, 0, z - 0.4], [x + 0.4, Y - 1, z + 0.4]);
     });
     if (pts.some(([x, z]) => near(x, z))) walk(pts, 3, (x, z, dx, dz) => { if (!near(x, z) || inTerminal(x, z)) return; const g = boxGeo([-2.0, Y - 0.62, -0.1], [2.0, Y - 0.25, 0.1]); g.rotateY(Math.atan2(dx, dz)); g.translate(x, 0, z); V.add('elGirder', g); });
     for (let i = 0; i + 1 < pts.length; i++) {
