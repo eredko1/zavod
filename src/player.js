@@ -259,8 +259,8 @@ export function update(dt, ctx) {
   } else {
     // air: reduced control, no speed gain beyond takeoff speed
     if (il > 0) {
-      const cap = Math.max(S.takeoffSpeed, 3.0, Math.min(wishSpeed, SPD.walk));
-      v.x = damp(v.x, wx * cap, ACCEL_L * AIR_CONTROL, dt); v.z = damp(v.z, wz * cap, ACCEL_L * AIR_CONTROL, dt);
+      const jet = p.jet?.on, cap = jet ? 13 : Math.max(S.takeoffSpeed, 3.0, Math.min(wishSpeed, SPD.walk));   // jet pack: full air control, fast
+      v.x = damp(v.x, wx * cap, ACCEL_L * (jet ? 1 : AIR_CONTROL), dt); v.z = damp(v.z, wz * cap, ACCEL_L * (jet ? 1 : AIR_CONTROL), dt);
       const hs = Math.hypot(v.x, v.z); if (hs > cap) { v.x *= cap / hs; v.z *= cap / hs; }
     } else { v.x = damp(v.x, 0, 0.4, dt); v.z = damp(v.z, 0, 0.4, dt); }
   }
@@ -276,6 +276,7 @@ export function update(dt, ctx) {
     S.takeoffSpeed = Math.hypot(v.x, v.z);
     if (S.sliding) { S.sliding = false; p.sliding = false; }
   }
+  if (p.jet?.thrust > 0) { v.y = Math.min(v.y + p.jet.thrust * dt, 11); if (v.y > 0.5) p.onGround = false; }   // jet pack thrust (world/coney/jetpack.js)
   if (!S.hover) v.y -= GRAVITY * dt * 0.5; else v.y = 0;   // leapfrog: half step before, half after → apex independent of frame rate
   if (v.y < -40) v.y = -40;
 
@@ -339,7 +340,7 @@ function onLand(p, ctx, fallSpeed) {
   const dip = clamp(fallSpeed * 0.013, 0.02, 0.24);
   S.landV -= dip * 16;
   S.landImpulseRaw = Math.max(S.landImpulseRaw, clamp(fallSpeed / 12, 0.15, 1));
-  if (fallSpeed > HARD_LAND_V && p.fallDamageEnabled && S.time > S.noFallDamageUntil) p.damage(Math.round((fallSpeed - HARD_LAND_V) * 7), null);
+  if (fallSpeed > HARD_LAND_V && p.fallDamageEnabled && !p.jet?.on && S.time > S.noFallDamageUntil) p.damage(Math.round((fallSpeed - HARD_LAND_V) * 7), null);
   // a landing counts as a heavy footstep
   emitFootstep(p, ctx, true);
   S.lastStepPhase = S.bobPhase;

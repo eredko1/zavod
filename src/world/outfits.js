@@ -367,8 +367,8 @@ export const CHARS = {
   arkasha: { name: 'ARKASHA', avatar: 'm02', h: 1.80, glasses: 'clear', glassesY: 0.035 },
   mcguinness: { name: 'McGUINNESS', avatar: 'm12', h: 1.73, wx: 1.22, wz: 1.18, afro: true, outfit: { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 } },
   feliks: { name: 'FELIKS', avatar: 'm20', h: 1.83, hair: 0x2b1d14, outfit: { top: 'tee', shirt: 6, bottom: 'jeans' } },
-  elf: { name: 'THE ELF', avatar: 'm10', h: 1.70, knife: true, outfit: { top: 'track', bottom: 'track', shoes: 'white' } },
-  sasha: { name: 'SASHA', avatar: 'm17', h: 1.78 },
+  elf: { name: 'THE ELF', avatar: 'm08', h: 1.70, knife: true, outfit: { top: 'track', bottom: 'track', shoes: 'white' } },
+  sasha: { name: 'SASHA', avatar: 'm01', h: 1.78 },
 };
 export function buildChar(id, ctx) {
   const C = CHARS[id] || CHARS.redko; const fig = buildPerson({ avatar: C.avatar, seed: 11, glasses: C.glasses, glassesY: C.glassesY }); if (!fig) return null;
