@@ -240,7 +240,7 @@ function update(dt) {
   }
   ctx.interactNear = !!act;   // next frame's weapons.js leaves F alone while a prompt is up
   V.promptT -= dt;
-  if (prompt && (prompt !== V.lastPrompt || V.promptT <= 0)) { ctx.hud?.toast?.(prompt, 700); V.promptT = 0.4; }
+  if (prompt && !ctx.isTouch && (prompt !== V.lastPrompt || V.promptT <= 0)) { ctx.hud?.toast?.(prompt, 700); V.promptT = 0.4; }   // phones: the big action button already shows it
   V.lastPrompt = prompt || '';
   if (F && act) { ctx.input.pressed.delete('KeyF'); act(); }
 }
@@ -615,6 +615,7 @@ function buildUI(o) {
   const cash = el('hgcash'), fade = el('hgfade'), floor = el('hgfloor'); fade.innerHTML = '<i class="tag">LPH 4 LIFE · DIMA ✶ 19</i>';
   const dlg = el('hkdlg'); dlg.innerHTML = '<div class="nm"></div><div class="tx"></div><div class="chs"></div><div class="ft">1–4 choose · F leave</div>';
   const use = el('hguse', 'button'); use.textContent = 'USE (B)'; use.style.cssText = 'position:fixed;left:18px;bottom:130px;z-index:46;display:none;padding:12px 18px;font:700 16px Barlow Condensed,Arial;letter-spacing:.12em;color:#fff;background:rgba(40,120,60,.8);border:1px solid rgba(255,255,255,.4);border-radius:6px';
+  if (V.ctx.isTouch) { cash.style.cssText = 'top:252px;bottom:auto;font-size:15px'; use.style.top = '280px'; use.style.bottom = 'auto'; use.style.padding = '8px 12px'; use.style.fontSize = '13px'; }   // phones: up under the bag button, out of the thumb cluster
   use.addEventListener('touchstart', (e) => { e.preventDefault(); useItem(); }, { passive: false }); use.addEventListener('click', (e) => { e.stopPropagation(); useItem(); });
   let help = null;
   if (o.help) {
