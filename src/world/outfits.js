@@ -72,8 +72,13 @@ export const SHIRTS = [
       [['#d90012', 0], ['#1d48b8', 1], ['#f2a800', 2]].forEach(([c, i]) => { g.fillStyle = c; g.fillRect(x0, y0 + (h / 3) * i, w, h / 3 + 1); });
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.save(); g.globalCompositeOperation = 'destination-out'; fitText(g, 'SOAD', S / 2, y0 + h / 2 + 6, `900 #px ${IMPACT}`, 250, w * 0.86); g.restore();
       g.textBaseline = 'alphabetic'; g.fillStyle = '#f4f2ec'; fitText(g, BAND, S / 2, S * 0.86, `900 #px ${BLACKF}`, 40, S * 0.9); } },
+  { key: 'tool', label: 'TOOL', c: '#c9c2b0', c2: '#8a7f66', front(g, S) {   // Redko's tee: plain lettering, no album art
+      g.textAlign = 'center'; g.fillStyle = '#c9c2b0'; g.save(); g.translate(S / 2, S * 0.5); g.scale(1, 1.35); fitText(g, 'TOOL', 0, 0, `900 #px ${SERIF}`, 210, S * 0.86); g.restore();
+      g.strokeStyle = '#8a7f66'; g.lineWidth = 4; g.strokeRect(S * 0.12, S * 0.2, S * 0.76, S * 0.6); } },
 ];
+const SOAD_N = 8;   // the per-player rotation only uses the SOAD tees; the ones after are character shirts
 function backPrint(g, S, v) {
+  if (v.key === 'tool') { g.textAlign = 'center'; g.fillStyle = v.c; fitText(g, 'TOOL', S / 2, S * 0.5, `900 #px ${SERIF}`, 160, S * 0.8); return; }
   g.textAlign = 'center'; g.fillStyle = v.c;
   fitText(g, 'SYSTEM', S / 2, S * 0.3, `900 #px ${IMPACT}`, 132, S * 0.9); fitText(g, 'OF A DOWN', S / 2, S * 0.54, `900 #px ${IMPACT}`, 132, S * 0.94);
   g.fillStyle = v.c2 === v.c ? '#ecebe6' : v.c2; g.fillRect(S * 0.2, S * 0.62, S * 0.6, 8);
@@ -88,13 +93,13 @@ function printTex(i, back) {
 }
 
 // ------------------------------------------------------------------------------------------------ shirt per player id
-const hashId = (s) => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % SHIRTS.length; };
+const hashId = (s) => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % SOAD_N; };
 /** tee variant for a net id: preferred = hash(id); clashes in the current room resolved in id order (same answer on every client) */
 export function shirtOf(id, ctx) {
   if (!id) return 0;
   const ids = new Set([id]); const n = ctx?.net; if (n?.id) ids.add(n.id); try { for (const x of n?.list?.() || []) ids.add(x); } catch {}
   const used = new Set();
-  for (const x of [...ids].sort()) { let v = hashId(x); while (used.has(v) && used.size < SHIRTS.length) v = (v + 1) % SHIRTS.length; used.add(v); if (x === id) return v; }
+  for (const x of [...ids].sort()) { let v = hashId(x); while (used.has(v) && used.size < SOAD_N) v = (v + 1) % SOAD_N; used.add(v); if (x === id) return v; }
   return hashId(id);
 }
 const escH = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -356,26 +361,44 @@ export function addAfro(fig, { scale = 1 } = {}) {
 // ------------------------------------------------------------------------------------------------ remote players (net.js)
 const REMOTES = new Set();
 let sigAt = 0, sig = '';
+/** playable looks (chill-mode picker; everyone online sees your pick) — the table crew plus REDKO, the default hero */
+export const CHARS = {
+  redko: { name: 'REDKO', avatar: 'm02', h: 1.83, wide: 1.07, hair: 0x0c0a09, outfit: { top: 'tee', shirt: 8, bottom: 'jeans', skin: 0xe7bda0 } },
+  arkasha: { name: 'ARKASHA', avatar: 'm02', h: 1.80, glasses: 'clear' },
+  mcguinness: { name: 'McGUINNESS', avatar: 'm12', h: 1.73, wx: 1.22, wz: 1.18, afro: true, outfit: { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 } },
+  feliks: { name: 'FELIKS', avatar: 'm20', h: 1.83, hair: 0x2b1d14, outfit: { top: 'tee', shirt: 6, bottom: 'jeans' } },
+  elf: { name: 'THE ELF', avatar: 'm10', h: 1.70, outfit: { top: 'track', bottom: 'track', shoes: 'white' } },
+  sasha: { name: 'SASHA', avatar: 'm17', h: 1.78 },
+};
+export function buildChar(id, ctx) {
+  const C = CHARS[id] || CHARS.redko; const fig = buildPerson({ avatar: C.avatar, seed: 11, glasses: C.glasses }); if (!fig) return null;
+  standTall(fig, C.h); if (C.wide) { fig.group.scale.x *= C.wide; fig.group.scale.z *= C.wide; } if (C.wx) { fig.group.scale.x *= C.wx; fig.group.scale.z *= C.wz; }
+  if (C.afro) addAfro(fig); if (C.hair) addLongHair(fig, { color: C.hair }); if (C.outfit) dressFigure(fig, ctx, C.outfit);
+  return fig;
+}
+const LOOKS = new Map();   // peer id -> character id (net 'look')
+export function setRemoteChar(pid, id, ctx) {
+  if (!CHARS[id] || LOOKS.get(pid) === id) return; LOOKS.set(pid, id);
+  for (const H of REMOTES) if (H.pid === pid && H.wrap) { const fig = buildChar(id, ctx); if (!fig) return; H.wrap.remove(H.fig.group); H.fig = fig; H.wrap.add(fig.group); fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.isTouch; }); }
+}
 function heroOutfit(pid, ctx) { return { top: 'tee', shirt: shirtOf(pid, ctx), bottom: 'jeans', shoes: 'keep', skin: SKIN_FAIR }; }
 /** swap the soldier look of a remote player for the hero (jeans + his own SOAD-style tee). Hitboxes / muzzle stay on the soldier rig. */
 export function dressRemote(inst, pid, ctx) {
   if (!inst || inst.hero) return;
   if (!peopleReady()) { const pd = peopleDebug(); (pd.loading || loadPeople(ctx)).then(() => { if (peopleReady()) dressRemote(inst, pid, ctx); }).catch(() => {}); return; }
-  const fig = buildPerson({ avatar: HERO.avatar, seed: 11 }); if (!fig || fig.avatar !== HERO.avatar && !peopleDebug().av[HERO.avatar]) return;
-  standTall(fig, HERO.height);
-  if (!dressFigure(fig, ctx, heroOutfit(pid, ctx))) return;
+  const fig = buildChar(LOOKS.get(pid) || 'redko', ctx); if (!fig) return;
   const hideMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   inst.model?.traverse((o) => { if (o.isMesh && !/^hit_/.test(o.name)) { o.visible = false; o.castShadow = false; } });
   for (const m of inst.props || []) { if (m.name === 'rifle') { m.material = hideMat; m.castShadow = false; } else m.visible = false; }
   const wrap = new THREE.Group(); wrap.name = 'hero'; wrap.rotation.y = -(inst.inner?.rotation.y || 0); (inst.inner || inst.group).add(wrap); wrap.add(fig.group);
   fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.isTouch; });
-  const H = { fig, pid, shirt: shirtOf(pid, ctx), last: new THREE.Vector3(), sp: 0, first: true };
+  const H = { fig, pid, wrap, shirt: shirtOf(pid, ctx), last: new THREE.Vector3(), sp: 0, first: true };
   inst.hero = H; REMOTES.add(H);
   const mix = inst.mixer, mu = mix ? mix.update.bind(mix) : null, wp = new THREE.Vector3();
   const tick = (dt) => {
     inst.group.getWorldPosition(wp);
     if (dt > 0) { const d = H.first ? 0 : Math.hypot(wp.x - H.last.x, wp.z - H.last.z) / dt; H.first = false; H.sp += (Math.min(d, 9) - H.sp) * Math.min(1, dt * 6); }
-    H.last.copy(wp); fig.update(dt, H.sp < 0.25 ? 0 : H.sp);
+    H.last.copy(wp); H.fig.update(dt, H.sp < 0.25 ? 0 : H.sp);
     const now = performance.now(); if (now - sigAt > 500) { sigAt = now; refreshShirts(ctx); }
   };
   if (mix) mix.update = (dt) => { const r = mu(dt); tick(dt); return r; };
@@ -383,10 +406,10 @@ export function dressRemote(inst, pid, ctx) {
 }
 function refreshShirts(ctx) {
   const n = ctx.net; const s = [n?.id, ...(n?.list?.() || [])].sort().join(','); if (s === sig) return; sig = s;
-  for (const H of REMOTES) { if (!H.fig.group.parent) { REMOTES.delete(H); continue; } const v = shirtOf(H.pid, ctx); if (v !== H.shirt) { H.shirt = v; dressFigure(H.fig, ctx, heroOutfit(H.pid, ctx)); } }
+  for (const H of REMOTES) { if (!H.fig.group.parent) { REMOTES.delete(H); continue; } }   // looks come from the character pick now (net 'look')
 }
 /** QA: what each remote peer wears */
-export const outfitsQA = { remotes: () => [...REMOTES].map((H) => ({ pid: H.pid, shirt: H.shirt, label: SHIRTS[H.shirt].label, h: +(avatarHeight(HERO.avatar) * (H.fig.heightScale || 1)).toFixed(3) })) };
+export const outfitsQA = { remotes: () => [...REMOTES].map((H) => ({ pid: H.pid, a: H.fig.avatar, shirt: H.shirt, label: SHIRTS[H.shirt].label, h: +(avatarHeight(HERO.avatar) * (H.fig.heightScale || 1)).toFixed(3) })) };
 
 // ------------------------------------------------------------------------------------------------ first-person forearms
 /** the viewmodel sleeve material becomes bare fair forearm skin (short-sleeve tee: the sleeve ends above the elbow, off-screen) */
@@ -413,9 +436,9 @@ export function addLongHair(fig, { color = 0x2b1d14 } = {}) {
   fig.group.updateWorldMatrix(true, true); const hs = fig.head.getWorldScale(new THREE.Vector3()).x / (fig.group.getWorldScale(new THREE.Vector3()).x || 1);
   const g = new THREE.Group(); g.name = 'longhair'; g.scale.setScalar(1 / (hs || 1));
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: THREE.DoubleSide });
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), m); cap.scale.set(1, 1.02, 1.08); cap.position.set(0, 0.012, -0.012);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.4), m); cap.scale.set(1, 1.02, 1.08); cap.position.set(0, 0.012, -0.012);
   const back = new THREE.Mesh(new THREE.CylinderGeometry(0.122, 0.17, 0.46, 18, 1, true, Math.PI * 0.62, Math.PI * 0.76), m); back.position.set(0, -0.2, -0.018);
-  for (const s of [-1, 1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.1), m); side.position.set(s * 0.112, -0.12, 0.0); side.rotation.z = s * 0.08; g.add(side); }
+  for (const s of [-1, 1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.1), m); side.position.set(s * 0.112, -0.13, -0.035); side.rotation.z = s * 0.08; g.add(side); }
   for (const o of [cap, back]) { o.castShadow = true; g.add(o); }
   fig.head.add(g); return g;
 }
