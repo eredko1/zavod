@@ -43,7 +43,7 @@ function carSpecFor(kind) {
   if (CAR_SPECS[kind]) return CAR_SPECS[kind];
   const K = carSpec(kind) || carSpec('sedan'), hw = K.w / 2, hl = K.len / 2, e = carEye(kind);
   return (CAR_SPECS[kind] = { ...CAR_BASE, kind, wheelbase: K.wheels[0] - K.wheels[1], circles: [-(hl - hw), 0, hl - hw], bodyR: hw, h: K.roof,
-    eyeH: e.y, eyeBack: -e.x, eyeSide: e.z, reach: 1.4, hx: hw + 0.05, hz: hl, boxH: K.roof });
+    eyeH: e.y, eyeBack: -e.x, eyeSide: e.z, reach: 1.4, hx: hw + 0.05, hz: hl, boxH: K.roof, ...(K.sport ? { max: 46, accel: 13.5, grip: 15, latG: 1.25, revMax: 8.5 } : {}) });   // sports cars: faster, grippier
 }
 // surfaces: sand is slow + slippery, grass/dirt a little
 const SURF = { hard: { max: 1, accel: 1, grip: 1, drag: 0, rumble: 0 }, soft: { max: 0.8, accel: 0.85, grip: 0.75, drag: 0.8, rumble: 0.3 }, sand: { max: 0.5, accel: 0.7, grip: 0.45, drag: 2.2, rumble: 1 } };
