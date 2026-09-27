@@ -1,8 +1,8 @@
 export function createMergeLog(root) {
 const $=id=>root.querySelector(`#${id}`);let result=null;
 function show(){const mode=$('merge-log-filter').value,term=$('merge-log-search').value.toLowerCase(),all=result?.decisions||[];
-  const rows=all.filter(r=>(mode==='all'||(mode==='conflicts'?r.conflicts.length:(!r.representedBy&&(r.members.length>1||r.status==='partial'||(r.status==='represented'&&r.evidence.length)))||r.conflicts.length))&&(!term||JSON.stringify(r).toLowerCase().includes(term)));
-  $('live-counts').textContent=result?`${all.length} records · ${result.summary.matched} matches · ${result.summary.suppressed} redundant records represented · ${result.summary.conflicts} conflicts · showing ${Math.min(rows.length,200)}/${rows.length} filtered results`:'No data loaded.';
+  const rows=all.filter(r=>(mode==='all'||(mode==='conflicts'?r.conflicts.length:(!r.representedBy&&(r.members.length>1||['partial','excluded'].includes(r.status)||r.attributes.treePlacement?.excluded?.length||(r.status==='represented'&&r.evidence.length)))||r.conflicts.length))&&(!term||JSON.stringify(r).toLowerCase().includes(term)));
+  $('live-counts').textContent=result?`${all.length} records · ${result.summary.matched} matches · ${result.summary.suppressed} suppressed records · ${result.summary.conflicts} conflicts · showing ${Math.min(rows.length,200)}/${rows.length} filtered results`:'No data loaded.';
   $('merge-results').replaceChildren();for(const r of rows.slice(0,200)){const b=document.createElement('button');b.dataset.mergeDecision=r.canonicalId;b.dataset.conflict=!!r.conflicts.length;b.textContent=`${r.status} · ${r.ruleId} · ${r.members.map(m=>m.id).join(' + ')} — ${r.conflicts[0]||r.evidence[0]||'Retained source record'}`;b.onclick=()=>{$('merge-selected').textContent=JSON.stringify(r,null,2);};$('merge-results').append(b);}
   if(!rows.length)$('merge-results').textContent=result?'No decisions match this filter. Choose “All source records” to inspect retained features.':'Fetch a source to begin. No saved map data is loaded.';
 }

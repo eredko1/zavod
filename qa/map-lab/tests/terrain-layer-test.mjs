@@ -33,7 +33,7 @@ try {
     }
     let maxPlaneError = 0, triangles = 0;
     function inspect(o) {
-      if (o.userData.building || o.isInstancedMesh) return;
+      if (o.userData.building || o.isInstancedMesh || o.userData.clippedInstance) return;
       if (o.isMesh) {
         const p = o.geometry.attributes.position, index = o.geometry.index, count = index ? index.count : p.count;
         for (let i = 0; i < count; i += 3) {
@@ -46,7 +46,7 @@ try {
     }
     inspect(g.scene);
     const { buildScene, dispose } = await import('/qa/map-lab/render/osm-meshes.js'), original = buildScene({ ...g.plan, buildings: [] });
-    const areas = meshes => { const out = new Map(); for (const o of meshes) { const f = o.userData.feature; if (!f || f.height) continue; const p = o.geometry.attributes.position, idx = o.geometry.index, count = idx?.count ?? p.count; let area = 0; for (let i = 0; i < count; i += 3) { const [a,b,c] = [0,1,2].map(j => idx ? idx.getX(i+j) : i+j); area += Math.abs((p.getX(b)-p.getX(a))*(p.getZ(c)-p.getZ(a))-(p.getZ(b)-p.getZ(a))*(p.getX(c)-p.getX(a)))/2; } out.set(f.id,(out.get(f.id)||0)+area); } return out; };
+    const areas = meshes => { const out = new Map(); for (const o of meshes) { const f = o.userData.feature; if (!o.isMesh || !f || f.height) continue; const p = o.geometry.attributes.position, idx = o.geometry.index, count = idx?.count ?? p.count; let area = 0; for (let i = 0; i < count; i += 3) { const [a,b,c] = [0,1,2].map(j => idx ? idx.getX(i+j) : i+j); area += Math.abs((p.getX(b)-p.getX(a))*(p.getZ(c)-p.getZ(a))-(p.getZ(b)-p.getZ(a))*(p.getX(c)-p.getX(a)))/2; } out.set(f.id,(out.get(f.id)||0)+area); } return out; };
     const {clipSurfaceGeometry}=await import('/qa/map-lab/render/map-merge-mesh.js'), cutInput=new T.PlaneGeometry(20,20);cutInput.rotateX(-Math.PI/2);
     const cp=cutInput.attributes.position;for(let i=0;i<cp.count;i++)cp.setY(i,cp.getX(i)*.1+cp.getZ(i)*.2);
     cutInput.setAttribute('heat',new T.Float32BufferAttribute(Array.from({length:cp.count},(_,i)=>cp.getX(i)+2*cp.getZ(i)),1));cutInput.addGroup(0,3,0);cutInput.addGroup(3,3,1);

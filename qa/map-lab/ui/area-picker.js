@@ -1,9 +1,11 @@
+import {eventScope} from './event-scope.js';
 import { CONEY_BOUNDS, NEIGHBOR_BOUNDS, validateArea, areaDimensions } from '../data/generator-area.js';
 import { MAX_MAP_LATITUDE, MIN_ZOOM, MAX_ZOOM, areaCenter, mapPoint, centeredArea, panArea, fitAreaZoom } from '../data/area-view.js';
 import { createAreaTiles } from './area-tiles.js';
 
 const TILE_SETTLE_MS=180, KEY_PAN_PIXELS=40;
 export function createAreaPicker(dialog,{onApply}) {
+const events=eventScope();
   const $=id=>dialog.querySelector(`#${id}`),map=$('area-map'),box=$('area-box');
   let bounds={...CONEY_BOUNDS},zoom=16,drag=null,timer=null;
   const tiles=createAreaTiles($('area-tiles'),{onError:()=>{$('area-map-status').textContent='Basemap unavailable. Bounds and presets still work.';}});
@@ -22,20 +24,20 @@ export function createAreaPicker(dialog,{onApply}) {
   function setDraft(next){bounds={...validateArea(next)};$('area-map-status').textContent='';fit();}
   function finishDrag(load=true){if(!drag)return;const id=drag.id;drag=null;map.classList.remove('dragging');if(map.hasPointerCapture(id))map.releasePointerCapture(id);draw(load);}
   function setZoom(value){finishDrag(false);zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,value));draw(false);settle();}
-  map.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;clearTimeout(timer);drag={id:e.pointerId,x:e.clientX,y:e.clientY,bounds};map.setPointerCapture(e.pointerId);map.classList.add('dragging');});
-  map.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;bounds=panArea(drag.bounds,e.clientX-drag.x,e.clientY-drag.y,zoom);$('area-preset').value='custom';draw(false);});
-  for(const type of ['pointerup','pointercancel','lostpointercapture'])map.addEventListener(type,e=>{if(drag?.id===e.pointerId)finishDrag();});
-  map.addEventListener('wheel',e=>{e.preventDefault();if(e.deltaY)setZoom(zoom+(e.deltaY<0?1:-1));},{passive:false});
-  map.addEventListener('keydown',e=>{
+  events.on(map,'pointerdown',e=>{if(e.button!==0||drag)return;clearTimeout(timer);drag={id:e.pointerId,x:e.clientX,y:e.clientY,bounds};map.setPointerCapture(e.pointerId);map.classList.add('dragging');});
+  events.on(map,'pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;bounds=panArea(drag.bounds,e.clientX-drag.x,e.clientY-drag.y,zoom);$('area-preset').value='custom';draw(false);});
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])events.on(map,type,e=>{if(drag?.id===e.pointerId)finishDrag();});
+  events.on(map,'wheel',e=>{e.preventDefault();if(e.deltaY)setZoom(zoom+(e.deltaY<0?1:-1));},{passive:false});
+  events.on(map,'keydown',e=>{
     const shifts={ArrowLeft:[KEY_PAN_PIXELS,0],ArrowRight:[-KEY_PAN_PIXELS,0],ArrowUp:[0,KEY_PAN_PIXELS],ArrowDown:[0,-KEY_PAN_PIXELS]};
     if(shifts[e.key]){bounds=panArea(bounds,...shifts[e.key],zoom);$('area-preset').value='custom';draw(false);settle();}
     else if(e.key==='+'||e.key==='=')setZoom(zoom+1);else if(e.key==='-')setZoom(zoom-1);else return;e.preventDefault();
   });
-  $('area-zoom-in').onclick=()=>setZoom(zoom+1);$('area-zoom-out').onclick=()=>setZoom(zoom-1);
-  $('area-preset').onchange=()=>{if($('area-preset').value==='custom')return;$('area-size').value='current';setDraft($('area-preset').value==='coney'?CONEY_BOUNDS:NEIGHBOR_BOUNDS);};
-  $('area-size').onchange=()=>{const metres=Number($('area-size').value);if(!metres)return;$('area-preset').value='custom';setDraft(centeredArea(areaCenter(bounds),{width:metres,height:metres}));};
-  $('area-use').onclick=()=>{onApply({...bounds});dialog.close();};$('area-dismiss').onclick=()=>dialog.close();
-  dialog.addEventListener('close',()=>{clearTimeout(timer);tiles.enable(false);finishDrag();});
+  events.on($('area-zoom-in'),'click',()=>setZoom(zoom+1));events.on($('area-zoom-out'),'click',()=>setZoom(zoom-1));
+  events.on($('area-preset'),'change',()=>{if($('area-preset').value==='custom')return;$('area-size').value='current';setDraft($('area-preset').value==='coney'?CONEY_BOUNDS:NEIGHBOR_BOUNDS);});
+  events.on($('area-size'),'change',()=>{const metres=Number($('area-size').value);if(!metres)return;$('area-preset').value='custom';setDraft(centeredArea(areaCenter(bounds),{width:metres,height:metres}));});
+  events.on($('area-use'),'click',()=>{onApply({...bounds});dialog.close();});events.on($('area-dismiss'),'click',()=>dialog.close());
+  events.on(dialog,'close',()=>{if(dialog.open)return;clearTimeout(timer);tiles.enable(false);finishDrag();});
   const observer=new ResizeObserver(()=>{if(dialog.open){draw(false);settle();}});observer.observe(map);
   return {
     open(initial){
@@ -43,6 +45,6 @@ export function createAreaPicker(dialog,{onApply}) {
       bounds={...initial};$('area-preset').value=Object.keys(CONEY_BOUNDS).every(k=>bounds[k]===CONEY_BOUNDS[k])?'coney':Object.keys(NEIGHBOR_BOUNDS).every(k=>bounds[k]===NEIGHBOR_BOUNDS[k])?'neighbor':'custom';$('area-size').value='current';$('area-map-status').textContent='';
       dialog.showModal();tiles.enable(true);fit();map.focus();
     },
-    dispose(){dialog.close();clearTimeout(timer);observer.disconnect();tiles.enable(false);},
+    dispose(){events.dispose();finishDrag(false);dialog.close();clearTimeout(timer);observer.disconnect();tiles.enable(false);},
   };
 }

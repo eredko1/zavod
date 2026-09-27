@@ -15,6 +15,13 @@ try{
     const clean=()=>!('profiler'in w)&&methods.every((k,i)=>w[k]===originals[i])&&gl.bufferData===upload;
     async function run(create,version=7){const h=createMapBenchmark(w,{scenarios:{custom:{version,create}}});try{return await runBenchmark(h,{options:{modes:['custom'],frames:3,warmup:0,repeats:2}});}finally{await h.dispose();}}
     const stationary=await run(world=>{world.fit();return ()=>null;});
+    const {sceneMetadata}=await import('/qa/map-lab/benchmark/scene-metadata.js'),{validateComparison}=await import('/qa/map-lab/benchmark/frame-report.js');
+    const terrain=w.getWorld().walkable[0],coverage=stationary.runs[0].metadata.geometryCoverage;
+    if(!coverage.some(f=>f.id==='terrain'))throw Error('Terrain is absent from benchmark coverage');
+    const rejectTerrainChange=()=>{const candidate=structuredClone(stationary);for(const r of candidate.runs)r.metadata=sceneMetadata(w);try{validateComparison(stationary,candidate);return null;}catch(e){return e.message;}};
+    terrain.visible=false;const hiddenTerrain=rejectTerrainChange();terrain.visible=true;
+    const positions=terrain.geometry.attributes.position,vertex=terrain.geometry.index.getX(0),height=positions.getY(vertex);positions.setY(vertex,height+1);const alteredTerrain=rejectTerrainChange();positions.setY(vertex,height);
+    if(!/geometryCoverage/.test(hiddenTerrain)||!/geometryCoverage/.test(alteredTerrain))throw Error(`Terrain changes escaped comparison validation: hidden=${hiddenTerrain}, altered=${alteredTerrain}`);
     const thrown=await run(()=>()=>{throw Error('scenario failure');});const afterError=clean();
     const asset=await run(()=>()=>{assets.itemStart('test://completed-asset');assets.itemEnd('test://completed-asset');return null;});
     const resized=await run(world=>()=>{const {width,height}=world.renderer.domElement;world.renderer.setSize(width+1,height,false);world.renderer.setSize(width,height,false);return null;});

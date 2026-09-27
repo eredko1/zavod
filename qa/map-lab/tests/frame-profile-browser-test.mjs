@@ -26,7 +26,7 @@ try {
   console.log('PASS: known CPU work, real texture/buffer/shader instrumentation, asynchronous GPU timing and cleanup', {cpu:f.cpu,gpuStatus:f.gpuStatus,gpuMs:f.gpuMs});
   const modes=['walk-turn','run-turn'],raw={...result.report,frames:modes.map(phase=>({...f,phase,pose:{position:[0,0,0],quaternion:[0,0,0,1],yaw:0,pitch:0}}))};
   const summaries=Object.fromEntries(await Promise.all(modes.map(async mode=>[mode,await summarizeFrames(raw,mode)])));
-  const report={schema:4,status:'complete',config:{modes},runs:[{repeat:0,metadata:{gpu:'Browser test'},summaries,raw}]};
+  const report={schema:5,status:'complete',config:{modes},runs:[{repeat:0,metadata:{gpu:'Browser test'},summaries,raw}]};
   await page.route('**/chart-test-report',route=>route.fulfill({contentType:'text/html',body:reportDocument(report)}));
   await page.goto('http://localhost:8790/chart-test-report');await page.waitForSelector('.frame-overview svg');
   assert.match(await page.locator('.frame-overview').textContent(),/60 FPS/);

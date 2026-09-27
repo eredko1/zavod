@@ -5,7 +5,7 @@ import { validateArea,queryForArea,inNYC } from '../data/generator-area.js';
 import {cpuParts,activitySummary,gpuSampleNote} from '../benchmark/frame-chart-data.js';
 import {replayConfig} from '../benchmark/replay-config.js';
 const config={frames:3,repeats:2,modes:SCENARIOS},metadata={gpu:'test',browser:'test',canvas:[100,100],settings:{},featureIDs:['road'],assetHashes:{'/texture?version=1':'abc'},geometryCoverage:[{id:'road',bounds:[0,0,0,1,0,1]}]};
-const good={schema:2,status:'complete',inputHash:'fixture',config,runs:[0,1].map(repeat=>({repeat,metadata,summaries:Object.fromEntries(SCENARIOS.map(mode=>[mode,{frames:3,hiddenFrames:0,poseHash:mode}]))}))};
+const good={schema:2,status:'complete',inputHash:'fixture',config,runs:[0,1].map(repeat=>({repeat,metadata,summaries:Object.fromEntries(SCENARIOS.map(mode=>[mode,{frames:3,hiddenFrames:0,poseHash:mode,distance:1}]))}))};
 validateBaseline(good,good);validateRepeats(good);validateComparison(good,good);
 for(const status of ['failed','running','cancelled'])assert.throws(()=>validateBaseline({...good,status},good),/complete/);
 for(const status of ['failed','running','cancelled'])assert.throws(()=>validateComparison(good,{...good,status}),/candidate must be complete/);

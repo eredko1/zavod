@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import * as T from 'three';
+import {featureID,NYC_SOURCES,fetchNYC} from '../data/map-sources.js';
+import {resolveMap,GEOMETRY_DEFAULTS} from '../pipeline/map-pipeline.js';
+import {compileMap} from '../pipeline/map-build.js';
+import {buildDetails} from '../render/osm-detail-meshes.js';
+import {buildScene,dispose} from '../render/osm-meshes.js';
+import {sceneCoverage} from '../benchmark/scene-coverage.js';
+import {validateReplay} from '../benchmark/frame-report.js';
+import {terrainFromSnapshots} from '../render/map-terrain.js';
+const bounds={south:0,west:0,north:.001,east:.001},coordinates=[[.0001,.0001],[.0009,.0001],[.0009,.0009],[.0001,.0009],[.0001,.0001]];
+const way=(id,tags)=>({type:'way',id,tags,geometry:coordinates.map(([lon,lat])=>({lat,lon}))});
+const source=NYC_SOURCES.find(s=>s.id==='nyc-elevation'),geometry={type:'Point',coordinates:[.0005,.0005]},features=[10,20].map(elevation=>({type:'Feature',geometry,properties:{source_id:0,sub_code:'300000',elevation:String(elevation)}}));
+assert.notEqual(featureID(source,features[0]),featureID(source,features[1]));
+const reordered={...features[0],properties:Object.fromEntries(Object.entries(features[0].properties).reverse())};assert.equal(featureID(source,features[0]),featureID(source,reordered),'property order must not change identity');
+const plan=resolveMap({bounds,nyc:[{sourceId:source.id,bounds,data:{features}}]});
+assert.equal(new Set(plan.coverage.map(f=>f.id)).size,2);for(const c of plan.coverage)assert.equal(c.merge.members[0].tags.elevation,c.tags.elevation);
+const multipart={...features[0],geometry:{type:'MultiPoint',coordinates:[[.0002,.0002],[.0008,.0008]]}},multiSnapshot={sourceId:source.id,bounds,data:{features:[multipart]}},multiOriginal=JSON.stringify(multiSnapshot),multiPlan=resolveMap({bounds,nyc:[multiSnapshot]});
+assert.equal(new Set(multiPlan.details.map(f=>f.id)).size,2,'individual points must not alias one merge record');assert.equal(multiPlan.coverage.length,2);assert.equal(JSON.stringify(multiSnapshot),multiOriginal);
+assert.deepEqual(new Set(terrainFromSnapshots([multiSnapshot],multiPlan.origin).samples.map(s=>s.id)),new Set(multiPlan.details.map(f=>f.id)),'terrain and normalization share multipart identities');
+const nativeFetch=globalThis.fetch;try{globalThis.fetch=async url=>new Response(JSON.stringify(String(url).includes('/resource/')?{type:'FeatureCollection',features:[features[0],reordered,features[1]]}:{}));const snapshot=await fetchNYC(source,bounds);assert.equal(snapshot.data.features.length,2,'equivalent key ordering deduplicates; conflicting attributes remain');}finally{globalThis.fetch=nativeFetch;}
+for(const mergeEnabled of [true,false]){
+  const result={bounds,mergeEnabled,data:{elements:[way(1,{railway:'platform',area:'yes',bridge:'yes',layer:'2'}),way(2,{barrier:'fence',bridge:'yes',layer:'1'}),way(3,{natural:'water'}),{type:'node',id:4,lon:.0005,lat:.0005,tags:{amenity:'bench',layer:'1'}}]}};
+  const build=compileMap(result,GEOMETRY_DEFAULTS);assert.equal(build.plan.details.length,4);
+  for(const f of build.plan.details){assert.ok(f.reference,f.id);assert.ok(!build.world.walkable.some(m=>m.userData.feature===f));assert.ok(!build.world.elevatedWalkable.some(m=>m.userData.feature===f));}
+  const props=build.world.selectable.filter(m=>m.isInstancedMesh);assert.equal(props.length,1,'elevated bench must emit only a reference marker');assert.equal(props[0].count,1);
+  dispose(build.world.group);dispose(build.reference);
+}
+const shape={outer:[[0,0],[1,0],[1,1]],holes:[]};
+const f={id:'surface',surface:true,rule:'surface',surfaceKind:'paved',shapes:[shape,shape],paths:[],dimensions:{}};let calls=0;
+const detail=buildDetails({details:[f],issues:[]},p=>{if(++calls===2)throw Error('second polygon failed');return new T.Shape(p.outer.map(([x,z])=>new T.Vector2(x,z)));});
+assert.ok(f.failed);assert.equal(detail.group.children.length,0);assert.equal(detail.selectable.length,0);dispose(detail.group);
+const road={id:'road',width:{value:2},shapes:[shape,{outer:null,holes:[]}],paths:[]},roads=buildScene({buildings:[],roads:[road],details:[],coverage:[{id:'road'}],issues:[]});
+assert.ok(road.failed);assert.equal(roads.selectable.length,0);assert.equal(roads.group.children.filter(m=>m.isMesh).length,0);dispose(roads.group);
+const group=new T.Group(),mesh=new T.Mesh(new T.BoxGeometry(1,1,1),new T.MeshBasicMaterial());mesh.userData.feature={id:'box'};group.add(mesh);
+const building={id:'building',extrude:true,height:{top:10,bottom:0},shapes:[{outer:[[0,0],[10,0],[10,10],[0,10]],holes:[]}]};
+const builtBuilding=buildScene({buildings:[building],roads:[],details:[],issues:[],coverage:[]}),outlined=sceneCoverage(builtBuilding.group);
+builtBuilding.group.traverse(o=>{if(o.geometry)assert.equal(o.userData.feature.id,building.id,'every building drawable participates in coverage');if(o.isLineSegments)o.visible=false;});
+const noOutline=sceneCoverage(builtBuilding.group);assert.equal(outlined[0].lineLength,120);assert.equal(noOutline[0].lineLength,0);assert.equal(noOutline[0].surfaceArea,outlined[0].surfaceArea);dispose(builtBuilding.group);
+const before=sceneCoverage(group);mesh.geometry.setDrawRange(0,3);const partial=sceneCoverage(group);assert.notDeepEqual(partial,before);assert.equal(partial[0].surfaceArea,.5);assert.equal(before[0].surfaceArea,6);
+mesh.geometry.setDrawRange(0,0);assert.deepEqual(sceneCoverage(group),[]);mesh.geometry.setDrawRange(0,Infinity);
+mesh.material=Array.from({length:6},()=>new T.MeshBasicMaterial());mesh.material[0].visible=false;assert.equal(sceneCoverage(group)[0].surfaceArea,5);
+mesh.geometry.dispose();for(const m of mesh.material)m.dispose();
+const line=new T.LineLoop(new T.BufferGeometry().setFromPoints([new T.Vector3(0,0,0),new T.Vector3(1,0,0),new T.Vector3(1,1,0)]),new T.LineBasicMaterial());line.userData.feature={id:'loop'};
+assert.equal(sceneCoverage(line)[0].lineLength,3.414);line.geometry.setDrawRange(0,1);assert.deepEqual(sceneCoverage(line),[]);line.geometry.dispose();line.material.dispose();
+const summary={frames:2,hiddenFrames:0,distance:0},config={frames:2,modes:['walk-turn']};
+assert.throws(()=>validateReplay({'walk-turn':summary},config),/must actually move/);
+validateReplay({'walk-turn':{...summary,distance:.02}},config);
+validateReplay({custom:summary},{frames:2,modes:['custom']},{custom:{version:1}});
+assert.throws(()=>validateReplay({custom:summary},{frames:2,modes:['custom']},{custom:{minimumDistance:1}}),/must actually move/);
+console.log('PASS source identity, unresolved physical levels/water, atomic mesh failure, drawn coverage and shared movement validation');

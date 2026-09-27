@@ -10,7 +10,7 @@ export function reportTable(report) {
 }
 export function buildTable(builds) {
   const names=[...new Set(builds.flatMap(b=>Object.keys(b.phases)))];
-  return `<table><thead><tr><th>Build</th>${names.map(n=>`<th>${esc(n)} ms</th>`).join('')}<th>Total CPU ms</th></tr></thead><tbody>${builds.map((b,i)=>`<tr><td>${i+1}</td>${names.map(n=>`<td>${num(b.phases[n])}</td>`).join('')}<td>${num(b.totalMs)}</td></tr>`).join('')}</tbody></table>`;
+  return `<table><thead><tr><th>Build</th>${names.map(n=>`<th>${esc(n)} ms</th>`).join('')}<th>Total CPU ms</th><th>Elapsed ms</th></tr></thead><tbody>${builds.map((b,i)=>`<tr><td>${i+1}</td>${names.map(n=>`<td>${num(b.phases[n])}</td>`).join('')}<td>${num(b.totalMs)}</td><td>${num(b.wallMs??b.totalMs)}</td></tr>`).join('')}</tbody></table>`;
 }
 const disposers=new WeakMap();
 export function clearReport(results){disposers.get(results)?.();disposers.delete(results);results.replaceChildren();}

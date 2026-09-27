@@ -1,5 +1,6 @@
 import { fetchJSON } from './api-request.js';
 import { withRequestTimeout } from './request-abort.js';
+import {sourceGeometryError} from './source-geometry.js';
 // Source IDs are stable provenance keys. Dataset updates and imagery capture dates are different.
 export const LION_LAYER = 'https://services5.arcgis.com/GfwWNkhOj9bNBqoJ/arcgis/rest/services/LION/FeatureServer/0';
 export const datasetURL = dataset => dataset === 'LION' ? LION_LAYER : `https://data.cityofnewyork.us/d/${dataset}`;
@@ -13,6 +14,14 @@ export const NYC_SOURCES = [
   { id: 'nyc-trees', dataset: 'hn5i-inap', name: 'NYC forestry tree points', color: '#89c79a', kind: 'tree', idField: 'objectid', geometryField: 'location' },
   { id: 'nyc-lion', dataset: 'LION', name: 'NYC LION street network', color: '#e9a4ad', kind: 'lion', idField: 'OBJECTID', api: 'arcgis', layer: LION_LAYER },
   { id: 'nyc-elevation', dataset: '9uxf-ng6q', name: 'NYC elevation samples', color: '#c2a1de', kind: 'elevation' },
+  { id: 'nyc-transport', dataset: 'r9cu-9r7b', name: 'NYC bridges and transport structures', color: '#dfad83', kind: 'transport' },
+  { id: 'nyc-railroad', dataset: 'anc7-97cy', name: 'NYC railroad lines', color: '#d6bdd5', kind: 'railroad' },
+  { id: 'nyc-rail-structures', dataset: 'dwer-xbgx', name: 'NYC stations and rail structures', color: '#b6a5d5', kind: 'rail-structures' },
+  { id: 'nyc-retaining-walls', dataset: 's2pi-ccum', name: 'NYC retaining walls', color: '#c4a895', kind: 'retaining-walls' },
+  { id: 'nyc-boardwalk', dataset: 'p9cw-7gsv', name: 'NYC boardwalks', color: '#d6bb91', kind: 'boardwalk' },
+  { id: 'nyc-shoreline', dataset: '59xk-wagz', name: 'NYC shoreline', color: '#82c8cf', kind: 'shoreline' },
+  { id: 'nyc-hydro-structures', dataset: '6hbv-tek4', name: 'NYC piers, jetties and seawalls', color: '#a9bfc3', kind: 'hydro-structures' },
+  { id: 'nyc-hydrography', dataset: 'pjs3-c3z5', name: 'NYC water and beach areas', color: '#81afc8', kind: 'hydrography' },
 ];
 export const CONEY_BOUNDS = { south: 40.5752, west: -73.9798, north: 40.5799, east: -73.9760 };
 export function areaWKT(b) {
@@ -35,7 +44,7 @@ export async function fetchNYC(source, bounds, signal, onRetry) {
     for (const f of data.features) {
       if (!['Polygon', 'MultiPolygon', 'LineString', 'MultiLineString', 'Point', 'MultiPoint'].includes(f.geometry?.type)) throw new Error('Unexpected geometry type; previous result retained.');
       const id = f.properties?.[source.idField || 'source_id']; if (id === undefined) throw new Error('NYC feature has no source identifier.');
-      const key = JSON.stringify([f.properties, f.geometry]); if (!ids.has(key)) { ids.add(key); features.push(f); }
+      const key = recordKey(f); if (!ids.has(key)) { ids.add(key); features.push(f); }
     }
     if (data.features.length < 1000) { complete = true; break; }
   }
@@ -51,9 +60,20 @@ export function geoPolygons(geometry) { return geometry.type === 'Polygon' ? [ge
 export function geoLines(g) { return g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []; }
 export function geoPoints(g) { return g.type === 'Point' ? [g.coordinates] : g.type === 'MultiPoint' ? g.coordinates : []; }
 export function featureID(source, feature) {
-  // Some NYC SOURCE_IDs are zero/repeated. A geometry suffix preserves distinct records.
-  let hash = 2166136261; for (const c of JSON.stringify(feature.geometry)) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619);
+  if(feature.sourceRecordId)return `${feature.sourceRecordId}/point/${feature.pointIndex}`;
+  // Repeated IDs can describe conflicting observations at identical coordinates.
+  let hash = 2166136261; for (const c of recordKey(feature)) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619);
   return `${source.id}/${feature.properties[source.idField || 'source_id']}@${(hash >>> 0).toString(16)}`;
+}
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+const recordKey=feature=>JSON.stringify([canonical(feature.geometry),canonical(feature.properties)]);
+// Expand multipart observations for normalization/display; keep raw snapshots intact.
+export function sourceFeatures(source,features){
+  return features.flatMap(feature=>{
+    const geometryError=sourceGeometryError(feature.geometry);
+    if(geometryError||feature.geometry.type!=='MultiPoint')return[{...feature,geometryError}];
+    const sourceRecordId=featureID(source,feature);return feature.geometry.coordinates.map((coordinates,pointIndex)=>({...feature,sourceRecordId,pointIndex,geometryError:null,geometry:{type:'Point',coordinates}}));
+  });
 }
 
 export const NYC_MEDIAN_TYPES = { '360010': 'Painted road marking area; not a physical island', '360020': 'Curbed median', '360030': 'Rail median', '360040': 'Fence median', '360050': 'Grass median', '360060': 'Barrier median', '360070': 'Other median', '360080': 'Traffic island' };

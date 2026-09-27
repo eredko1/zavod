@@ -92,8 +92,8 @@ export function createFrameProfiler(renderer, { clock = () => performance.now(),
     },
     abortFrame(error) { if (frame) { frame.error = error.message; api.endFrame(null); } },
     beginBuild(meta = {}) { if (active) { const start = clock(); build = { ...meta, startMs: start-origin, phases: {}, stamp: start }; builds.push(build); } },
-    buildMark(name) { if (build) { const now = clock(); build.phases[name] = now-build.stamp; build.stamp = now; } },
-    endBuild() { if (build) { build.totalMs = clock()-origin-build.startMs; delete build.stamp; build = null; } },
+    buildMark(name,durationMs) { if (build) { const now = clock(); build.phases[name] = durationMs??now-build.stamp; build.stamp = now; } },
+    endBuild() { if (build) { build.wallMs = clock()-origin-build.startMs; build.totalMs=Object.values(build.phases).reduce((sum,ms)=>sum+ms,0);build.yieldMs=Math.max(0,build.wallMs-build.totalMs);delete build.stamp; build = null; } },
     async stop() {
       if (frame) throw Error('Cannot stop inside a frame');
       active = false; build = null;

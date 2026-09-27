@@ -1,3 +1,4 @@
+import {NYC_SOURCES} from '../data/map-sources.js';
 import {chromeOptions} from '../../browser-launch.mjs';
 // Explicit live fixture capture through the same generator APIs used interactively.
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -10,10 +11,12 @@ await mkdir(output,{recursive:true});
 const browser=await chromium.launch(chromeOptions({channel:'chrome',headless:false,args:['--no-sandbox','--disable-dev-shm-usage']}));
 try{
   const page=await browser.newPage();await page.goto('http://localhost:8790/qa/map-lab/index.html?qa=1');await page.waitForFunction(()=>window.__generator);
+  await page.locator('#area-coordinates > summary').click();
+  page.on('requestfinished',r=>{if(/resource\/.*geojson|api\/interpreter|LION\/FeatureServer\/0\/query/.test(r.url()))console.log('Received',new URL(r.url()).pathname);});
   for(const [key,value]of Object.entries(bounds))await page.fill('#area-'+key,String(value));
   await page.evaluate(()=>window.__generator.fetchArea());
   const result=await page.evaluate(()=>window.__generator.result);
-  if(!result.data||result.nyc.length!==(inNYC(bounds)?9:0))throw Error(await page.textContent('#error')||'Incomplete source capture');
+  if(!result.data||result.nyc.length!==(inNYC(bounds)?NYC_SOURCES.length:0))throw Error(await page.textContent('#error')||'Incomplete source capture');
   await writeFile(`${output}/scene.json`,JSON.stringify(result));
   // Existing geometry tests consume individual snapshots; scene.json is the portable replay input.
   await writeFile(`${output}/osm-latest-data.json`,JSON.stringify({...result,nyc:undefined}));

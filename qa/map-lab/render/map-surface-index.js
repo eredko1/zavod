@@ -8,6 +8,8 @@ export function surfaceIndex(meshes, fallback, cell = 10) {
     for (let i = 0; i < count; i += 3) {
       const [a,b,c] = [0,1,2].map(j => point(index ? index.getX(i+j) : i+j)), bx = b[0]-a[0], bz = b[2]-a[2], cx = c[0]-a[0], cz = c[2]-a[2], det = bx*cz-bz*cx;
       if (Math.abs(det) < 1e-10) continue;
+      // Building undersides cannot support a person; road ribbons may have either winding.
+      if(mesh.userData.feature?.height&&det>0)continue;
       const t = [a[0],a[2],a[1],cz/det,-cx/det,-bz/det,bx/det,b[1]-a[1],c[1]-a[1]];
       const x0 = Math.floor(Math.min(a[0],b[0],c[0])/cell), x1 = Math.floor(Math.max(a[0],b[0],c[0])/cell), z0 = Math.floor(Math.min(a[2],b[2],c[2])/cell), z1 = Math.floor(Math.max(a[2],b[2],c[2])/cell);
       for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
@@ -17,12 +19,12 @@ export function surfaceIndex(meshes, fallback, cell = 10) {
       triangles++;
     }
   }
-  return { cells: cells.size, triangles, sample(x,z) {
-    let height = fallback(x,z);
+  return { cells: cells.size, triangles, sample(x,z,ceiling=Infinity) {
+    const base=fallback(x,z);let height=base<=ceiling?base:-Infinity;
     const groups = cells.get(`${Math.floor(x/cell)},${Math.floor(z/cell)}`); if (!groups) return height;
     for (const [mesh, list] of groups) {
       if (!objectVisible(mesh)) continue;
-      for (const t of list) { const dx = x-t[0], dz = z-t[1], u = dx*t[3]+dz*t[4], v = dx*t[5]+dz*t[6]; if (u >= 0 && v >= 0 && u+v <= 1) height = Math.max(height, t[2]+u*t[7]+v*t[8]); }
+      for (const t of list) { const dx = x-t[0], dz = z-t[1], u = dx*t[3]+dz*t[4], v = dx*t[5]+dz*t[6]; if (u >= 0 && v >= 0 && u+v <= 1) {const y=t[2]+u*t[7]+v*t[8];if(y<=ceiling)height=Math.max(height,y);} }
     }
     return height;
   } };

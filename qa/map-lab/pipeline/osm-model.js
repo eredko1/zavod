@@ -1,6 +1,7 @@
 // OSM -> metre-based construction plan. Pure data: no rendering, game state, or authored scenery.
 import { normalize } from './osm-geometry.js';
 import { detailsFromOSM } from './osm-rules.js';
+import {physicalLevel,isGroundLevel,isBridgeLevel} from './physical-level.js';
 
 export const DEFAULTS = { storey: 3, curb: 0.15, laneWidth: 3, roadWidth: 7, pathWidth: 2 };
 const DEG = Math.PI / 180, A = 6378137, E2 = 6.69437999014e-3;
@@ -54,7 +55,7 @@ export function planFromOSM(data, options = {}) {
   if (data.remark) throw new Error(`Incomplete API response: ${data.remark}`);
   const o = { ...DEFAULTS, ...options };
   for (const k of ['storey', 'laneWidth', 'roadWidth', 'pathWidth']) if (!(o[k] > 0 && Number.isFinite(o[k]))) throw new Error(`Invalid ${k}. Enter a positive number.`);
-  const all = normalize(data.elements), normalized = new Map(all.map(f => [f.id, f])), list = all.filter(f => active(f.tags.building) || active(f.tags['building:part']) || f.tags.highway);
+  const all = normalize(data.elements), normalized = new Map(all.map(f => [f.id, f])), rawWays=new Map(data.elements.filter(e=>e.type==='way').map(e=>[`way/${e.id}`,e])), list = all.filter(f => active(f.tags.building) || active(f.tags['building:part']) || f.tags.highway);
   const points = all.flatMap(f => f.paths.flatMap(p => p.points));
   if (!points.length && !data.elements.some(e => active(e.tags?.building) || active(e.tags?.['building:part']))) throw new Error('No drawable geometry. Include out geom; in the query.');
   let lat0 = Infinity, lat1 = -Infinity, lon0 = Infinity, lon1 = -Infinity;
@@ -66,10 +67,10 @@ export function planFromOSM(data, options = {}) {
   const relationMembers = new Set();
   for (const e of data.elements.filter(e => e.type === 'relation' && e.tags?.type === 'multipolygon' && (active(e.tags.building) || active(e.tags['building:part'])))) {
     const parent = normalized.get(`relation/${e.id}`);
-    if (!parent?.paths.length || parent.paths.some(p => !p.closed) || !polygons(parent.paths, project).length || !heightOf(e.tags, o).valid) continue;
+    if (!parent?.paths.length || parent.paths.some(p => !p.closed) || !polygons(parent.paths, project).length || !heightOf(e.tags, o).valid || !isGroundLevel(e)) continue;
     for (const m of e.members || []) if (m.type === 'way' && (!m.role || m.role === 'outer')) {
       const child = normalized.get(`way/${m.ref}`);
-      if (child && active(child.tags['building:part']) === active(e.tags['building:part'])) relationMembers.add(child.id);
+      if (child && isGroundLevel(child) && active(child.tags['building:part']) === active(e.tags['building:part'])) relationMembers.add(child.id);
     }
   }
   for (const f of list) {
@@ -79,20 +80,21 @@ export function planFromOSM(data, options = {}) {
       const shapes = polygons(f.paths, project), height = heightOf(t, o), incomplete = f.paths.some(p => !p.closed);
       if (!shapes.length || incomplete) { counts.incompleteBuildings++; issue(f.id, 'incomplete-footprint', 'Skipped: no complete area footprint. Fetch full out geom;.'); }
       if (!height.valid && height.top !== null) issue(f.id, 'invalid-height', 'Skipped: top height must exceed min_height.');
-      const extrude = shapes.length > 0 && !incomplete && height.valid;
+      const reference=!isGroundLevel(f),extrude = shapes.length > 0 && !incomplete && height.valid&&!reference;
       if (height.top === null) { counts.unknownHeights++; issue(f.id, 'missing-height', 'Skipped: neither a usable height nor building:levels tag.'); }
       if (t.height !== undefined && !(length(t.height) > 0)) issue(f.id, 'invalid-height-tag', 'Unusable height tag; floor count used if available.', 'warning');
       if (height.valid && height.estimated) issue(f.id, 'estimated-height', height.source, 'info');
       if (extrude && height.estimated) counts.estimatedHeights++;
-      buildings.push({ id: f.id, tags: t, shapes, paths: f.paths.map(p => p.points.map(project)), height, extrude, part: active(t['building:part']), suppressed: false });
+      buildings.push({ id: f.id, tags: t, shapes, paths: f.paths.map(p => p.points.map(project)), height, extrude, reference, part: active(t['building:part']), suppressed: false });
     } else if (t.highway && f.type === 'way') {
-      if (active(t.tunnel) || t.location === 'underground') { counts.tunnels++; issue(f.id, 'flat-road', 'Tunnel shown on reference ground; no elevation model.', 'warning'); }
+      const placement=physicalLevel(f);if(['tunnel','subsurface'].includes(placement.kind))counts.tunnels++;
+      if(placement.kind!=='ground')issue(f.id,'flat-road',`Vertical placement requires resolution: ${placement.reason}`,'warning');
       const width = widthOf(t, o), shapes = polygons(f.paths, project), paths = f.paths.filter(p => !p.closed && p.points.length > 1).map(p => p.points.map(project));
       if (!shapes.length && !paths.length) continue;
-      const elevated = active(t.bridge) || Number(t.layer) > 0;
-      if (elevated) issue(f.id, 'flat-road', 'Bridge/layer tag present; road drawn on flat reference ground.', 'warning');
+      const elevated = isBridgeLevel(f);
       if (paths.length && width.estimated) counts.estimatedWidths++;
-      roads.push({ id: f.id, tags: t, width, shapes, paths, elevated, path: /^(footway|path|pedestrian|steps|cycleway|bridleway)$/.test(t.highway) });
+      const nodes=rawWays.get(f.id)?.nodes;
+      roads.push({ id: f.id, tags: t, width, shapes, paths, ...(paths.length===1&&nodes?.length===paths[0].length?{nodes:[...nodes]}:{}), elevated, path: /^(footway|path|pedestrian|steps|cycleway|bridleway)$/.test(t.highway) });
     }
   }
   // OSM Simple 3D Buildings: parts replace the parent volume; keep its outline for inspection.
@@ -124,7 +126,7 @@ export function planFromOSM(data, options = {}) {
     if (!Object.keys(tags).length) { status = 'support'; reason = 'Geometry reference retained in source data.'; rule = 'geometry-reference'; }
     else if (g) {
       rule = g.rule || (g.height ? 'building' : 'road'); status = g.reference ? 'reference' : 'rendered'; reason = g.reference ? 'Mapped geometry shown without inventing an object model.' : 'Generated from mapped geometry; inspect attributes for estimates.';
-      if (g.height && !g.extrude) { status = 'skipped'; reason = 'Building requires a complete footprint and usable height or floor count.'; }
+      if (g.height && !g.extrude && !g.reference) { status = 'skipped'; reason = 'Building requires a complete footprint and usable height or floor count.'; }
       if (g.suppressed) { status = 'represented'; reason = 'Parent volume replaced by mapped building parts.'; }
     } else if (surfaceMembers.has(id)) { reason = `Member surface represented by ${surfaceMembers.get(id)}.`; rule = 'member-surface'; }
     else if (relationMembers.has(id)) { reason = 'Member geometry represented by the parent building relation.'; }

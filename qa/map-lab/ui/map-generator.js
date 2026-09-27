@@ -1,3 +1,4 @@
+import {showGeometryReport} from './geometry-report.js';
 import { initHelp } from './map-help.js';
 import { createMapPreview } from './map-preview.js';
 import { createMergeLog } from './live-merge-log.js';
@@ -10,23 +11,26 @@ import { runBenchmark } from '../benchmark/benchmark-runner.js';
 import { buildTable, mountReport, clearReport } from '../benchmark/frame-report-view.js';
 import { downloadJSON } from './download.js';
 import { createAreaPicker } from './area-picker.js';
+import {createBuildProgress,buildStageLabel,paintProgress as settle} from './build-progress.js';
 
 const $=id=>document.getElementById(id),log=createMergeLog(document);
+const loading=createBuildProgress($('build-loading'));
 initHelp($('pipeline'));
 const geometryOptions=()=>({storey:Number($('storey').value),curb:Number($('curb-height').value),terrain:$('terrain-enabled').checked});
 $('storey').value=GEOMETRY_DEFAULTS.storey;$('curb-height').value=GEOMETRY_DEFAULTS.curb;
 const preview=createMapPreview(document,{options:geometryOptions,onMerge:log.update});
+let geometryReport=null;
 let bounds={...DEFAULT_BOUNDS},controller=null,busy=false,dirty=true,areaChanged=false,report=null,generationProfile=null,world=null,harness=null,acquisition=[];
 const picker=createAreaPicker($('area-picker'),{onApply:b=>{const previous=formBounds(),changed=Object.keys(b).some(k=>b[k]!==previous[k]);setBounds(b);if(changed)pendingArea();}});
-const say=text=>$('area-status').textContent=text;
-function sync(){const r=preview.result(),has=!!r.data?.elements.length||r.nyc.some(s=>s.data.features.length);$('generate').disabled=busy||areaChanged||!has;$('bench-run').disabled=busy||dirty||!world?.plan;$('tab-3d').disabled=busy||!world?.plan;$('generate').textContent=dirty?'Generate 3D':'Regenerate 3D';}
+const say=text=>{$('area-status').textContent=text;if(busy)loading.show(text);};
+function sync(){const r=preview.result(),has=!!r.data?.elements.length||r.nyc.some(s=>s.data.features.length);$('generate').disabled=busy||areaChanged||!has;$('bench-run').disabled=busy||dirty||!world?.plan;$('validate').disabled=busy||dirty||!world?.plan;$('tab-3d').disabled=busy||!world?.plan;$('generate').textContent=dirty?'Generate 3D':'Regenerate 3D';}
 function lock(value){
   busy=value;$('selection-controls').disabled=value;$('selection-controls').inert=value;$('generation-info').inert=value;
   // A disabled fieldset covers controls created by subsequent API responses too.
   for(const id of ['auto-coney','area-fetch','fetch','tab-2d','orbit','top','walk','respawn'])$(id).disabled=value;
-  $('busy-cover').hidden=!value;sync();
+  $('busy-cover').hidden=!value;for(const id of ['world','map-viewport'])$(id).setAttribute('aria-busy',String(value));if(!value)loading.hide();sync();
 }
-function invalidate(){dirty=true;report=null;clearReport($('bench-results'));$('benchmark-panel').hidden=true;$('bench-download').disabled=$('log-download').disabled=true;sync();if(world?.plan)$('generation-summary').textContent='Selection changed. Generate 3D to apply these sources and rules.';}
+function invalidate(){geometryReport=null;$('geometry-report-panel').hidden=true;dirty=true;report=null;clearReport($('bench-results'));$('benchmark-panel').hidden=true;$('bench-download').disabled=$('log-download').disabled=true;sync();if(world?.plan)$('generation-summary').textContent='Selection changed. Generate 3D to apply these sources and rules.';}
 function updateLink(){$('turbo').href=`https://overpass-turbo.eu/?Q=${encodeURIComponent($('query').value)}`;}
 const formBounds=()=>Object.fromEntries(['south','west','north','east'].map(k=>[k,$('area-'+k).valueAsNumber]));
 function pendingArea(){areaChanged=true;invalidate();say('Area changed. Fetch area to load its data.');}
@@ -63,20 +67,25 @@ async function fetchArea(coney=false,custom=null){
 function switchView(view){const three=view==='3d';$('map-viewport').hidden=three;$('three-view').hidden=!three;$('tab-2d').setAttribute('aria-pressed',!three);$('tab-3d').setAttribute('aria-pressed',three);world?.suspend(!three);if(!three)requestAnimationFrame(()=>preview.fit());}
 function inspect(f){if(!f)return;const link=document.createElement('a'),pre=document.createElement('pre');link.textContent=f.id;link.href=f.dataset?datasetURL(f.dataset):`https://www.openstreetmap.org/${f.id}`;link.target='_blank';link.rel='noopener';pre.textContent=JSON.stringify({rule:f.rule,height:f.height,width:f.width,tags:f.tags,merge:f.merge,attributes:f.attributes,estimates:f.estimates},null,2);$('details').replaceChildren(link,pre);}
 async function ensureWorld(){if(!world){const {createMapWorld}=await import('../render/map-world.js');const {createMapBenchmark}=await import('../benchmark/map-benchmark.js');world=createMapWorld({canvas:$('world'),viewport:$('three-view'),onInspect:inspect,onError:message=>$('error').textContent=message,onMode:(mode,message)=>{$('world-help').textContent=message;$('reticle').hidden=mode!=='walk';}});harness=createMapBenchmark(world);}return world;}
-const settle=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 function showBenchmarkBuilds(builds){$('bench-builds').innerHTML=builds.length?buildTable(builds):'';$('bench-builds').parentElement.hidden=!builds.length;}
 function showGeneration(){const s=world.stats();$('generation-summary').textContent=`${s.buildings} buildings · ${s.roads} road/path features · ${s.details} other features · ${s.errors} generation errors.`;$('build-results').innerHTML=buildTable(generationProfile.builds);$('generation-log').textContent=world.plan.issues.map(i=>`${i.severity} · ${i.id} · ${i.message}`).join('\n')||'No issues.';$('log-download').disabled=false;}
 async function generate(){
-  if(busy||areaChanged)return;let profiling=false;lock(true);$('log-download').disabled=true;$('generation-summary').textContent='Building merged geometry…';
-  try{switchView('3d');await ensureWorld();world.suspend(false);await settle();harness.profiler.start();profiling=true;harness.loadResult(preview.result(),geometryOptions());await harness.profiler.waitForAssets();generationProfile=await harness.profiler.stop();profiling=false;dirty=false;showGeneration();}
+  if(busy||areaChanged)return;geometryReport=null;$('geometry-report-panel').hidden=true;let profiling=false;lock(true);$('log-download').disabled=true;$('generation-summary').textContent='Building merged geometry…';
+  try{loading.show('Preparing map');switchView('3d');await ensureWorld();world.suspend(true);await settle();harness.profiler.start();profiling=true;await harness.loadResult(preview.result(),geometryOptions(),async stage=>{loading.show(buildStageLabel(stage));await settle();});loading.show('Finishing build');await harness.profiler.waitForAssets();generationProfile=await harness.profiler.stop();profiling=false;dirty=false;showGeneration();}
   catch(e){if(profiling)await harness.profiler.stop();$('generation-summary').textContent=e.message;dirty=true;}
-  finally{lock(false);}
+  finally{world?.suspend(false);lock(false);}
+}
+async function validate(){
+  if(busy||dirty||!world?.plan)return;lock(true);loading.show('Checking generated geometry');
+  try{await settle();const {validateGeometry}=await import('../render/geometry-validation.js');geometryReport=validateGeometry({plan:world.plan,world:world.getWorld(),terrain:world.getTerrain(),surfaces:{sample:world.groundAt},selection:world.selection});showGeometryReport($('geometry-report'),geometryReport,id=>{switchView('3d');world.focusFeature(id);});$('geometry-report-panel').hidden=false;$('geometry-report-panel').open=true;$('geometry-report-panel').scrollIntoView({block:'nearest'});}
+  catch(e){$('error').textContent=e.message;}finally{lock(false);}
 }
 async function benchmark(options={}){
   if(busy||dirty||!world?.plan)return;report=null;lock(true);switchView('3d');controller=new AbortController();const signal=controller.signal;
   $('benchmark-panel').hidden=false;$('benchmark-panel').dataset.running='true';clearReport($('bench-results'));showBenchmarkBuilds([]);$('bench-scenario').closest('.frame-sequence').hidden=true;$('bench-scenario').hidden=$('benchmark-chart').hidden=true;$('bench-cancel').disabled=false;$('bench-download').disabled=true;
+  $('bench-state').textContent='Preparing benchmark. Graphs appear here after all repeats finish.';loading.show('Preparing benchmark');
   const hidden=()=>{if(document.hidden)controller?.abort(new Error('Benchmark cancelled: page became hidden'));};document.addEventListener('visibilitychange',hidden);
-  try{await settle();report=await runBenchmark(harness,{options,signal,generationProfile,onReport:r=>{report=r;report.acquisition=acquisition;},progress:(repeat,mode)=>{$('bench-state').textContent=`Repeat ${repeat+1} · ${mode}. Keep this page in the foreground.`;}});
+  try{report=await runBenchmark(harness,{options,signal,generationProfile,onReport:r=>{report=r;report.acquisition=acquisition;},progress:(repeat,mode,stage)=>{$('bench-state').textContent=`Repeat ${repeat+1} · ${stage?buildStageLabel(stage):mode}. Keep this page in the foreground.`;if(stage||mode==='Rebuilding map'){loading.show(`Repeat ${repeat+1} · ${stage?buildStageLabel(stage):mode}`);return settle(signal);}loading.hide();}});
     showBenchmarkBuilds([...report.runs.flatMap(r=>r.raw.builds),...(report.failureProfile?.builds||[])]);
     if(report.status==='complete'){await mountReport(report,{results:$('bench-results'),select:$('bench-scenario'),timeline:$('benchmark-chart')});$('bench-state').textContent='Complete. Click legends to filter; red line = 60 FPS target.';}
     else $('bench-state').textContent=`${report.status==='cancelled'?'Cancelled':'Failed'}: ${report.failure}. No complete frame charts; available build timings and diagnostic download are retained.`;
@@ -88,11 +97,12 @@ $('area-choose').onclick=()=>{try{picker.open(formBounds());}catch(e){say(e.mess
 for(const key of ['south','west','north','east'])$('area-'+key).addEventListener('input',pendingArea);
 $('area-cancel').onclick=()=>controller?.abort(new Error('Request cancelled'));$('bench-cancel').onclick=()=>controller?.abort(new Error('Benchmark cancelled'));
 $('generate').onclick=generate;$('tab-2d').onclick=()=>switchView('2d');$('tab-3d').onclick=()=>switchView('3d');$('bench-run').onclick=()=>benchmark();
-$('orbit').onclick=()=>world.fit();$('top').onclick=()=>world.fit(true);$('walk').onclick=()=>world.walk();$('respawn').onclick=()=>world.respawn();
+$('validate').onclick=validate;$('geometry-report-download').onclick=()=>downloadJSON(geometryReport,'map-geometry-checks.json');
+$('orbit').onclick=()=>world.fit();$('top').onclick=()=>world.fit(true);$('walk').onclick=()=>world.pickWalk();$('respawn').onclick=()=>world.respawn();
 $('bench-download').onclick=()=>downloadJSON(report,'map-benchmark.json');$('log-download').onclick=()=>downloadJSON({acquisition,settings:world.settings,builds:generationProfile.builds,coverage:world.plan.coverage,merge:world.plan.merge,issues:world.plan.issues},'map-generation.json');
 for(const id of ['layers','nyc-sources','merge-panel','osm-visible'])$(id).addEventListener('change',invalidate);
 $('geometry-settings').addEventListener('change',()=>{invalidate();try{preview.refreshRules();$('error').textContent='';}catch(e){$('error').textContent=e.message;}});
 $('help-open').onclick=()=>$('pipeline').showModal();$('help-close').onclick=()=>$('pipeline').close();if(location.hash==='#pipeline')$('pipeline').showModal();
 setBounds(DEFAULT_BOUNDS,{selection:true});preview.load({data:null,nyc:[]});sync();
 // QA observes the same explicit APIs used by the page; production modules do not read this hook.
-if(new URLSearchParams(location.search).has('qa'))window.__generator={fetchArea,generate,benchmark,load,ensureWorld,switchView,get busy(){return busy;},get report(){return report;},get result(){return preview.result();},get world(){return world;},get harness(){return harness;},get previewPlan(){return preview.plan;}};
+if(new URLSearchParams(location.search).has('qa'))window.__generator={fetchArea,generate,benchmark,validate,load,ensureWorld,switchView,get busy(){return busy;},get report(){return report;},get geometryReport(){return geometryReport;},get result(){return preview.result();},get world(){return world;},get harness(){return harness;},get previewPlan(){return preview.plan;}};

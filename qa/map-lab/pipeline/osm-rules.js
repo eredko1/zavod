@@ -1,4 +1,5 @@
 // Feature rules produce renderer-independent geometry instructions. Defaults are explicit estimates.
+import {isGroundLevel} from './physical-level.js';
 export function detailsFromOSM(features, project, polygons, length, issue, curbDefault) {
   const details = [];
   for (const f of features) {
@@ -39,13 +40,19 @@ export function detailsFromOSM(features, project, polygons, length, issue, curbD
         // One object can have both park-area and fence-boundary tags.
         base.surface = area && !!(t.leisure || t.landuse);
       } else if (t.natural === 'tree_row') { base.rule = 'tree-row'; dim('height', 'height', 7); dim('spacing', 'tree_spacing', 6); }
-      else if (t.railway && t.railway !== 'platform') { base.rule = 'rail'; dim('width', 'width', 1.5); }
+      else if (['rail','light_rail','subway','tram','narrow_gauge','miniature'].includes(t.railway)) {
+        base.rule='rail';const gauge=/^\d+(\.\d+)?$/.test(String(t.gauge))?Number(t.gauge)/1000:null;
+        base.dimensions.width=gauge>0?gauge:1.435;base.attributes.width={value:base.dimensions.width,unit:'metres',source:gauge>0?'OSM gauge (millimetres)':'Standard-gauge rule',tag:'gauge',raw:t.gauge??null,estimated:!(gauge>0)};
+        if(!(gauge>0))base.estimates.push('Rail gauge=1.435 m (default; single numeric gauge absent/unusable).');
+      }
+      else if(t.railway&&t.railway!=='platform'){base.rule='line';base.reference=true;issue(f.id,'rail-reference','Railway role has no supported track solid; original geometry retained.','info');}
       else if (area) { base.rule = 'surface'; base.surface = true; }
       else { base.rule = 'line'; base.reference = true; issue(f.id, 'line-reference', 'Mapped line only: no complete surface or supported solid rule.', 'info'); }
       if (base.surface) base.surfaceKind = t.natural === 'water' || t.water || t.amenity === 'fountain' ? 'water' : t.leisure === 'pitch' ? 'pitch' : t.amenity === 'parking' || t.railway === 'platform' || t.public_transport === 'platform' ? 'paved' : 'land';
+      if(base.surfaceKind==='water'){base.reference=true;base.requiresWaterElevation=true;issue(f.id,'missing-water-elevation','Water outline retained until a compatible water-level observation is available; terrain is not a water surface.','warning');}
       if (f.paths.some(p => !p.closed) && (t.type === 'multipolygon' || t.area === 'yes')) issue(f.id, 'partial-area', 'Incomplete area: showing returned boundary segments only.', 'warning');
-      if (t.tunnel || t.bridge || Number(t.layer)) issue(f.id, 'flat-detail', 'Elevation/structure tag present; geometry shown on flat reference ground.', 'warning');
     }
+    if(!isGroundLevel(f))issue(f.id,'flat-detail','Vertical placement requires a supported physical-level model; retained for resolution.','warning');
     if (base.estimates.length) issue(f.id, 'estimated-detail', `${base.rule}: ${base.estimates.join('; ')}.`, 'info');
     details.push(base);
   }

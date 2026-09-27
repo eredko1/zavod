@@ -1,8 +1,10 @@
+import {eventScope} from './event-scope.js';
 import { NYC_SOURCES, nycURL } from '../data/map-sources.js';
 import { downloadJSON } from './download.js';
 
 // Source cards present the active session; API requests belong to the generator controller.
 export function sourceControls({ root, mapBounds, changed }) {
+const events=eventScope();
   const states = new Map();
   const el=(name,text,parent)=>{const e=document.createElement(name);e.textContent=text;parent?.append(e);return e;};
   for(const source of NYC_SOURCES){
@@ -10,9 +12,9 @@ export function sourceControls({ root, mapBounds, changed }) {
     const status=el('p','Not loaded.',card),details=el('details','',card);status.dataset.sourceStatus=source.id;el('summary','Source details',details);
     const query=el('a','Open API query ↗',details),meta=el('p',`Dataset ${source.dataset}`,details),download=el('button','Download JSON',details);query.target='_blank';query.rel='noopener';download.disabled=true;
     const state={source,snapshot:null,visible,status,query,meta,download};states.set(source.id,state);
-    visible.onchange=()=>changed(source.id,'visibility');download.onclick=()=>downloadJSON(state.snapshot,`${source.id}.json`);
+    events.on(visible,'change',()=>changed(source.id,'visibility'));events.on(download,'click',()=>downloadJSON(state.snapshot,`${source.id}.json`));
   }
-  return { states,
+  return { states,dispose(){events.dispose();root.replaceChildren();},
     snapshots:()=>[...states.values()].flatMap(s=>s.snapshot?[{...s.snapshot,visible:s.visible.checked}]:[]),
     restore(snapshots=[]){for(const s of states.values()){
       const previous=s.snapshot;s.snapshot=snapshots.find(snap=>snap.sourceId===s.source.id)||null;

@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { clipSurfaceGeometry } from './map-merge-mesh.js';
 import { buildDetails } from './osm-detail-meshes.js';
+import { boundGeometry } from './bounded-geometry.js';
+import {clipSolidGeometry} from './solid-clip.js';
+import {rollbackMeshes} from './mesh-transaction.js';
 
 function shapeOf(p) {
   const points = r => r.map(([x, z]) => new THREE.Vector2(x, -z));
@@ -14,24 +17,25 @@ export function buildScene(plan) {
   const solid = new THREE.MeshStandardMaterial({ color: 0xdce1df, roughness: 1 }), estimated = new THREE.MeshStandardMaterial({ color: 0xe5c394, roughness: 1 });
   const asphalt = new THREE.MeshBasicMaterial({ color: 0x727d82, side: THREE.DoubleSide }), path = new THREE.MeshBasicMaterial({ color: 0xc2c5bc, side: THREE.DoubleSide });
   const edge = new THREE.LineBasicMaterial({ color: 0x84928f, transparent: true, opacity: 0.45 });
-  const add = (g, material, f, parent = group) => { if (f.mergeMasks) g = clipSurfaceGeometry(g, f.mergeMasks); const m = new THREE.Mesh(g, material); m.userData.feature = f; parent.add(m); selectable.push(m); return m; };
+  const add = (g, material, f, parent = group) => { g=f.height?clipSolidGeometry(g,f.clipBounds):boundGeometry(g,f.clipBounds);if (f.mergeMasks) g = clipSurfaceGeometry(g, f.mergeMasks); const m = new THREE.Mesh(g, material); m.userData.feature = f; parent.add(m); selectable.push(m); return m; };
   for (const b of plan.buildings) {
-    if (!b.extrude || b.suppressed) continue;
+    if (!b.extrude || b.suppressed || b.reference) continue;
     const building = new THREE.Group(); building.userData.building = b;
     try {
       for (const p of b.shapes) {
         const geometry = new THREE.ExtrudeGeometry(shapeOf(p), { depth: b.height.top - b.height.bottom, bevelEnabled: false, steps: 1 });
         if (!geometry.attributes.position.count) { geometry.dispose(); throw new Error('Triangulation produced no faces.'); }
         geometry.rotateX(-Math.PI / 2); geometry.translate(0, b.height.bottom, 0);
-        add(geometry, b.height.estimated ? estimated : solid, b, building);
-        building.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 25), edge));
+        const mesh=add(geometry, b.height.estimated ? estimated : solid, b, building);
+        const outline=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), edge);outline.userData.feature=b;building.add(outline);
       }
       group.add(building);
     } catch (e) { b.failed = true; dispose(building, false); plan.issues.push({ id: b.id, code: 'mesh-error', severity: 'error', message: `Skipped: ${e.message}` }); }
   }
   // Centerlines become ribbons with round joins; widths are separately marked as tagged/estimated.
   for (const r of plan.roads) {
-    const material = r.path ? path : asphalt, y = r.path ? 0.035 : 0.025;
+    if(r.reference)continue;
+    const material = r.path ? path : asphalt, y = r.surfaceHeight??(r.path ? 0.035 : 0.025),start=selectable.length;
     try {
       for (const p of r.shapes) { const g = new THREE.ShapeGeometry(shapeOf(p)); g.rotateX(-Math.PI / 2); g.translate(0, y, 0); add(g, material, r); }
       const vertices = [], radius = r.width.value / 2, tri = (a, b, c) => vertices.push(a[0], y, a[1], b[0], y, b[1], c[0], y, c[1]);
@@ -44,9 +48,9 @@ export function buildScene(plan) {
         for (const p of line) for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6, b = (i + 1) * Math.PI / 6; tri(p, [p[0] + Math.cos(a) * radius, p[1] + Math.sin(a) * radius], [p[0] + Math.cos(b) * radius, p[1] + Math.sin(b) * radius]); }
       }
       if (vertices.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); add(g, material, r); }
-    } catch (e) { r.failed = true; plan.issues.push({ id: r.id, code: 'road-mesh-error', severity: 'error', message: e.message }); }
+    } catch (e) { rollbackMeshes(selectable,start);r.failed = true; plan.issues.push({ id: r.id, code: 'road-mesh-error', severity: 'error', message: e.message }); }
   }
-  const details = buildDetails(plan, shapeOf); group.add(details.group); selectable.push(...details.selectable);
+  const details = buildDetails(plan, shapeOf, [...plan.roads,...plan.buildings].filter(f=>f.reference&&!f.suppressed)); group.add(details.group); selectable.push(...details.selectable);
   const failed = new Set([...plan.buildings, ...plan.roads, ...plan.details].filter(f => f.failed).map(f => f.id));
   for (const c of plan.coverage) if (failed.has(c.id)) { c.status = 'error'; c.reason = 'Mesh generation failed; see generation log.'; }
   // Own even unused materials so repeated rebuilds release all GPU resources.

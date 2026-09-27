@@ -3,7 +3,9 @@ import { projection } from '../pipeline/osm-model.js';
 import { vertexData, triangleGroups } from './vertex-data.js';
 import { sourceNumber } from '../data/source-number.js';
 import { sourceCoordinate } from '../data/source-coordinate.js';
-import { featureID, NYC_SOURCES } from '../data/map-sources.js';
+import { featureID, sourceFeatures, NYC_SOURCES } from '../data/map-sources.js';
+import {profileHeight} from '../pipeline/infrastructure-merge.js';
+import {approachHeight} from '../pipeline/road-approaches.js';
 
 // Every surface uses the same cell diagonal and elevation plane, including clipped edges.
 export const TERRAIN_CELL = 5;
@@ -42,21 +44,30 @@ export function terrainGeometry(bounds, terrain) {
   const x1 = Math.ceil(bounds.x1 / cell) * cell, z1 = Math.ceil(bounds.z1 / cell) * cell;
   const nx = terrain.active ? (x1-x0)/cell : 1, nz = terrain.active ? (z1-z0)/cell : 1, positions = [], indices = [];
   for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) { const x = x0 + ix * (x1-x0)/nx, z = z0 + iz * (z1-z0)/nz; positions.push(x, terrain.sample(x, z) - 0.02, z); }
-  for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) { const a = iz * (nx + 1) + ix, b = a + 1, c = a + nx + 1, d = c + 1; indices.push(a, d, b, a, c, d); }
+  const boundaryVertices=new Map();
+  function triangle(ids){
+    const points=ids.map(i=>positions.slice(i*3,i*3+3));
+    if(points.every(p=>p[0]>=bounds.x0&&p[0]<=bounds.x1&&p[2]>=bounds.z0&&p[2]<=bounds.z1)){indices.push(...ids);return;}
+    let ring=points;for(const side of[p=>p[0]-bounds.x0,p=>bounds.x1-p[0],p=>p[2]-bounds.z0,p=>bounds.z1-p[2]])ring=halfPlane(ring,side);
+    const at=p=>{const key=`${p[0].toFixed(6)},${p[2].toFixed(6)}`;if(!boundaryVertices.has(key)){boundaryVertices.set(key,positions.length/3);positions.push(...p);}return boundaryVertices.get(key);};
+    for(let i=1;i+1<ring.length;i++)indices.push(at(ring[0]),at(ring[i]),at(ring[i+1]));
+  }
+  for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) { const a = iz * (nx + 1) + ix, b = a + 1, c = a + nx + 1, d = c + 1; triangle([a,d,b]);triangle([a,c,d]); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setIndex(indices); g.computeVertexNormals(); g.computeBoundingSphere();
-  g.userData.groundBounds = { x0, z0, x1, z1 }; return g;
+  // Walking must use the same Float32 boundary as the drawn triangles.
+  g.userData.groundBounds = Object.fromEntries(Object.entries(bounds).map(([key,value])=>[key,Math.fround(value)])); return g;
 }
 
-export function terrainFromSnapshots(snapshots, origin, enabled = true) {
+export function terrainFromSnapshots(snapshots, origin, enabled = true, levelDecisions = []) {
   const project = projection(...origin), samples = [], issues = [], positions = new Map();
+  const nonGround=new Set(levelDecisions.filter(d=>d.status==='elevated-road').map(d=>d.id));
   const source = NYC_SOURCES.find(s => s.id === 'nyc-elevation');
-  for (const snap of snapshots.filter(s => s.sourceId === 'nyc-elevation')) for (const f of snap.data.features) {
+  for (const snap of snapshots.filter(s => s.sourceId === 'nyc-elevation'&&s.visible!==false)) for (const f of sourceFeatures(source,snap.data.features)) {
+    if(f.geometryError){issues.push({id:featureID(source,f),dataset:source.dataset,code:'invalid-geometry',severity:'error',message:f.geometryError});continue;}
     const p = f.properties, elevation = sourceNumber(p.elevation);
-    // Roofs (302000) and bridges (300020) are not ground. Never mix them into the terrain.
+    // Subtype 300000 includes visible elevated roads: exclude resolved deck spots too.
     if (String(p.sub_code) !== '300000' || elevation === null || f.geometry.type !== 'Point') continue;
-    const id = featureID(source,f); let coordinate;
-    try { coordinate = sourceCoordinate(f.geometry.coordinates); }
-    catch (e) { issues.push({id,dataset:source.dataset,code:'invalid-geometry',severity:'error',message:e.message}); continue; }
+    const id = featureID(source,f);if(nonGround.has(id))continue;const coordinate=sourceCoordinate(f.geometry.coordinates);
     const key = `${coordinate.lon},${coordinate.lat}`, [x,z] = project(coordinate);
     if (!positions.has(key)) positions.set(key,[]);
     positions.get(key).push({id,x,z,elevation:elevation*0.3048,sourceId:String(p.source_id)});
@@ -86,22 +97,26 @@ export function terrainFromSnapshots(snapshots, origin, enabled = true) {
     const a = estimate(x0, z0), d = estimate(x0 + cell, z0 + cell);
     return v <= u ? a * (1 - u) + estimate(x0 + cell, z0) * (u - v) + d * v : a * (1 - v) + d * u + estimate(x0, z0 + cell) * (v - u);
   };
-  return { active, samples, issues, datum, min: values[0] ?? null, max: values.at(-1) ?? null, sample, method: 'Shared 5 m triangle grid; vertex elevations use four-nearest inverse-distance weighting, nearest sample beyond 100 m. Ground subtype 300000 only; conflicting co-located observations excluded. Estimated surface, not a surveyed terrain mesh.' };
+  return { active, samples, issues, datum, min: values[0] ?? null, max: values.at(-1) ?? null, sample, method: 'Shared 5 m triangle grid; vertex elevations use four-nearest inverse-distance weighting, nearest sample beyond 100 m. Subtype 300000 excluding inferred elevated-road spots and conflicting co-located observations; role evidence retained in merge logs. Estimated surface, not a surveyed terrain mesh.' };
 }
 
 export function drapeScene(group, terrain) {
-  if (!terrain.active) return;
+  const elevation=(f,x,z)=>f?.roadElevation?approachHeight(f.roadElevation,x,z,terrain):f?.elevationProfile?profileHeight(f.elevationProfile,x,z)-terrain.datum:Number.isFinite(f?.absoluteElevation)?f.absoluteElevation-terrain.datum:terrain.sample(x,z);
   function visit(o) {
     if (o.userData.building) {
+      if(!terrain.active)return;
       const b = o.userData.building, ring = b.shapes[0].outer, x = ring.reduce((s, p) => s + p[0], 0) / ring.length, z = ring.reduce((s, p) => s + p[1], 0) / ring.length;
       b.ground = Number.isFinite(b.groundElevation) ? b.groundElevation - terrain.datum : terrain.sample(x, z); o.position.y = b.ground; return;
     }
     if (o.isInstancedMesh) {
       const m = o.matrixWorld.clone();
-      for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); const f = o.userData.features[i]; m.elements[13] += f.elevation !== undefined ? f.elevation - terrain.datum : terrain.sample(m.elements[12], m.elements[14]); o.setMatrixAt(i, m); }
+      for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); const f = o.userData.features[i],segment=o.userData.segments?.[i];
+        if(segment){const [a,b]=segment,ya=elevation(f,...a),yb=elevation(f,...b),distance=Math.hypot(b[0]-a[0],b[1]-a[1]),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();m.decompose(position,rotation,scale);position.y+=(ya+yb)/2;rotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.atan2(yb-ya,distance)));scale.z=Math.hypot(distance,yb-ya);m.compose(position,rotation,scale);}
+        else m.elements[13] += f.elevation !== undefined&&terrain.active ? f.elevation - terrain.datum : elevation(f,m.elements[12], m.elements[14]); o.setMatrixAt(i, m); }
       o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere(); return;
     }
     if (o.isMesh && o.geometry?.attributes.position) {
+      if(!terrain.active&&!o.userData.feature?.roadElevation&&!o.userData.feature?.elevationProfile&&!Number.isFinite(o.userData.feature?.absoluteElevation))return;
       // One projection pass over original triangles. No recursive pre-subdivision or temporary non-indexed copy.
       const old=o.geometry,index=old.index,channels=vertexData(old),vertices=[],groups=[];
       for(const group of triangleGroups(old)){
@@ -113,7 +128,7 @@ export function drapeScene(group, terrain) {
       old.dispose();
     }
     if (o.geometry?.attributes.position) {
-      const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + terrain.sample(p.getX(i), p.getZ(i))); p.needsUpdate = true; o.geometry.computeVertexNormals(); o.geometry.computeBoundingSphere();
+      const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + elevation(o.userData.feature,p.getX(i), p.getZ(i))); p.needsUpdate = true;if(o.isMesh)o.geometry.computeVertexNormals(); o.geometry.computeBoundingSphere();
     }
     for (const child of o.children) visit(child);
   }
