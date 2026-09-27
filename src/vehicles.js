@@ -112,7 +112,7 @@ function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
   const kit = new THREE.Group(); kit.rotation.y = Math.PI / 2; body.add(kit);     // kit frame (+x front) → vehicle frame (-z front)
   const meshes = []; const paint = CM.paint.clone(); paint.color = new THREE.Color(color);
   const lampR = CM.lampR.clone(), lampW = CM.lampW.clone(); lampR.emissive = new THREE.Color(0xff1a0a); lampR.emissiveIntensity = 0.08; lampW.emissive = new THREE.Color(0xfff0d0); lampW.emissiveIntensity = 0.05;
-  const mat = { paint, lampR, lampW };
+  const mat = { paint, lampR, lampW, glass: CM.glassSee || CM.glass };   // see-through: the cabin (and whoever's in it) shows
   for (const [slot, g] of Object.entries(geos)) { if (!g) continue; const m = new THREE.Mesh(g, mat[slot] || CM[slot]); m.castShadow = slot === 'paint'; m.receiveShadow = true; m.userData.surface = 'metal'; kit.add(m); meshes.push(m); }
   const cab = carInterior(kind, geos); kit.add(cab.group);
   const sp = carSpecFor(kind);
