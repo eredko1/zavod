@@ -13,6 +13,8 @@ const KINDS = {
   cab:   { len: 4.8, w: 1.82, clr: 0.2, belt: 0.95, roof: 1.47, hood: 0.88, ws: [0.92, 0.1], rs: [-0.8, -1.5], wheels: [1.45, -1.42], b: [0.02], trunk: 0.99, sign: true },
   hatch: { len: 4.2, w: 1.76, clr: 0.19, belt: 0.95, roof: 1.46, hood: 0.84, ws: [0.9, 0.18], rs: [-1.25, -1.85], wheels: [1.3, -1.28], b: [0.1], trunk: 1.0 },
   suv:   { len: 4.75, w: 1.9, clr: 0.28, belt: 1.12, roof: 1.74, hood: 1.04, ws: [1.05, 0.35], rs: [-1.9, -2.15], wheels: [1.45, -1.42], b: [0.2, -0.95], trunk: 1.12 },
+  coupe: { len: 4.45, w: 1.94, clr: 0.14, belt: 0.78, roof: 1.22, hood: 0.72, ws: [0.55, -0.35], rs: [-0.95, -1.7], wheels: [1.33, -1.3], b: [-0.35], trunk: 0.84, sport: true },   // mid-engine supercar
+  muscle: { len: 4.8, w: 1.9, clr: 0.16, belt: 0.86, roof: 1.33, hood: 0.84, ws: [0.75, -0.1], rs: [-0.75, -1.6], wheels: [1.45, -1.4], b: [-0.1], trunk: 0.88, sport: true },   // Camaro-ish
   van:   { len: 5.2, w: 1.98, clr: 0.24, belt: 1.12, roof: 2.08, hood: 1.02, ws: [1.72, 1.2], rs: [-2.5, -2.58], wheels: [1.68, -1.72], b: [0.7], trunk: 1.12, panel: true },
 };
 export const CAR_KINDS = Object.keys(KINDS);
@@ -22,7 +24,7 @@ const smooth = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a
 
 export function carGeometries(kind = 'sedan') {
   const K = KINDS[kind]; const L = K.len, HW = K.w / 2, xf = L / 2, xr = -L / 2;
-  const NS = 22;                       // stations along the length
+  const NS = 44;                       // stations along the length (22 read faceted up close)
   const xs = []; for (let i = 0; i <= NS; i++) { const t = i / NS; xs.push(xr + (xf - xr) * (0.5 - 0.5 * Math.cos(Math.PI * t))); } // denser at the ends
   const [wsBase, wsTop] = K.ws, [rsTop, rsBase] = K.rs;
   const archR = 0.43, wheelR = K.clr > 0.25 ? 0.37 : 0.33;
@@ -94,7 +96,7 @@ export function carGeometries(kind = 'sedan') {
   // glass sits a hair inside the body so its edges read as a frame
   { const p = glass.attributes.position, n = glass.attributes.normal; for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) - n.getX(i) * 0.006, p.getY(i) - n.getY(i) * 0.006, p.getZ(i) - n.getZ(i) * 0.006); }
 
-  const parts = { rubber: [], rim: [], trim: [], lampW: [], lampR: [], plate: [], paintX: [] };
+  const parts = { rubber: [], rim: [], trim: [], lampW: [], lampR: [], plate: [], paintX: [], caliper: [] };
   const box = (arr, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); arr.push(g); };
   // wheels: tyre with a rounded shoulder, rim face with 5 spokes, dark hub; dark arch liner behind each wheel
   for (const wx of K.wheels) for (const sz of [1, -1]) {
@@ -102,7 +104,11 @@ export function carGeometries(kind = 'sedan') {
     const tyre = new THREE.LatheGeometry([[0.2, -0.11], [wheelR - 0.035, -0.115], [wheelR, -0.08], [wheelR + 0.004, 0], [wheelR, 0.08], [wheelR - 0.035, 0.115], [0.2, 0.11]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
     tyre.rotateX(Math.PI / 2); tyre.translate(wx, wheelR, zc); parts.rubber.push(tyre);
     const face = new THREE.CylinderGeometry(0.215, 0.215, 0.02, 12); face.rotateX(Math.PI / 2); face.translate(wx, wheelR, zc + sz * 0.1); parts.trim.push(face);
-    for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; const sp = new THREE.BoxGeometry(0.2, 0.045, 0.03); sp.translate(0.1, 0, 0); sp.rotateZ(a); sp.translate(wx, wheelR, zc + sz * 0.115); parts.rim.push(sp); }
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + (k % 2) * 0.12; const sp = new THREE.BoxGeometry(0.19, 0.03, 0.025); sp.translate(0.105, 0, 0); sp.rotateZ(a); sp.translate(wx, wheelR, zc + sz * 0.115); parts.rim.push(sp); }   // split 5-spoke
+    { const lip = new THREE.TorusGeometry(0.212, 0.012, 6, 24); lip.translate(wx, wheelR, zc + sz * 0.112); parts.rim.push(lip);
+      const barrel = new THREE.CylinderGeometry(0.205, 0.205, 0.16, 16, 1, true); barrel.rotateX(Math.PI / 2); barrel.translate(wx, wheelR, zc + sz * 0.03); parts.trim.push(barrel);
+      const disc = new THREE.CylinderGeometry(0.16, 0.16, 0.02, 18); disc.rotateX(Math.PI / 2); disc.translate(wx, wheelR, zc + sz * 0.06); parts.rim.push(disc);
+      const cal = new THREE.BoxGeometry(0.1, 0.13, 0.05); cal.translate(wx + (wx > 0 ? -0.12 : 0.12), wheelR + 0.06, zc + sz * 0.075); parts.caliper.push(cal); }
     const hub = new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10); hub.rotateX(Math.PI / 2); hub.translate(wx, wheelR, zc + sz * 0.12); parts.rim.push(hub);
     const liner = new THREE.CylinderGeometry(archR - 0.01, archR - 0.01, HW * 1.5, 8, 1, true, -Math.PI / 2, Math.PI); liner.rotateX(Math.PI / 2); liner.translate(wx, 0.33, 0); parts.trim.push(liner);
   }
@@ -111,8 +117,9 @@ export function carGeometries(kind = 'sedan') {
   // lamps: headlamps wrap the nose corners, tail lamps across the tail corners
   const hlY = K.hood - 0.13, tlY = K.trunk - 0.12;
   for (const sz of [1, -1]) {
-    box(parts.lampW, 0.1, 0.13, 0.42, xf - 0.07, hlY, sz * (HW - 0.3), 0, sz * 0.25);
-    box(parts.lampR, 0.08, 0.14, 0.4, xr + 0.06, tlY, sz * (HW - 0.28), 0, -sz * 0.2);
+    box(parts.lampW, 0.05, 0.09, 0.36, xf - 0.035, hlY, sz * (halfW(xf - 0.1) - 0.3), 0, sz * 0.22);
+    box(parts.lampW, 0.03, 0.018, 0.34, xf - 0.02, hlY - 0.075, sz * (halfW(xf - 0.1) - 0.3), 0, sz * 0.22);   // DRL strip
+    box(parts.lampR, 0.035, 0.08, 0.36, xr + 0.03, tlY, sz * (halfW(xr + 0.1) - 0.27), 0, -sz * 0.18);
     // mirrors (paint) on a dark stalk
     const mx = wsBase - 0.2; box(parts.paintX, 0.1, 0.12, 0.2, mx, K.belt + 0.08, sz * (HW + 0.1)); box(parts.trim, 0.05, 0.04, 0.12, mx, K.belt + 0.04, sz * (HW + 0.02));
     // door handles + shut lines
@@ -126,6 +133,8 @@ export function carGeometries(kind = 'sedan') {
   box(parts.trim, 0.05, 0.16, K.w * 0.5, xf - 0.02, hlY - 0.02, 0);
   box(parts.trim, 0.06, 0.1, K.w * 0.78, xf - 0.04, K.clr + 0.16, 0);
   box(parts.trim, 0.06, 0.1, K.w * 0.8, xr + 0.04, K.clr + 0.16, 0);
+  box(parts.lampR, 0.02, 0.022, K.w * 0.55, xr + 0.012, tlY + 0.045, 0);   // light bar across the tail
+  if (K.sport) { box(parts.trim, 0.3, 0.03, K.w * 0.82, xr + 0.25, K.trunk + 0.09, 0); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, 0.55); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, -0.55); }   // spoiler
   box(parts.plate, 0.012, 0.11, 0.36, xf + 0.005, K.clr + 0.3, 0);
   box(parts.plate, 0.012, 0.11, 0.36, xr - 0.005, tlY - 0.2, 0);
   if (K.sign) { box(parts.trim, 0.2, 0.05, 0.5, 0.1, K.roof + 0.03, 0); box(parts.lampW, 0.16, 0.16, 0.48, 0.1, K.roof + 0.13, 0); }
@@ -134,11 +143,15 @@ export function carGeometries(kind = 'sedan') {
   for (const g of [paint, glass]) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
   const paintAll = merge([paint, ...parts.paintX]);
   return {
-    geos: { paint: paintAll, glass, rubber: merge(parts.rubber), rim: merge(parts.rim), trim: merge(parts.trim), lampW: merge(parts.lampW), lampR: merge(parts.lampR), plate: merge(parts.plate) },
+    geos: { paint: paintAll, glass, rubber: merge(parts.rubber), rim: merge(parts.rim), trim: merge(parts.trim), lampW: merge(parts.lampW), lampR: merge(parts.lampR), plate: merge(parts.plate), caliper: merge(parts.caliper), shadow: (() => { const g = new THREE.PlaneGeometry(L * 1.08, K.w * 1.25); g.rotateX(-Math.PI / 2); g.translate(0, 0.012, 0); return g; })() },
     len: L, w: K.w + 0.2, h: K.roof,
   };
 }
 
+function shadowTex() {   // soft contact shadow under the car (ambient occlusion on the road)
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 32, 4, 64, 32, 62); gr.addColorStop(0, 'rgba(0,0,0,0.75)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.save(); g.scale(1, 0.55); g.fillStyle = gr; g.fillRect(0, 0, 128, 117); g.restore(); const t = new THREE.CanvasTexture(c); return t;
+}
 function plateTex() {   // New York 'Excelsior' plate: gold with navy lettering
   const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#f1c83a'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#12264f'; g.fillRect(0, 0, 256, 26); g.fillRect(0, 110, 256, 18);
   g.fillStyle = '#f1c83a'; g.font = 'bold 20px Arial'; g.textAlign = 'center'; g.fillText('NEW YORK', 128, 20); g.font = 'bold 13px Arial'; g.fillText('EXCELSIOR', 128, 124);
@@ -158,6 +171,8 @@ export function carMaterials() {
     lampW: new THREE.MeshStandardMaterial({ color: 0xd9e0e4, roughness: 0.1, metalness: 0.3, emissive: 0x3a4044 }),
     lampR: new THREE.MeshStandardMaterial({ color: 0x8a0e0e, roughness: 0.2, emissive: 0x300404 }),
     plate: new THREE.MeshStandardMaterial({ map: plateTex(), roughness: 0.45 }),
+    caliper: new THREE.MeshStandardMaterial({ color: 0xb01818, roughness: 0.4, metalness: 0.3 }),
+    shadow: new THREE.MeshBasicMaterial({ map: shadowTex(), transparent: true, depthWrite: false, opacity: 0.85 }),
   };
   MATS.lampW.emissive.setHex(0x8a9298); MATS.lampR.emissive.setHex(0x6a0808);
   MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x1c262c, roughness: 0.04, transparent: true, opacity: 0.62, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4 });   // driven cars: see who's inside

@@ -326,7 +326,7 @@ function carMats() {
 function buildCopCarMesh() {
   const G = carGeometries('sedan').geos, M = carMats();
   const group = new THREE.Group(), body = new THREE.Group(); group.add(body);
-  for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, M[slot] || M.trim); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; m.receiveShadow = true; body.add(m); }
+  for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, M[slot] || carMaterials()[slot] || M.trim); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; m.receiveShadow = true; body.add(m); }
   // blue side stripe + roof light bar
   for (const s of [-1, 1]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.12, 3.6), M.stripe); st.position.set(s * 0.905, 0.72, 0.05); body.add(st); }
   const bar = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.26), M.off); bar.position.set(0, 1.49, 0.15); body.add(bar);
