@@ -359,9 +359,9 @@ function crewTalk(world) { for (const [id, e] of Object.entries(world.W.crew || 
 const BS_EXTRA = () => Object.values(MIND).flat();
 const BS = ['REDKO: «Короче, я вчера на Белте — сто сорок, и тут мент.»', 'SASHA: «Сто сорок на твоей тачке? Она сорок не едет.»', 'McGUINNESS: «Lads, who took my last Guinness?»', 'FELIKS: «I merged nine data sources into one map. For this. For us.»', 'THE ELF: «Джеймисон кончился. Это заговор.»', 'ARKASHA: «Кто на интерес? Бурбон, братва, Гудзон.»', 'REDKO: «Дай прикурить. …Не эту, нормальную.»', 'SASHA: «В этот раз я его обыграю. Точно.»', 'FELIKS: «Relax. The ground is supposed to breathe.»', 'REDKO: «Tool в Барклайс — лучший концерт в жизни, отвечаю.»', 'McGUINNESS: «Your round, Sasha.»', 'THE ELF: «Кто-то видел мою шапку? …Ладно, без шапки.»'];
 function redkoAtTablePark(world) {
-  const P = H.park; if (!P || !peopleReady()) return; const ctx = world.ctx;
+  const T = world.W.arkadyTable, P = T ? { pos: T.pos, yaw: Math.atan2(T.seat.x - T.pos.x, T.seat.z - T.pos.z) } : H.park; if (!P || !peopleReady()) return; const ctx = world.ctx;   // with the crew at Arkasha's table
   const fig = buildPerson({ avatar: 'm02', seed: 21 }); standTall(fig, 1.83); dressFigure(fig, ctx, { top: 'tee', shirt: 8, bottom: 'jeans' });
-  const pos = new THREE.Vector3(2.2, 0, -1.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.yaw).add(P.pos).setY(0); fig.group.position.copy(pos); fig.group.rotation.y = P.yaw + 2.4; world.scene.add(fig.group);
+  const pos = new THREE.Vector3(1.4, 0, 2.9).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.yaw).add(P.pos).setY(0); fig.group.position.copy(pos); fig.group.rotation.y = P.yaw + 2.4; world.scene.add(fig.group);
   world.updaters.push((dt) => fig.update(dt, 0)); fig.mood = 'talk';
   K.vendor({ name: 'REDKO', pos, r: 2.4, fig, talk: (Kk, again) => ({ text: again ? BS[(Math.random() * BS.length) | 0] : 'REDKO: «О, здорово. Сигаретку будешь? Мы тут по кругу.»',
     choices: [{ label: 'Давай сигарету 🚬', go: () => (K.full() ? { text: 'REDKO: «Руки заняты, брат.»', choices: [{ label: 'Ok', go: null }] } : (K.give('cigs'), { text: 'REDKO: «Держи пачку. B — закурить. Передавай по кругу.»', choices: [{ label: 'Спасибо', go: null }] })) },
