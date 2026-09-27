@@ -406,3 +406,16 @@ export function dressViewmodelArms(mats) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.2, 1.2);
   m.map = t; m.color?.set(0xffffff); m.bumpMap = null; m.normalScale?.set(0.15, 0.15); m.roughness = 0.6; m.envMapIntensity = 0.25; m.needsUpdate = true;
 }
+
+/** long rocker hair: a cap over the crown and a curtain down the back to the shoulder blades (dark brown) */
+export function addLongHair(fig, { color = 0x2b1d14 } = {}) {
+  if (!fig?.head) return null;
+  fig.group.updateWorldMatrix(true, true); const hs = fig.head.getWorldScale(new THREE.Vector3()).x / (fig.group.getWorldScale(new THREE.Vector3()).x || 1);
+  const g = new THREE.Group(); g.name = 'longhair'; g.scale.setScalar(1 / (hs || 1));
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: THREE.DoubleSide });
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), m); cap.scale.set(1, 1.02, 1.08); cap.position.set(0, 0.012, -0.012);
+  const back = new THREE.Mesh(new THREE.CylinderGeometry(0.122, 0.17, 0.46, 18, 1, true, Math.PI * 0.62, Math.PI * 0.76), m); back.position.set(0, -0.2, -0.018);
+  for (const s of [-1, 1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.1), m); side.position.set(s * 0.112, -0.12, 0.0); side.rotation.z = s * 0.08; g.add(side); }
+  for (const o of [cap, back]) { o.castShadow = true; g.add(o); }
+  fig.head.add(g); return g;
+}

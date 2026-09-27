@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
 import { buildPerson, peopleReady } from '../people.js';
-import { dressFigure, standTall, addAfro } from '../outfits.js';
+import { dressFigure, standTall, addAfro, addLongHair } from '../outfits.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews, gunShop } from './chill.js';
 import { buildJobs, jobsTalk, startIce, finishIce } from './jobs.js';
@@ -430,16 +430,20 @@ function tableRegulars(g, c) {
     text: again ? 'SASHA: "Я правила зубрил, понимаешь? Зубрил! А он козырем — хлоп." *доедает сосиску*' : 'SASHA: "Ты с Аркашей играть? Совет: не кричи «Бей!». Я кричал «Бей!», потом кричал «Беру!». Теперь у меня вся колода."',
     choices: [{ label: 'Сосиску будешь? — угостишь?', go: () => (K.full() ? { text: 'SASHA: "Руки заняты у тебя."', choices: [{ label: 'Ok', go: null }] } : (K.give('sausage'), { text: 'SASHA: "Держи. Виски-шмиски, вот сосиски — вся закуска наша!"', choices: [{ label: 'Спасибо, Саша', go: null }] })) },
       { label: 'Как он всегда выигрывает?', go: { text: 'SASHA: "Медведь по козырям — ещё какой мастак. Он все карты помнит. И переводит, гад, переводит!"', choices: [{ label: 'Ясно', go: null }] } }, { label: 'Later', go: null }] }) });
+  // FELIKS: 6', long hair, band tee — a Coney Island engineer by day; here he hands out mushrooms (2 minutes of tripping balls)
+  const fel = buildPerson({ avatar: 'm20', seed: 12 }); standTall(fel, 1.83); addLongHair(fel); dressFigure(fel, H.ctx, { top: 'tee', shirt: 6, bottom: 'jeans' }); put(fel, -3.3, -1.4, 1.1);
+  K.vendor({ name: 'FELIKS', pos: wpos(-3.3, -1.4), r: 2.4, fig: fel, talk: (Kk, again) => ({
+    text: again ? 'FELIKS: "Still here? The code compiles, the ground breathes. Both are fine."' : 'FELIKS: "Engineer by day. Tonight? Tonight I review the universe. Want some mushrooms, bro? Two minutes, full send."',
+    choices: [{ label: 'Давай грибы 🍄', go: () => (K.full() ? { text: 'FELIKS: "Pockets full, man. Make room."', choices: [{ label: 'Ok', go: null }] } : (K.give('shrooms'), { text: 'FELIKS: "B to eat. Don\'t drive. Or do — it\'s a game."', choices: [{ label: 'Спасибо, Феликс', go: null }] })) },
+      { label: 'What are you building?', go: { text: 'FELIKS: "A map lab. Merges nine NYC data sources into one world. Also this park, probably."', choices: [{ label: 'Respect', go: null }] } }, { label: 'Later', go: null }] }) });
   // McGUINNESS: by the lamp with a crate of Guinness — «Guinness будешь?» — «За тебя!»
   const mcg = buildPerson({ avatar: 'm12', seed: 8 }); standTall(mcg, 1.73); mcg.group.scale.x *= 1.22; mcg.group.scale.z *= 1.18; addAfro(mcg); dressFigure(mcg, H.ctx, { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 }); put(mcg, -2.9, 1.9, 2.2);   // ~20, 5'8", heavyset, afro, band tee
   K.vendor({ name: 'McGUINNESS', pos: wpos(-2.9, 1.9), r: 2.4, fig: mcg, talk: (Kk, again) => ({
     text: again ? 'McGUINNESS: "Another? Go on, go on, go on."' : 'McGUINNESS: "Guinness будешь? Proper pint, poured slow. Arkasha takes his with bourbon, God help him."',
     choices: [{ label: '«За тебя!» — давай пинту', go: () => (K.full() ? { text: 'McGUINNESS: "Finish what you\'re holding first."', choices: [{ label: 'Sláinte', go: null }] } : (K.give('guinness'), { text: 'McGUINNESS: "Sláinte! B to drink — and share it, it\'s rude not to."', choices: [{ label: 'Sláinte', go: null }] })) },
       { label: '«За тебя, но я-то пас»', go: { text: 'McGUINNESS: "Ah, a bourbon man. Suit yourself."', choices: [{ label: 'Later', go: null }] } }] }) });
-  // THE ELF: 5'7" Russian/Ukrainian, white, dark hair, brown eyes, in a full three-stripe track suit, green hat — Jameson, and a spliff rolled like a magic scroll
+  // THE ELF: 5'7" Russian/Ukrainian, white, dark hair, brown eyes, in a full three-stripe track suit, no hat — Jameson, and a spliff rolled like a magic scroll
   const elf = buildPerson({ avatar: 'm10', seed: 9 }); standTall(elf, 1.70); dressFigure(elf, H.ctx, { top: 'track', bottom: 'track', shoes: 'white' }); put(elf, 2.6, 2.3, -2.4);   // 5'7", full three-stripe track suit
-  { const hat = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.34, 14), new THREE.MeshStandardMaterial({ color: 0x1f7a33, roughness: 0.8 })); hat.position.set(0, 0.2, -0.02); hat.rotation.x = -0.25; elf.head.add(hat);
-    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xe0b422, metalness: 0.8, roughness: 0.3 })); bell.position.set(0, 0.35, -0.1); elf.head.add(bell); }
   K.vendor({ name: 'THE ELF', pos: wpos(2.6, 2.3), r: 2.4, fig: elf, talk: (Kk, again) => ({
     text: again ? 'THE ELF: "Ещё фокус?" *шуршит бумагой*' : 'THE ELF: "Jameson? Или… фокус? Я сворачиваю бумажный свиток — и готово. Заклинаний не надо."',
     choices: [{ label: 'Jameson', go: () => (K.full() ? { text: 'THE ELF: "Руки заняты."', choices: [{ label: '…', go: null }] } : (K.give('jameson'), { text: 'THE ELF: "Sláinte по-эльфийски. B — выпить."', choices: [{ label: 'За тебя', go: null }] })) },

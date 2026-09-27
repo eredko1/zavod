@@ -31,6 +31,7 @@ export const ITEMS = {
   vodka: { kind: 'booze', icon: '🥃', name: 'стопка водки', drunk: 0.45, dur: 120, glass: 'shot', liq: 0xdfe6e8 },
   vape: { kind: 'smoke', icon: '💨', name: 'disposable vape (watermelon ice)', cig: 15 },   // B takes a hit: vapour, no high
   bic: { kind: 'tool', icon: '🔥', name: 'Bic lighter', keep: true },
+  shrooms: { kind: 'trip', icon: '🍄', name: 'Feliks\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
   zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
 };
 
@@ -125,7 +126,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
-    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
+    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
     for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
     for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
     for (const m of V.puddles || []) m.visible = false;
@@ -248,6 +249,7 @@ function useItem(want) {
   const it = V.inv.splice(k, 1)[0]; renderCash();
   if (it === 'weed') return lightUp();
   if (ITEMS[it]?.cig) { const L = V.left || (V.left = {}); L[it] = (L[it] > 0 ? L[it] : ITEMS[it].cig) - 1; if (L[it] > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
+  if (ITEMS[it]?.trip) { V.tripT = ITEMS[it].trip; V.tripMax = V.tripT; ctx.hud?.toast?.('*chews* …земля дышит. The ground is breathing, bro.', 3000); return; }
   if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
   const spec = ITEMS[it];
   if (spec?.food) { ctx.player?.heal?.(spec.food); ctx.hud?.toast?.(spec.milk ? 'Зебровое молоко. Редко одобряет. (+' + spec.food + ' HP)' : '*хрум* Виски-шмиски, вот сосиски! (+' + spec.food + ' HP)', 2000); return; }
@@ -326,6 +328,7 @@ function updateJoint(dt) {
 }
 function updateHigh(dt) {
   const { ctx } = V; const cv = ctx.canvas; if (!cv) return;
+  if (V.tripT > 0) { V.tripT -= dt; return trip(cv); } else if (V.tripOv) { V.tripOv.remove(); V.tripOv = null; cv.style.filter = ''; cv.style.transform = ''; }
   if (V.highT > 0) { V.highT -= dt; if (V.highT < 40) V.high = Math.max(0, V.high - dt / 40); }
   if (V.drunkT > 0) { V.drunkT -= dt; if (V.drunkT < 30) V.drunk = Math.max(0, V.drunk - dt / 30); } else V.drunk = 0;
   const k = V.high, d = V.drunk || 0;
@@ -340,6 +343,16 @@ function updateHigh(dt) {
   cv.style.transform = `rotate(${(Math.sin(t * 0.55) * 0.8 * k + Math.sin(t * 0.33) * 6 * d).toFixed(3)}deg) scale(${(1 + 0.025 * k + 0.07 * d + Math.sin(t * 0.9) * 0.012 * (k + d)).toFixed(4)}) translate(${(Math.sin(t * 0.37) * 14 * d).toFixed(1)}px, ${(Math.sin(t * 0.5) * 12 * d).toFixed(1)}px)`;
   // drunk: the view drifts on its own and your aim swims — you fight it with the mouse
   const p = ctx.player; if (d > 0.05 && p && !p.dead && ctx.state === 'playing') { p.yaw += Math.sin(t * 0.62) * 0.35 * d * dt; p.pitch += Math.sin(t * 0.47 + 1.3) * 0.12 * d * dt; }
+}
+// mushrooms: colour cycling, pink/cyan double vision, the world breathes and swims, a slow rainbow swirl over everything
+function trip(cv) {
+  const t = performance.now() / 1000, e = Math.max(0, Math.min(1, (V.tripMax - V.tripT) / 8, V.tripT / 12));
+  if (!V.tripOv) { const o = document.createElement('div'); o.style.cssText = 'position:fixed;inset:-25%;pointer-events:none;z-index:5;mix-blend-mode:overlay;background:conic-gradient(from 0deg,#ff0080,#ffcc00,#00ff88,#00c8ff,#b000ff,#ff0080);filter:blur(30px)'; document.body.appendChild(o); V.tripOv = o; }
+  V.tripOv.style.opacity = (0.28 * e * (0.7 + 0.3 * Math.sin(t * 1.3))).toFixed(3); V.tripOv.style.transform = `rotate(${(t * 25) % 360}deg) scale(${1 + 0.1 * Math.sin(t * 0.7)})`;
+  const sx = 14 * e * Math.sin(t * 1.3), sy = 9 * e * Math.cos(t * 1.1);
+  cv.style.filter = `saturate(${(1 + 1.8 * e).toFixed(2)}) contrast(${(1 + 0.22 * e).toFixed(2)}) hue-rotate(${((t * 70) % 360 * e).toFixed(1)}deg) drop-shadow(${sx.toFixed(1)}px ${sy.toFixed(1)}px 0 rgba(255,0,200,${(0.35 * e).toFixed(2)})) drop-shadow(${(-sx).toFixed(1)}px ${(-sy).toFixed(1)}px 0 rgba(0,255,220,${(0.3 * e).toFixed(2)}))`;
+  cv.style.transform = `rotate(${(Math.sin(t * 0.8) * 3 * e).toFixed(2)}deg) scale(${(1 + 0.05 * e + Math.sin(t * 1.7) * 0.03 * e).toFixed(4)}) skew(${(Math.sin(t * 0.9) * 4 * e).toFixed(2)}deg, ${(Math.cos(t * 0.7) * 2 * e).toFixed(2)}deg)`;
+  const p = V.ctx.player; if (p && !p.dead && V.ctx.state === 'playing') p.yaw += Math.sin(t * 0.5) * 0.12 * e * (1 / 60);
 }
 function buildPuffs() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(235,235,230,0.55)'); gr.addColorStop(1, 'rgba(235,235,230,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);

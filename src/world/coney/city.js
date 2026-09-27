@@ -75,6 +75,7 @@ function building(T, world, M, b) {
   const cw = Math.cos(ang), sw = Math.sin(ang), cl = Math.cos(-ang), sl = Math.sin(-ang);
   const toWorld = aligned ? (x, z) => [x, z] : (x, z) => [ox + (x - ox) * cw - (z - oz) * sw, oz + (x - ox) * sw + (z - oz) * cw];
   const loc = aligned ? b.p : b.p.map(([x, z]) => [ox + (x - ox) * cl - (z - oz) * sl, oz + (x - ox) * sl + (z - oz) * cl]);
+  if (s === 'aquarium') { try { aquariumShell(world, b); } catch (e) { console.warn('[coney] aquarium', e); } }
   const shopLike = s !== 'tower' && s !== 'apart' && s !== 'civic' && s !== 'rowhouse' && s !== 'aquarium' && s !== 'service';
   // Surf Avenue frontage: a face whose outward normal points at the avenue within a sidewalk's width of its kerb
   const fronts = (mx, mz, nx, nz) => { const [wx, wz] = toWorld(mx, mz), [qx, qz] = toWorld(mx + nx * 4, mz + nz * 4); const d = surfDist(wx, wz); return d < 24 && surfDist(qx, qz) < d - 2.5; };
@@ -131,6 +132,34 @@ function awning(F, key, u0, u1, yTop, far = false) {
   if (!far) for (const e of [u0, u1]) { const t = new THREE.BoxGeometry(0.03, 0.03, S); t.rotateX(th); t.translate(e, yTop - fall / 2 - 0.03, D / 2); F.geo('corniceDark', t); }   // side frame rods
 }
 
+const EATS = [6, 9, 10, 11, 13, 14, 15, 0, 1];   // mats.js SIGNS: COLD BEER, BAR & GRILL, RESTAURANT, PIZZA, TACOS, CORN DOGS, SEAFOOD, HOT DOGS, CLAMS
+/** New York Aquarium (rough): the Ocean Wonders shimmer wall wrapped around the OSM footprint (the precast block stays
+ *  inside as the collider), and a NEW YORK AQUARIUM sign on the face that looks at Surf Ave. */
+let aqMat = null, aqSign = null;
+function aquariumShell(world, b) {
+  if (!aqMat) {
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#9fb8c9'); gr.addColorStop(1, '#4f6f8a'); g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+    for (let y = 0; y < 256; y += 8) for (let x = 0; x < 256; x += 5) { const v = Math.random(); g.fillStyle = v < 0.5 ? `rgba(230,240,248,${0.15 + v * 0.5})` : `rgba(20,40,70,${(v - 0.5) * 0.5})`; g.fillRect(x, y, 3, 6); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 5, 1 / 5); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    aqMat = new THREE.MeshStandardMaterial({ map: t, metalness: 0.55, roughness: 0.35 });
+    const s2 = document.createElement('canvas'); s2.width = 1024; s2.height = 160; const q = s2.getContext('2d');
+    q.fillStyle = '#0d2b4a'; q.fillRect(0, 0, 1024, 160); q.fillStyle = '#f4f8fb'; q.font = 'bold 92px Arial'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText('NEW YORK AQUARIUM', 512, 84);
+    const st = new THREE.CanvasTexture(s2); st.colorSpace = THREE.SRGBColorSpace; aqSign = new THREE.MeshStandardMaterial({ map: st, roughness: 0.5, emissive: 0xffffff, emissiveMap: st, emissiveIntensity: 0.25 });
+  }
+  const [ox, oz] = cen(b.p), H = 12.6;
+  const pts = b.p.map(([x, z]) => { const dx = x - ox, dz = z - oz, d = Math.hypot(dx, dz) || 1; return new THREE.Vector2(x + dx / d * 0.3, -(z + dz / d * 0.3)); });
+  const geo = new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: H, bevelEnabled: false }); geo.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(geo, aqMat); m.name = 'coney:aquarium'; m.castShadow = true; m.receiveShadow = true; world.scene.add(m);
+  // the sign: on the longest edge facing Surf Ave
+  let best = null; for (let i = 0; i < b.p.length; i++) { const A = b.p[i], B = b.p[(i + 1) % b.p.length], L = Math.hypot(B[0] - A[0], B[1] - A[1]); if (L < 14) continue;
+    const mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2, sc = surfDist(mx, mz) - L * 0.2; if (!best || sc < best.sc) best = { sc, mx, mz, A, B, L }; }
+  if (!best) return;
+  let nx = -(best.B[1] - best.A[1]) / best.L, nz = (best.B[0] - best.A[0]) / best.L; if (nx * (best.mx - ox) + nz * (best.mz - oz) < 0) { nx = -nx; nz = -nz; }
+  const w = Math.min(22, best.L * 0.8), sg = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.156), aqSign);
+  sg.position.set(best.mx + nx * 0.45, H - 2.2, best.mz + nz * 0.45); sg.rotation.y = Math.atan2(nx, nz); world.scene.add(sg);
+}
+
 /** Amusement-strip storefront face (boardwalk + side streets): stucco pilasters between galvanised roll-down shutters (some
  *  rolled up onto a lit counter), shutter hood, 1.2 m painted sign boards on the fascia, striped awnings on ~60 % of units,
  *  projecting cornice; two-storey fronts get a window row (or sideshow banners) upstairs. */
@@ -156,9 +185,9 @@ function shopFront(F, M, R, L, h, wall, o) {
     const W = U1 - U0, ns = Math.max(1, Math.round(W / 6)), slot = W / ns;
     for (let j = 0; j < ns; j++) {
       const cx = U0 + slot * (j + 0.5), sw = Math.min(4.4, slot - 0.5); if (sw < 1.6) continue;
-      signSeq = (signSeq + 1 + ((R() * 5) | 0)) % M.signCount;
+      signSeq = o.surf && R() < 0.75 ? EATS[(R() * EATS.length) | 0] : (signSeq + 1 + ((R() * 5) | 0)) % M.signCount;   // Surf Ave: mostly bars + restaurants
       if (!far) F.box('corniceDark', [cx - sw / 2 - 0.08, 3.3, 0], [cx + sw / 2 + 0.08, 4.5, 0.14]);
-      F.quad('signAtlas', cx - sw / 2, cx + sw / 2, 3.36, 4.44, far ? 0.03 : 0.145, M.signCell(o.arcade && R() < 0.5 ? [2, 3, 8, 9][(R() * 4) | 0] : signSeq));
+      F.quad('signAtlas', cx - sw / 2, cx + sw / 2, 3.36, 4.44, far ? 0.03 : 0.145, M.signCell(o.arcade && R() < 0.5 ? [2, 3, 8, 4][(R() * 4) | 0] : signSeq));
     }
     if (R() < 0.6) awning(F, M.awnKeys[(R() * (R() < 0.8 ? 2 : 3)) | 0], U0 + 0.15, U1 - 0.15, 3.25, far);
   }
@@ -220,7 +249,7 @@ function shop(B, world, M, r, h0, o) {
     if (o.inside(mx, mz)) continue;                                               // shared wall with another rect of this footprint
     const F = faceKit(B, alongX, sgn, mid, c);
     if (o.sideshow && o.fronts(alongX ? mid : c, alongX ? c : mid, alongX ? 0 : sgn, alongX ? sgn : 0)) sideshowFront(F, M, R, L, h);
-    else shopFront(F, M, R, L, h, wall, o);
+    else shopFront(F, M, R, L, h, wall, { ...o, surf: o.fronts(alongX ? mid : c, alongX ? c : mid, alongX ? 0 : sgn, alongX ? sgn : 0) });
   }
   if (w > 6 && d > 6) { world.cover((r.x0 + r.x1) / 2, r.z0 - 1.2, 0, -1); world.cover((r.x0 + r.x1) / 2, r.z1 + 1.2, 0, 1); }
 }
