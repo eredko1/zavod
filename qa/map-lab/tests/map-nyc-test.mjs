@@ -1,3 +1,4 @@
+import {NYC_SOURCES} from '../data/map-sources.js';
 import {chromeOptions} from '../../browser-launch.mjs';
 import assert from 'node:assert/strict';
 import {loadFixture} from './fixture.mjs';
@@ -30,11 +31,11 @@ try {
   assert.ok(groundChecks.groundError < 1e-8); assert.ok(groundChecks.hasFiniteMeshes);
   await page.evaluate(()=>window.__generator.world.setSourceVisible('nyc-buildings',false)); assert.equal(await page.evaluate(() => window.__generator.world.stats().buildings), 0); await page.evaluate(()=>window.__generator.world.setSourceVisible('nyc-buildings',true));
   await page.evaluate(()=>window.__generator.world.setSourceVisible('nyc-elevation',false)); assert.equal(await page.evaluate(() => window.__generator.world.stats().terrain.active), true, 'markers independent of terrain input');
-  await page.screenshot({ path: '.tmp/map-lab/nyc-3d.png' }); await page.bringToFront(); await page.click('#walk'); await page.waitForFunction(() => document.pointerLockElement?.id === 'world'); await page.keyboard.down('KeyW'); await page.waitForTimeout(500); await page.keyboard.up('KeyW');
+  await page.screenshot({ path: '.tmp/map-lab/nyc-3d.png' }); await page.bringToFront(); await page.evaluate(()=>window.__generator.world.walk({capture:false})); await page.locator('#world').click(); await page.waitForFunction(() => document.pointerLockElement?.id === 'world'); await page.keyboard.down('KeyW'); await page.waitForTimeout(500); await page.keyboard.up('KeyW');
   assert.ok(await page.evaluate(() => { const g = window.__generator.world, p = g.stats().position; return Math.abs(p[1] - g.groundAt(p[0],p[2]) - 1.7) < 1e-6; })); await page.screenshot({ path: '.tmp/map-lab/nyc-3d-walk.png' }); await page.evaluate(() => document.exitPointerLock()); await page.click('#orbit');
   await page.locator('#geometry-settings > summary').click();await page.uncheck('#terrain-enabled');await page.evaluate(()=>window.__generator.generate()); assert.equal(await page.evaluate(() => window.__generator.world.stats().terrain.active), false); await page.fill('#curb-height','0.2');await page.evaluate(()=>window.__generator.generate()); await page.locator('#curb-height').blur();
   assert.ok(await page.evaluate(() => window.__generator.world.plan.details.filter(f => f.sourceId === 'nyc-sidewalk').every(f => Math.abs(f.surfaceHeight-0.24)<1e-8)));
-  await page.click('#help-open');await page.waitForFunction(()=>document.querySelectorAll('#source-rows tr').length===9);assert.ok((await page.textContent('#osm-query')).includes('out geom'));await page.screenshot({path:'.tmp/map-lab/map-flow.png'});
+  await page.click('#help-open');await page.waitForFunction(count=>document.querySelectorAll('#source-rows tr').length===count,NYC_SOURCES.length);assert.ok((await page.textContent('#osm-query')).includes('out geom'));await page.screenshot({path:'.tmp/map-lab/map-flow.png'});
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); assert.deepEqual(errors, []);
   console.log('PASS: nine source scene, recorded building ground elevations, source visibility, terrain toggle, walking surface height, curb rule, mobile layout', stats);
 } finally { await browser.close(); }

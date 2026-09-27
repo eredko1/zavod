@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
 import {chromeOptions} from '../../browser-launch.mjs';
+import {loadFixture} from './fixture.mjs';
 const browser=await chromium.launch(chromeOptions({args:['--no-sandbox','--disable-dev-shm-usage']}));
 try {
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://localhost:8790/qa/map-lab/index.html?qa=1');await page.waitForFunction(()=>window.__generator);
+  await page.evaluate(scene=>window.__generator.load(scene),await loadFixture());
+  const excluded=await page.evaluate(()=>window.__generator.previewPlan.merge.decisions.find(r=>r.status==='excluded')?.members[0].id);
+  await page.locator('details:has(> #live-log) > summary').click();
+  assert.ok(excluded,'fixture exercises tree-placement exclusions');await page.locator('#merge-log-search').fill(excluded);assert.ok(await page.locator('#merge-results button').count());assert.equal(await page.locator(`#map [data-feature="${excluded}"],#map [data-nyc-feature="${excluded}"]`).isVisible(),false,'excluded tree is hidden in 2D with its log available');await page.locator('#merge-log-search').fill('');
+  await page.evaluate(()=>{window.previewNodes={paths:[...document.querySelectorAll('#map [data-nyc-feature]')],defs:document.querySelector('#map [data-merge-defs]'),plan:window.__generator.previewPlan};});
+  for(const source of ['nyc-buildings','nyc-sidewalk','nyc-trees']){
+    const control=page.locator(`[data-source-visible="${source}"]`),group=page.locator(`#map [data-nyc-source="${source}"]`);
+    await control.uncheck();assert.ok(await group.isHidden(),`${source} hides immediately`);
+    await control.check();assert.ok(await group.isVisible(),`${source} returns immediately`);
+  }
+  assert.ok(await page.evaluate(()=>{const before=window.previewNodes,after=[...document.querySelectorAll('#map [data-nyc-feature]')];delete window.previewNodes;return before.paths.length===after.length&&after.every((p,i)=>p===before.paths[i])&&before.plan!==window.__generator.previewPlan;}),'source checkboxes reuse raw paths and resolve the new input selection');
   const result=await page.evaluate(async()=>{
     const {display2DMerge}=await import('/qa/map-lab/ui/map-merge-2d.js');
     const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 100 100');svg.setAttribute('width',100);svg.setAttribute('height',100);
@@ -18,15 +30,19 @@ try {
     const canvas=document.createElement('canvas');canvas.width=canvas.height=100;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
     const alpha=(x,y)=>ctx.getImageData(x,y,1,1).data[3],pixels=[alpha(5,5),alpha(20,20),alpha(50,50)];
     display2DMerge(svg,{...plan,merge:{enabled:false}});const restored=!node.hasAttribute('mask')&&node.getAttribute('d')==='M0 0H100V100H0Z'&&!svg.querySelector('defs');
+    group.remove();const city=element('path',{'data-nyc-feature':'bed',d:'M0 0H100V100H0Z',fill:'red'},svg),cityPlan={merge:{enabled:true,suppressed:[]},roads:[],details:[{id:'bed',paths:[],shapes:road.shapes,mergeMasks:[shape]}]};display2DMerge(svg,cityPlan);
+    image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(svg));await image.decode();ctx.clearRect(0,0,100,100);ctx.drawImage(image,0,0);const cityPixels=[alpha(5,5),alpha(20,20),alpha(50,50)];
+    display2DMerge(svg,{...cityPlan,merge:{enabled:false}});const cityRestored=!city.hasAttribute('mask')&&city.getAttribute('d')==='M0 0H100V100H0Z';
     // Many roads share dense, distant polygons. Storage must grow with unique outlines, not road × polygon vertices.
     svg.replaceChildren();const shapes=Array.from({length:200},(_,i)=>{const x=(i%20)*100,y=Math.floor(i/20)*100;return {outer:Array.from({length:128},(_,j)=>{const a=j*Math.PI*2/128;return [x+30*Math.cos(a),y+30*Math.sin(a)];}),holes:[]};});
     const roads=Array.from({length:1000},(_,i)=>{const x=(i%20)*100,y=Math.floor(i/20)*20;const g=element('g',{'data-feature':String(i)},svg);element('path',{d:`M${x},${y}h50`,fill:'none'},g);return {id:String(i),sourcePaths:[[[x,y],[x+50,y]]],paths:[[[x,y],[x+50,y]]],shapes:[],mergeMasks:shapes};});
     display2DMerge(svg,{merge:{enabled:true,suppressed:[]},roads});
     const counts={outlines:svg.querySelectorAll('defs > path').length,copies:svg.querySelectorAll('mask path').length,uses:svg.querySelectorAll('mask use').length,bytes:svg.outerHTML.length};
     display2DMerge(svg,{merge:{enabled:true,suppressed:[]},roads});counts.defs=svg.querySelectorAll('defs').length;
-    return {pixels,restored,counts};
+    return {pixels,restored,cityPixels,cityRestored,counts};
   });
   assert.deepEqual(result.pixels,[255,0,255],'outside remains visible, sidewalk hidden, courtyard hole preserved');assert.ok(result.restored,'merge toggle restores original geometry');
+  assert.deepEqual(result.cityPixels,[255,0,255],'direct NYC paths use the same deck masks');assert.ok(result.cityRestored,'NYC paths restore on merge toggle');
   assert.equal(result.counts.outlines,200);assert.equal(result.counts.copies,0);assert.ok(result.counts.uses<10000,'distant polygons excluded');assert.ok(result.counts.bytes<2e6,'dense outlines stored once');assert.equal(result.counts.defs,1);assert.deepEqual(errors,[]);
   console.log('PASS SVG holes, mask sharing, merge toggle and bounded 2 km preview storage',result.counts);
 } finally {await browser.close();}

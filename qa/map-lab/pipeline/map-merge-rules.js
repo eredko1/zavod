@@ -1,5 +1,5 @@
 // Shared policy catalog; map-merge.js executes conservative matching before either viewer renders.
-export const MERGE_POLICY_VERSION = 5;
+export const MERGE_POLICY_VERSION = 11;
 export const MERGE_POLICY_STATUS = 'enabled in both viewers; ambiguous features retained with logged conflicts';
 export const MERGE_INVARIANTS = [
   'Preserve every original record. Resolve geometry and each attribute separately; there is no global winning provider.',
@@ -11,14 +11,31 @@ export const MERGE_INVARIANTS = [
   'Valid measured values outrank estimates. Null, field-specific zero-as-missing and malformed values never erase valid values. Explicit zero curb height is valid. Never average conflicting dimensions silently.',
   'Use observation dates for freshness when available. Fetch time, dataset publication time and edit time alone do not establish when an object was observed.',
   'Keep every candidate value, chosen source, conversion, rule version, match evidence, estimate and conflict in the resolved record.',
-  'Matching and resolution must not depend on source fetch order or display toggles. Source visibility is a presentation setting, not source authority.',
-  'Do not suppress covered fallback geometry until usable replacement geometry has been validated. Keep holes, uncovered segments and distinct stacked levels.',
+  'Matching is independent of fetch order. Source/category checkboxes select merge inputs: disabled providers cannot suppress selected alternatives. Cached 3D display-only visibility does not re-resolve a plan; regenerate after changing inputs.',
+  'Coverage suppression requires usable replacement geometry. Explicit tree-placement exclusions retain the original observation and surface conflict without claiming a replacement. Keep holes, uncovered segments and distinct stacked levels.',
 ];
 export const NYC_MERGE_POLICY = {
   'nyc-buildings': 'buildings', 'nyc-roadbed': 'roads', 'nyc-sidewalk': 'sidewalks', 'nyc-median': 'medians',
+  'nyc-transport':'transport', 'nyc-railroad':'rail', 'nyc-rail-structures':'rail', 'nyc-retaining-walls':'barriers', 'nyc-boardwalk':'coastal', 'nyc-shoreline':'coastal', 'nyc-hydro-structures':'coastal', 'nyc-hydrography':'coastal',
   'nyc-lion': 'roads', 'nyc-curbs': 'curbs', 'nyc-pavement': 'pavement-edges', 'nyc-trees': 'trees', 'nyc-elevation': 'elevation',
 };
 export const MERGE_POLICIES = [
+  {
+    id:'transport',name:'Bridge decks and transportation structures',sources:['nyc-transport','nyc-elevation','osm-overpass','nyc-railroad'],
+    match:'Bridge samples must be contained in exactly one structure polygon. Compatible roads or tracks must fit entirely within one supported deck. Overlapping structures remain ambiguous.',
+    geometrySources:['nyc-transport'],geometry:'Render measured deck footprints with holes using bounded bridge-sample interpolation. No guessed piers, deck thickness or layer-to-height conversion. Unresolved structures stay outlines, including with Merge disabled.',
+    attributeSources:{elevation:['nyc-elevation:sub_code=300020'],classification:['nyc-transport:feat_code','osm-overpass']},
+    attributes:'Require multiple distinct bridge observations and local coverage. Log sample IDs, feet-to-metres conversion, interpolation parameters and vertical-reference assumptions separately from measured values. Road centrelines remain references over their deck; rails retain their geometry. Connected non-bridge approaches follow shared OSM nodes across way splits, joining deck edges, uniquely associated road spots and estimated terrain at terminal junctions. Original footprints remain; deck masks remove duplicate approach coverage. Grades and crossfall remain logged estimates.',
+    conflicts:'No mixing bridge, ground or roof observations. Conflicting co-located samples reject the profile. Unknown station roof heights, tunnel depths and deck supports remain unresolved. Wall/fence dimensions use explicit rule estimates. Elevated surfaces are excluded from ground queries; a separate height-limited support index handles roof/deck walking.',
+  },
+  {
+    id:'coastal',name:'Boardwalks, shorelines and waterfront surfaces',sources:['nyc-boardwalk','nyc-shoreline','nyc-hydro-structures','nyc-hydrography','osm-overpass'],
+    match:'These are complementary roles. A shoreline does not replace a seawall, and water does not replace a pier. No automatic cross-source identity suppression without matching evidence.',
+    geometrySources:['original-source'],geometry:'Clip new 3D geometry to requested bounds while preserving polygon holes. Boardwalk, beach and wetland footprints follow estimated terrain. Piers, jetties and seawalls render surface tops only when elevation is recorded. Water remains a reference until its level is known.',
+    attributeSources:{elevation:['nyc-hydro-structures:elevation'],classification:['feat_code','sub_code','osm-overpass']},
+    attributes:'Convert hydro-structure elevation in feet to absolute metres, then local Y using the ground datum. Keep raw properties and source geometry. Terrain/display offsets remain labelled estimates.',
+    conflicts:'No inferred water slope/depth, wall height or structure thickness. Overlapping same-role sources remain separate pending a verified matching rule.',
+  },
   {
     id: 'buildings', name: 'Buildings and building parts', sources: ['osm-overpass', 'nyc-buildings'],
     match: 'Unique shared NYC BIN (OSM nycdoitt:bin ↔ NYC bin) plus at least 50% sampled footprint intersection-over-union, or 80% without conflicting valid BINs. Ignore borough placeholder IDs. Repeated IDs, conflicting IDs and weak overlap remain review records. Match only whole-building roles; preserve parts and ambiguous splits.',
@@ -62,7 +79,7 @@ export const MERGE_POLICIES = [
     geometry: 'Use NYC curb alignment for matched segments and preserve unmatched OSM curb segments. Suppress only proven duplicate beams; retain ramp nodes and cuts as modifiers.',
     attributeSources: { height: ['osm-overpass:height', 'osm-overpass:kerb:height', 'matched-measurement', 'osm-overpass:kerb-classification', 'rule-default:curb-height'], accessibility: ['osm-overpass'] },
     attributes: 'Use valid explicit height or kerb:height (including zero) before classification estimates or the configurable 0.15 m default. Numeric values only transfer to a fully covered matching curb; point observations remain local ramp inputs. Curb/ramp classification and accessibility are semantic inputs; a line alone gives no measured top elevation.',
-    conflicts: 'A pavement edge or fence is not automatically a curb. Inconsistent heights or sides of a street require review; lowered/flush curbs must not acquire the default raised height.',
+    conflicts: 'A pavement edge or fence is not automatically a curb. Equal-priority conflicting heights retain every record without selecting a height; contradictory lower-priority alternatives also stay visible and logged. Lowered/flush curbs must not acquire the default raised height.',
   },
   {
     id: 'pavement-edges', name: 'Pavement boundaries', sources: ['nyc-pavement', 'osm-overpass'],
@@ -77,7 +94,7 @@ export const MERGE_POLICIES = [
     id: 'trees', name: 'Individual trees', sources: ['osm-overpass', 'nyc-trees'],
     match: 'Generate nearby point candidates, then require compatible tree identity, status and any available species/size evidence with an unambiguous one-to-one assignment. Nearest point alone is not enough in dense rows.',
     geometrySources: ['matched-position-quality', 'osm-overpass', 'nyc-trees'],
-    geometry: 'Union both sources. Preserve unmatched OSM and NYC trees; spawn one tree per confirmed match. Choose a supported position by source quality and observation evidence; unresolved ties keep the OSM point deterministically and log both coordinates.',
+    geometry: 'Union both sources, one tree per confirmed match. Prefer a matched point outside ground road/walkway interiors; otherwise keep the OSM point and both coordinates. Suppress tree centres inside those surfaces beyond the configured edge clearance, preserving polygon holes and planted islands. Log the conflicting surface and retain original observations; this is a visual conflict rule, not proof of removal.',
     attributeSources: { speciesAndCondition: ['nyc-trees', 'osm-overpass'], height: ['osm-overpass:height', 'matched-measurement', 'rule-default'], status: ['dated-observation', 'conflict-review'] },
     attributes: 'Combine species, condition and compatible dimensions. NYC DBH and OSM circumference need explicit unit/measurement-height validation before comparison; neither directly supplies tree height.',
     conflicts: 'A NYC retired/stump record does not automatically delete an OSM living-tree point. Review dated status evidence; retain the unmatched OSM tree. Do not bridge clusters into one tree through transitive proximity.',
@@ -86,7 +103,7 @@ export const MERGE_POLICIES = [
     id: 'vegetation-areas', name: 'Tree rows, woods, hedges and vegetation areas', sources: ['osm-overpass', 'nyc-trees'],
     match: 'Relate individual trees to row/area generators spatially, while preserving the distinction between observed tree points and areas of vegetation.',
     geometrySources: ['osm-overpass'],
-    geometry: 'Keep row/area boundaries and actual tree points. Suppress generated placeholder trees around already represented individual trees; do not delete the area or hedge itself.',
+    geometry: 'Keep row/area boundaries. Suppress generated trees inside ground road/walkway interiors and near retained individual trees or earlier generated row trees, using stable row-ID order. Log excluded positions, surface IDs and represented tree IDs; do not delete the row or hedge itself.',
     attributeSources: { vegetationType: ['osm-overpass'], individualTree: ['nyc-trees', 'osm-overpass'] },
     attributes: 'Use available species/height tags, otherwise explicit procedural spacing and size defaults. Tree canopy, hedge boundary and woodland ground cover have separate roles.',
     conflicts: 'No automatic deletion of real tree points based on forest-area overlap. Unknown spacing/exclusion distances remain tunable generation parameters, not measurements.',
@@ -95,28 +112,28 @@ export const MERGE_POLICIES = [
     id: 'elevation', name: 'Ground, roof and bridge elevations', sources: ['nyc-elevation', 'nyc-buildings', 'osm-overpass'],
     match: 'Match samples only when horizontal location, feature class, units and vertical reference are compatible. Ground samples, building base values, roof heights and roof elevations are not interchangeable.',
     geometrySources: ['nyc-elevation:ground-only'],
-    geometry: 'Construct terrain only from verified compatible ground samples. Keep roof/bridge samples as separate constraints or references. Place buildings using compatible base elevations; keep them upright.',
+    geometry: 'Construct estimated terrain from subtype 300000 after excluding conflicts and inferred elevated-road spots. Role inference uses unique deck containment and separation from ground-road centrelines; preserve every reading and the inference evidence. Keep roof/bridge samples separate. Place buildings using compatible base elevations; keep them upright.',
     attributeSources: { ground: ['nyc-elevation:sub_code=300000'], buildingBase: ['nyc-buildings:ground_elevation', 'ground-interpolation'], supplementalElevation: ['osm-overpass:ele-with-verified-datum'] },
     attributes: 'Convert feet to metres; preserve source datum and interpolation provenance. Reject invalid coordinates, combine equal co-located ground readings, and exclude conflicting locations with candidate values in the generation log. A curb offset is a relative dimension, not an absolute elevation sample.',
     conflicts: 'Unknown datum, conflicting co-located samples and outliers are logged. Do not average incompatible datums or interpolate through a bridge as if it were ground. Current prototype datum assumptions remain explicitly provisional.',
   },
   {
-    id: 'barriers', name: 'Fences, walls, gates and retaining walls', sources: ['osm-overpass'],
+    id: 'barriers', name: 'Fences, walls, gates and retaining walls', sources: ['osm-overpass','nyc-retaining-walls'],
     match: 'Same barrier type, compatible level and coincident segment/point identity. Gates belong to a barrier but are not duplicate fence posts; retaining walls have a different role from curbs.',
     geometrySources: ['osm-overpass'],
-    geometry: 'Preserve OSM barriers; no connected NYC source replaces them. Collapse only confirmed duplicate segments. Keep gates/openings and distinct parallel fences.',
+    geometry: 'Preserve OSM barriers. A mutually unique, fully coincident NYC retaining wall can be represented by an explicitly ground-level OSM retaining wall with measured height. Keep gates/openings and distinct parallel fences.',
     attributeSources: { dimensionsAndMaterial: ['osm-overpass', 'rule-default'] },
     attributes: 'Use height, width, material, access and direction where valid; record every dimensional default.',
     conflicts: 'Do not infer fences from pavement or curb lines. If one object also bounds a park, retain both its boundary and surface roles.',
   },
   {
-    id: 'rail', name: 'Railways, stations and platforms', sources: ['osm-overpass'],
+    id: 'rail', name: 'Railways, stations and platforms', sources: ['osm-overpass','nyc-railroad','nyc-rail-structures'],
     match: 'Match only the same track/platform role and known level. Route relations describe service membership; they do not duplicate every member track.',
     geometrySources: ['osm-overpass'],
     geometry: 'Preserve separate tracks, platform areas, station points and entrances. Roadbed polygons do not erase rails or elevated infrastructure.',
     attributeSources: { gaugeAndUse: ['osm-overpass', 'rule-default'] },
-    attributes: 'Retain railway class, gauge, bridge/tunnel/layer, name and service references. Unknown vertical separation stays unresolved.',
-    conflicts: 'Parallel tracks, overlapping elevated lines and station buildings are distinct unless identity is proven. Log current flattened geometry as a rendering limitation.',
+    attributes: 'Use a single numeric OSM gauge in millimetres; otherwise log the standard-gauge estimate. Retain class, bridge/tunnel/layer, name and service. Mutually coincident, unique ground tracks can merge only when OSM explicitly supplies layer=0. Parallel tracks remain distinct.',
+    conflicts: 'Parallel tracks, overlapping elevated lines and station buildings are distinct unless identity is proven. Unresolved elevated/tunnel tracks remain outlines. Stations retain outlines because their roof or platform role and height may be unknown.',
   },
   {
     id: 'street-furniture', name: 'Benches, lamps, signals, bins and bollards', sources: ['osm-overpass'],

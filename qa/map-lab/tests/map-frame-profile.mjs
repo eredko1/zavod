@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { chromium } from 'playwright-core';
 import { validateBaseline, validateRepeats, validateComparison } from '../benchmark/frame-report.js';
 import { distribution } from '../benchmark/frame-profiler.js';
-import { DEFAULT_SCENARIOS } from '../benchmark/scenarios.js';
+import { DEFAULT_SCENARIOS,scenarioRequirements } from '../benchmark/scenarios.js';
 import { REPLAY, replayConfig } from '../benchmark/replay-config.js';
 import { reportDocument } from '../benchmark/frame-report-view.js';
 const arg = (key,fallback) => { const i = process.argv.indexOf(key); return i < 0 ? fallback : process.argv[i+1]; };
@@ -26,7 +26,7 @@ const codeFiles=[];
 for(const dir of ['qa/map-lab','vendor/three','vendor/echarts'])for(const f of await readdir(dir,{recursive:true}))if(/\.(js|html|css)$/.test(f))codeFiles.push(dir+'/'+f);
 codeFiles.push('qa/map-lab/tests/map-frame-profile.mjs','qa/browser-launch.mjs');codeFiles.sort();
 const codeHash=hash((await Promise.all(codeFiles.map(async f=>f+await readFile(f,'utf8')))).join(''));
-const report = { schema: 4, status: 'running', label, scene:sceneFile||'pinned-coney-fixture', recordedAt: new Date().toISOString(), inputHash, codeHash, config, scenarioVersions:Object.fromEntries(config.modes.map(id=>[id,DEFAULT_SCENARIOS[id].version])), runs: [], comparison: null };
+const report = { schema: 5, status: 'running', label, scene:sceneFile||'pinned-coney-fixture', recordedAt: new Date().toISOString(), inputHash, codeHash, config, scenarioVersions:Object.fromEntries(config.modes.map(id=>[id,DEFAULT_SCENARIOS[id].version])),scenarioRequirements:scenarioRequirements(config.modes), runs: [], comparison: null };
 const comparisonBaseline = arg('--compare',null) ? JSON.parse(await readFile(arg('--compare'),'utf8')) : null;
 if(comparisonBaseline) validateBaseline(comparisonBaseline,report);
 async function saveTrace(cdp,path) {
@@ -54,7 +54,6 @@ try {
       for(const snap of selection.nyc)assert.equal(metadata.stats.nyc[snap.sourceId].features,snap.data.features.length,'Scene source records must survive loading');
       metadata.assetHashes=Object.fromEntries([...assets].filter(([url])=>!/\.(js|html|css)(\?|$)/.test(url)).sort(([a],[b])=>a.localeCompare(b)));
       metadata.servedCodeHash=hash(JSON.stringify([...assets].filter(([url])=>/\.(js|html|css)(\?|$)/.test(url)).sort(([a],[b])=>a.localeCompare(b))));
-      for(const mode of config.modes) { assert.equal(summaries[mode].frames,config.frames); assert.equal(summaries[mode].hiddenFrames,0); if(mode.endsWith('-turn')) assert.ok(summaries[mode].distance>.1,`${mode} must actually move`); }
       const run={repeat,metadata,summaries,raw,assetWaitMs,errors}; report.runs.push(run);
       await page.screenshot({path:`${root}/frame-profile-${label}-${repeat+1}.png`});
       if(config.trace) await saveTrace(cdp,`${root}/frame-profile-${label}-${repeat+1}.trace.json`);

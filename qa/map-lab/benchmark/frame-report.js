@@ -1,4 +1,5 @@
 import { distribution, gpuStatusCounts } from './frame-profiler.js';
+import {DEFAULT_SCENARIOS} from './scenarios.js';
 export { SCENARIOS } from './replay-config.js';
 export async function fingerprint(value) {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
@@ -15,15 +16,21 @@ export async function summarizeFrames(raw, mode) {
 const same=(a,b,message)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw Error(message);};
 export function validateBaseline(baseline, candidate) {
   if(baseline.status!=='complete' || baseline.runs?.length!==baseline.config?.repeats) throw Error('Baseline must be complete with all repeats');
-  for(const key of ['schema','inputHash','config','scenarioVersions'])same(baseline[key],candidate[key],`Baseline ${key} mismatch`);
+  for(const key of ['schema','inputHash','config','scenarioVersions','scenarioRequirements'])same(baseline[key],candidate[key],`Baseline ${key} mismatch`);
   for(const run of baseline.runs)for(const mode of baseline.config.modes)if(run.summaries?.[mode]?.frames!==baseline.config.frames)throw Error(`Incomplete baseline scenario: ${mode}`);
 }
 export function validateRepeats(report) {
   if(report.runs.length!==report.config.repeats)throw Error('Missing benchmark repeats');
   const first=report.runs[0];
   for(const run of report.runs){
+    validateReplay(run.summaries,report.config,report.scenarioRequirements||DEFAULT_SCENARIOS);
     for(const key of ['gpu','browser','viewport','canvas','devicePixelRatio','settings','featureIDs','assetHashes','geometryCoverage','servedCodeHash'])same(run.metadata[key],first.metadata[key],`Repeat ${key} mismatch`);
-    for(const mode of report.config.modes){const s=run.summaries[mode];if(s.frames!==report.config.frames||s.hiddenFrames)throw Error(`Invalid frame coverage: ${mode}`);same(s.poseHash,first.summaries[mode].poseHash,`Replay path drift: ${mode}`);}
+    for(const mode of report.config.modes)same(run.summaries[mode].poseHash,first.summaries[mode].poseHash,`Replay path drift: ${mode}`);
+  }
+}
+export function validateReplay(summaries,config,scenarios=DEFAULT_SCENARIOS){
+  for(const mode of config.modes){const summary=summaries[mode];if(summary?.frames!==config.frames||summary.hiddenFrames)throw Error(`Invalid frame coverage: ${mode}`);
+    const minimum=scenarios[mode]?.minimumDistance;if(minimum!==undefined&&(!Number.isFinite(summary.distance)||summary.distance<minimum))throw Error(`${mode} must actually move (travelled ${summary.distance} m; minimum ${minimum} m)`);
   }
 }
 export function validateComparison(before, after, allowContentChange=false) {

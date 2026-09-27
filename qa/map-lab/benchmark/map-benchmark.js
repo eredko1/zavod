@@ -14,7 +14,7 @@ export function createMapBenchmark(world,{scenarios=DEFAULT_SCENARIOS}={}) {
     if(error)current.reject(error);else current.resolve();
   }
   const api={world,profiler,scenarios,
-    loadResult(selection,settings){profiler.beginBuild({settings});try{return world.loadResult(selection,settings,name=>profiler.buildMark(name));}finally{profiler.endBuild();}},
+    async loadResult(selection,settings,beforeStage){profiler.beginBuild({settings});try{return await world.loadResult(selection,settings,(name,ms)=>profiler.buildMark(name,ms),beforeStage);}finally{profiler.endBuild();}},
     runReplay(mode,{frames=REPLAY.frames,warmup=REPLAY.warmup}={}) {
       if(replay)return Promise.reject(Error('Replay already running'));
       if(!Number.isInteger(frames)||frames<2||!Number.isInteger(warmup)||warmup<0||frames+warmup>MAX_REPLAY_FRAMES)return Promise.reject(Error('Invalid replay length'));
@@ -28,7 +28,7 @@ export function createMapBenchmark(world,{scenarios=DEFAULT_SCENARIOS}={}) {
           const wrap=(name,fn)=>{const original=world[name];world[name]=fn(original);replay.restores.push(()=>{world[name]=original;});};
           wrap('controls',original=>()=>{const update=()=>{input=step(tick*REPLAY.fixedSimulationDt);original();};return profiler.active?profiler.measure('controls',update):update();});
           if(profiler.active){
-            for(const [method,scope]of [['simulate','simulation'],['groundAt','ground'],['collision','collision']])wrap(method,original=>(...args)=>profiler.measure(scope,()=>original(...args)));
+            for(const [method,scope]of [['simulate','simulation'],['groundAt','ground'],['supportAt','ground'],['collision','collision']])wrap(method,original=>(...args)=>profiler.measure(scope,()=>original(...args)));
             wrap('draw',original=>()=>profiler.render(original));
           }
           world.renderer.setAnimationLoop(()=>{

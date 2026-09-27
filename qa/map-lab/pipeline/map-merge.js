@@ -1,18 +1,25 @@
+import {segmentCuts} from './segment-cuts.js';
 import { inShape } from './osm-model.js';
 import { MERGE_POLICY_VERSION, MERGE_POLICIES, NYC_MERGE_POLICY } from './map-merge-rules.js';
 import { buildingOverlap, createBuildingMatcher } from './building-match.js';
 import { createShapeQuery, pointBounds } from './shape-query.js';
+import { resolveInfrastructure } from './infrastructure-merge.js';
+import {createTreeSurfaceQuery,resolveTreePlacements,TREE_PLACEMENT_RULES} from './tree-placement.js';
+import {edgeDistance as segmentDistance} from './geometry-distance.js';
+import {surfaceIdentity} from './surface-identity.js';
+import {resolveGroundLevels} from './ground-levels.js';
+import {resolveRoadApproaches} from './road-approaches.js';
+import {isGroundLevel as physicalLevel} from './physical-level.js';
 
 // Conservative starting tolerances, in metres. Ambiguous candidates never suppress either source.
-export const MERGE_PARAMETERS = { treeDistance: 1.5, treeConflictDistance: 4, buildingOverlap: 0.8, buildingIdentityOverlap: 0.5, buildingReviewOverlap: 0.2, buildingGrid: 1, curbDistance: 0.35, treeRowClearance: 2 };
+export const MERGE_PARAMETERS = { treeDistance: 1.5, treeConflictDistance: 4, buildingOverlap: 0.8, buildingIdentityOverlap: 0.5, buildingReviewOverlap: 0.2, buildingGrid: 1, curbDistance: 0.35, curbHeightTolerance:.001, treeRowClearance: TREE_PLACEMENT_RULES.rowClearance,treeSurfaceEdgeClearance:TREE_PLACEMENT_RULES.edgeClearance };
 const osm = f => !f.sourceId || f.sourceId === 'osm-overpass';
 const sourceOf = f => f.sourceId || 'osm-overpass';
 const stableID = f => f.sourceId === 'nyc-lion' && f.tags?.SegmentID ? `nyc-lion/segment/${f.tags.SegmentID}` : f.id.replace(/@[a-f0-9]+$/, '');
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const inside = (p, shapes) => shapes.some(s => inShape(...p, s));
-const physicalLevel = f => [undefined,'no'].includes(f.tags?.bridge) && [undefined,'no'].includes(f.tags?.tunnel) && [undefined,'surface'].includes(f.tags?.location) && (!f.tags?.layer || Number(f.tags.layer) === 0);
 const overlap=(a,b)=>buildingOverlap(a,b,MERGE_PARAMETERS.buildingGrid);
-function edgeDistance(p, a, b) { const dx=b[0]-a[0], dz=b[1]-a[1], t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dz)/(dx*dx+dz*dz||1))); return dist(p,[a[0]+dx*t,a[1]+dz*t]); }
+const edgeDistance=(p,a,b)=>segmentDistance(...p,a,b);
 function lineCovered(paths, candidates, tolerance) {
   const edges = candidates.flatMap(f => f.paths.flatMap(r => r.slice(1).map((b,i) => [r[i],b])));
   return edges.length && paths.length && paths.every(r => r.slice(1).every((b,i) => { const a=r[i], steps=Math.max(1,Math.ceil(dist(a,b))); for(let n=0;n<=steps;n++) {const p=[a[0]+(b[0]-a[0])*n/steps,a[1]+(b[1]-a[1])*n/steps]; if(!edges.some(([u,v])=>edgeDistance(p,u,v)<=tolerance)) return false;} return true; }));
@@ -21,10 +28,9 @@ function lineCovered(paths, candidates, tolerance) {
 export function uncoveredPaths(paths, shapes, query = createShapeQuery(shapes)) {
   const result = []; let removed = 0;
   for (const path of paths) { let current = null;
-    for (let k=1;k<path.length;k++) { const a=path[k-1],b=path[k],dx=b[0]-a[0],dz=b[1]-a[1], cuts=[0,1];
+    for (let k=1;k<path.length;k++) { const a=path[k-1],b=path[k],dx=b[0]-a[0],dz=b[1]-a[1];
       const nearby=query(pointBounds([a,b]));
-      for (const s of nearby) for (const r of [s.outer,...s.holes]) for(let i=0;i<r.length;i++) {const c=r[i],d=r[(i+1)%r.length],ex=d[0]-c[0],ez=d[1]-c[1],den=dx*ez-dz*ex;if(Math.abs(den)<1e-10)continue;const t=((c[0]-a[0])*ez-(c[1]-a[1])*ex)/den,u=((c[0]-a[0])*dz-(c[1]-a[1])*dx)/den;if(t>1e-9&&t<1-1e-9&&u>=0&&u<=1)cuts.push(t);}
-      cuts.sort((u,v)=>u-v);
+      const cuts=segmentCuts(a,b,nearby);
       for(let i=1;i<cuts.length;i++){const lo=cuts[i-1],hi=cuts[i];if(hi-lo<1e-9)continue;const at=t=>[a[0]+dx*t,a[1]+dz*t];if(inside(at((lo+hi)/2),nearby)){removed+=(hi-lo)*Math.hypot(dx,dz);current=null;continue;}const start=at(lo),end=at(hi);if(current&&dist(current.at(-1),start)<1e-6)current.push(end);else{current=[start,end];result.push(current);}}
     }
   }
@@ -69,7 +75,7 @@ export function mergePlan(input, enabled = true) {
 
     const cityBuildings=plan.buildings.filter(f=>f.sourceId==='nyc-buildings'&&f.shapes.length&&String(f.tags.feature_code)!=='1003');
     const osmBuildings=plan.buildings.filter(f=>osm(f)&&!f.part&&!f.suppressed&&f.shapes.length),matchBuilding=createBuildingMatcher(osmBuildings,cityBuildings,MERGE_PARAMETERS),rejectedBuildings=[];
-    pair(osmBuildings,cityBuildings,(a,b)=>{const match=matchBuilding(a,b);if(match.reason)rejectedBuildings.push({a,b,reason:match.reason});return match.evidence;},(a,b,evidence)=>{
+    pair(osmBuildings,cityBuildings,(a,b)=>{const match=matchBuilding(a,b);if(match.evidence&&!physicalLevel(a)){rejectedBuildings.push({a,b,reason:'OSM building has unresolved vertical placement; a ground footprint cannot establish the same physical level.'});return null;}if(match.reason)rejectedBuildings.push({a,b,reason:match.reason});return match.evidence;},(a,b,evidence)=>{
       if(plan.buildings.some(p=>p.part&&p.extrude&&overlap(p.shapes,b.shapes)>0.1)){note(b,'NYC building overlaps mapped building parts; retained for review rather than collapsing part geometry.');return;}
       if(!b.extrude&&a.extrude){b.height=structuredClone(a.height);b.extrude=true;b.merge.attributes.height={source:a.id,value:b.height.top,unit:'metres',estimated:b.height.estimated};const c=coverage.get(b.id);if(c){c.status='rendered';c.reason='Height recovered from matched OSM building.';}plan.issues=plan.issues.filter(i=>!(i.id===b.id&&i.code==='missing-height'));}
       else if(b.extrude)b.merge.attributes.height={source:b.id,value:b.height.top,unit:'metres',estimated:false};
@@ -78,10 +84,13 @@ export function mergePlan(input, enabled = true) {
       b.merge.attributes.geometry={source:b.id};b.merge.attributes.osmTags={source:a.id,value:a.tags};represent(a,b,evidence);plan.issues=plan.issues.filter(i=>!(i.id===a.id&&i.code==='missing-height'));
     });
     for(const {a,b,reason} of rejectedBuildings)if(!suppressed.has(a.id)&&!suppressed.has(b.id)){note(a,`${b.id}: ${reason}`,'building-match-review');note(b,`${a.id}: ${reason}`,'building-match-review');}
-    const cityTrees=plan.details.filter(f=>f.sourceId==='nyc-trees'), osmTrees=plan.details.filter(f=>osm(f)&&f.rule==='tree');
-    pair(osmTrees,cityTrees.filter(f=>f.rule==='tree'),(a,b)=>{const d=dist(a.point,b.point),species=a.tags.species?.toLowerCase(),other=b.tags.genusspecies?.toLowerCase();return d<=MERGE_PARAMETERS.treeDistance&&(!species||!other||other.includes(species))?`Tree points ${d.toFixed(2)} m apart; mutually unique active-tree match.`:null;},(a,b,evidence)=>{a.merge.attributes.forestry={source:b.id,value:b.tags};a.merge.attributes.height={source:a.attributes.height?.estimated?'rule-default':a.id,value:a.dimensions.height,estimated:a.attributes.height?.estimated??true};represent(b,a,evidence);});
-    for(const a of osmTrees)for(const b of cityTrees.filter(f=>f.rule!=='tree'))if(dist(a.point,b.point)<=MERGE_PARAMETERS.treeConflictDistance)note(a,`Nearby NYC ${b.tags.tpstructure} record ${b.id}; OSM tree preserved pending dated status evidence.`);
     const roadbeds=plan.details.filter(f=>f.sourceId==='nyc-roadbed'), sidewalks=plan.details.filter(f=>f.sourceId==='nyc-sidewalk');
+    const medians=plan.details.filter(f=>f.sourceId==='nyc-median'&&f.surface&&physicalLevel(f));
+    const identities=new Map([...medians,...sidewalks].map(f=>[f,surfaceIdentity(f.shapes)]));
+    for(const sidewalk of sidewalks){
+      const candidates=medians.filter(m=>m.surfaceKind===sidewalk.surfaceKind&&m.surfaceHeight===sidewalk.surfaceHeight&&identities.get(m)===identities.get(sidewalk));
+      if(candidates.length===1)represent(sidewalk,candidates[0],'Identical raised paved footprint and surface level; median supplies the surface, sidewalk record retained as a member.');
+    }
     const roadMasks=roadbeds.flatMap(f=>f.shapes.map(s=>({outer:s.outer,holes:[]}))), sidewalkMasks=sidewalks.flatMap(f=>f.shapes);
     const roadQuery=createShapeQuery(roadMasks),sidewalkQuery=createShapeQuery(sidewalkMasks);
     for(const road of plan.roads.filter(osm)){
@@ -94,25 +103,59 @@ export function mergePlan(input, enabled = true) {
       if(!road.paths.length&&!road.shapes.length){suppressed.add(road.id);road.merge.status='represented';const c=coverage.get(road.id);if(c){c.status='represented';c.reason=road.merge.evidence.at(-1);}}
     }
     const curbs=plan.details.filter(f=>f.sourceId==='nyc-curbs');
-    // Resolve recorded dimensions before classifications; source ordering cannot choose a height.
-    const osmCurbs=plan.details.filter(f=>osm(f)&&f.rule==='kerb').sort((a,b)=>Number(!!a.attributes.height?.estimated)-Number(!!b.attributes.height?.estimated)||a.id.localeCompare(b.id));
+    // Collect all claims before selecting a height; equal-priority conflicts have no winner.
+    const priority=f=>!f.attributes.height?0:!f.attributes.height.estimated?2:f.attributes.height.source==='OSM classification'?1:0;
+    const differs=(a,b)=>Math.abs(a-b)>MERGE_PARAMETERS.curbHeightTolerance;
+    const osmCurbs=plan.details.filter(f=>osm(f)&&f.rule==='kerb').sort((a,b)=>a.id.localeCompare(b.id)),curbClaims=new Map();
     for(const f of osmCurbs)if(physicalLevel(f)&&lineCovered(f.paths,curbs,MERGE_PARAMETERS.curbDistance)){
       const candidates=curbs.filter(c=>lineCovered(f.paths,[c],MERGE_PARAMETERS.curbDistance));
       if(candidates.length!==1){note(f,'Curb alignment spans multiple candidate records; retained for review.');continue;}
-      const c=candidates[0],h=f.attributes.height;
-      if(h && (!h.estimated || h.source==='OSM classification')){
-        if(!lineCovered(c.paths,[f],MERGE_PARAMETERS.curbDistance)){note(f,'Local curb height cannot set an entire longer NYC curb; tagged geometry retained.');continue;}
-        if(c.attributes?.height&&!c.attributes.height.estimated&&Math.abs(c.dimensions.height-h.value)>.001){note(f,'Conflicting curb heights; both records retained for review.');continue;}
-        if(c.attributes.height?.estimated || !h.estimated){
-          c.dimensions.height=h.value;c.attributes.height=structuredClone(h);c.merge.attributes.height={...structuredClone(h),source:f.id};
-          c.estimates=(c.estimates||[]).filter(message=>!message.startsWith('Curb height='));
-          plan.issues=plan.issues.filter(i=>!(i.id===c.id&&i.code==='estimated-detail'&&i.message.startsWith('Curb height=')));
-          if(h.estimated){const message=`Curb height=${h.value} m (${h.reason}; matched ${f.id}).`;c.estimates.push(message);plan.issues.push({id:c.id,dataset:c.dataset,code:'estimated-detail',severity:'info',message});}
-        }
-      }
-      represent(f,c,'Coincident compatible curb segments, every metre checked within 0.35 m.');
+      const c=candidates[0];
+      if(priority(f)&&!lineCovered(c.paths,[f],MERGE_PARAMETERS.curbDistance)){note(f,'Local curb height cannot set an entire longer NYC curb; tagged geometry retained.');continue;}
+      if(!curbClaims.has(c))curbClaims.set(c,[]);curbClaims.get(c).push(f);
     }
-    const trees=plan.details.filter(f=>f.rule==='tree'&&!suppressed.has(f.id));for(const f of plan.details.filter(f=>f.rule==='tree-row')){f.excludeTreePoints=trees.map(t=>t.point);f.treeClearance=MERGE_PARAMETERS.treeRowClearance;f.merge.evidence.push('Generated tree-row placeholders excluded within 2 m of individual tree records.');}
+    for(const [c,claims]of curbClaims){
+      const ranked=[c,...claims].filter(priority).sort((a,b)=>priority(b)-priority(a)||a.id.localeCompare(b.id));
+      const best=ranked.filter(f=>priority(f)===priority(ranked[0]||c)),values=best.map(f=>f.attributes.height.value);
+      if(values.length&&differs(Math.min(...values),Math.max(...values))){
+        const message=`Conflicting curb heights at equal evidence priority (${best.map(f=>`${f.id}: ${f.attributes.height.value} m`).join(', ')}); no height selected and all records retained.`;
+        for(const f of [c,...claims])note(f,message);continue;
+      }
+      const selected=best[0];
+      if(selected&&selected!==c){
+        const h=selected.attributes.height;c.dimensions.height=h.value;c.attributes.height=structuredClone(h);c.merge.attributes.height={...structuredClone(h),source:selected.id};
+        c.estimates=(c.estimates||[]).filter(message=>!message.startsWith('Curb height='));
+        plan.issues=plan.issues.filter(i=>!(i.id===c.id&&i.code==='estimated-detail'&&i.message.startsWith('Curb height=')));
+        if(h.estimated){const message=`Curb height=${h.value} m (${h.reason}; matched ${selected.id}).`;c.estimates.push(message);plan.issues.push({id:c.id,dataset:c.dataset,code:'estimated-detail',severity:'info',message});}
+      }
+      for(const f of claims){
+        if(priority(f)&&differs(c.dimensions.height,f.attributes.height.value)){const message=`Conflicting curb height from ${f.id}; selected higher-priority ${selected.id}, alternative retained.`;note(c,message);note(f,message);continue;}
+        represent(f,c,'Coincident compatible curb segments, every metre checked within 0.35 m.');
+      }
+    }
+    // Track and wall roles require mutual full-length coverage; nearby parallel lines are distinct.
+    for(const [source,compatible] of [
+      ['nyc-railroad',(a,b)=>a.rule==='rail'&&b.infrastructure==='rail'&&a.tags.layer==='0'&&physicalLevel(a)],
+      ['nyc-retaining-walls',(a)=>a.tags.barrier==='retaining_wall'&&a.tags.layer==='0'&&physicalLevel(a)&&!a.attributes.height?.estimated],
+    ])pair(plan.details.filter(osm),plan.details.filter(f=>f.sourceId===source),(a,b)=>compatible(a,b)&&lineCovered(a.paths,[b],MERGE_PARAMETERS.curbDistance)&&lineCovered(b.paths,[a],MERGE_PARAMETERS.curbDistance)?'Same physical role, explicit ground level and mutually coincident complete lines within 0.35 m.':null,(a,b,evidence)=>represent(b,a,evidence));
+  }
+  // Vertical safety is required even with duplicate suppression disabled.
+  resolveInfrastructure(plan,{note});
+  resolveGroundLevels(plan);
+  resolveRoadApproaches(plan,{note});
+  if(enabled){
+    const surfaceAt=createTreeSurfaceQuery(plan),cityTrees=plan.details.filter(f=>f.sourceId==='nyc-trees'),osmTrees=plan.details.filter(f=>osm(f)&&f.rule==='tree');
+    pair(osmTrees,cityTrees.filter(f=>f.rule==='tree'),(a,b)=>{const d=dist(a.point,b.point),species=a.tags.species?.toLowerCase(),other=b.tags.genusspecies?.toLowerCase();return physicalLevel(a)&&physicalLevel(b)&&d<=MERGE_PARAMETERS.treeDistance&&(!species||!other||other.includes(species))?`Tree points ${d.toFixed(2)} m apart; mutually unique active-tree match.`:null;},(a,b,evidence)=>{
+      const selected=surfaceAt(a.point)&&!surfaceAt(b.point)?b:a,other=selected===a?b:a;
+      if(selected===b){b.dimensions=structuredClone(a.dimensions);b.attributes=structuredClone(a.attributes);b.estimates=structuredClone(a.estimates||[]);plan.issues=plan.issues.filter(i=>i.id!==b.id||i.code!=='estimated-detail');for(const message of b.estimates)plan.issues.push({id:b.id,code:'estimated-detail',severity:'info',message:`Matched ${a.id}: ${message}`});evidence+=' Selected the matched NYC point outside the road/walkway; retained OSM dimensions.';}
+      selected.merge.attributes.forestry={source:b.id,value:b.tags};selected.merge.attributes.position={source:selected.id,value:selected.point,alternatives:[{source:a.id,value:a.point},{source:b.id,value:b.point}]};selected.merge.attributes.height={source:a.attributes.height?.estimated?'rule-default':a.id,value:a.dimensions.height,estimated:a.attributes.height?.estimated??true};represent(other,selected,evidence);
+    });
+    for(const a of osmTrees)for(const b of cityTrees.filter(f=>f.rule!=='tree'))if(dist(a.point,b.point)<=MERGE_PARAMETERS.treeConflictDistance)note(a,`Nearby NYC ${b.tags.tpstructure} record ${b.id}; OSM tree preserved pending dated status evidence.`);
+    for(const e of resolveTreePlacements(plan,suppressed,surfaceAt)){
+      suppressed.add(e.id);const r=records.get(e.id);r.status='excluded';r.attributes.treePlacement={...e,rule:TREE_PLACEMENT_RULES};r.evidence.push(e.reason+` Surface: ${e.surface}. Visual conflict suppression; original observation retained.`);
+      r.conflicts.push(r.evidence.at(-1));
+      const c=coverage.get(e.id);if(c){c.status='excluded';c.reason=r.evidence.at(-1);}plan.issues.push({id:e.id,code:'tree-surface-conflict',severity:'warning',message:r.evidence.at(-1)});
+    }
   }
   for(const f of all){const r=records.get(f.id);if(!r.evidence.length)r.evidence.push(enabled?'No confirmed duplicate; retained with original geometry and attributes.':'Merge disabled; original source overlay.');const c=coverage.get(f.id);if(c)c.merge=r;}
   const active = Object.fromEntries(['buildings','roads','details'].map(k=>[k,plan[k].filter(f=>!suppressed.has(f.id))]));Object.assign(plan,active);

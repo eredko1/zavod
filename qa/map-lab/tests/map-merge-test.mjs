@@ -30,7 +30,7 @@ if(process.argv.includes('--snapshots')){
   const {planFromOSM}=await import('../pipeline/osm-model.js'),{planFromNYC}=await import('../pipeline/nyc-model.js');
   const {data,nyc}=await loadFixture(),base=planFromOSM(data);
   for(const snap of nyc){const part=planFromNYC(snap,base.origin);for(const k of ['buildings','roads','details','coverage','issues'])base[k].push(...part[k]);}
-  const p=mergePlan(base);assert.equal(p.coverage.length,base.coverage.length);assert.ok(p.details.filter(f=>f.rule==='tree').length>=134,'unmatched OSM trees cannot disappear');console.log('SNAPSHOT',p.merge.summary,'buildings',base.buildings.length,'→',p.buildings.length,'trees',base.details.filter(f=>f.rule==='tree').length,'→',p.details.filter(f=>f.rule==='tree').length);
+  const p=mergePlan(base);assert.equal(p.coverage.length,base.coverage.length);for(const tree of base.details.filter(f=>f.rule==='tree'))assert.ok(p.details.some(f=>f.id===tree.id)||p.merge.decisions.some(r=>r.members.some(m=>m.id===tree.id)&&(r.representedBy||r.status==='excluded')),'every removed tree retains a merge or placement decision');console.log('SNAPSHOT',p.merge.summary,'buildings',base.buildings.length,'→',p.buildings.length,'trees',base.details.filter(f=>f.rule==='tree').length,'→',p.details.filter(f=>f.rule==='tree').length);
 }
 const curb=(id,sourceId,height,end=10)=>({id,sourceId,tags:{barrier:'kerb'},rule:'kerb',paths:[[[0,0],[end,0]]],shapes:[],dimensions:{height,width:.12},attributes:{height:{value:height,estimated:!!sourceId}},estimates:[]});
 const measured=curb('way/curb',undefined,0),city=curb('nyc-curbs/curb','nyc-curbs',.15);
@@ -45,6 +45,15 @@ const numeric=curb('way/numeric',undefined,.02),lowered=curb('way/lowered',undef
 const mergeCurbs=records=>{const out=mergePlan(input([],records));return {suppressed:out.merge.suppressed,heights:out.details.map(f=>[f.id,f.dimensions.height]).sort(),conflicts:out.merge.summary.conflicts};};
 assert.deepEqual(mergeCurbs([numeric,lowered,city]),mergeCurbs([lowered,numeric,city]),'conflicting classified and numeric heights resolve independently of response order');
 console.log('PASS deterministic conflicting curb heights');
+for(const measuredClaims of [false,true])for(const swapped of [false,true]){
+  const a=structuredClone(classified),b=structuredClone(lowered);a.id=swapped?'way/z':'way/a';b.id=swapped?'way/a':'way/z';
+  if(measuredClaims){a.attributes.height.estimated=false;b.attributes.height.estimated=false;}
+  const out=mergePlan(input([],[a,b,city]));
+  assert.equal(out.details.length,3,'equal-priority contradictions must retain every record');assert.deepEqual(out.merge.suppressed,[]);
+  assert.equal(out.details.find(f=>f.id===city.id).dimensions.height,city.dimensions.height,'no arbitrary height selected');
+  for(const f of [a,b,city])assert.ok(out.issues.some(i=>i.id===f.id&&/Conflicting curb heights/.test(i.message)));
+}
+console.log('PASS numeric and classified curb conflicts do not choose by source ID');
 for(const tags of [{bridge:'no'},{tunnel:'no'},{location:'surface'}])assert.deepEqual(mergePlan(input([],[bed],[{...road,tags:{...road.tags,...tags}}])).roads[0].paths,q.paths);
 for(const tags of [{bridge:'yes'},{tunnel:'yes'},{location:'underground'}])assert.deepEqual(mergePlan(input([],[bed],[{...road,tags:{...road.tags,...tags}}])).roads[0].paths,road.paths);
 console.log('PASS explicit surface tags merge; separate structure levels remain independent');

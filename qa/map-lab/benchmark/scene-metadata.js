@@ -11,6 +11,6 @@ export function sceneMetadata(world) {
     viewport:[innerWidth,innerHeight],canvas:[r.domElement.width,r.domElement.height],devicePixelRatio,
     materialTextures:textures.size,geometryBufferBytes:bytes,
     settings:{...world.settings,merge:world.selection.mergeEnabled!==false,hiddenOSM:world.selection.hiddenOSM||[],sources:world.selection.nyc.map(s=>[s.sourceId,s.visible!==false])},
-    geometryCoverage:sceneCoverage(world.getWorld().group),focused:document.hasFocus(),contextLost:gl.isContextLost(),
+    geometryCoverage:sceneCoverage(world.scene),focused:document.hasFocus(),contextLost:gl.isContextLost(),
   };
 }

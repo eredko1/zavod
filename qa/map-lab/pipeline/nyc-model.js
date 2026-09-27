@@ -1,19 +1,26 @@
 import { projection, DEFAULTS } from './osm-model.js';
-import { NYC_SOURCES, featureID, geoPolygons, geoLines, geoPoints } from '../data/map-sources.js';
+import { NYC_SOURCES, featureID, sourceFeatures, geoPolygons, geoLines, geoPoints } from '../data/map-sources.js';
 import { sourceNumber } from '../data/source-number.js';
-import { sourceCoordinate } from '../data/source-coordinate.js';
+import { INFRASTRUCTURE_KINDS, infrastructureFeature } from './nyc-infrastructure.js';
+import { clipPaths } from './area-clip.js';
 
 export function planFromNYC(snapshot, origin, curbHeight = DEFAULTS.curb) {
   const source = NYC_SOURCES.find(s => s.id === snapshot.sourceId), project = projection(...origin), buildings = [], details = [], coverage = [], issues = [];
-  const point = p => project(sourceCoordinate(p));
-  for (const f of snapshot.data.features) {
-    const id = featureID(source, f), tags = f.properties, item = { id, sourceId: source.id, dataset: source.dataset, tags, rule: source.kind, status: 'rendered', reason: 'NYC geometry; original properties retained.' }; coverage.push(item);
+  if(!source)throw Error(`Unknown NYC source: ${snapshot.sourceId}`);
+  const infrastructure=INFRASTRUCTURE_KINDS.has(source.kind),bounds=snapshot.bounds;
+  const clipBounds=infrastructure&&bounds?(()=>{const a=project({lat:bounds.south,lon:bounds.west}),b=project({lat:bounds.north,lon:bounds.east});return{x0:a[0],x1:b[0],z0:b[1],z1:a[1]};})():null;
+  const point = ([lon,lat]) => project({lon,lat});
+  for (const f of sourceFeatures(source,snapshot.data.features)) {
+    const id = featureID(source, f), tags = f.properties, item = { id, sourceRecordId:f.sourceRecordId||id, sourceId: source.id, dataset: source.dataset, tags, rule: source.kind, status: 'rendered', reason: 'NYC geometry; original properties retained.' }; coverage.push(item);
     try {
-      const ring = r => { if (r.length < 4 || r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) throw new Error('Incomplete polygon ring.'); return r.slice(0, -1).map(point); };
+      if(f.geometryError)throw Error(f.geometryError);
+      const ring = r => r.slice(0,-1).map(point);
       const shapes = geoPolygons(f.geometry).map(p => ({ outer: ring(p[0]), holes: p.slice(1).map(ring) }));
-      if (shapes.some(s => s.outer.length < 3 || s.holes.some(h => h.length < 3))) throw new Error('Incomplete polygon ring.');
-      const base = { id, sourceId: source.id, dataset: source.dataset, tags, shapes, paths: geoLines(f.geometry).map(r => r.map(point)), dimensions: {}, attributes: {}, estimates: [], rule: source.kind };
-      if (source.kind === 'building') {
+      const base = { id, sourceRecordId:item.sourceRecordId, sourceId: source.id, dataset: source.dataset, tags, shapes, paths: geoLines(f.geometry).map(r => r.map(point)), dimensions: {}, attributes: {}, estimates: [], rule: source.kind };
+      if(infrastructure){
+        if(clipBounds){base.clipBounds=clipBounds;base.paths=clipPaths(base.paths,clipBounds);}
+        details.push(infrastructureFeature(base,source,item,issues));
+      } else if (source.kind === 'building') {
         const h = Number(tags.height_roof), valid = h > 0 && Number.isFinite(h) && String(tags.feature_code) !== '1003';
         base.height = { top: valid ? h * 0.3048 : null, bottom: 0, valid, estimated: false, source: 'NYC height_roof (feet → metres)' }; base.extrude = valid; base.suppressed = false;
         const ground=sourceNumber(tags.ground_elevation);if(ground!==null)base.groundElevation=ground*0.3048;
@@ -43,8 +50,8 @@ export function planFromNYC(snapshot, origin, curbHeight = DEFAULTS.curb) {
     } catch (e) { item.status = 'skipped'; item.reason = e.message; issues.push({ id, dataset: source.dataset, code: 'invalid-geometry', severity: 'error', message: e.message }); }
   }
   for (const d of details) {
-    for (const [key, value] of Object.entries(d.dimensions)) d.attributes[key] = { value, unit: 'metres', source: 'rule default', estimated: true };
-    if (d.surfaceHeight !== undefined) d.attributes.surfaceOffset = { value: d.surfaceHeight, unit: 'metres', source: 'curb rule + 0.04 m display offset', estimated: true };
+    for (const [key, value] of Object.entries(d.dimensions)) d.attributes[key] ??= { value, unit: 'metres', source: 'rule default', estimated: true };
+    if (d.surfaceHeight !== undefined) d.attributes.surfaceOffset = { value: d.surfaceHeight, unit: 'metres', source: infrastructure ? 'Display offset; not a measured physical dimension' : 'Curb rule + display offset', estimated: true };
     if (d.elevation !== undefined) d.attributes.elevation = { value: d.elevation, unit: 'metres', source: 'NYC elevation (feet)', raw: d.tags.elevation, estimated: false };
   }
   for (const d of details) for (const message of d.estimates) issues.push({ id: d.id, dataset: source.dataset, code: 'estimated-detail', severity: 'info', message });

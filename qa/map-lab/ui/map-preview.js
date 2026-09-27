@@ -1,16 +1,21 @@
+import {eventScope} from './event-scope.js';
 import { initNYCLayers } from './nyc-layers.js';
 import { downloadJSON } from './download.js';
 import { resolveMap } from '../pipeline/map-pipeline.js';
 import { projection } from '../pipeline/osm-model.js';
 import { display2DMerge } from './map-merge-2d.js';
 import { normalize } from '../pipeline/osm-geometry.js';
+import { clipPreviewArea } from './preview-area.js';
 
 export function createMapPreview(root, { options = () => ({}), onMerge = () => {} } = {}) {
+const events=eventScope();
+let layerEvents=eventScope();
 const $ = id => root.querySelector(`#${id}`), svg = $('map'), NS = 'http://www.w3.org/2000/svg';
 const COLORS = { land: ['Land & recreation', '#50775e'], water: ['Water', '#5192b5'], buildings: ['Buildings', '#d7a477'], roads: ['Roads', '#97a7af'], paths: ['Paths & steps', '#d8d4a7'], rail: ['Railways', '#cba5c5'], other: ['Other outlines', '#a49cd1'], points: ['Mapped points', '#f3cb72'], vertices: ['Geometry nodes', '#647681'] };
 const view = { x: 0, z: 0, span: 600 }, features = new Map(), groups = new Map();
 let nyc = null, displayData = null, mergedPlan = null, mergedInput = null, mergedSnapshots = [], mergedEnabled = null;
 let areaOverride = null;
+let mergedFilters='';
 let origin = [40.5775, -73.978], selected = null, drag = null, moved = false, raw = null, fullBounds = null, lastQuery = '', lastEndpoint = '', fetchedAt = '';
 let project = projection(...origin);
 const filters = new Map();
@@ -33,7 +38,7 @@ function layer(id, count) {
   const label = document.createElement('label'), input = document.createElement('input'), swatch = document.createElement('span'), text = document.createElement('span'), num = document.createElement('small');
   input.type = 'checkbox'; input.checked = filters.get(id) ?? id !== 'vertices'; input.dataset.layer = id; g.toggleAttribute('hidden', !input.checked);
   swatch.className = 'swatch'; swatch.style.background = color; text.textContent = title; num.textContent = count;
-  input.addEventListener('change', () => { filters.set(id,input.checked); g.toggleAttribute('hidden', !input.checked); if (selected && g.contains(selected)) clearSelection(); });
+  layerEvents.on(input,'change', () => { filters.set(id,input.checked); g.toggleAttribute('hidden', !input.checked); if (selected && g.contains(selected)) clearSelection(); updateMerge(); });
   label.append(input, swatch, text, num); $('layers').append(label);
 }
 function clearSelection() { selected?.classList.remove('selected'); selected = null; $('details').textContent = 'Select a feature.'; }
@@ -50,7 +55,7 @@ function show(data) {
   const list = normalize(data.elements);
   if (data.elements.length && !list.length) throw new Error('No drawable coordinates. End the query with out geom; to include geometry.');
   // Validate before replacing SVG geometry. The controller owns source-session resets.
-  displayData = data; clearSelection(); svg.replaceChildren(); $('layers').replaceChildren(); features.clear(); groups.clear();
+  displayData = data; clearSelection();layerEvents.dispose();layerEvents=eventScope(); svg.replaceChildren(); $('layers').replaceChildren(); features.clear(); groups.clear();
   const pts = list.flatMap(f => f.paths.flatMap(p => p.points)), geo = bounds(pts.map(p => [p.lon, p.lat]));
   if (pts.length) origin = [(geo.z0 + geo.z1) / 2, (geo.x0 + geo.x1) / 2];
   project = projection(...origin);
@@ -68,25 +73,25 @@ function show(data) {
   }
   $('coverage').textContent = `${list.length} drawable / ${data.elements.length} returned`;
   nyc?.render();applyOSMVisibility();
-  fullBounds=mergedPlan?.bounds;fit(fullBounds);$('position').textContent=`${list.length.toLocaleString()} OSM features`;
+  fit(fullBounds);$('position').textContent=`${list.length.toLocaleString()} OSM features`;
   $('empty').hidden = !!list.length || !!nyc?.hasVisible(); $('empty').textContent = 'No features returned. Try another area or query.';
 }
-$('all').addEventListener('click', () => fit(fullBounds));
-$('download').onclick=()=>downloadJSON({ ...raw, query:lastQuery },'osm-query.json');
-$('zoom-in').addEventListener('click', () => zoom(0.75)); $('zoom-out').addEventListener('click', () => zoom(1 / 0.75));
-svg.addEventListener('wheel', e => { e.preventDefault(); zoom(Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * 0.001))), point(e)); }, { passive: false });
-svg.addEventListener('pointerdown', e => { if (e.button !== 0 || drag) return; moved = false; drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: view.x, cz: view.z, target: e.target.closest('[data-feature]') }; svg.setPointerCapture(e.pointerId); svg.classList.add('dragging'); });
-svg.addEventListener('pointermove', e => {
+events.on($('all'),'click', () => fit(fullBounds));
+events.on($('download'),'click',()=>downloadJSON({ ...raw, query:lastQuery },'osm-query.json'));
+events.on($('zoom-in'),'click', () => zoom(0.75)); events.on($('zoom-out'),'click', () => zoom(1 / 0.75));
+events.on(svg,'wheel', e => { e.preventDefault(); zoom(Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * 0.001))), point(e)); }, { passive: false });
+events.on(svg,'pointerdown', e => { if (e.button !== 0 || drag) return; moved = false; drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: view.x, cz: view.z, target: e.target.closest('[data-feature]') }; svg.setPointerCapture(e.pointerId); svg.classList.add('dragging'); });
+events.on(svg,'pointermove', e => {
   if (drag && e.pointerId === drag.id) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 4) moved = true; view.x = drag.cx - dx * view.span / size().height; view.z = drag.cz - dy * view.span / size().height; renderView(); }
   const [x, z] = point(e), [lat, lon] = gps(x, z); $('position').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
 });
 function endDrag(e) { if (!drag || drag.id !== e.pointerId) return; const target = drag.target; drag = null; svg.classList.remove('dragging'); if (svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId); if (e.type === 'pointerup' && !moved) select(target); }
-svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag); svg.addEventListener('lostpointercapture', endDrag);
-svg.addEventListener('keydown', e => { if (e.key === '+' || e.key === '=') zoom(0.75); else if (e.key === '-') zoom(1 / 0.75); else if (e.key === 'Escape') clearSelection(); else if (e.key.startsWith('Arrow')) { const d = view.span * 0.1; if (e.key === 'ArrowLeft') view.x -= d; if (e.key === 'ArrowRight') view.x += d; if (e.key === 'ArrowUp') view.z -= d; if (e.key === 'ArrowDown') view.z += d; renderView(); } else return; e.preventDefault(); });
+events.on(svg,'pointerup', endDrag); events.on(svg,'pointercancel', endDrag); events.on(svg,'lostpointercapture', endDrag);
+events.on(svg,'keydown', e => { if (e.key === '+' || e.key === '=') zoom(0.75); else if (e.key === '-') zoom(1 / 0.75); else if (e.key === 'Escape') clearSelection(); else if (e.key.startsWith('Arrow')) { const d = view.span * 0.1; if (e.key === 'ArrowLeft') view.x -= d; if (e.key === 'ArrowRight') view.x += d; if (e.key === 'ArrowUp') view.z -= d; if (e.key === 'ArrowDown') view.z += d; renderView(); } else return; e.preventDefault(); });
 const observer=new ResizeObserver(renderView);observer.observe(svg);
 
 function applyOSMVisibility() { for (const g of groups.values()) g.style.display = $('osm-visible').checked ? '' : 'none'; }
-$('osm-visible').onchange = applyOSMVisibility;
+events.on($('osm-visible'),'change',() => {applyOSMVisibility();updateMerge();});
 nyc = initNYCLayers({ root, svg, project:p=>project(p),
   mapBounds: () => { if (areaOverride) return areaOverride; const s = size(), w = view.span * s.width / s.height, [south, west] = gps(view.x - w / 2, view.z + view.span / 2), [north, east] = gps(view.x + w / 2, view.z - view.span / 2); return { south, west, north, east }; },
   inspected: clearSelection, mergeDecision,
@@ -94,22 +99,23 @@ nyc = initNYCLayers({ root, svg, project:p=>project(p),
 });
 
 function mergeDecision(id) { return mergedPlan?.merge.decisions.find(d => d.members.some(m => m.id === id) && !d.representedBy) || mergedPlan?.merge.decisions.find(d => d.members.some(m => m.id === id)); }
+function hiddenOSM(){return [...features.values()].filter(f=>!$('osm-visible').checked||groups.get(f.category)?.hasAttribute('hidden')).map(f=>f.id);}
 function updateMerge() {
-  const snaps=nyc?.snapshots()||[], enabled=$('merge-enabled').checked;
-  if (mergedInput!==displayData || mergedEnabled!==enabled || snaps.length!==mergedSnapshots.length || snaps.some((s,i)=>s.data!==mergedSnapshots[i])) { mergedPlan=resolveMap({data:displayData,nyc:snaps,bounds:areaOverride,mergeEnabled:enabled},options()); mergedInput=displayData;mergedSnapshots=snaps.map(s=>s.data);mergedEnabled=enabled; }
-  display2DMerge(svg,mergedPlan);const m=mergedPlan?.merge;
-  $('merge-summary').textContent=m?.enabled?`${m.summary.matched} matches · ${m.summary.suppressed} redundant · ${m.summary.partial} partial roads · ${m.summary.conflicts} conflicts.`:'Merging off.';
+  const snaps=nyc?.snapshots()||[], enabled=$('merge-enabled').checked,hidden=hiddenOSM(),filterKey=JSON.stringify([hidden,snaps.map(s=>[s.sourceId,s.visible!==false])]);
+  if (mergedInput!==displayData || mergedEnabled!==enabled || mergedFilters!==filterKey || snaps.length!==mergedSnapshots.length || snaps.some((s,i)=>s.data!==mergedSnapshots[i])) { mergedPlan=resolveMap({data:displayData,nyc:snaps,bounds:areaOverride,mergeEnabled:enabled,hiddenOSM:hidden},options()); mergedInput=displayData;mergedSnapshots=snaps.map(s=>s.data);mergedEnabled=enabled;mergedFilters=filterKey; }
+  display2DMerge(svg,mergedPlan);fullBounds=clipPreviewArea(svg,areaOverride,project)||mergedPlan?.bounds;const m=mergedPlan?.merge;
+  $('merge-summary').textContent=m?.enabled?`${m.summary.matched} matches · ${m.summary.suppressed} suppressed · ${m.summary.partial} partial roads · ${m.summary.conflicts} conflicts.`:'Merging off.';
   $('merge-download').disabled=!m; onMerge(m);
 }
-$('merge-enabled').onchange=updateMerge;
-$('merge-download').onclick=()=>downloadJSON({merge:mergedPlan.merge,query:lastQuery,endpoint:lastEndpoint,fetchedAt,nycSources:nyc.snapshots().map(({data,...p})=>p)},'map-merge-log.json');
+events.on($('merge-enabled'),'change',updateMerge);
+events.on($('merge-download'),'click',()=>downloadJSON({merge:mergedPlan.merge,query:lastQuery,endpoint:lastEndpoint,fetchedAt,nycSources:nyc.snapshots().map(({data,...p})=>p)},'map-merge-log.json'));
 return {
   setArea(bounds) { areaOverride=bounds;origin=[(bounds.south+bounds.north)/2,(bounds.west+bounds.east)/2];project=projection(...origin); },
   load(result) { raw=result.data;lastQuery=result.query;lastEndpoint=result.endpoint;fetchedAt=result.fetchedAt;nyc.restore(result.nyc||[]);show(raw||{elements:[]});$('download').disabled=!raw; },
-  result() { return { data:raw,query:lastQuery,endpoint:lastEndpoint,fetchedAt,bounds:areaOverride,nyc:nyc.snapshots(),mergeEnabled:$('merge-enabled').checked,hiddenOSM:[...features.values()].filter(f=>!$('osm-visible').checked||groups.get(f.category)?.hasAttribute('hidden')).map(f=>f.id) }; },
+  result() { return { data:raw,query:lastQuery,endpoint:lastEndpoint,fetchedAt,bounds:areaOverride,nyc:nyc.snapshots(),mergeEnabled:$('merge-enabled').checked,hiddenOSM:hiddenOSM() }; },
   get plan() { return mergedPlan; },
   refreshRules() {mergedInput=null;updateMerge();},
   fit() { fit(fullBounds); },
-  dispose() {observer.disconnect();},
+  dispose() {events.dispose();layerEvents.dispose();nyc.dispose();observer.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.classList.remove('dragging');},
 };
 }

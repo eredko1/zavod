@@ -1,4 +1,5 @@
 import { MOVEMENT } from '../render/movement.js';
+const MIN_TRAVEL_METRES=1e-6;
 
 // Scenario factories reset the scene once; step() is driven by fixed simulation time.
 const idle = world => { world.fit();world.look(0,0);return ()=>null; };
@@ -9,5 +10,6 @@ const orbit = world => {
 const walking = speed => world => {idle(world);world.walk({capture:false});return t=>{world.look(.65*Math.sin(t*.7),.22*Math.sin(t*.9));return {x:.3*Math.sin(t),z:-1,speed};};};
 export const DEFAULT_SCENARIOS = Object.freeze({
   idle:{version:1,create:idle},orbit:{version:1,create:orbit},
-  'walk-turn':{version:1,create:walking(MOVEMENT.walk)},'run-turn':{version:1,create:walking(MOVEMENT.run)},
+  'walk-turn':{version:2,minimumDistance:MIN_TRAVEL_METRES,create:walking(MOVEMENT.walk)},'run-turn':{version:2,minimumDistance:MIN_TRAVEL_METRES,create:walking(MOVEMENT.run)},
 });
+export const scenarioRequirements=(modes,scenarios=DEFAULT_SCENARIOS)=>Object.fromEntries(modes.map(id=>[id,{minimumDistance:scenarios[id].minimumDistance??0}]));

@@ -33,8 +33,8 @@ try {
   });
   assert.equal(geometry.height, 12); assert.ok(Math.abs(geometry.estimated - 6) < 1e-5); assert.equal(geometry.courtyardHits, 0); assert.equal(geometry.hiddenMissing, true); assert.equal(geometry.vertices, 6);
   await page.locator('#geometry-settings > summary').click();await page.fill('#storey', '3.5');await page.click('#generate');await page.waitForFunction(()=>!window.__generator.busy); assert.equal(await page.evaluate(() => window.__generator.world.plan.buildings[1].height.top), 7);
-  await page.locator('#generation-info > details > summary').click();const download = page.waitForEvent('download'); await page.click('#log-download'); assert.equal((await download).suggestedFilename(), 'map-generation.json');
-  await page.bringToFront(); await page.click('#walk'); await page.waitForFunction(() => document.pointerLockElement?.id === 'world');
+  await page.locator('#generation-info > details:has(#generation-log) > summary').click();const download = page.waitForEvent('download'); await page.click('#log-download'); assert.equal((await download).suggestedFilename(), 'map-generation.json');
+  await page.bringToFront(); await page.evaluate(()=>window.__generator.world.walk({capture:false})); await page.locator('#world').click(); await page.waitForFunction(() => document.pointerLockElement?.id === 'world');
   await page.evaluate(() => new Promise(requestAnimationFrame));
   const start = (await stats()).position; await page.keyboard.down('KeyW');
   try { await page.waitForFunction(start => { const p = window.__generator.world.stats().position; return Math.hypot(p[0]-start[0],p[2]-start[2])>.3; }, start, { timeout: 5000 }); } finally { await page.keyboard.up('KeyW'); }
@@ -45,7 +45,7 @@ try {
   await page.evaluate(() => document.exitPointerLock()); await page.waitForFunction(() => !document.pointerLockElement); await page.click('#orbit');
   console.log('PASS: extrusion, height policy, courtyard holes, skipped-building log, rebuild, walking and running collisions');
   await mkdir('.tmp/map-lab', { recursive: true }); await page.screenshot({ path: '.tmp/map-lab/osm-3d.png' });
-  await page.click('#walk'); await page.waitForFunction(() => document.pointerLockElement?.id === 'world'); await page.screenshot({ path: '.tmp/map-lab/osm-3d-walk.png' }); await page.evaluate(() => document.exitPointerLock()); await page.click('#orbit');
+  await page.evaluate(()=>window.__generator.world.walk({capture:false})); await page.locator('#world').click(); await page.waitForFunction(() => document.pointerLockElement?.id === 'world'); await page.screenshot({ path: '.tmp/map-lab/osm-3d-walk.png' }); await page.evaluate(() => document.exitPointerLock()); await page.click('#orbit');
   await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await page.screenshot({ path: '.tmp/map-lab/osm-3d-mobile.png' });
   assert.deepEqual(errors, []); console.log('PASS: desktop/mobile rendering; no page errors');
 } finally { await browser.close(); }

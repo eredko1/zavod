@@ -8,6 +8,9 @@ function fixture(supported=true,maxPending=8) {
 }
 assert.equal(distribution([]).p95,null); assert.equal(distribution([null,NaN]).samples,0); assert.equal(distribution([1,2,3,4,5]).p95,5);
 {
+  const {profiler:p,advance}=fixture();p.start();p.beginBuild();advance(100);advance(8);p.buildMark('mesh',8);advance(50);advance(4);p.buildMark('drape',4);p.endBuild();const r=await p.stop();assert.equal(r.builds[0].totalMs,12);assert.equal(r.builds[0].wallMs,162);assert.equal(r.builds[0].yieldMs,150,'paint waits never inflate measured build work');
+}
+{
   const {profiler:p,gl,advance}=fixture(), original=gl.texImage2D;
   p.start(); p.beginBuild({sources:9}); advance(8); p.buildMark('merge'); advance(4); p.buildMark('mesh'); p.endBuild();
   p.beginFrame('walk-turn'); p.measure('controls',()=>advance(2));
