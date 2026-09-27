@@ -94,8 +94,11 @@ export function buildGreens(world, M) {
     const out = d.outside, inn = d.inside, dir = new THREE.Vector3(out.x - inn.x, 0, out.z - inn.z).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x), yaw = Math.atan2(side.x, side.z) - Math.PI / 2;
     for (const sg of [-1, 1]) { const p = inn.clone().addScaledVector(dir, 4.5).addScaledVector(side, sg * 3.4); if (isLawn(p.x, p.z) && !blocked(p.x, p.z, 0.4)) bed(p.x, p.z, yaw); }
   }
+  // corner beds: where the lawn fences turn, a bed runs along the fence (housing.js records the spots)
   let edgeBeds = 0;
-  for (const [x, z] of cand) { if (edgeBeds >= 22) break; if (!isLawn(x, z) || blocked(x, z, 0.8)) continue;
+  for (const c of world.W?.fenceCorners || []) { if (edgeBeds >= 60) break; if (!isLawn(c.x, c.z) || blocked(c.x, c.z, 0.3) || flowers.some((f) => Math.hypot(f[0] - c.x, f[1] - c.z) < 4)) continue;
+    bed(c.x, c.z, c.yaw, 3.4, 1.0); edgeBeds++; }
+  for (const [x, z] of (world.W?.fenceCorners?.length ? [] : cand)) { if (edgeBeds >= 22) break; if (!isLawn(x, z) || blocked(x, z, 0.8)) continue;
     const edge = [[3, 0], [-3, 0], [0, 3], [0, -3]].find(([dx, dz]) => !isLawn(x + dx, z + dz) && !blocked(x + dx, z + dz, 0.2)); if (!edge) continue;
     if (placed.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + 3) || flowers.some((f) => Math.hypot(f[0] - x, f[1] - z) < 9)) continue;
     const yaw = Math.atan2(edge[0], edge[1]) + Math.PI / 2; bed(x - edge[0] * 0.35, z - edge[1] * 0.35, yaw, 4 + Math.random() * 2, 1.0); edgeBeds++;
