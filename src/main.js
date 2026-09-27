@@ -25,7 +25,7 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 const ctx = createCtx();
 // Phones: every image loader (textures, GLTF props, HDR stays) is redirected to the <=512px mirror in assets-m/ (see qa/build-mobile-assets.sh)
-if (ctx.isTouch && ctx.qs.get('fullassets') !== '1') THREE.DefaultLoadingManager.setURLModifier((url) => /\/assets\/.*\.(jpe?g|png)(\?.*)?$/i.test(url) ? url.replace('/assets/', '/assets-m/').replace(/\.png(\?.*)?$/i, '.jpg$1') : url);
+if (ctx.lite && ctx.qs.get('fullassets') !== '1') THREE.DefaultLoadingManager.setURLModifier((url) => /\/assets\/.*\.(jpe?g|png)(\?.*)?$/i.test(url) ? url.replace('/assets/', '/assets-m/').replace(/\.png(\?.*)?$/i, '.jpg$1') : url);
 window.__ctx = ctx;
 
 // ---------- renderer / scene / camera ----------

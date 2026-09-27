@@ -17,7 +17,7 @@ export function loadCarModels(ctx) {
   if (loading) return loading;
   const draco = new DRACOLoader(); draco.setDecoderPath('./vendor/three/examples/jsm/libs/draco/');
   const gl = new GLTFLoader(); gl.setDRACOLoader(draco);
-  const touch = !!ctx?.isTouch;
+  const touch = !!ctx?.lite;
   loading = Promise.all(Object.entries(SRC).map(async ([kind, s]) => {
     try {
       const g = await gl.loadAsync(s.url), scene = g.scene;

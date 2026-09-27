@@ -263,7 +263,7 @@ function outfitKey(o) { return [o.top, o.shirt | 0, o.bottom, o.shoes, o.skin, o
 function bakedMaterial(ctx, id, o) {
   const key = id + '|' + outfitKey(o); if (bakeCache.has(key)) return bakeCache.get(key);
   const pr = prepAvatar(id); const R = ctx?.renderer; if (!pr || !R) return null;
-  const K = bakeKit(), S = ctx.isTouch ? 512 : 1024, u = K.paint.uniforms;
+  const K = bakeKit(), S = ctx.lite ? 512 : 1024, u = K.paint.uniforms;
   const src = pr.material.map;
   u.uMap.value = src; u.uHasMap.value = src ? 1 : 0;
   u.uTop.value = { tee: 1, track: 2 }[o.top] || 0; u.uBottom.value = { jeans: 1, track: 2 }[o.bottom] || 0; u.uShoes.value = o.shoes === 'white' ? 1 : 0;
@@ -273,7 +273,7 @@ function bakedMaterial(ctx, id, o) {
   const mk = (filter) => { const t = new THREE.WebGLRenderTarget(S, S, { depthBuffer: false, minFilter: filter, magFilter: filter === THREE.NearestFilter ? THREE.NearestFilter : THREE.LinearFilter, generateMipmaps: false }); t.texture.colorSpace = THREE.SRGBColorSpace; return t; };
   const a = mk(THREE.NearestFilter), b = mk(THREE.NearestFilter);
   const out = new THREE.WebGLRenderTarget(S, S, { depthBuffer: false, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true });
-  out.texture.colorSpace = THREE.SRGBColorSpace; out.texture.anisotropy = ctx.isTouch ? 2 : 8; out.texture.flipY = false;
+  out.texture.colorSpace = THREE.SRGBColorSpace; out.texture.anisotropy = ctx.lite ? 2 : 8; out.texture.flipY = false;
   const prevRT = R.getRenderTarget(), prevAuto = R.autoClear, cc = R.getClearColor(new THREE.Color()), ca = R.getClearAlpha();
   const sc = new THREE.Scene(), m = new THREE.Mesh(pr.geo, K.paint); m.frustumCulled = false; sc.add(m);
   try {
@@ -380,7 +380,7 @@ const LOOKS = new Map();   // peer id -> character id (net 'look')
 export const looks = () => LOOKS;
 export function setRemoteChar(pid, id, ctx) {
   if (!CHARS[id] || LOOKS.get(pid) === id) return; LOOKS.set(pid, id);
-  for (const H of REMOTES) if (H.pid === pid && H.wrap) { const fig = buildChar(id, ctx); if (!fig) return; H.wrap.remove(H.fig.group); H.fig = fig; H.wrap.add(fig.group); fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.isTouch; }); }
+  for (const H of REMOTES) if (H.pid === pid && H.wrap) { const fig = buildChar(id, ctx); if (!fig) return; H.wrap.remove(H.fig.group); H.fig = fig; H.wrap.add(fig.group); fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.lite; }); }
 }
 function heroOutfit(pid, ctx) { return { top: 'tee', shirt: shirtOf(pid, ctx), bottom: 'jeans', shoes: 'keep', skin: SKIN_FAIR }; }
 /** swap the soldier look of a remote player for the hero (jeans + his own SOAD-style tee). Hitboxes / muzzle stay on the soldier rig. */
@@ -392,7 +392,7 @@ export function dressRemote(inst, pid, ctx) {
   inst.model?.traverse((o) => { if (o.isMesh && !/^hit_/.test(o.name)) { o.visible = false; o.castShadow = false; } });
   for (const m of inst.props || []) { if (m.name === 'rifle') { m.material = hideMat; m.castShadow = false; } else m.visible = false; }
   const wrap = new THREE.Group(); wrap.name = 'hero'; wrap.rotation.y = -(inst.inner?.rotation.y || 0); (inst.inner || inst.group).add(wrap); wrap.add(fig.group);
-  fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.isTouch; });
+  fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.lite; });
   const H = { fig, pid, wrap, shirt: shirtOf(pid, ctx), last: new THREE.Vector3(), sp: 0, first: true };
   inst.hero = H; REMOTES.add(H);
   const mix = inst.mixer, mu = mix ? mix.update.bind(mix) : null, wp = new THREE.Vector3();

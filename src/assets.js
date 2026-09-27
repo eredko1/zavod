@@ -41,7 +41,7 @@ export async function init(ctx) {
   const texLoader = new THREE.TextureLoader();
   const gltfLoader = new GLTFLoader();
   const hdrLoader = new RGBELoader();
-  const maxAniso = Math.min(ctx.isTouch ? 4 : 16, ctx.renderer?.capabilities?.getMaxAnisotropy?.() ?? 8);
+  const maxAniso = Math.min(ctx.lite ? 4 : 16, ctx.renderer?.capabilities?.getMaxAnisotropy?.() ?? 8);
   const cache = new Map();
   const models = new Map();
   let hdr = null;
@@ -123,7 +123,7 @@ export async function init(ctx) {
         if (o.isMesh) {
           o.castShadow = true; o.receiveShadow = true;
           const mats = Array.isArray(o.material) ? o.material : [o.material];
-          for (const m of mats) { for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (m[k]) { fit(m[k]); m[k].anisotropy = Math.min(maxAniso, ctx.isTouch ? 4 : 16); } m.envMapIntensity = 1; }
+          for (const m of mats) { for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (m[k]) { fit(m[k]); m[k].anisotropy = Math.min(maxAniso, ctx.lite ? 4 : 16); } m.envMapIntensity = 1; }
         }
       });
       models.set(id, g); tick(id); res(g);

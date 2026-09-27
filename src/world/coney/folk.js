@@ -46,7 +46,7 @@ export function buildFolk(world, spots, crowd) {
   const { ctx, W } = world;
   try { buildHustlers(world); } catch (e) { console.warn('[folk] hustlers', e); }   // the vendors come either way
   if (!peopleReady() || !crowd || !kit() || ctx.qs?.get?.('folk') === '0') return;   // ?folk=0: instanced crowd only (perf A/B)
-  const touch = !!ctx.isTouch;
+  const touch = !!ctx.lite;
   F = { world, ctx, crowd, spots: spots.filter((s) => s._refs).concat(subwaySpots(world)), active: new Set(), cache: [], tickT: 0, frame: 0, barkT: 0, mugT: ctx.mode === 'chill' ? 60 + Math.random() * 40 : 140 + Math.random() * 90,
     N: touch ? 10 : 30, R_ON: touch ? 26 : 42, CACHE: touch ? 14 : 44, robE: null, robPos: new THREE.Vector3(0, -999, 0), lastP: new THREE.Vector3(), pspeed: 0, stats: { barks: 0, muggers: 0, adopted: 0 } };
   W.sandAt = (x, z) => z > BW.z1;
@@ -296,7 +296,7 @@ function tick() {
   const fx = -Math.sin(me.yaw || 0) * Math.cos(me.pitch || 0), fz = -Math.cos(me.yaw || 0) * Math.cos(me.pitch || 0);
   for (const E of F.active) {
     const dx = E.pos.x - P.x, dz = E.pos.z - P.z, d = Math.hypot(dx, dz); E.barkT -= 0.25;
-    const cast = !ctx.isTouch && d < 18; if (cast !== E.cast) { E.cast = cast; for (const m of E.meshes) m.castShadow = cast; }   // shadow LOD
+    const cast = !ctx.lite && d < 18; if (cast !== E.cast) { E.cast = cast; for (const m of E.meshes) m.castShadow = cast; }   // shadow LOD
     if (E.dead) continue;
     if (aiming && d < 28 && d > 0.5 && (dx * fx + dz * fz) / d > 0.985) {   // a gun on them: hands up (and a mouthful)
       if (E.mode !== 'lie' && E.mode !== 'sit') { E.fig.hands = true; E.hands = 2.5; }

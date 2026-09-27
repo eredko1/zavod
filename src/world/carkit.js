@@ -177,7 +177,7 @@ export function carMaterials() {
   };
   MATS.lampW.emissive.setHex(0x8a9298); MATS.lampR.emissive.setHex(0x6a0808);
   MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x1c262c, roughness: 0.04, transparent: true, opacity: 0.62, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4 });   // driven cars: see who's inside
-  if (typeof navigator !== 'undefined' && (matchMedia?.('(pointer: coarse)')?.matches)) { for (const k of ['paint', 'glass', 'glassSee']) { const o = MATS[k]; const n = new THREE.MeshStandardMaterial({ color: o.color, roughness: o.roughness, metalness: o.metalness, transparent: o.transparent, opacity: o.opacity, depthWrite: o.depthWrite }); MATS[k] = n; } }   // phones: no clearcoat
+  if (typeof window !== 'undefined' && window.__zavodLite) { for (const k of ['paint', 'glass', 'glassSee']) { const o = MATS[k]; const n = new THREE.MeshStandardMaterial({ color: o.color, roughness: o.roughness, metalness: o.metalness, transparent: o.transparent, opacity: o.opacity, depthWrite: o.depthWrite }); MATS[k] = n; } }   // phones: no clearcoat
   for (const k in MATS) MATS[k].name = 'car_' + k;
   return MATS;
 }

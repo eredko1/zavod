@@ -30,7 +30,7 @@ export function buildChase(world) {
   const { ctx, W } = world;
   const towers = world.lunaTowers || [];
   const zones = towers.map(lobbyZone).filter(Boolean);
-  if (ctx.isTouch) { MAX_COPS = 5; MAX_CREW = 4; MAX_CARS = 4; }
+  if (ctx.lite) { MAX_COPS = 5; MAX_CREW = 4; MAX_CARS = 4; }
   // nav-only no-go: lobby floors vanish from the AI grid (players are unaffected)
   W.navBlockers = (W.navBlockers || []).concat(zones.map((z) => ({ min: z.min, max: z.max, test: (x, zz) => inZone(z, x, zz, 0.6) })));
   // shared with the wave AI (ai.js / netwaves.js): where is "indoors" for any player, and where may soldiers never step
