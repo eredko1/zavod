@@ -223,6 +223,7 @@ function makeHousingMats(world, M) {
   const fac = (map, normal, color = 0xffffff) => new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(1, 1), roughnessMap: T.rough, roughness: 1, metalness: 0, color, envMapIntensity: 0.55, emissiveMap: T.lit, emissive: 0xffffff, emissiveIntensity: 0 });
   reg('hBrickWin', fac(T.brick, T.normal, 0xe0d6d3), 'concrete');
   reg('hCreamWin', fac(T.cream, T.normal, 0xe2dbd0), 'concrete');
+  reg('hBaseWin', fac(T.cream, T.normal, 0xa9adb0), 'concrete');   // the light grey brick base (floors 1-3), as on the real towers
   reg('hBrickTop', fac(T.top, T.normal, 0xe0d6d3), 'concrete');
   reg('hBrickPlain', new THREE.MeshStandardMaterial({ map: T.plain, normalMap: T.normalPlain, color: 0xe0d6d3, roughness: 0.92, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
   reg('hCreamPlain', new THREE.MeshStandardMaterial({ map: T.cream, color: 0xe2dbd0, roughness: 0.85, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
@@ -397,6 +398,7 @@ function buildTower(L, parts, R, acs, m) {
     const V = (y) => uvMode === 'gal' ? y / ST : y / (ST * TILE_FLOORS);
     L.quad(key, P(f, l, yB, o), P(f, r, yB, o), P(f, r, yT, o), P(f, l, yT, o), [[U(l), V(yB)], [U(r), V(yB)], [U(r), V(yT)], [U(l), V(yT)]]);
   };
+  const BASE_TOP = 3 * ST, rectB = (key, f, aL, aR, yB, yT, o, bw) => { if (yB < BASE_TOP) rect('hBaseWin', f, aL, aR, yB, Math.min(yT, BASE_TOP), o, bw); if (yT > BASE_TOP) rect(key, f, aL, aR, Math.max(yB, BASE_TOP), yT, o, bw); };   // floors 1-3 in grey brick
   /** a quad perpendicular to the face at along-position a, spanning offsets o0..o1 (outward), facing `side` (+1 = +a) */
   const side = (key, f, a, o0, o1, yB, yT, sgn) => {
     const A = (o) => P(f, a, 0, o); const p0 = A(o0), p1 = A(o1);
@@ -484,15 +486,15 @@ function buildTower(L, parts, R, acs, m) {
         }
         const inStrip = strip && mid > Math.min(strip.a0, strip.a1) && mid < Math.max(strip.a0, strip.a1);
         if (inStrip) {
-          if (strip.y0 > yb) rect('hBrickWin', f, a, bnd, yb, strip.y0, 0, bw);
+          if (strip.y0 > yb) rectB('hBrickWin', f, a, bnd, yb, strip.y0, 0, bw);
           const c0 = Math.max(yb, strip.y0), c1 = Math.min(strip.y1, Hw);
           if (c1 > c0) {
-            rect('hCreamWin', f, a, bnd, c0, c1, 0.1, bw);
+            rectB('hCreamWin', f, a, bnd, c0, c1, 0.1, bw);
             if (Math.abs(a - Math.min(strip.a0, strip.a1)) < 1e-3) side('hCreamPlain', f, a, 0, 0.1, c0, c1, -1);
             if (Math.abs(bnd - Math.max(strip.a0, strip.a1)) < 1e-3) side('hCreamPlain', f, bnd, 0, 0.1, c0, c1, 1);
           }
           if (Hw > Math.max(yb, strip.y1)) rect('hBrickTop', f, a, bnd, Math.max(yb, strip.y1), Hw, 0, bw);
-        } else if (Hw > yb) rect('hBrickWin', f, a, bnd, yb, Hw, 0, bw);
+        } else if (Hw > yb) rectB('hBrickWin', f, a, bnd, yb, Hw, 0, bw);
         rect('hBrickPlain', f, a, bnd, Math.max(yb, Hw), Ht, 0, bw);
         // AC units under / in the windows of this run
         for (let k = 0; k < nb; k++) for (const w of WIN_AT) {

@@ -24,7 +24,7 @@ function pick(id) {
 function open() {
   if (S.root) return; try { document.exitPointerLock?.(); } catch {}
   const cur = myChar(), r = document.createElement('div'); r.className = 'cs-panel';
-  const blurb = { redko: '6\'0", long black hair, blue eyes, TOOL tee', arkasha: 'glasses, a Manhattan, never loses at durak', mcguinness: '5\'8", big afro, band tee, pints', feliks: '6\'0", long hair, rocker, mushrooms', elf: '5\'7", full three-stripe track suit', sasha: 'always takes, never beats' };
+  const blurb = { redko: 'long hair, TOOL tee, the new guy on the block', arkasha: 'glasses, a Manhattan, never loses at durak', mcguinness: 'big afro, band tee, pints of Guinness', feliks: 'long hair, rocker, engineer, mushrooms', elf: 'full three-stripe track suit, Jameson', sasha: 'always takes, never beats' };
   r.innerHTML = `<div class="cs-box"><h2>WHO ARE YOU?</h2><div class="cs-grid">${Object.entries(CHARS).map(([id, c]) => `<button data-c="${id}" class="${id === cur ? 'on' : ''}"><b>${c.name}</b><small>${blurb[id] || ''}</small></button>`).join('')}</div><button class="cs-x" data-c="">Close</button></div>`;
   r.addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (!b) return; b.dataset.c ? pick(b.dataset.c) : close(); });
   if (!document.getElementById('cs-css')) { const st = document.createElement('style'); st.id = 'cs-css'; st.textContent = CSS; document.head.appendChild(st); }
