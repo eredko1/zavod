@@ -122,6 +122,7 @@ function bindOnce(ctx) {
     if (!V || e.repeat || V.ctx.state !== 'playing' || V.dialog) return;
     if (e.code === 'KeyQ' && V.ctx.vehicles?.mounted?.spec?.car) { const p = V.ctx.vehicles.mounted.pos; horn(1); V.ctx.net?.send?.('horn', { p: [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); }
     if (e.code === 'KeyN') giveCash();
+    if (e.code === 'KeyJ') offerPistol();
     if (e.code === 'KeyP' && !V.ctx.vehicles?.mounted && !V.riding && !V.passenger && !V.piss) startPiss();
   });
   // START FRESH (pause menu): everyone in the room goes back to square one
@@ -136,6 +137,9 @@ function bindOnce(ctx) {
   });
   ctx.bus.on('net:piss', (m) => { if (!V || !Array.isArray(m.p)) return; puddle(new THREE.Vector3(m.p[0], m.p[1], m.p[2])); const me = V.ctx.player.position; if (Math.hypot(me.x - m.p[0], me.z - m.p[2]) < 25) V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Somebody'} is taking a leak. Classy.`, 1800); });
   ctx.bus.on('net:horn', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player.position; const d = Math.hypot(me.x - m.p[0], me.z - m.p[2]); if (d < 160) horn(Math.max(0.08, 1 - d / 160)); });
+  ctx.bus.on('net:gunoffer', (m) => onGunOffer(m));
+  ctx.bus.on('net:gunpaid', (m) => { if (!V || m?.to !== V.ctx.net?.id) return; api.earn(PISTOL_PRICE); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Your friend'} paid $${PISTOL_PRICE} for the ${String(m.g || 'pistol').toUpperCase()}`, 2200); });
+  ctx.bus.on('net:gunno', (m) => { if (V && m?.to === V.ctx.net?.id) V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'They'} passed on the pistol`, 1600); });
   ctx.bus.on('net:cash', (m) => {
     if (!V || !m || m.to !== V.ctx.net?.id || m.n !== CASH_GIFT) return;
     const peer = V.ctx.net?.peer?.(m.f), me = V.ctx.player;
@@ -425,6 +429,23 @@ let _ac = null;
 function horn(vol) {
   try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); const t = _ac.currentTime, g = _ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18 * vol, t + 0.02); g.gain.setValueAtTime(0.18 * vol, t + 0.42); g.gain.linearRampToValueAtTime(0, t + 0.5); g.connect(_ac.destination);
     for (const f of [415, 523]) { const o = _ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const lp = _ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800; o.connect(lp); lp.connect(g); o.start(t); o.stop(t + 0.52); } } catch {}
+}
+// J: sell a friend a pistol for $30 (you keep yours: street guys always have a spare). They get a dialog: buy or pass.
+const PISTOL = /^(m9|deagle|makarov|glock|pistol)/i, PISTOL_PRICE = 30;
+function offerPistol() {
+  const net = V.ctx.net; if (!net?.list || V.ctx.player.dead) return; const me = V.ctx.player.position; let best = null, bd = GIFT_RANGE + 1;
+  for (const id of net.list()) { const q = net.peer(id); if (!q?.pos || q.dead || q.afk) continue; const d = q.pos.distanceTo(me); if (d < bd) { bd = d; best = { id, name: q.name }; } }
+  const g = (V.ctx.weapons?.bag || []).find((x) => PISTOL.test(x));
+  if (!g) { V.ctx.hud?.toast?.('No pistol to sell', 1400); return; }
+  if (!best) { V.ctx.hud?.toast?.('Get next to a friend to sell a pistol (J)', 1600); return; }
+  net.send('gunoffer', { to: best.id, g, p: PISTOL_PRICE }); V.ctx.hud?.toast?.(`Offered ${best.name || 'your friend'} a ${g.toUpperCase()} for $${PISTOL_PRICE}`, 1800);
+}
+function onGunOffer(m) {
+  if (!V || !m || m.to !== V.ctx.net?.id || !PISTOL.test(String(m.g)) || m.p !== PISTOL_PRICE) return;
+  const who = V.ctx.net?.peer?.(m.f)?.name || 'A friend', g = String(m.g).slice(0, 12);
+  openDialog(who, { text: `${who}: "${g.toUpperCase()}, clean, full mag. Thirty bucks, bro."`, choices: [
+    { label: `Buy it — $${PISTOL_PRICE}`, go: () => { if (!api.pay(PISTOL_PRICE)) return { text: `${who}: "Thirty. Not twenty-nine."`, choices: [{ label: 'Later', go: null }] }; V.ctx.weapons?.collect?.(g, 21); V.ctx.net?.send?.('gunpaid', { to: m.f, g }); return { text: `${who}: "Pleasure. Keys 1-9, it's in your bag."`, choices: [{ label: 'Bet', go: null }] }; } },
+    { label: 'Pass', go: () => { V.ctx.net?.send?.('gunno', { to: m.f }); return null; } }] });
 }
 function giveCash() {
   const net = V.ctx.net; if (!net?.list || V.ctx.player.dead) return; const me = V.ctx.player.position; let best = null, bd = GIFT_RANGE;

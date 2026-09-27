@@ -398,7 +398,7 @@ export function dressRemote(inst, pid, ctx) {
   const tick = (dt) => {
     inst.group.getWorldPosition(wp);
     if (dt > 0) { const d = H.first ? 0 : Math.hypot(wp.x - H.last.x, wp.z - H.last.z) / dt; H.first = false; H.sp += (Math.min(d, 9) - H.sp) * Math.min(1, dt * 6); }
-    H.last.copy(wp); H.fig.update(dt, H.sp < 0.25 ? 0 : H.sp);
+    H.last.copy(wp); H.fig.update(dt, H.fig.mood === 'sit' || H.sp < 0.25 ? 0 : H.sp);   // seated in a car: no running legs
     const now = performance.now(); if (now - sigAt > 500) { sigAt = now; refreshShirts(ctx); }
   };
   if (mix) mix.update = (dt) => { const r = mu(dt); tick(dt); return r; };

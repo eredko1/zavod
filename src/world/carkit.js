@@ -139,6 +139,12 @@ export function carGeometries(kind = 'sedan') {
   };
 }
 
+function plateTex() {   // New York 'Excelsior' plate: gold with navy lettering
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#f1c83a'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#12264f'; g.fillRect(0, 0, 256, 26); g.fillRect(0, 110, 256, 18);
+  g.fillStyle = '#f1c83a'; g.font = 'bold 20px Arial'; g.textAlign = 'center'; g.fillText('NEW YORK', 128, 20); g.font = 'bold 13px Arial'; g.fillText('EXCELSIOR', 128, 124);
+  g.fillStyle = '#12264f'; g.font = 'bold 54px Arial'; const L = 'ABCDEFGHJKLMNPRSTUVWXYZ'; let s = ''; for (let i = 0; i < 3; i++) s += L[(Math.random() * L.length) | 0]; s += '-'; for (let i = 0; i < 4; i++) s += (Math.random() * 10) | 0; g.fillText(s, 128, 88);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 /** Default materials for the kit (maps may substitute their own). Paint is white so instanceColor tints it. */
 let MATS = null;
 export function carMaterials() {
@@ -151,8 +157,11 @@ export function carMaterials() {
     trim: new THREE.MeshStandardMaterial({ color: 0x121314, roughness: 0.6, metalness: 0.2 }),
     lampW: new THREE.MeshStandardMaterial({ color: 0xd9e0e4, roughness: 0.1, metalness: 0.3, emissive: 0x3a4044 }),
     lampR: new THREE.MeshStandardMaterial({ color: 0x8a0e0e, roughness: 0.2, emissive: 0x300404 }),
-    plate: new THREE.MeshStandardMaterial({ color: 0xe6e2d4, roughness: 0.5 }),
+    plate: new THREE.MeshStandardMaterial({ map: plateTex(), roughness: 0.45 }),
   };
+  MATS.lampW.emissive.setHex(0x8a9298); MATS.lampR.emissive.setHex(0x6a0808);
+  MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x1c262c, roughness: 0.04, transparent: true, opacity: 0.62, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4 });   // driven cars: see who's inside
+  if (typeof navigator !== 'undefined' && (matchMedia?.('(pointer: coarse)')?.matches)) { for (const k of ['paint', 'glass', 'glassSee']) { const o = MATS[k]; const n = new THREE.MeshStandardMaterial({ color: o.color, roughness: o.roughness, metalness: o.metalness, transparent: o.transparent, opacity: o.opacity, depthWrite: o.depthWrite }); MATS[k] = n; } }   // phones: no clearcoat
   for (const k in MATS) MATS[k].name = 'car_' + k;
   return MATS;
 }
@@ -228,12 +237,28 @@ export function carInterior(kind = 'sedan', geos = null) {
   for (const a of [0, Math.PI * 0.62, -Math.PI * 0.62]) { const sp = new THREE.BoxGeometry(0.02, 0.17, 0.03); sp.translate(0, -0.085, 0); add(sp, I.wheel, 0, 0, 0, a, 0, 0, wheel); }
   add(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12), I.wheel, 0.01, 0, 0, 0, 0, Math.PI / 2, wheel);
   add(new THREE.CylinderGeometry(0.035, 0.045, 0.34, 8), I.trim, 0.18, 0, 0, 0, 0, Math.PI / 2, col);
+  // rear bench (base + back), door cards with armrests both sides, sun visors, shifter, cup holders
+  { const rx = eye.x - 1.05; if (rx - 0.3 > K.rs[1]) { add(new THREE.BoxGeometry(0.5, 0.14, K.w * 0.78), I.seat, rx, K.clr + 0.3, 0); add(new THREE.BoxGeometry(0.12, 0.62, K.w * 0.78), I.seat, rx - 0.3, K.clr + 0.66, 0, 0, 0, 0.22); } }
+  for (const sz of [1, -1]) { const zc = sz * (HW - 0.09);
+    add(new THREE.BoxGeometry(1.9, 0.55, 0.05), I.door, eye.x - 0.35, K.clr + 0.55, zc);
+    add(new THREE.BoxGeometry(0.55, 0.06, 0.1), I.trim, eye.x - 0.05, K.clr + 0.66, zc - sz * 0.05);
+    add(new THREE.BoxGeometry(0.02, 0.16, 0.36), I.visor, wsTop - 0.12, K.roof - 0.09, sz * 0.42, 0, 0, 0.35); }
+  add(new THREE.CylinderGeometry(0.015, 0.02, 0.18, 8), I.trim, eye.x + 0.15, K.clr + 0.55, 0);
+  add(new THREE.SphereGeometry(0.035, 10, 8), I.chrome, eye.x + 0.15, K.clr + 0.65, 0);
+  for (const dz of [-0.06, 0.06]) add(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12), I.dash, eye.x - 0.1, K.clr + 0.47, dz);
   // rear-view mirror
   add(new THREE.BoxGeometry(0.03, 0.07, 0.24), I.trim, wsTop - 0.04, K.roof - 0.12, 0);
   add(new THREE.BoxGeometry(0.004, 0.055, 0.22), I.mirror, wsTop - 0.058, K.roof - 0.12, 0);
   return { group: g, wheel };
 }
 let IMATS = null;
+function gaugeTex() {   // speedo + tach dials, lit orange needles
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#050505'; g.fillRect(0, 0, 256, 64);
+  for (const cx of [64, 192]) { g.strokeStyle = '#d8d2c4'; g.lineWidth = 2; g.beginPath(); g.arc(cx, 34, 26, Math.PI * 0.8, Math.PI * 2.2); g.stroke();
+    for (let i = 0; i <= 10; i++) { const a = Math.PI * 0.8 + i / 10 * Math.PI * 1.4; g.beginPath(); g.moveTo(cx + Math.cos(a) * 20, 34 + Math.sin(a) * 20); g.lineTo(cx + Math.cos(a) * 26, 34 + Math.sin(a) * 26); g.stroke(); }
+    g.strokeStyle = '#ff7a1a'; g.lineWidth = 3; const a = Math.PI * (cx < 128 ? 1.2 : 1.05); g.beginPath(); g.moveTo(cx, 34); g.lineTo(cx + Math.cos(a) * 22, 34 + Math.sin(a) * 22); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 function interiorMats() {
   if (IMATS) return IMATS;
   IMATS = {
@@ -241,9 +266,10 @@ function interiorMats() {
     glassIn: new THREE.MeshPhysicalMaterial({ color: 0x8fa3ad, roughness: 0.05, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.BackSide, envMapIntensity: 0.6 }),
     dash: new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.8 }),
     trim: new THREE.MeshStandardMaterial({ color: 0x151618, roughness: 0.55, metalness: 0.2 }),
-    seat: new THREE.MeshStandardMaterial({ color: 0x2b2926, roughness: 0.95 }),
+    seat: new THREE.MeshStandardMaterial({ color: 0x3b3029, roughness: 0.8 }),   // worn brown leather
     wheel: new THREE.MeshStandardMaterial({ color: 0x101112, roughness: 0.5 }),
-    gauge: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0xff9a3a, emissiveIntensity: 0.22, roughness: 0.4 }),
+    gauge: (() => { const t = gaugeTex(); return new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.35, roughness: 0.4 }); })(),
+    door: new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.85 }), visor: new THREE.MeshStandardMaterial({ color: 0x8a847a, roughness: 0.95 }), chrome: new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.15, metalness: 1 }),
     screen: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0x2a5f9a, emissiveIntensity: 0.25, roughness: 0.3 }),
     mirror: new THREE.MeshStandardMaterial({ color: 0xaab4bc, roughness: 0.05, metalness: 1 }),
   };

@@ -47,7 +47,7 @@
 // Public brokers are shared and unauthenticated: rooms are not private and a modified client could lie. Fine for casual play.
 import * as THREE from 'three';
 import { createInstance } from './ai/model.js';
-import { carGeometries, carMaterials, CAR_KINDS } from './world/carkit.js';
+import { carGeometries, carMaterials, carInterior, carEye, CAR_KINDS } from './world/carkit.js';
 import { buildBike } from './vehicles/bike.js';
 import { buildJetski } from './vehicles/jetski.js';
 import * as UI from './netui.js';
@@ -125,7 +125,7 @@ function api() {
     get peers() { return S.peers.size; }, get connected() { return anyUp(); }, get room() { return S.room; }, get name() { return S.name; }, get id() { return S.id; },
     hit: (peer, dmg, hs) => { const p = S.peers.get(peer); if (!p || p.dead || p.afk) return; send({ t: 'hit', to: peer, dmg: Math.max(0, Math.min(250, dmg | 0)), hs: !!hs }); },
     scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
-    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'dk', 'folk'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
+    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'gunoffer', 'gunpaid', 'dk', 'folk'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
     qaPeers: () => [...S.peers.values()].map((p) => ({ veh: p.veh?.k || null, riderVisible: !!p.inst.group.visible, y: +p.inst.group.position.y.toFixed(2) })),
     peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk } : null; },
     list: () => [...S.peers.keys()],
@@ -518,8 +518,10 @@ function renderPeer(p, now, rdt, ctx) {
     if (cur.v?.k === 'bike' || ski) {   // a bike / jet-ski rider stays visible, sat astride and facing the way it goes (was hidden: "invisible riders")
       g.visible = true; g.position.set(x, y + (ski ? 0.3 : 0.28), z); g.rotation.set(0, yaw + Math.PI, 0);
       if (A_) { A_.Idle?.setEffectiveWeight(1); A_.Walk?.setEffectiveWeight(0); A_.Run?.setEffectiveWeight(0); }
+    } else if (p.inst.hero) {   // a friend driving: sat in the driver's seat, visible through the glass
+      const e = carEye(cur.v?.k || 'sedan'); _seat.set(e.z, 0.08, -(e.x - 0.2)).applyAxisAngle(_up, yaw); g.visible = true; g.position.set(x + _seat.x, y + _seat.y, z + _seat.z); g.rotation.set(0, yaw + Math.PI, 0); p.inst.hero.fig.mood = 'sit';
     } else g.visible = false;
-  } else g.visible = true;
+  } else { g.visible = true; if (p.inst.hero) p.inst.hero.fig.mood = nearCar(g.position) ? 'sit' : null; }
   setTag(p);
   p.tag.visible = !p.dead;
   if (p.vehObj) p.tag.position.set(x, y + 2.1, z); else p.tag.position.set(g.position.x, g.position.y + (crouch ? 1.8 : 2.25), g.position.z);
@@ -545,12 +547,16 @@ export function netInfo() { return S ? { room: S.room, name: S.name, map: S.map,
 
 // ---------- remote vehicles (cars from the car kit, bikes from the bike kit) ----------
 const _carGeo = new Map();
+const _seat = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+/** a passenger rides in someone's car: their snapshots put them in the seat, so sit them down if a car is right there */
+function nearCar(pos) { const m = S.ctx.vehicles?.mounted; if (m?.spec?.car && m.pos.distanceTo(pos) < 1.6) return true; for (const q of S.peers.values()) if (q.vehObj && q.veh?.k !== 'bike' && q.veh?.k !== 'jetski' && q.vehObj.position.distanceTo(pos) < 1.6) return true; return false; }
 function remoteVehicle(ctx, v) {
   const grp = new THREE.Group();
   if (v.k === 'bike') { try { const b = buildBike(ctx); grp.add(b.group); } catch {} return grp; }
   if (v.k === 'jetski') { try { const b = buildJetski(ctx, v.c || null); grp.add(b.group); } catch {} return grp; }
   const G = _carGeo.get(v.k) || (_carGeo.set(v.k, carGeometries(v.k).geos), _carGeo.get(v.k)); const CM = carMaterials();
   const paint = CM.paint.clone(); paint.color = new THREE.Color(v.c || 0x22305c);
-  for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : CM[slot]); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; grp.add(m); }
+  for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : slot === 'glass' ? (CM.glassSee || CM.glass) : CM[slot]); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; grp.add(m); }
+  try { const cab = carInterior(v.k, G); cab.group.rotation.y = Math.PI / 2; grp.add(cab.group); } catch {}
   return grp;
 }
