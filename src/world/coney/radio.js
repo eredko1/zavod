@@ -9,6 +9,7 @@ const TRACKS = [
   { src: './assets/audio/radio/gopnik-disneyland.mp3', title: 'Гопник-Диснейленд' },
   { src: './assets/audio/radio/burbon-bratva-gudzon.mp3', title: 'Бурбон, братва, Гудзон' },
   { src: './assets/audio/radio/olya-angliyskaya.mp3', title: 'Оля английская' },
+  { src: './assets/audio/radio/burbon-bratva-gudzon-2.mp3', title: 'Бурбон, братва, Гудзон (версия 2)' },
 ];
 
 export function buildRadio(world) {
