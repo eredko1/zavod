@@ -19,6 +19,7 @@ const CSS = `
 #touch .crouch{right:calc(env(safe-area-inset-right,0px) + 150px);bottom:calc(env(safe-area-inset-bottom,0px) + 156px);width:60px;height:60px}
 #touch .reload{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:56px;height:56px;font-size:12px}
 #touch .swap{right:calc(env(safe-area-inset-right,0px) + 112px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:52px;height:52px;font-size:11px}
+#touch.melee .ads,#touch.melee .reload,#touch.melee .zoom,#touch.melee .nade,#touch.melee .fireL,#touch.portrait .fireL,#touch.nozoom .zoom{display:none}   /* only what you can use: a knife needs SLASH, not aim / reload / zoom / nade */
 #touch .zoom{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 164px);width:54px;height:54px;font-size:11px}
 #touch .nade{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 100px);width:54px;height:54px;font-size:11px}
 #touch .pause{right:calc(env(safe-area-inset-right,0px) + 16px);top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:30px;border-radius:6px;font-size:12px}
@@ -116,10 +117,13 @@ export function update(dt, ctx) {
   if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { S.clearFire(); S.setAds?.(false); } }
   // fire buttons say what they do (the left one is a second trigger for the left thumb)
   const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? 'SLASH' : 'FIRE';
+  { const pistol = (ctx.weapons?.current?.spec?.slot ?? 0) === 1 || /m9|deagle|makarov|glock/i.test(ctx.weapons?.currentId || ''), portrait = innerHeight > innerWidth;   // declutter: ZOOM only with a long gun, one trigger in portrait
+    S.root.classList.toggle('melee', melee); S.root.classList.toggle('portrait', portrait); S.root.classList.toggle('nozoom', melee || pistol); }
   if (ft !== S.fireTxt) { S.fireTxt = ft; S.root.querySelector('.fire').textContent = ft; S.root.querySelector('.fireL').textContent = ft; }
   // contextual action button: weapon pickup or motorcycle mount/dismount; a map may name its own F action (ctx.actionLabel: BOARD F / GET OFF)
   const pk = ctx.ai?.nearPickup, bike = ctx.vehicles?.nearBike, mounted = ctx.vehicles?.mounted || ctx.player?.mounted;
   const label = ctx.actionLabel ? ctx.actionLabel : mounted?.train ? null : mounted ? 'GET OFF' : pk ? `TAKE ${(pk.id || 'GUN').toUpperCase().replace('AK74', 'AK')}` : bike ? 'RIDE' : null;
-  if (label !== S.actLabel) { S.actLabel = label; S.act.textContent = label || ''; S.act.classList.toggle('show', !!label && ctx.state === 'playing'); }
+  if (label !== S.actLabel) { S.actLabel = label; { const hp = document.querySelector('#hud .prompt'); if (hp) hp.style.visibility = label ? 'hidden' : ''; }   // the big button says it: no duplicate prompt
+    S.act.textContent = label || ''; S.act.classList.toggle('show', !!label && ctx.state === 'playing'); }
 }
 export function reset(ctx) { if (S) { S.clearFire(); if (S.setAds) S.setAds(false); else ctx.input.touch.ads = false; } }
