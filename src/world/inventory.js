@@ -3,7 +3,7 @@
 // used (same as B, but the one you pick) or dropped. Mounted by hangkit.buildKit on every hangout map. Owned by: main.
 import { ITEMS } from './hangkit.js';
 
-const CATS = [['smoke', 'Smokes'], ['tool', 'Lighters'], ['booze', 'Booze'], ['drink', 'Drinks'], ['food', 'Food'], ['loot', 'Loot'], ['misc', 'Other']];
+const CATS = [['smoke', 'Smokes'], ['tool', 'Lighters'], ['booze', 'Booze'], ['drink', 'Drinks'], ['food', 'Food'], ['loot', 'Loot'], ['trip', 'Trips'], ['misc', 'Other']];
 let I = null;
 
 export function mountInventory(ctx, K) {
