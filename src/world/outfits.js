@@ -363,17 +363,17 @@ const REMOTES = new Set();
 let sigAt = 0, sig = '';
 /** playable looks (chill-mode picker; everyone online sees your pick) — the table crew plus REDKO, the default hero */
 export const CHARS = {
-  redko: { name: 'REDKO', avatar: 'm02', h: 1.83, wide: 1.07, hair: 0x0c0a09, outfit: { top: 'tee', shirt: 8, bottom: 'jeans', skin: 0xe7bda0 } },
-  arkasha: { name: 'ARKASHA', avatar: 'm02', h: 1.80, glasses: 'clear' },
+  redko: { name: 'REDKO', avatar: 'm02', h: 1.83, wide: 1.07, outfit: { top: 'tee', shirt: 8, bottom: 'jeans', skin: 0xe7bda0 } },
+  arkasha: { name: 'ARKASHA', avatar: 'm02', h: 1.80, glasses: 'clear', glassesY: 0.035 },
   mcguinness: { name: 'McGUINNESS', avatar: 'm12', h: 1.73, wx: 1.22, wz: 1.18, afro: true, outfit: { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 } },
   feliks: { name: 'FELIKS', avatar: 'm20', h: 1.83, hair: 0x2b1d14, outfit: { top: 'tee', shirt: 6, bottom: 'jeans' } },
-  elf: { name: 'THE ELF', avatar: 'm10', h: 1.70, outfit: { top: 'track', bottom: 'track', shoes: 'white' } },
+  elf: { name: 'THE ELF', avatar: 'm10', h: 1.70, knife: true, outfit: { top: 'track', bottom: 'track', shoes: 'white' } },
   sasha: { name: 'SASHA', avatar: 'm17', h: 1.78 },
 };
 export function buildChar(id, ctx) {
-  const C = CHARS[id] || CHARS.redko; const fig = buildPerson({ avatar: C.avatar, seed: 11, glasses: C.glasses }); if (!fig) return null;
+  const C = CHARS[id] || CHARS.redko; const fig = buildPerson({ avatar: C.avatar, seed: 11, glasses: C.glasses, glassesY: C.glassesY }); if (!fig) return null;
   standTall(fig, C.h); if (C.wide) { fig.group.scale.x *= C.wide; fig.group.scale.z *= C.wide; } if (C.wx) { fig.group.scale.x *= C.wx; fig.group.scale.z *= C.wz; }
-  if (C.afro) addAfro(fig); if (C.hair) addLongHair(fig, { color: C.hair }); if (C.outfit) dressFigure(fig, ctx, C.outfit);
+  if (C.afro) addAfro(fig); if (C.hair) addLongHair(fig, { color: C.hair }); if (C.knife) addKnife(fig); if (C.outfit) dressFigure(fig, ctx, C.outfit);
   return fig;
 }
 const LOOKS = new Map();   // peer id -> character id (net 'look')
@@ -442,4 +442,18 @@ export function addLongHair(fig, { color = 0x2b1d14 } = {}) {
   for (const s of [-1, 1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.1), m); side.position.set(s * 0.112, -0.13, -0.035); side.rotation.z = s * 0.08; g.add(side); }
   for (const o of [cap, back]) { o.castShadow = true; g.add(o); }
   fig.head.add(g); return g;
+}
+
+/** a long knife in the right hand (THE ELF never puts it down) */
+export function addKnife(fig, { len = 0.34 } = {}) {
+  if (!fig?.handR) return null;
+  fig.group.updateWorldMatrix(true, true); const hs = fig.handR.getWorldScale(new THREE.Vector3()).x / (fig.group.getWorldScale(new THREE.Vector3()).x || 1);
+  const g = new THREE.Group(); g.name = 'knife'; g.scale.setScalar(1 / (hs || 1));
+  const steel = new THREE.MeshStandardMaterial({ color: 0xd8dde2, metalness: 1, roughness: 0.22 }), grip = new THREE.MeshStandardMaterial({ color: 0x1a1512, roughness: 0.7 });
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.017, 0.12, 10), grip); handle.position.y = -0.02;
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.022), steel); guard.position.y = 0.045;
+  const bladeG = new THREE.BoxGeometry(0.034, len, 0.004); bladeG.translate(0, len / 2 + 0.05, 0); { const P = bladeG.attributes.position; for (let i = 0; i < P.count; i++) { const y = P.getY(i); if (y > len * 0.8 + 0.05) P.setX(i, P.getX(i) * (1 - (y - len * 0.8 - 0.05) / (len * 0.2)) + 0.008); } bladeG.computeVertexNormals(); }
+  const blade = new THREE.Mesh(bladeG, steel);
+  for (const o of [handle, guard, blade]) { o.castShadow = true; g.add(o); }
+  g.rotation.set(Math.PI / 2, 0, 0); fig.handR.add(g); return g;
 }

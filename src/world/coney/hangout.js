@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
 import { buildDeli, sammyTalk, fadeNear, nameTag } from '../deli.js';
 import { buildPerson, peopleReady } from '../people.js';
-import { dressFigure, standTall, addAfro, addLongHair } from '../outfits.js';
+import { dressFigure, standTall, addAfro, addLongHair, addKnife } from '../outfits.js';
 import { buildLocals, sammyLotion } from './locals.js';
 import { buildChill, buildCrews, gunShop } from './chill.js';
 import { buildJobs, jobsTalk, startIce, finishIce } from './jobs.js';
@@ -62,6 +62,7 @@ export function buildHangout(world, M) {
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
   try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }
   try { redkoAtTablePark(world); } catch (e) { console.warn('[hangout] redko', e); }
+  try { crewTalk(world); } catch (e) { console.warn('[hangout] crew talk', e); }
   { let tries = 0; const t = setInterval(() => { if (world.W.babFigs?.length || ++tries > 60) { clearInterval(t); try { babushkas(world); } catch (e) { console.warn('[hangout] babushkas', e); } } }, 250); }   // greens.js seats them later in the build   // the bench grannies (greens.js seats them)   // ARKASHA's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
@@ -341,19 +342,31 @@ function setDoor(D, open, send) {
 
 // ---- ARKASHA's card table: a little paved park off building 1's lobby, a stone table, two stools; durak on F ----
 const B1 = new THREE.Vector3(137, 0, -293);   // Luna Park Houses building 1 (the tower south of building 2)
+// what the crew talks about: cool nerds — geopolitics, music, NYC, history, tech
+const MIND = {
+  redko: ['REDKO: «The Cyclone opened in 1927. Still wood, still terrifying. That\'s engineering.»', 'REDKO: «"Lateralus" is built on Fibonacci — the syllables go 1, 1, 2, 3, 5, 8. Tool are math nerds with distortion.»', 'REDKO: «Robert Moses built half this city and bulldozed the other half. These towers are his kind of project.»', 'REDKO: «Everyone\'s scared of AI. I\'m scared of the G train on a weekend.»', 'REDKO: «SOAD put Armenian genocide recognition on a platinum record. Metal can do more than yell.»'],
+  arkasha: ['ARKASHA: «Durak is geopolitics. Hold your trumps, let him overextend, then transfer the whole war back.»', 'ARKASHA: «Brighton was Little Odessa before anyone here could find Odessa on a map.»', 'ARKASHA: «Bretton Woods, 1944. Everything since then is footnotes, my friend.»', 'ARKASHA: «The Manhattan: Manhattan Club, 1870s. Rye or bourbon, vermouth, bitters. Anything else is propaganda.»', 'ARKASHA: «Every empire thinks it is the exception. That is how you know it is not.»'],
+  mcguinness: ['McGUINNESS: «Coltrane cut "A Love Supreme" in one day. In Jersey. One day, lads.»', 'McGUINNESS: «The Ramones played CBGB for rent money. Now it\'s a boutique. That\'s New York in one sentence.»', 'McGUINNESS: «The Irish dug the subway, the Russians run the boardwalk, and everyone drinks at the same bar.»', 'McGUINNESS: «Hip-hop was born at a rec room party in the Bronx, 1973. Best block party in history.»'],
+  feliks: ['FELIKS: «This whole map is OpenStreetMap plus nine city datasets. Every footprint you walk past is real.»', 'FELIKS: «Rust or Go? Wrong question. What are you shipping?»', 'FELIKS: «The Culver line\'s been running to Coney since the 1870s — steam dummies first, then the el.»', 'FELIKS: «Mycelium did mesh networking a billion years before we did.»', 'FELIKS: «Latency is a moral issue. Fifty milliseconds and your friends think you\'re lying.»'],
+  elf: ['THE ELF: «Adidas and Puma — two brothers, one town, never spoke again. Pick a side. I did.»', 'THE ELF: «Jameson, 1780. Older than the Constitution. Show some respect.»', 'THE ELF: «Three stripes because Dassler bought them off a Finnish brand for two bottles of whisky. True story. Mostly.»', 'THE ELF: «Coney had three amusement parks by 1904. Luna Park had a million electric bulbs. We have one lamp. It flickers.»'],
+  sasha: ['SASHA: «I read the whole Wikipedia page on durak. Still lose. Theory versus practice, brother.»', 'SASHA: «Nathan\'s opened in 1916 with a nickel hot dog. Inflation is the real war.»', 'SASHA: «Crypto? I bought the top. Twice. At least I\'m consistent.»', 'SASHA: «Whoever controls the Bosphorus controls the chessboard. Arkasha taught me that. Then he beat me.»'],
+};
+function mindChoice(id) { return { label: 'What\'s on your mind?', go: () => ({ text: MIND[id][(Math.random() * MIND[id].length) | 0], choices: [{ label: 'Ha — true', go: null }, { label: 'Tell me another', go: () => mindChoice(id).go() }] }) }; }
+function crewTalk(world) { for (const [id, e] of Object.entries(world.W.crew || {})) { if (!e?.talk || !MIND[id] || e._mind) continue; e._mind = true; const orig = e.talk; e.talk = (Kk, again) => { const n = orig(Kk, again); if (n?.choices) n.choices.splice(Math.max(0, n.choices.length - 1), 0, mindChoice(id)); return n; }; } }
 // REDKO hangs at Table Park with a cigarette; when you're around, the crew bullshits back and forth
+const BS_EXTRA = () => Object.values(MIND).flat();
 const BS = ['REDKO: «Короче, я вчера на Белте — сто сорок, и тут мент.»', 'SASHA: «Сто сорок на твоей тачке? Она сорок не едет.»', 'McGUINNESS: «Lads, who took my last Guinness?»', 'FELIKS: «I merged nine data sources into one map. For this. For us.»', 'THE ELF: «Джеймисон кончился. Это заговор.»', 'ARKASHA: «Кто на интерес? Бурбон, братва, Гудзон.»', 'REDKO: «Дай прикурить. …Не эту, нормальную.»', 'SASHA: «В этот раз я его обыграю. Точно.»', 'FELIKS: «Relax. The ground is supposed to breathe.»', 'REDKO: «Tool в Барклайс — лучший концерт в жизни, отвечаю.»', 'McGUINNESS: «Your round, Sasha.»', 'THE ELF: «Кто-то видел мою шапку? …Ладно, без шапки.»'];
 function redkoAtTablePark(world) {
   const P = H.park; if (!P || !peopleReady()) return; const ctx = world.ctx;
-  const fig = buildPerson({ avatar: 'm02', seed: 21 }); standTall(fig, 1.83); addLongHair(fig, { color: 0x0c0a09 }); dressFigure(fig, ctx, { top: 'tee', shirt: 8, bottom: 'jeans' });
+  const fig = buildPerson({ avatar: 'm02', seed: 21 }); standTall(fig, 1.83); dressFigure(fig, ctx, { top: 'tee', shirt: 8, bottom: 'jeans' });
   const pos = new THREE.Vector3(2.2, 0, -1.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.yaw).add(P.pos).setY(0); fig.group.position.copy(pos); fig.group.rotation.y = P.yaw + 2.4; world.scene.add(fig.group);
   world.updaters.push((dt) => fig.update(dt, 0)); fig.mood = 'talk';
   K.vendor({ name: 'REDKO', pos, r: 2.4, fig, talk: (Kk, again) => ({ text: again ? BS[(Math.random() * BS.length) | 0] : 'REDKO: «О, здорово. Сигаретку будешь? Мы тут по кругу.»',
     choices: [{ label: 'Давай сигарету 🚬', go: () => (K.full() ? { text: 'REDKO: «Руки заняты, брат.»', choices: [{ label: 'Ok', go: null }] } : (K.give('cigs'), { text: 'REDKO: «Держи пачку. B — закурить. Передавай по кругу.»', choices: [{ label: 'Спасибо', go: null }] })) },
       { label: 'Что обсуждаете?', go: () => ({ text: BS[(Math.random() * BS.length) | 0], choices: [{ label: 'Ха', go: null }] }) }, { label: 'Later', go: null }] }) });
   let puffT = 3, bsT = 6;
-  K.onUpdate((dt) => { const me = ctx.player?.position; if (!me) return; puffT -= dt; if (puffT < 0) { puffT = 4 + Math.random() * 5; try { K.puff?.(pos.clone().setY(1.7)); } catch {} }
-    const d = Math.hypot(me.x - P.pos.x, me.z - P.pos.z); bsT -= dt; if (d < 14 && bsT < 0) { bsT = 9 + Math.random() * 8; ctx.hud?.toast?.(BS[(Math.random() * BS.length) | 0], 3200); } });
+  K.onUpdate((dt) => { const me = ctx.player?.position; if (!me) return; puffT -= dt; if (puffT < 0) { puffT = 2.5 + Math.random() * 3; const crew = [pos, ...Object.values(world.W.crew || {}).filter((e) => e && !e.off && e.pos).map((e) => e.pos)]; const who = crew[(Math.random() * crew.length) | 0]; try { K.puff?.(who.clone().setY(1.65)); } catch {} }   // everyone's passing the pack round
+    const d = Math.hypot(me.x - P.pos.x, me.z - P.pos.z); bsT -= dt; if (d < 14 && bsT < 0) { bsT = 9 + Math.random() * 8; const all = BS.concat(BS_EXTRA()); ctx.hud?.toast?.(all[(Math.random() * all.length) | 0], 3600); } });
 }
 // the babushkas on the path benches: named, they gossip, sell seeds, and know everybody's business
 const BAB_NAMES = ['БАБА ЗИНА', 'БАБА ГАЛЯ', 'БАБА ЛЮДА', 'БАБА ВАЛЯ', 'БАБА НИНА', 'БАБА ТОМА', 'БАБА РАЯ', 'БАБА ФИРА', 'БАБА СОНЯ'];
@@ -397,7 +410,7 @@ function buildDurakPark() {
   g.updateMatrixWorld(true);
   { const w = c; world.box([w.x - 0.55, 0, w.z - 0.55], [w.x + 0.55, 0.8, w.z + 0.55]); }
   // ARKASHA: late 30s, black hair, blue eyes, glasses — on the far stool, facing the table
-  const pf = buildPerson({ avatar: 'm02', pose: 'sit', glasses: 'clear', seed: 2 }); g.add(pf.group); pf.group.position.set(0, 0, -1.05); pf.group.rotation.y = 0;
+  const pf = buildPerson({ avatar: 'm02', pose: 'sit', glasses: 'clear', glassesY: 0.035, seed: 2 }); g.add(pf.group); pf.group.position.set(0, 0, -1.05); pf.group.rotation.y = 0;
   world.updaters.push((dt) => pf.update(dt, 0));
   // his Manhattan (a coupe of amber rye with a cherry) on the table, and a lit spliff between his fingers
   { const glass = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.3, depthWrite: false });   // NOT transmission: that re-renders the whole scene every frame
@@ -476,7 +489,7 @@ function tableRegulars(g, c) {
     choices: [{ label: '«За тебя!» — давай пинту', go: () => (K.full() ? { text: 'McGUINNESS: "Finish what you\'re holding first."', choices: [{ label: 'Sláinte', go: null }] } : (K.give('guinness'), { text: 'McGUINNESS: "Sláinte! B to drink — and share it, it\'s rude not to."', choices: [{ label: 'Sláinte', go: null }] })) },
       { label: '«За тебя, но я-то пас»', go: { text: 'McGUINNESS: "Ah, a bourbon man. Suit yourself."', choices: [{ label: 'Later', go: null }] } }] }) });
   // THE ELF: 5'7" Russian/Ukrainian, white, dark hair, brown eyes, in a full three-stripe track suit, no hat — Jameson, and a spliff rolled like a magic scroll
-  const elf = buildPerson({ avatar: 'm10', seed: 9 }); standTall(elf, 1.70); dressFigure(elf, H.ctx, { top: 'track', bottom: 'track', shoes: 'white' }); put(elf, 2.6, 2.3, -2.4);   // 5'7", full three-stripe track suit
+  const elf = buildPerson({ avatar: 'm10', seed: 9 }); standTall(elf, 1.70); dressFigure(elf, H.ctx, { top: 'track', bottom: 'track', shoes: 'white' }); addKnife(elf); put(elf, 2.6, 2.3, -2.4);   // 5'7", full three-stripe track suit
   (H.world.W.crew || (H.world.W.crew = {})).elf = K.vendor({ name: 'THE ELF', pos: wpos(2.6, 2.3), r: 2.4, fig: elf, talk: (Kk, again) => ({
     text: again ? 'THE ELF: "Ещё фокус?" *шуршит бумагой*' : 'THE ELF: "Jameson? Или… фокус? Я сворачиваю бумажный свиток — и готово. Заклинаний не надо."',
     choices: [{ label: 'Jameson', go: () => (K.full() ? { text: 'THE ELF: "Руки заняты."', choices: [{ label: '…', go: null }] } : (K.give('jameson'), { text: 'THE ELF: "Sláinte по-эльфийски. B — выпить."', choices: [{ label: 'За тебя', go: null }] })) },

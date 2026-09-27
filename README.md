@@ -32,3 +32,6 @@ Query params: `?map=`, `?primary=&secondary=`, `?quality=ultra|high|medium|low`,
 - Mobile assets: `qa/build-mobile-assets.sh` regenerates the 512 px mirror in `assets-m/`.
 
 Assets: Poly Haven (CC0), three.js example soldier, Microsoft Rocketbox avatars + animations (MIT, converted to GLB), Barlow (OFL). Non-commercial tech demo.
+
+## Credits
+- Ferrari 458 Italia model by [vicent091036](https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6), CC-BY 4.0, via the three.js examples (`assets/models/cars/ferrari.glb`).

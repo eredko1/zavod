@@ -48,6 +48,7 @@
 import * as THREE from 'three';
 import { createInstance } from './ai/model.js';
 import { carGeometries, carMaterials, carInterior, carEye, CAR_KINDS } from './world/carkit.js';
+import { hasCarModel, carModel } from './world/carmodels.js';
 import { buildBike } from './vehicles/bike.js';
 import { buildJetski } from './vehicles/jetski.js';
 import * as UI from './netui.js';
@@ -554,6 +555,7 @@ function remoteVehicle(ctx, v) {
   const grp = new THREE.Group();
   if (v.k === 'bike') { try { const b = buildBike(ctx); grp.add(b.group); } catch {} return grp; }
   if (v.k === 'jetski') { try { const b = buildJetski(ctx, v.c || null); grp.add(b.group); } catch {} return grp; }
+  if (hasCarModel(v.k)) { const m = carModel(v.k, v.c || 0xb01010); if (m) { m.rotation.y = Math.PI / 2; grp.add(m); return grp; } }
   const G = _carGeo.get(v.k) || (_carGeo.set(v.k, carGeometries(v.k).geos), _carGeo.get(v.k)); const CM = carMaterials();
   const paint = CM.paint.clone(); paint.color = new THREE.Color(v.c || 0x22305c);
   for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : slot === 'glass' ? (CM.glassSee || CM.glass) : CM[slot]); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; grp.add(m); }
