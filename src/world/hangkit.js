@@ -50,6 +50,7 @@ export function buildKit(world, o = {}) {
   buildUI(o); buildPuffs();
   if (!ctx.__hangkitBound) { ctx.__hangkitBound = true; bindOnce(ctx); }
   world.updaters.push((dt) => { if (V?.world === world) update(dt); });
+  import('./charselect.js').then((m) => m.mountCharSelect(world.ctx || V.ctx)).catch((e) => console.warn('[hangkit] charselect', e));
   import('./inventory.js').then((m) => m.mountInventory(world.ctx || V.ctx, api)).catch((e) => console.warn('[hangkit] inventory', e));   // I: the bag panel
   return api;
 }
