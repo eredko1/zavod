@@ -234,7 +234,7 @@ function makeHousingMats(world, M) {
   reg('hRoof', new THREE.MeshStandardMaterial({ color: 0x5f5c57, roughness: 0.95, metalness: 0 }), 'concrete', 0.25);
   reg('hFence', new THREE.MeshStandardMaterial({ map: fenceTexture(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.5, metalness: 0.5 }), 'metal');
   reg('hDoor', new THREE.MeshStandardMaterial({ color: 0x1c2328, roughness: 0.15, metalness: 0.3, envMapIntensity: 1.1 }), 'metal', 0.5);
-  { const g = M.grass.clone(); g.color = new THREE.Color(0x6e8c4c); reg('hLawn', g, 'ground', 1 / 2.5); }
+  { const g = M.grass.clone(); g.color = new THREE.Color(0x7aa650); reg('hLawn', g, 'ground', 1 / 2.5); }
   // lobby + elevators (hangout): brushed-steel doors, terrazzo floor, pale tile walls, glowing ceiling panels, lit call buttons
   { const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#b9bdc1'; g.fillRect(0, 0, 64, 256);
     for (let i = 0; i < 900; i++) { const v = 160 + Math.random() * 80; g.fillStyle = `rgba(${v},${v},${v + 4},0.35)`; g.fillRect(Math.random() * 64, Math.random() * 256, 1, 6 + Math.random() * 30); }
@@ -609,8 +609,13 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
   }
   // lawn edge runs -> fence (0.3 m inside the lawn) + concrete curb
   const runs = [];
-  for (let i = 0; i < nx; i++) { let start = null, sideS = 0; for (const s of [-1, 1]) { start = null; for (let j = 0; j <= nz; j++) { const e = j < nz && L(i, j) && !L(i + s, j); if (e && start === null) start = j; if (!e && start !== null) { runs.push({ axis: 'z', c: x0 + (i + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: z0 + start * CELL, a1: z0 + j * CELL }); start = null; } } } }
-  for (let j = 0; j < nz; j++) { for (const s of [-1, 1]) { let start = null; for (let i = 0; i <= nx; i++) { const e = i < nx && L(i, j) && !L(i, j + s); if (e && start === null) start = i; if (!e && start !== null) { runs.push({ axis: 'x', c: z0 + (j + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: x0 + start * CELL, a1: x0 + i * CELL }); start = null; } } } }
+  for (let i = 0; i < nx; i++) { let start = null, sideS = 0; for (const s of [-1, 1]) { start = null; for (let j = 0; j <= nz; j++) { const e = j < nz && L(i, j) && !L(i + s, j); if (e && start === null) start = j; if (!e && start !== null) { runs.push({ s, axis: 'z', c: x0 + (i + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: z0 + start * CELL, a1: z0 + j * CELL }); start = null; } } } }
+  for (let j = 0; j < nz; j++) { for (const s of [-1, 1]) { let start = null; for (let i = 0; i <= nx; i++) { const e = i < nx && L(i, j) && !L(i, j + s); if (e && start === null) start = i; if (!e && start !== null) { runs.push({ s, axis: 'x', c: z0 + (j + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: x0 + start * CELL, a1: x0 + i * CELL }); start = null; } } } }
+  // flower-bed spots for greens.js: tucked into the lawn at both ends of every fence run (the corners), running along the fence
+  { const W = world.W || (world.W = {}), FC = W.fenceCorners || (W.fenceCorners = []), v = new THREE.Vector3(), d = new THREE.Vector3();
+    for (const r of runs) { if (r.a1 - r.a0 < 7) continue; const dirL = r.axis === 'z' ? [0, 1] : [1, 0], inL = r.axis === 'z' ? [-r.s, 0] : [0, -r.s];
+      d.set(dirL[0], 0, dirL[1]).transformDirection(m); const yaw = Math.atan2(d.x, d.z) - Math.PI / 2;
+      for (const [a, k] of [[r.a0 + 2.2, 1], [r.a1 - 2.2, -1]]) { const lx = r.axis === 'z' ? r.c : a, lz = r.axis === 'z' ? a : r.c; v.set(lx + inL[0] * 0.9, 0, lz + inL[1] * 0.9).applyMatrix4(m); FC.push({ x: v.x, z: v.z, yaw, k }); } } }
   for (const r of runs) {
     let a0 = r.a0 + 0.3, a1 = r.a1 - 0.3; const len = a1 - a0; if (len < 1.5) continue;
     // a gate gap in long runs
@@ -638,13 +643,19 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
 function plantTrees(world, trees) {
   const { scene, ctx, R } = world; if (!trees.length) return;
   const bark = barkTexture(R), leaf = leafTexture(R, { hue: 92 });
-  const trunkG = new THREE.CylinderGeometry(0.14, 0.28, 7.5, 7); trunkG.translate(0, 3.75, 0);
-  const cards = [];
-  for (let i = 0; i < 5; i++) { const q = new THREE.PlaneGeometry(8.5 - (i & 1) * 2, 7.5 - (i & 1) * 1.5); q.rotateX((i & 1 ? 0.25 : -0.2)); q.translate(0, 8.2 + (i & 1) * 0.8, 0); q.rotateY(i / 5 * Math.PI + 0.3); cards.push(q); }
-  for (const [yy, rr, sz] of [[7.6, 0.5, 7], [9.6, 2.1, 5.5]]) { const q = new THREE.PlaneGeometry(sz, sz); q.rotateX(-Math.PI / 2 + 0.35); q.rotateY(rr); q.translate(0, yy, 0); cards.push(q); }
+  // a mature shade tree (London plane / honey locust, as in the aerial photo): a stout trunk forking into three limbs under a
+  // domed crown of lumpy leaf clusters, with a fringe of leaf cards for a soft silhouette. Phones get fewer fringe cards.
+  const rnd = mulberry(1234), bits = [];
+  { const tg = new THREE.CylinderGeometry(0.22, 0.34, 5.2, 8); tg.translate(0, 2.6, 0); bits.push(tg);
+    for (const [ry, lean] of [[0.3, 0.5], [2.4, 0.45], [4.4, 0.55]]) { const b = new THREE.CylinderGeometry(0.09, 0.17, 3.6, 6); b.translate(0, 1.8, 0); b.rotateZ(lean); b.rotateY(ry); b.translate(0, 4.8, 0); bits.push(b); } }
+  const trunkG = mergeSimple(bits);
+  const cards = [], lump = (r, x, y, z) => { const g = new THREE.IcosahedronGeometry(r, 1), P = g.attributes.position; for (let i = 0; i < P.count; i++) { const k = 1 + (rnd() - 0.5) * 0.28; P.setXYZ(i, P.getX(i) * k + x, P.getY(i) * k * 0.82 + y, P.getZ(i) * k + z); } g.computeVertexNormals(); cards.push(g); };
+  lump(3.3, 0, 9.0, 0); lump(2.5, 2.4, 7.9, 0.9); lump(2.5, -2.3, 8.0, -0.7); lump(2.4, 0.6, 8.1, 2.4); lump(2.4, -0.5, 7.9, -2.4); lump(2.2, 0.4, 10.9, -0.3);
+  const fringe = ctx.isTouch ? 4 : 10;
+  for (let i = 0; i < fringe; i++) { const a = i / fringe * Math.PI * 2 + rnd() * 0.4, q = new THREE.PlaneGeometry(3.6, 3.0); q.rotateX((rnd() - 0.5) * 0.6); q.rotateY(a + Math.PI / 2); q.translate(Math.cos(a) * 3.4, 7.6 + rnd() * 2.6, Math.sin(a) * 3.4); cards.push(q); }
   const canopyG = mergeSimple(cards);
   const trunkM = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.9, color: 0xa89f8c });
-  const leafM = new THREE.MeshLambertMaterial({ map: leaf, alphaTest: 0.5, side: THREE.DoubleSide, color: 0xa6b391, emissiveMap: leaf, emissive: 0x33441f, emissiveIntensity: 0.2 });
+  const leafM = new THREE.MeshLambertMaterial({ map: leaf, alphaTest: 0.45, side: THREE.DoubleSide, color: 0xb8d28c, emissiveMap: leaf, emissive: 0x33441f, emissiveIntensity: 0.2 });
   const t = new THREE.InstancedMesh(trunkG, trunkM, trees.length), c = new THREE.InstancedMesh(canopyG, leafM, trees.length);
   const mm = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   trees.forEach((tr, i) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), tr.ry); s.set(tr.s, tr.s, tr.s); p.set(tr.x, 0, tr.z); mm.compose(p, q, s); t.setMatrixAt(i, mm); c.setMatrixAt(i, mm); world.box([tr.x - 0.3, 0, tr.z - 0.3], [tr.x + 0.3, 5, tr.z + 0.3]); });
@@ -652,6 +663,7 @@ function plantTrees(world, trees) {
   t.name = 'luna:trunks'; c.name = 'luna:canopy'; t.userData.surface = 'wood'; c.userData.surface = 'wood'; ctx.raycastTargets.push(t);
 }
 
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function mergeSimple(list) {
   const pos = [], nor = [], uv = [];
   for (let g of list) { if (g.index) g = g.toNonIndexed(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); }
