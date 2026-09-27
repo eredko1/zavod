@@ -623,7 +623,7 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
       const np = Math.max(1, Math.round((s1 - s0) / 2.4));
       for (let k = 0; k <= np; k++) { const a = s0 + (s1 - s0) * k / np; const p0 = Pp(a - 0.035, 0), p1 = Pp(a + 0.035, 1.12); loc.box('hRail', [Math.min(p0[0], p1[0]) - (r.axis === 'z' ? 0.035 : 0), 0, Math.min(p0[2], p1[2]) - (r.axis === 'x' ? 0.035 : 0)], [Math.max(p0[0], p1[0]) + (r.axis === 'z' ? 0.035 : 0), 1.12, Math.max(p0[2], p1[2]) + (r.axis === 'x' ? 0.035 : 0)], { collide: false }); }
       const c0 = Pp(s0, 0), c1 = Pp(s1, 1.05); const w = 0.06;
-      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)], 1.0);   // 1 m cells: coarse (4 m) ones bulged across the openings
+      loc.collide([Math.min(c0[0], c1[0]) - (r.axis === 'z' ? w : 0), 0, Math.min(c0[2], c1[2]) - (r.axis === 'x' ? w : 0)], [Math.max(c0[0], c1[0]) + (r.axis === 'z' ? w : 0), 1.05, Math.max(c0[2], c1[2]) + (r.axis === 'x' ? w : 0)], 0.3);   // fine cells: 1 m ones bulged ~0.5 m past the rail and pinched the path openings (bikes clipped them)
     }
   }
   // fences + grass go to the ground batch (fence geometry is alpha, keep it out of shadows too)
@@ -750,11 +750,12 @@ function coreInterior(L, p, Ht) {
     if (sh0 > mid + GROUND_HI) gF(mid + GROUND_HI, 0, i0, sh0, ST, i1);
     const gap = Math.min(sh1 + 1.4, A[1]); gF(sh1, 0, i0, gap, ST, i1); if (gap < A[1]) col(gap, 0, i0, A[1], ST, i1);
   }
-  else col(mid + GROUND_HI, 0, i0, A[1], ST, i1);
+  else { const [mn, mx] = bx(mid + GROUND_HI, 0, i0, A[1], ST, i1); L.collide(mn, mx, 1.0); }   // 1 m cells: coarse ones bulged past the wall on the rotated towers
   // lobby glass walls (colliders) with the entrance gaps
-  for (const c of [i0, i1]) { col(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06);
-    if (hasB && bToGround) { const nr = Math.max(mid + DOOR_HALF, sh0 - 2.5); col(mid + DOOR_HALF, 0, c - 0.06, nr, ST, c + 0.06); const [mn, mx] = bx(nr, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); L.collide(mn, mx, 0.2); }
-    else col(mid + DOOR_HALF, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); }
+  const glassCol = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.2); };   // fine cells: on the rotated towers a coarse cell became a 3.6 m invisible box across the entrance paths
+  for (const c of [i0, i1]) { glassCol(mid - LOBBY_HALF, 0, c - 0.06, mid - DOOR_HALF, ST, c + 0.06);
+    if (hasB && bToGround) { const nr = Math.max(mid + DOOR_HALF, sh0 - 2.5); glassCol(mid + DOOR_HALF, 0, c - 0.06, nr, ST, c + 0.06); const [mn, mx] = bx(nr, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); L.collide(mn, mx, 0.2); }
+    else glassCol(mid + DOOR_HALF, 0, c - 0.06, mid + GROUND_HI, ST, c + 0.06); }
   // lobby dressing: 12" VCT checker floor, glazed-tile wainscot walls, a dropped ceiling with light panels, three steel cars
   // with call-button plates and lit floor indicators, a bank of aluminium mailboxes, a directory board, a bench
   vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + GROUND_HI, 0.03, i1);
