@@ -128,7 +128,7 @@ export function buildGreens(world, M) {
         babs.push(fig); world.updaters.push((dt) => fig.update(dt, 0)); } } }
   if (babs.length) { const LINES = ['«Опять этот наркоман…»', '«Шапку надень! Простудишься!»', '«В наше время такого не было.»', '«Видела? С пятого этажа опять полицию вызывали.»', '«Бандит! Иди работай!»', '«Ой, какой худой. Кушать надо!»', '«Это Аркашин друг. Тоже в карты играет, тунеядец.»', '«Не топчи газон!»', '«Сосиску хочешь? Нет? Ну и не надо.»', '«А Люська-то из третьего корпуса…»'];
     let cd = 0; world.updaters.push((dt) => { cd -= dt; const me = ctx.player?.position; if (cd > 0 || !me) return; for (const f of babs) { const p = f.group.position; if (Math.hypot(me.x - p.x, me.z - p.z) < 6) { cd = 10 + Math.random() * 8; ctx.hud?.toast?.('БАБУШКИ: ' + LINES[(Math.random() * LINES.length) | 0], 2600); return; } } }); }
-  W.benches = benches; W.babushkas = babs.map((f) => f.group.position);
+  W.benches = benches; W.babushkas = babs.map((f) => f.group.position); W.babFigs = babs;   // hangout.js makes them talk (vendors)
   console.log('[greens]', benches.length, 'benches ·', babs.length, 'babushkas');
   // the flowers themselves: crossed quads (instanced), four kinds from one atlas
   if (flowers.length) {

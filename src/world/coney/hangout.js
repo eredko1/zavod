@@ -5,7 +5,7 @@
 // (cash, stash, B, elevators, stealing, passengers, merc cash, respawn-at) lives in ../hangkit.js. CONEY agent.
 import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
-import { buildDeli, sammyTalk, fadeNear } from '../deli.js';
+import { buildDeli, sammyTalk, fadeNear, nameTag } from '../deli.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { dressFigure, standTall, addAfro, addLongHair } from '../outfits.js';
 import { buildLocals, sammyLotion } from './locals.js';
@@ -60,7 +60,8 @@ export function buildHangout(world, M) {
   try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
   try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
-  try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }   // ARKASHA's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
+  try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }
+  { let tries = 0; const t = setInterval(() => { if (world.W.babFigs?.length || ++tries > 60) { clearInterval(t); try { babushkas(world); } catch (e) { console.warn('[hangout] babushkas', e); } } }, 250); }   // greens.js seats them later in the build   // the bench grannies (greens.js seats them)   // ARKASHA's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
   buildDoors(world);
@@ -340,6 +341,20 @@ function setDoor(D, open, send) {
 
 // ---- ARKASHA's card table: a little paved park off building 1's lobby, a stone table, two stools; durak on F ----
 const B1 = new THREE.Vector3(137, 0, -293);   // Luna Park Houses building 1 (the tower south of building 2)
+// the babushkas on the path benches: named, they gossip, sell seeds, and know everybody's business
+const BAB_NAMES = ['БАБА ЗИНА', 'БАБА ГАЛЯ', 'БАБА ЛЮДА', 'БАБА ВАЛЯ', 'БАБА НИНА', 'БАБА ТОМА', 'БАБА РАЯ', 'БАБА ФИРА', 'БАБА СОНЯ'];
+const GOSSIP = ['«Видела? Люська из третьего корпуса опять с новым. Третий за месяц!»', '«Аркаша опять в карты всех обыграл. Жулик, но вежливый.»', '«Этот, лохматый, Феликс — инженер! А ведёт себя как хиппи.»', '«Лифт в пятом корпусе опять не работает. Я пешком на девятнадцатый не пойду.»', '«Раньше тут всё было лучше. Всё!»', '«Внучок, ты кушал? Худой какой.»', '«Не стой над душой. Садись или иди.»'];
+function babushkas(world) {
+  const figs = world.W.babFigs || []; const ctx = world.ctx;
+  figs.forEach((f, i) => {
+    const name = BAB_NAMES[i % BAB_NAMES.length], tag = nameTag(name, '#f3c9d8'); tag.position.set(0, 1.55, 0); f.group.add(tag);
+    K.vendor({ name, pos: f.group.position, r: 2.2, fig: f, talk: (Kk, again) => ({
+      text: `${name}: ${again ? GOSSIP[(Math.random() * GOSSIP.length) | 0] : '«Ну, чего встал? Садись, посиди с нами. Семечки хочешь?»'}`,
+      choices: [{ label: 'Семечки — $2', go: () => ({ text: `${name}: "${sell('semechki', 2, name, { ok: 'Держи, внучок. Шелуху не кидай на дорожку!', broke: 'Два доллара, милок.', full: 'Руки полные у тебя.' })}"`, choices: [{ label: 'Спасибо, бабушка', go: null }] }) },
+        { label: 'Что нового?', go: () => ({ text: `${name}: ${GOSSIP[(Math.random() * GOSSIP.length) | 0]}`, choices: [{ label: 'Ого', go: null }] }) },
+        { label: 'Пойду я', go: null }] }) });
+  });
+}
 function buildDurakPark() {
   const { world, ctx } = H; if (!peopleReady()) return;
   let t1 = null; for (const t of H.towers) if (t !== H.b2 && (!t1 || t.centre.distanceTo(B1) < t1.centre.distanceTo(B1))) t1 = t; if (!t1) return;
@@ -383,8 +398,9 @@ function buildDurakPark() {
   let puffT = 2; world.updaters.push((dt) => { const e = spliff.userData.ember; e.material.color.setHSL(0.04, 1, 0.45 + 0.15 * Math.sin(performance.now() / 260)); if ((puffT -= dt) <= 0) { puffT = 4 + Math.random() * 4; try { K.puff?.(spliff.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.35, 0.9, 0.2))); } catch {} } });   // the puff drifts up past his head, not in his face
   const seatYou = new THREE.Vector3(0, 0, 1.3).applyMatrix4(g.matrixWorld);
   H.arkady = { pos: c.clone(), seat: seatYou, fig: pf };
+  world.W.arkadyTable = { pos: c.clone(), seat: seatYou.clone() };   // charselect.js: picked characters spawn here
   try { tableRegulars(g, c); } catch (e) { console.warn('[hangout] regulars', e); }
-  K.vendor({ name: 'ARKASHA', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
+  (H.world.W.crew || (H.world.W.crew = {})).arkasha = K.vendor({ name: 'ARKASHA', pos: c.clone(), r: 2.6, fig: pf, talk: arkadyTalk });
   try { initDurakMP(ctx, { pos: () => H.arkady?.pos }); } catch (e) { console.warn('[hangout] durak-mp', e); }   // the shared table online (coney/durak-mp.js)
   (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: 'DURAK · ARKASHA', x: c.x, z: c.z, kind: 'shop' });
 }
@@ -428,25 +444,26 @@ function tableRegulars(g, c) {
   const wpos = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(g.matrixWorld);
   // SASHA: on the bench, always loses — «Бей!» … «Беру!»
   const sasha = buildPerson({ avatar: 'm17', pose: 'sit', seed: 5 }); put(sasha, 3.2, -2.35, 0);   // faces out from the backrest
-  K.vendor({ name: 'SASHA', pos: wpos(3.2, -2.35), r: 2.4, fig: sasha, talk: (Kk, again) => ({
+  (H.world.W.crew || (H.world.W.crew = {})).sasha = K.vendor({ name: 'SASHA', pos: wpos(3.2, -2.35), r: 2.4, fig: sasha, talk: (Kk, again) => ({
     text: again ? 'SASHA: "Я правила зубрил, понимаешь? Зубрил! А он козырем — хлоп." *доедает сосиску*' : 'SASHA: "Ты с Аркашей играть? Совет: не кричи «Бей!». Я кричал «Бей!», потом кричал «Беру!». Теперь у меня вся колода."',
     choices: [{ label: 'Сосиску будешь? — угостишь?', go: () => (K.full() ? { text: 'SASHA: "Руки заняты у тебя."', choices: [{ label: 'Ok', go: null }] } : (K.give('sausage'), { text: 'SASHA: "Держи. Виски-шмиски, вот сосиски — вся закуска наша!"', choices: [{ label: 'Спасибо, Саша', go: null }] })) },
       { label: 'Как он всегда выигрывает?', go: { text: 'SASHA: "Медведь по козырям — ещё какой мастак. Он все карты помнит. И переводит, гад, переводит!"', choices: [{ label: 'Ясно', go: null }] } }, { label: 'Later', go: null }] }) });
   // FELIKS: 6', long hair, band tee — a Coney Island engineer by day; here he hands out mushrooms (2 minutes of tripping balls)
   const fel = buildPerson({ avatar: 'm20', seed: 12 }); standTall(fel, 1.83); addLongHair(fel); dressFigure(fel, H.ctx, { top: 'tee', shirt: 6, bottom: 'jeans' }); put(fel, -3.3, -1.4, 1.1);
-  K.vendor({ name: 'FELIKS', pos: wpos(-3.3, -1.4), r: 2.4, fig: fel, talk: (Kk, again) => ({
+  (H.world.W.crew || (H.world.W.crew = {})).feliks = K.vendor({ name: 'FELIKS', pos: wpos(-3.3, -1.4), r: 2.4, fig: fel, talk: (Kk, again) => ({
     text: again ? 'FELIKS: "Still here? The code compiles, the ground breathes. Both are fine."' : 'FELIKS: "Engineer by day. Tonight? Tonight I review the universe. Want some mushrooms, bro? Two minutes, full send."',
     choices: [{ label: 'Давай грибы 🍄', go: () => (K.full() ? { text: 'FELIKS: "Pockets full, man. Make room."', choices: [{ label: 'Ok', go: null }] } : (K.give('shrooms'), { text: 'FELIKS: "B to eat. Don\'t drive. Or do — it\'s a game."', choices: [{ label: 'Спасибо, Феликс', go: null }] })) },
+      { label: 'Got any weed? 🌿', go: () => (K.full() ? { text: 'FELIKS: "Pockets full, man."', choices: [{ label: 'Ok', go: null }] } : (K.give('weed'), { text: 'FELIKS: "Free. Always free. Pass it around (B)."', choices: [{ label: 'Respect', go: null }] })) },
       { label: 'What are you building?', go: { text: 'FELIKS: "A map lab. Merges nine NYC data sources into one world. Also this park, probably."', choices: [{ label: 'Respect', go: null }] } }, { label: 'Later', go: null }] }) });
   // McGUINNESS: by the lamp with a crate of Guinness — «Guinness будешь?» — «За тебя!»
   const mcg = buildPerson({ avatar: 'm12', seed: 8 }); standTall(mcg, 1.73); mcg.group.scale.x *= 1.22; mcg.group.scale.z *= 1.18; addAfro(mcg); dressFigure(mcg, H.ctx, { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 }); put(mcg, -2.9, 1.9, 2.2);   // ~20, 5'8", heavyset, afro, band tee
-  K.vendor({ name: 'McGUINNESS', pos: wpos(-2.9, 1.9), r: 2.4, fig: mcg, talk: (Kk, again) => ({
+  (H.world.W.crew || (H.world.W.crew = {})).mcguinness = K.vendor({ name: 'McGUINNESS', pos: wpos(-2.9, 1.9), r: 2.4, fig: mcg, talk: (Kk, again) => ({
     text: again ? 'McGUINNESS: "Another? Go on, go on, go on."' : 'McGUINNESS: "Guinness будешь? Proper pint, poured slow. Arkasha takes his with bourbon, God help him."',
     choices: [{ label: '«За тебя!» — давай пинту', go: () => (K.full() ? { text: 'McGUINNESS: "Finish what you\'re holding first."', choices: [{ label: 'Sláinte', go: null }] } : (K.give('guinness'), { text: 'McGUINNESS: "Sláinte! B to drink — and share it, it\'s rude not to."', choices: [{ label: 'Sláinte', go: null }] })) },
       { label: '«За тебя, но я-то пас»', go: { text: 'McGUINNESS: "Ah, a bourbon man. Suit yourself."', choices: [{ label: 'Later', go: null }] } }] }) });
   // THE ELF: 5'7" Russian/Ukrainian, white, dark hair, brown eyes, in a full three-stripe track suit, no hat — Jameson, and a spliff rolled like a magic scroll
   const elf = buildPerson({ avatar: 'm10', seed: 9 }); standTall(elf, 1.70); dressFigure(elf, H.ctx, { top: 'track', bottom: 'track', shoes: 'white' }); put(elf, 2.6, 2.3, -2.4);   // 5'7", full three-stripe track suit
-  K.vendor({ name: 'THE ELF', pos: wpos(2.6, 2.3), r: 2.4, fig: elf, talk: (Kk, again) => ({
+  (H.world.W.crew || (H.world.W.crew = {})).elf = K.vendor({ name: 'THE ELF', pos: wpos(2.6, 2.3), r: 2.4, fig: elf, talk: (Kk, again) => ({
     text: again ? 'THE ELF: "Ещё фокус?" *шуршит бумагой*' : 'THE ELF: "Jameson? Или… фокус? Я сворачиваю бумажный свиток — и готово. Заклинаний не надо."',
     choices: [{ label: 'Jameson', go: () => (K.full() ? { text: 'THE ELF: "Руки заняты."', choices: [{ label: '…', go: null }] } : (K.give('jameson'), { text: 'THE ELF: "Sláinte по-эльфийски. B — выпить."', choices: [{ label: 'За тебя', go: null }] })) },
       { label: 'Фокус (a spliff) — $10', go: () => ({ text: 'THE ELF: "' + sell('spliff', 10, 'THE ELF', { ok: 'Вот и фокус мой готов. «Заклинанье?» — «Затянись.»', broke: 'Магия стоит десятку.', full: 'Руки заняты, волшебник.' }) + '"', choices: [{ label: 'Колдуй', go: null }] }) },

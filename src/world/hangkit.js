@@ -32,6 +32,7 @@ export const ITEMS = {
   vape: { kind: 'smoke', icon: '💨', name: 'disposable vape (watermelon ice)', cig: 15 },   // B takes a hit: vapour, no high
   bic: { kind: 'tool', icon: '🔥', name: 'Bic lighter', keep: true },
   nutcracker: { kind: 'booze', icon: '🧃', name: 'nutcracker (Henny + juice, plastic bottle)', drunk: 0.75, dur: 170, glass: 'can', liq: 0xc2263a },
+  semechki: { kind: 'food', icon: '🌻', name: 'семечки (sunflower seeds)', food: 6 },
   shrooms: { kind: 'trip', icon: '🍄', name: 'Feliks\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
   zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
 };
