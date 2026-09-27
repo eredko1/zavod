@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildPerson, peopleReady } from '../people.js';
 
 export function buildGreens(world, M) {
   const { scene, ctx } = world; const towers = world.lunaTowers || []; if (!towers.length || !M?.hLawn) return;
@@ -88,6 +89,7 @@ export function buildGreens(world, M) {
   const flowers = [];
   const bed = (x, z, yaw, len = 3.2, wid = 1.1) => {
     const P = { x, z, yaw }; box(mats.soil, P, 0, 0.07, 0, len, 0.14, wid); box(mats.kerb, P, 0, 0.1, wid / 2 + 0.05, len + 0.2, 0.2, 0.1); box(mats.kerb, P, 0, 0.1, -wid / 2 - 0.05, len + 0.2, 0.2, 0.1);
+    for (const [lx, lz, L, ry] of [[0, wid / 2 + 0.16, len + 0.3, 0], [0, -wid / 2 - 0.16, len + 0.3, 0], [len / 2 + 0.16, 0, wid + 0.3, Math.PI / 2], [-len / 2 - 0.16, 0, wid + 0.3, Math.PI / 2]]) { const q = new THREE.PlaneGeometry(L, 0.42); q.rotateY(P.yaw + ry); const [qx, qz] = at(P, lx, lz); q.translate(qx, 0.21, qz); put(mats.hoop, q); }   // low black hoop fence
     const n = Math.round(len * wid * 7); for (let i = 0; i < n; i++) { const [fx, fz] = at(P, (Math.random() - 0.5) * (len - 0.2), (Math.random() - 0.5) * (wid - 0.2)); flowers.push([fx, fz, Math.floor(Math.random() * 4), 0.7 + Math.random() * 0.6]); }
   };
   for (const t of towers) for (const d of t.lobby?.doors || []) {
@@ -104,6 +106,30 @@ export function buildGreens(world, M) {
     const yaw = Math.atan2(edge[0], edge[1]) + Math.PI / 2; bed(x - edge[0] * 0.35, z - edge[1] * 0.35, yaw, 4 + Math.random() * 2, 1.0); edgeBeds++;
     if (Math.random() < 0.5) { const [hx, hz] = [x - edge[1] * 3, z + edge[0] * 3]; if (isLawn(hx, hz) && !blocked(hx, hz, 0.6)) for (let i = 0; i < 3; i++) { const g = new THREE.SphereGeometry(0.55 + Math.random() * 0.25, 10, 8); g.translate(hx + (Math.random() - 0.5) * 1.6, 0.5, hz + (Math.random() - 0.5) * 1.6); put(Math.random() < 0.5 ? mats.hydrPink : mats.hydrBlue, g); } }
   }
+  // ---- NYC park benches in rows along the paths (backs to the lawn fences), babushkas on some of them ----
+  const benches = []; let nb = 0;
+  for (const f of W.fenceSegs || []) {
+    const dx = f.b[0] - f.a[0], dz = f.b[1] - f.a[1], L = Math.hypot(dx, dz); if (L < 6) continue; const ux = dx / L, uz = dz / L, yaw = Math.atan2(ux, uz) - Math.PI / 2;
+    for (let t = 1.2, k = 0; t < L - 1.2 && nb < 260; t += 2.25, k++) { if (k % 4 === 3) continue;   // rows of three with a gap
+      const x = f.a[0] + ux * t + f.n[0] * 0.95, z = f.a[1] + uz * t + f.n[1] * 0.95; if (isLawn(x, z) || blocked(x, z, 0.35)) continue;
+      const P = { x, z, yaw }, [px, pz] = at(P, 0, 1), sg = (px - x) * f.n[0] + (pz - z) * f.n[1] > 0 ? 1 : -1;
+      for (const zz of [0.1, 0.0, -0.1]) box(mats.benchWood, P, 0, 0.45, zz * sg, 1.9, 0.035, 0.085);
+      for (const yy of [0.62, 0.76]) box(mats.benchWood, P, 0, yy, -0.22 * sg, 1.9, 0.09, 0.03, -0.18 * sg);
+      for (const xx of [-0.85, 0.85]) { box(mats.benchIron, P, xx, 0.22, 0, 0.05, 0.44, 0.46); box(mats.benchIron, P, xx, 0.6, -0.22 * sg, 0.05, 0.4, 0.05); }
+      for (const xx of [-0.7, 0, 0.7]) { const [cx, cz] = at(P, xx, 0); world.box([cx - 0.3, 0, cz - 0.3], [cx + 0.3, 0.5, cz + 0.3]); }
+      benches.push({ x, z, face: Math.atan2(f.n[0], f.n[1]) }); nb++; }
+  }
+  const babs = [];
+  if (peopleReady()) { const want = ctx.isTouch ? 8 : 18, step = Math.max(1, Math.floor(benches.length / want));
+    for (let i = 3; i < benches.length && babs.length < want; i += step) { const b = benches[i];
+      for (const off of Math.random() < 0.6 ? [-0.45, 0.45] : [0]) { const fig = buildPerson({ avatar: Math.random() < 0.6 ? 'f09' : 'f17', pose: 'sit', seed: 40 + babs.length }); if (!fig) continue;
+        const ax = Math.cos(b.face), az = -Math.sin(b.face); fig.group.position.set(b.x + ax * off, 0, b.z + az * off); fig.group.rotation.y = b.face; scene.add(fig.group);
+        const scarf = new THREE.Mesh(new THREE.SphereGeometry(0.125, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), new THREE.MeshStandardMaterial({ color: [0x8a2a3a, 0x2a4a7a, 0x6a5a2a, 0x3a3a3a, 0x7a3a6a][babs.length % 5], roughness: 0.9 })); scarf.position.set(0, 0.01, -0.01); scarf.scale.set(1.05, 1.08, 1.12); fig.head?.add(scarf);
+        babs.push(fig); world.updaters.push((dt) => fig.update(dt, 0)); } } }
+  if (babs.length) { const LINES = ['«Опять этот наркоман…»', '«Шапку надень! Простудишься!»', '«В наше время такого не было.»', '«Видела? С пятого этажа опять полицию вызывали.»', '«Бандит! Иди работай!»', '«Ой, какой худой. Кушать надо!»', '«Это Аркашин друг. Тоже в карты играет, тунеядец.»', '«Не топчи газон!»', '«Сосиску хочешь? Нет? Ну и не надо.»', '«А Люська-то из третьего корпуса…»'];
+    let cd = 0; world.updaters.push((dt) => { cd -= dt; const me = ctx.player?.position; if (cd > 0 || !me) return; for (const f of babs) { const p = f.group.position; if (Math.hypot(me.x - p.x, me.z - p.z) < 6) { cd = 10 + Math.random() * 8; ctx.hud?.toast?.('БАБУШКИ: ' + LINES[(Math.random() * LINES.length) | 0], 2600); return; } } }); }
+  W.benches = benches; W.babushkas = babs.map((f) => f.group.position);
+  console.log('[greens]', benches.length, 'benches ·', babs.length, 'babushkas');
   // the flowers themselves: crossed quads (instanced), four kinds from one atlas
   if (flowers.length) {
     const q1 = new THREE.PlaneGeometry(0.34, 0.34), q2 = q1.clone(); q2.rotateY(Math.PI / 2); const cross = mergeGeometries([q1, q2]); cross.translate(0, 0.17, 0);
@@ -159,6 +185,9 @@ function makeMats() {
     cols.forEach(([pet, ctr], k) => { const ox = k * 64; g.fillStyle = '#2f6a22'; g.fillRect(ox + 30, 30, 4, 34); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2, cx = ox + 32 + Math.cos(a) * 10, cy = 22 + Math.sin(a) * 10; g.fillStyle = pet; g.beginPath(); g.ellipse(cx, cy, 9, 6, a, 0, 7); g.fill(); } g.fillStyle = ctr; g.beginPath(); g.arc(ox + 32, 22, 5, 0, 7); g.fill();
       g.fillStyle = '#3f7a2a'; g.beginPath(); g.ellipse(ox + 22, 46, 8, 4, 0.6, 0, 7); g.fill(); g.beginPath(); g.ellipse(ox + 42, 50, 8, 4, -0.6, 0, 7); g.fill(); });
   });
+  const hoopTex = canvasTex(256, 64, (g) => { g.clearRect(0, 0, 256, 64); g.strokeStyle = '#141414'; g.lineWidth = 3; for (let x = 4; x < 256; x += 12) { g.beginPath(); g.moveTo(x, 64); g.lineTo(x, 14); g.stroke(); } g.lineWidth = 3.5; for (let x = 0; x < 256; x += 64) { g.beginPath(); g.arc(x + 32, 44, 30, Math.PI, 0); g.stroke(); } g.beginPath(); g.moveTo(0, 60); g.lineTo(256, 60); g.stroke(); });
+  hoopTex.wrapS = THREE.RepeatWrapping; hoopTex.repeat.set(2, 1);
+  const hoop = new THREE.MeshStandardMaterial({ map: hoopTex, alphaTest: 0.5, transparent: false, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.4 });
   const flower = new THREE.MeshStandardMaterial({ map: flowerTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7 });
   flower.onBeforeCompile = (sh) => {   // pick one of the 4 flowers per instance from the 'kind' attribute
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float kind;').replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\n vMapUv = vec2((uv.x + kind) / 4.0, uv.y);\n#endif');
@@ -166,7 +195,7 @@ function makeMats() {
   return {
     court: new THREE.MeshStandardMaterial({ map: court, roughness: 0.9 }), rubberA: new THREE.MeshStandardMaterial({ map: rubber('#a8462e', '#c86a4a'), roughness: 0.95 }), rubberB: new THREE.MeshStandardMaterial({ map: rubber('#2e5f8a', '#4a86b8'), roughness: 0.95 }),
     iron: S(0x1b1b1d, 0.5, 0.6), bench: S(0x2e5a3a, 0.8), post: S(0x2a6ab0, 0.4, 0.5), deck: S(0x6a6e72, 0.6, 0.4), rail: S(0xe0b422, 0.4, 0.3), slide: S(0xe8c21a, 0.3, 0.1), roofA: S(0xc8321e, 0.6), roofB: S(0x2a8a4a, 0.6),
-    chain: S(0x8d9296, 0.35, 0.9), seat: S(0x1a1a1a, 0.8), soil: S(0x3a2a1c, 1), kerb: S(0xb3aea4, 0.9), hydrPink: S(0xd88ab8, 0.8), hydrBlue: S(0x8aa8e0, 0.8),
-    trunk: S(0x4a3a2a, 1), leaves: S(0x4a6a2e, 0.95), steelDark: S(0x2b2c2e, 0.6, 0.6), tankWood: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95 }), tankRoof: S(0x3a2e24, 0.9), flower,
+    chain: S(0x8d9296, 0.35, 0.9), seat: S(0x1a1a1a, 0.8), soil: S(0x5e2618, 1), benchWood: S(0x2f5a3a, 0.7), benchIron: S(0x1b1c1d, 0.55, 0.6), kerb: S(0xb3aea4, 0.9), hydrPink: S(0xd88ab8, 0.8), hydrBlue: S(0x8aa8e0, 0.8),
+    hoop, trunk: S(0x4a3a2a, 1), leaves: S(0x4a6a2e, 0.95), steelDark: S(0x2b2c2e, 0.6, 0.6), tankWood: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95 }), tankRoof: S(0x3a2e24, 0.9), flower,
   };
 }

@@ -623,6 +623,7 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
     const segs = []; if (len < 12) segs.push([a0, a1]); else { let q = a0; while (q < a1 - 0.5) { let e = Math.min(q + 11, a1); if (a1 - e < 3) e = a1; segs.push([q, e]); q = e + 5; } }
     for (const [s0, s1] of segs) {
       const Pp = (a, y) => r.axis === 'z' ? [r.c, y, a] : [a, y, r.c];
+      if (s1 - s0 >= 7) { const W = world.W, FS = W.fenceSegs || (W.fenceSegs = []), A = new THREE.Vector3(...Pp(s0 + 1, 0)).applyMatrix4(m), B = new THREE.Vector3(...Pp(s1 - 1, 0)).applyMatrix4(m), n = new THREE.Vector3(r.axis === 'z' ? r.s : 0, 0, r.axis === 'z' ? 0 : r.s).transformDirection(m); FS.push({ a: [A.x, A.z], b: [B.x, B.z], n: [n.x, n.z] }); }   // path side of each fence stretch: greens.js lines it with benches
       const u1 = (s1 - s0) / 2.4;
       loc.quad('hFence', Pp(s0, 0.02), Pp(s1, 0.02), Pp(s1, 1.07), Pp(s0, 1.07), [[0, 0], [u1, 0], [u1, 1], [0, 1]]);
       const np = Math.max(1, Math.round((s1 - s0) / 2.4));
