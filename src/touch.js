@@ -19,6 +19,7 @@ const CSS = `
 #touch .crouch{right:calc(env(safe-area-inset-right,0px) + 150px);bottom:calc(env(safe-area-inset-bottom,0px) + 156px);width:60px;height:60px}
 #touch .reload{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 28px);width:56px;height:56px;font-size:12px}
 #touch .swap{right:calc(env(safe-area-inset-right,0px) + 112px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:52px;height:52px;font-size:11px}
+#touch .zoom{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 164px);width:54px;height:54px;font-size:11px}
 #touch .nade{right:calc(env(safe-area-inset-right,0px) + 236px);bottom:calc(env(safe-area-inset-bottom,0px) + 100px);width:54px;height:54px;font-size:11px}
 #touch .pause{right:calc(env(safe-area-inset-right,0px) + 16px);top:calc(env(safe-area-inset-top,0px) + 10px);width:44px;height:30px;border-radius:6px;font-size:12px}
 #touch .act{left:calc(env(safe-area-inset-left,0px) + 120px);bottom:calc(env(safe-area-inset-bottom,0px) + 230px);min-width:96px;height:44px;padding:0 14px;border-radius:22px;font-size:13px;background:rgba(233,162,59,.35);border-color:#e9a23b;display:none}
@@ -44,6 +45,7 @@ export async function init(ctx) {
     <div class="btn reload">RELOAD</div>
     <div class="btn swap">SWAP</div>
     <div class="btn nade">NADE</div>
+    <div class="btn zoom">ZOOM</div>
     <div class="btn act">TAKE</div>`;
   document.body.appendChild(root);
   const q = (c) => root.querySelector(c);
@@ -90,6 +92,7 @@ export async function init(ctx) {
   tap(q('.reload'), () => press('KeyR'));
   tap(q('.swap'), () => { const slot = ctx.weapons?.current?.slot ?? 0; press(slot === 0 ? 'Digit2' : 'Digit1'); });
   tap(q('.nade'), () => press('KeyG'));
+  hold(q('.zoom'), () => { T.zoom = true; }, () => { T.zoom = false; });   // weapons.js: hold to zoom (rooftops)
   S.act = q('.act'); tap(S.act, () => { input.pressed.add('KeyF'); }); // contextual: pick up weapon / mount / dismount (same F both systems read)
   tap(q('.pause'), () => ctx.setState('paused'));
 

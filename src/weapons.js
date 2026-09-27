@@ -488,7 +488,8 @@ export function update(dt, ctx) {
   } else if (playing && dt > 0 && !S.dead) {
     for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { selectBag(n - 1); break; }   // 1–9 / numpad: your collected guns
     if (input.mouse.wheel) {
-      if (S.weapons[S.cur]?.spec?.scope && S.adsTarget) {   // sniper aimed: the wheel steps the scope zoom (x0.5 … x3 of its base magnification)
+      if (ctx.input?.keys?.has?.('KeyZ')) { S.zMag = clamp((S.zMag || 4) * (input.mouse.wheel < 0 ? 1.25 : 0.8), 2, 8); ctx.hud?.toast?.(`${S.zMag.toFixed(1)}×`, 600); }
+      else if (S.weapons[S.cur]?.spec?.scope && S.adsTarget) {   // sniper aimed: the wheel steps the scope zoom (x0.5 … x3 of its base magnification)
         S.zoomMul = clamp((S.zoomMul || 1) * (input.mouse.wheel < 0 ? 1.25 : 0.8), 0.5, 3);
         const base = 1 / (S.weapons[S.cur].spec.adsFovMul ?? ADS_FOV_MUL); ctx.hud?.toast?.(`${(base * S.zoomMul).toFixed(1)}×`, 600);
       } else startSwap(1 - S.cur);
@@ -515,7 +516,9 @@ export function update(dt, ctx) {
   const fovBase = ctx.settings.fov || 75; const adsMul = sp.adsFovMul ?? ADS_FOV_MUL;
   // scopes: fov stays normal until the eye reaches the eyepiece, then snaps down through the last 15% of the transition
   const fovK = sp.scope ? sstep((S.ads - 0.8) / 0.2) : sstep(S.adsT); // irons/dots: smoothstep over adsTime — no velocity pop at either end
-  const targetFov = Math.max(1.5, fovBase * lerp(1, sp.scope ? adsMul / (S.zoomMul || 1) : adsMul, fovK));
+  // Z (hold): squint / field-glasses zoom with any gun — ~4x, the wheel steps it 2x…8x (rooftop spotting, long shots)
+  const zHeld = !!(ctx.input?.keys?.has?.('KeyZ') || ctx.input?.touch?.zoom) && ctx.state === 'playing'; S.zK = lerp(S.zK || 0, zHeld ? 1 : 0, Math.min(1, dt * 12));
+  const targetFov = Math.max(1.5, fovBase * lerp(1, sp.scope ? adsMul / (S.zoomMul || 1) : adsMul, fovK) * lerp(1, 1 / (S.zMag || 4), S.zK));
   if (Math.abs(cam.fov - targetFov) > 0.01 || S.lastFov !== targetFov) { cam.fov = targetFov; cam.updateProjectionMatrix(); S.lastFov = targetFov; }
   // viewmodel projection: x/y scale emulates VM_FOV under the world fov. With spec.adsVmFov the gun is drawn at a steady fov while aimed
   // instead of magnifying with the world zoom (on-axis points stay on-axis at any scale, so the sight line is unaffected).

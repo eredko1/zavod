@@ -42,7 +42,7 @@ const MUG = { hi: ['Ey. Ты. Come here a sec.', 'Yo, lemme talk to you real qui
 let C = null;
 
 // ---- guns off the books: IGOR (under the bench) and now and then a tough in a crew that rolls up to talk ----
-const GUNS = { m9: { name: 'Makarov', price: 40, slot: 1 }, deagle: { name: 'Desert Eagle', price: 120, slot: 1 }, r870: { name: 'Sawed-off pump', price: 90, slot: 0 }, mp5: { name: 'MP5', price: 110, slot: 0 }, ak74: { name: 'AK', price: 160, slot: 0 } };
+const GUNS = { m24: { name: 'M24 sniper rifle', price: 180, slot: 0 }, m9: { name: 'Makarov', price: 40, slot: 1 }, deagle: { name: 'Desert Eagle', price: 120, slot: 1 }, r870: { name: 'Sawed-off pump', price: 90, slot: 0 }, mp5: { name: 'MP5', price: 110, slot: 0 }, ak74: { name: 'AK', price: 160, slot: 0 } };
 export function gunShop(seller, ids, pitch) {
   return { text: pitch, choices: [...ids.map((id) => ({ label: `${GUNS[id].name} — $${GUNS[id].price}`, go: () => buyGun(seller, id) })), { label: 'Just looking', go: null }] };
 }
