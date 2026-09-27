@@ -120,7 +120,7 @@ export function buildGreens(world, M) {
       benches.push({ x, z, face: Math.atan2(f.n[0], f.n[1]) }); nb++; }
   }
   const babs = [];
-  if (peopleReady()) { const want = ctx.isTouch ? 8 : 18, step = Math.max(1, Math.floor(benches.length / want));
+  if (peopleReady()) { const want = ctx.isTouch ? 14 : 45, step = Math.max(1, Math.floor(benches.length / want));
     for (let i = 3; i < benches.length && babs.length < want; i += step) { const b = benches[i];
       for (const off of Math.random() < 0.6 ? [-0.45, 0.45] : [0]) { const fig = buildPerson({ avatar: Math.random() < 0.6 ? 'f09' : 'f17', pose: 'sit', seed: 40 + babs.length }); if (!fig) continue;
         const ax = Math.cos(b.face), az = -Math.sin(b.face); fig.group.position.set(b.x + ax * off, 0, b.z + az * off); fig.group.rotation.y = b.face; scene.add(fig.group);

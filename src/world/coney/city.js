@@ -14,6 +14,12 @@ import { placeCars } from '../carkit.js';
 export function buildCity(world, M) {
   const { scene, ctx, R } = world;
   const G = new Batch(world, M, 'cityGround'), S = new Batch(world, M, 'city'), F = new Batch(world, M, 'cityFar');
+  if (!M.lunaPaver) {   // Luna Park walks: grey rectangular pavers in running bond (the real ones), not plain concrete
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#6f6c66'; g.fillRect(0, 0, 256, 256);
+    for (let r = 0; r < 8; r++) for (let k = -1; k < 5; k++) { const x = k * 64 + (r % 2 ? 32 : 0), y = r * 32, v = 148 + Math.random() * 30 | 0; g.fillStyle = `rgb(${v},${v},${v - 5})`; g.fillRect(x + 2, y + 2, 60, 28); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    M.lunaPaver = new THREE.MeshStandardMaterial({ map: t, roughness: 0.88, metalness: 0 }); M.lunaPaver.name = 'lunaPaver';
+  }
   // ground layers sit mm apart (visual only; the walk collider is the base slab). From the 19th floor (~50 m up, near 0.03)
   // the depth buffer can't resolve 5 mm at 100 m+ and roads/curbs/lots z-fought — "pulsating" streets as the camera swayed.
   // Each layer gets its own merged mesh and a per-draw polygon offset rank (higher = drawn on top) instead of relying on y.
@@ -31,7 +37,8 @@ export function buildCity(world, M) {
     if (r.w >= 14) { const y1 = ribbonOffset(r.p, -0.18, 0.18, 0.04), y2 = ribbonOffset(r.p, 0.18, 0.18, 0.04); if (y1) Lpaint.add('paintY', y1, { uv: false }); if (y2) Lpaint.add('paintY', y2, { uv: false }); }
     else if (r.w >= 9) walk(r.p, 6, (x, z, dx, dz) => { const d = boxGeo([-0.06, 0.04, -1.5], [0.06, 0.045, 1.5]); d.rotateY(Math.atan2(dx, dz)); d.translate(x, 0, z); Lpaint.add('paint', d, { uv: false }); });
   }
-  for (const w of OSM.w) { const g = ribbon(w.p, w.w, 0.045); if (g) Lpath.add(w.s ? 'concreteGrey' : 'concretePav', g, { uvScale: 1 / 3 }); }
+  const inLuna = (p) => { const [x, z] = cen(p); return x > 40 && x < 440 && z > -580 && z < -110; };
+  for (const w of OSM.w) { const g = ribbon(w.p, w.w, 0.045); if (g) Lpath.add(w.s ? 'concreteGrey' : inLuna(w.p) ? 'lunaPaver' : 'concretePav', g, { uvScale: w.s || !inLuna(w.p) ? 1 / 3 : 1 / 1.6 }); }
   G.flush({ shadow: false });
   for (const B of L) for (const m of B.flush({ shadow: false })) groundBias(m, B.rank);
 

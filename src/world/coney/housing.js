@@ -223,6 +223,7 @@ function makeHousingMats(world, M) {
   const fac = (map, normal, color = 0xffffff) => new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(1, 1), roughnessMap: T.rough, roughness: 1, metalness: 0, color, envMapIntensity: 0.55, emissiveMap: T.lit, emissive: 0xffffff, emissiveIntensity: 0 });
   reg('hBrickWin', fac(T.brick, T.normal, 0xe0d6d3), 'concrete');
   reg('hCreamWin', fac(T.cream, T.normal, 0xe2dbd0), 'concrete');
+  { const t = paverTexture(); reg('hPaver', new THREE.MeshStandardMaterial({ map: t, roughness: 0.88, metalness: 0, envMapIntensity: 0.4 }), 'concrete', 1); }   // interlocking grey pavers on the walks
   reg('hBaseWin', fac(T.cream, T.normal, 0xa9adb0), 'concrete');   // the light grey brick base (floors 1-3), as on the real towers
   reg('hBrickTop', fac(T.top, T.normal, 0xe0d6d3), 'concrete');
   reg('hBrickPlain', new THREE.MeshStandardMaterial({ map: T.plain, normalMap: T.normalPlain, color: 0xe0d6d3, roughness: 0.92, metalness: 0, envMapIntensity: 0.5 }), 'concrete', 1 / 9.6);
@@ -342,9 +343,9 @@ function buildAll(world, M) {
     const lb = bbox(loc); const spineX = (lb.x1 - lb.x0) > (lb.z1 - lb.z0);
     const cx = (lb.x0 + lb.x1) / 2, cz = (lb.z0 + lb.z1) / 2;
     const m = new THREE.Matrix4().makeTranslation(ox, 0, oz).multiply(new THREE.Matrix4().makeRotationY(-ang)).multiply(new THREE.Matrix4().makeTranslation(cx, 0, cz));
-    // complexes vary 20 / 21 / 22 storeys (the core is H-1 and must keep a 19th floor for the hangout walkway)
-    const H = [21, 20, 22, 20, 21][towers.indexOf(b) % 5];
-    const parts = plan(R, H).map((p) => {
+        const H = 20;   // every section flat at one roof line, as on the real towers (the core keeps its 19th-floor walkway)
+    const pl = plan(R, H), coreF = (pl.find((p) => p.kind === 'core') || pl[0]).floors;
+    const parts = pl.map((p0) => { const p = { ...p0, floors: coreF };
       // (t, s) -> local (x, z): spine along z unless the footprint's long axis is x
       const q = spineX ? { x0: p.s0, x1: p.s1, z0: p.t0, z1: p.t1 } : { x0: p.t0, x1: p.t1, z0: p.s0, z1: p.s1 };
       let ent = p.entrance; if (ent && spineX) ent = { s0: 'x0', s1: 'x1', t0: 'z0', t1: 'z1' }[ent]; else if (ent) ent = { s0: 'z0', s1: 'z1', t0: 'x0', t1: 'x1' }[ent];
@@ -609,6 +610,10 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
     const a = x0 + i * CELL, b = z0 + j * CELL, y = 0.028;
     loc.quad('hLawn', [a, y, b + CELL], [a + CELL, y, b + CELL], [a + CELL, y, b], [a, y, b], [[a / 2.5, b / 2.5 + CELL / 2.5], [(a + CELL) / 2.5, (b + CELL) / 2.5], [(a + CELL) / 2.5, b / 2.5], [a / 2.5, b / 2.5]].map(([u, w]) => [u, w]));
   }
+  // walkways: grey concrete pavers on the non-lawn cells between the lawns (within 2 cells of one)
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if (!L(i, j)) { let nearL = false; for (let di = -2; di <= 2 && !nearL; di++) for (let dj = -2; dj <= 2; dj++) if (L(i + di, j + dj)) { nearL = true; break; } if (!nearL) continue;
+    const a = x0 + i * CELL, b = z0 + j * CELL, y = 0.05; loc.quad('hPaver', [a, y, b + CELL], [a + CELL, y, b + CELL], [a + CELL, y, b], [a, y, b], [[a / 1.6, (b + CELL) / 1.6], [(a + CELL) / 1.6, (b + CELL) / 1.6], [(a + CELL) / 1.6, b / 1.6], [a / 1.6, b / 1.6]]);
+  }
   // lawn edge runs -> fence (0.3 m inside the lawn) + concrete curb
   const runs = [];
   for (let i = 0; i < nx; i++) { let start = null, sideS = 0; for (const s of [-1, 1]) { start = null; for (let j = 0; j <= nz; j++) { const e = j < nz && L(i, j) && !L(i + s, j); if (e && start === null) start = j; if (!e && start !== null) { runs.push({ s, axis: 'z', c: x0 + (i + (s > 0 ? 1 : 0)) * CELL - s * 0.3, a0: z0 + start * CELL, a1: z0 + j * CELL }); start = null; } } } }
@@ -667,6 +672,11 @@ function plantTrees(world, trees) {
 }
 
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function paverTexture() {   // grey rectangular pavers, running bond, a few darker/warmer ones, sanded joints
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#6f6c66'; g.fillRect(0, 0, 256, 256);
+  const H = 32, Wd = 64; for (let r = 0; r < 8; r++) for (let k = -1; k < 5; k++) { const x = k * Wd + (r % 2 ? Wd / 2 : 0), y = r * H, v = 150 + Math.random() * 30 | 0, w = Math.random() < 0.12 ? 12 : 0; g.fillStyle = `rgb(${v + w},${v + w * 0.4},${v - 4})`; g.fillRect(x + 2, y + 2, Wd - 4, H - 4); for (let n = 0; n < 40; n++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`; g.fillRect(x + 2 + Math.random() * (Wd - 6), y + 2 + Math.random() * (H - 6), 2, 2); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
 function mergeSimple(list) {
   const pos = [], nor = [], uv = [];
   for (let g of list) { if (g.index) g = g.toNonIndexed(); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); uv.push(...g.attributes.uv.array); }

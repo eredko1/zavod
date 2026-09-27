@@ -61,6 +61,7 @@ export function buildHangout(world, M) {
   try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
   try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }
+  try { redkoAtTablePark(world); } catch (e) { console.warn('[hangout] redko', e); }
   { let tries = 0; const t = setInterval(() => { if (world.W.babFigs?.length || ++tries > 60) { clearInterval(t); try { babushkas(world); } catch (e) { console.warn('[hangout] babushkas', e); } } }, 250); }   // greens.js seats them later in the build   // the bench grannies (greens.js seats them)   // ARKASHA's card table by building 1 (coney/durak.js)   // Igor's side work (coney/jobs.js)   // chill mode / the crews that roll through (coney/chill.js)
   // the Wonder Wheel: ride a cabin all the way round (~2.5 min) — look around and snipe from the top; F gets you off
   const wheelSpot = () => { const WW = W.wonderWheel; if (!WW || H.wheelSpot) return; H.wheelSpot = K.spot({ pos: WW.base, r: 3.2, dy: 2, prompt: 'F — RIDE THE WONDER WHEEL', act: () => rideWheel(WW) }); };   // landmarks build after the hangout
@@ -124,8 +125,7 @@ function buildIgor(world, M, pos) {
   const fence = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0); for (const y of [0.25, 1.1]) add(new THREE.BoxGeometry(L, 0.04, 0.04), iron, (x0 + x1) / 2, y, (z0 + z1) / 2, 0, -a); for (let k = 0; k <= L / 0.13; k++) { const t = k * 0.13 / L; add(new THREE.BoxGeometry(0.02, 1.22, 0.02), iron, x0 + (x1 - x0) * t, 0.61, z0 + (z1 - z0) * t); } const n = 12; for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n; wbox(Math.min(x0 + (x1 - x0) * t0, x0 + (x1 - x0) * t1) - 0.06, 0, Math.min(z0 + (z1 - z0) * t0, z0 + (z1 - z0) * t1) - 0.06, Math.max(x0 + (x1 - x0) * t0, x0 + (x1 - x0) * t1) + 0.06, 1.2, Math.max(z0 + (z1 - z0) * t0, z0 + (z1 - z0) * t1) + 0.06); } };
   const hx = Wd / 2, hz = Dd / 2;
   // wide openings on every side (6.4 m at the front gate, 5 m back and sides) — ride a bike straight through
-  fence(-hx, -hz, -2.5, -hz); fence(2.5, -hz, hx, -hz); fence(-hx, -hz, -hx, -2.5); fence(-hx, 2.5, -hx, hz); fence(hx, -hz, hx, -2.5); fence(hx, 2.5, hx, hz); fence(-hx, hz, -3.2, hz); fence(3.2, hz, hx, hz);
-  for (const [x, z] of [[-3.2, hz], [3.2, hz], [-2.5, -hz], [2.5, -hz], [-hx, -2.5], [-hx, 2.5], [hx, -2.5], [hx, 2.5]]) add(new THREE.BoxGeometry(0.08, 1.5, 0.08), iron, x, 0.75, z);
+  // (no fence: the crew hangs out here and walks in from every side)
   H.gate = new THREE.Vector3(0, 0, hz + 3).applyAxisAngle(new THREE.Vector3(0, 1, 0), toB2).add(pos);   // just outside the gate
   H.park = { pos: pos.clone(), yaw: toB2, hx, hz };
   // rundown picnic tables: faded slats, one missing plank, one knocked askew
@@ -341,6 +341,20 @@ function setDoor(D, open, send) {
 
 // ---- ARKASHA's card table: a little paved park off building 1's lobby, a stone table, two stools; durak on F ----
 const B1 = new THREE.Vector3(137, 0, -293);   // Luna Park Houses building 1 (the tower south of building 2)
+// REDKO hangs at Table Park with a cigarette; when you're around, the crew bullshits back and forth
+const BS = ['REDKO: «Короче, я вчера на Белте — сто сорок, и тут мент.»', 'SASHA: «Сто сорок на твоей тачке? Она сорок не едет.»', 'McGUINNESS: «Lads, who took my last Guinness?»', 'FELIKS: «I merged nine data sources into one map. For this. For us.»', 'THE ELF: «Джеймисон кончился. Это заговор.»', 'ARKASHA: «Кто на интерес? Бурбон, братва, Гудзон.»', 'REDKO: «Дай прикурить. …Не эту, нормальную.»', 'SASHA: «В этот раз я его обыграю. Точно.»', 'FELIKS: «Relax. The ground is supposed to breathe.»', 'REDKO: «Tool в Барклайс — лучший концерт в жизни, отвечаю.»', 'McGUINNESS: «Your round, Sasha.»', 'THE ELF: «Кто-то видел мою шапку? …Ладно, без шапки.»'];
+function redkoAtTablePark(world) {
+  const P = H.park; if (!P || !peopleReady()) return; const ctx = world.ctx;
+  const fig = buildPerson({ avatar: 'm02', seed: 21 }); standTall(fig, 1.83); addLongHair(fig, { color: 0x0c0a09 }); dressFigure(fig, ctx, { top: 'tee', shirt: 8, bottom: 'jeans' });
+  const pos = new THREE.Vector3(2.2, 0, -1.6).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.yaw).add(P.pos).setY(0); fig.group.position.copy(pos); fig.group.rotation.y = P.yaw + 2.4; world.scene.add(fig.group);
+  world.updaters.push((dt) => fig.update(dt, 0)); fig.mood = 'talk';
+  K.vendor({ name: 'REDKO', pos, r: 2.4, fig, talk: (Kk, again) => ({ text: again ? BS[(Math.random() * BS.length) | 0] : 'REDKO: «О, здорово. Сигаретку будешь? Мы тут по кругу.»',
+    choices: [{ label: 'Давай сигарету 🚬', go: () => (K.full() ? { text: 'REDKO: «Руки заняты, брат.»', choices: [{ label: 'Ok', go: null }] } : (K.give('cigs'), { text: 'REDKO: «Держи пачку. B — закурить. Передавай по кругу.»', choices: [{ label: 'Спасибо', go: null }] })) },
+      { label: 'Что обсуждаете?', go: () => ({ text: BS[(Math.random() * BS.length) | 0], choices: [{ label: 'Ха', go: null }] }) }, { label: 'Later', go: null }] }) });
+  let puffT = 3, bsT = 6;
+  K.onUpdate((dt) => { const me = ctx.player?.position; if (!me) return; puffT -= dt; if (puffT < 0) { puffT = 4 + Math.random() * 5; try { K.puff?.(pos.clone().setY(1.7)); } catch {} }
+    const d = Math.hypot(me.x - P.pos.x, me.z - P.pos.z); bsT -= dt; if (d < 14 && bsT < 0) { bsT = 9 + Math.random() * 8; ctx.hud?.toast?.(BS[(Math.random() * BS.length) | 0], 3200); } });
+}
 // the babushkas on the path benches: named, they gossip, sell seeds, and know everybody's business
 const BAB_NAMES = ['БАБА ЗИНА', 'БАБА ГАЛЯ', 'БАБА ЛЮДА', 'БАБА ВАЛЯ', 'БАБА НИНА', 'БАБА ТОМА', 'БАБА РАЯ', 'БАБА ФИРА', 'БАБА СОНЯ'];
 const GOSSIP = ['«Видела? Люська из третьего корпуса опять с новым. Третий за месяц!»', '«Аркаша опять в карты всех обыграл. Жулик, но вежливый.»', '«Этот, лохматый, Феликс — инженер! А ведёт себя как хиппи.»', '«Лифт в пятом корпусе опять не работает. Я пешком на девятнадцатый не пойду.»', '«Раньше тут всё было лучше. Всё!»', '«Внучок, ты кушал? Худой какой.»', '«Не стой над душой. Садись или иди.»'];
@@ -348,7 +362,7 @@ function babushkas(world) {
   const figs = world.W.babFigs || []; const ctx = world.ctx;
   figs.forEach((f, i) => {
     const name = BAB_NAMES[i % BAB_NAMES.length], tag = nameTag(name, '#f3c9d8'); tag.position.set(0, 1.55, 0); f.group.add(tag);
-    K.vendor({ name, pos: f.group.position, r: 2.2, fig: f, talk: (Kk, again) => ({
+    K.vendor({ name, pos: f.group.position, r: 2.2, fig: f, noMap: true, talk: (Kk, again) => ({
       text: `${name}: ${again ? GOSSIP[(Math.random() * GOSSIP.length) | 0] : '«Ну, чего встал? Садись, посиди с нами. Семечки хочешь?»'}`,
       choices: [{ label: 'Семечки — $2', go: () => ({ text: `${name}: "${sell('semechki', 2, name, { ok: 'Держи, внучок. Шелуху не кидай на дорожку!', broke: 'Два доллара, милок.', full: 'Руки полные у тебя.' })}"`, choices: [{ label: 'Спасибо, бабушка', go: null }] }) },
         { label: 'Что нового?', go: () => ({ text: `${name}: ${GOSSIP[(Math.random() * GOSSIP.length) | 0]}`, choices: [{ label: 'Ого', go: null }] }) },
