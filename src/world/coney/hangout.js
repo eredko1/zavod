@@ -215,7 +215,7 @@ function buildRedCar(world) {
   let best = null, bd = 1e9; for (const c of cars) { if (c.gone || c.kind === 'van') continue; const d = Math.hypot(c.x - sx, c.z - sz); if (d > 12 && d < bd) { bd = d; best = c; } }
   if (!best || !ctx.vehicles?.spawnCar) return;
   const i = cars.indexOf(best); stealLocal(i, false);   // the kerb slot becomes the red car
-  const car = ctx.vehicles.spawnCar(best.x, best.z, (best.ry || 0) - Math.PI / 2, 'sedan', 0xb3121c, 0);
+  const car = ctx.vehicles.spawnCar(best.x, best.z, (best.ry || 0) - Math.PI / 2, 'coupe', 0xb3121c, 0);
   if (!car) return; car.isRed = true; H.red = { car, mine: false, hidden: false };
   // a red marker so friends can find it
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '700 30px Barlow, Arial'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(20, 10, 216, 44); g.fillStyle = '#ff5a5a'; g.fillText('THE RED CAR', 128, 42);
