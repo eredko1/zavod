@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { MAPS, DEFAULT_MAP } from './world/maps/index.js';
 import { loadPeople } from './world/people.js';
+import { loadCarModels } from './world/carmodels.js';
 import { clampTextures } from './texclamp.js';
 
 const updaters = [];
@@ -64,7 +65,8 @@ export async function init(ctx) {
   };
 
   ctx.progress(0.12, `map: ${map.meta.name}`);
-  if (['coney', 'wsp', 'sbu'].includes(mapId)) { try { await loadPeople(ctx); } catch (e) { console.warn('[world] people', e); } }   // realistic NPCs (world/people.js)
+  if (['coney', 'wsp', 'sbu'].includes(mapId)) { try { await loadPeople(ctx); } catch (e) { console.warn('[world] people', e); } }
+  if (mapId === 'coney') { try { await loadCarModels(ctx); } catch (e) { console.warn('[world] car models', e); } }   // real GLB cars (world/carmodels.js)   // realistic NPCs (world/people.js)
   map.build(world);
   try { clampTextures(ctx); setTimeout(() => { try { clampTextures(ctx); } catch {} }, 5000); } catch (e) { console.warn('[world] texclamp', e); }   // phones: textures down to the device budget
   if (!W.poses.spawn && W.playerSpawns[0]) { const s = W.playerSpawns[0]; W.poses.spawn = [s.x, s.y, s.z, 0, 0]; }

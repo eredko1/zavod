@@ -122,9 +122,13 @@ export function buildGreens(world, M) {
   const babs = [];
   if (peopleReady()) { const want = ctx.isTouch ? 14 : 45, step = Math.max(1, Math.floor(benches.length / want));
     for (let i = 3; i < benches.length && babs.length < want; i += step) { const b = benches[i];
-      for (const off of Math.random() < 0.6 ? [-0.45, 0.45] : [0]) { const fig = buildPerson({ avatar: Math.random() < 0.6 ? 'f09' : 'f17', pose: 'sit', seed: 40 + babs.length }); if (!fig) continue;
+      for (const off of Math.random() < 0.6 ? [-0.45, 0.45] : [0]) { const fig = buildPerson({ avatar: 'f09', pose: 'sit', seed: 40 + babs.length }); if (!fig) continue;
         const ax = Math.cos(b.face), az = -Math.sin(b.face); fig.group.position.set(b.x + ax * off, 0, b.z + az * off); fig.group.rotation.y = b.face; scene.add(fig.group);
-        const scarf = new THREE.Mesh(new THREE.SphereGeometry(0.125, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), new THREE.MeshStandardMaterial({ color: [0x8a2a3a, 0x2a4a7a, 0x6a5a2a, 0x3a3a3a, 0x7a3a6a][babs.length % 5], roughness: 0.9 })); scarf.position.set(0, 0.01, -0.01); scarf.scale.set(1.05, 1.08, 1.12); fig.head?.add(scarf);
+        { const col = new THREE.MeshStandardMaterial({ color: [0x8a2a3a, 0x2a4a7a, 0x6a5a2a, 0x3a3a3a, 0x7a3a6a][babs.length % 5], roughness: 0.9, side: THREE.DoubleSide });   // платок: over the crown and round the back, face open, tied under the chin
+          const top = new THREE.Mesh(new THREE.SphereGeometry(0.108, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.36), col); top.position.set(0, 0.015, -0.012);
+          const back = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 10, Math.PI * 0.8, Math.PI * 1.4, Math.PI * 0.2, Math.PI * 0.5), col); back.position.set(0, 0.0, -0.01);
+          const knot = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), col); knot.position.set(0, -0.14, 0.05);
+          for (const o of [top, back, knot]) fig.head?.add(o); }
         babs.push(fig); world.updaters.push((dt) => fig.update(dt, 0)); } } }
   if (babs.length) { const LINES = ['«Опять этот наркоман…»', '«Шапку надень! Простудишься!»', '«В наше время такого не было.»', '«Видела? С пятого этажа опять полицию вызывали.»', '«Бандит! Иди работай!»', '«Ой, какой худой. Кушать надо!»', '«Это Аркашин друг. Тоже в карты играет, тунеядец.»', '«Не топчи газон!»', '«Сосиску хочешь? Нет? Ну и не надо.»', '«А Люська-то из третьего корпуса…»'];
     let cd = 0; world.updaters.push((dt) => { cd -= dt; const me = ctx.player?.position; if (cd > 0 || !me) return; for (const f of babs) { const p = f.group.position; if (Math.hypot(me.x - p.x, me.z - p.z) < 6) { cd = 10 + Math.random() * 8; ctx.hud?.toast?.('БАБУШКИ: ' + LINES[(Math.random() * LINES.length) | 0], 2600); return; } } }); }

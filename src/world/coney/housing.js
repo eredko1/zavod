@@ -630,6 +630,7 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
     const segs = []; if (len < 12) segs.push([a0, a1]); else { let q = a0; while (q < a1 - 0.5) { let e = Math.min(q + 11, a1); if (a1 - e < 3) e = a1; segs.push([q, e]); q = e + 5; } }
     for (const [s0, s1] of segs) {
       const Pp = (a, y) => r.axis === 'z' ? [r.c, y, a] : [a, y, r.c];
+      { const q = new THREE.Vector3(...Pp((s0 + s1) / 2, 0)).applyMatrix4(m); if (FENCE_HOLES.some(([hx, hz, hr]) => Math.hypot(q.x - hx, q.z - hz) < hr)) continue; }   // no fence through the crew's hangout
       if (s1 - s0 >= 7) { const W = world.W, FS = W.fenceSegs || (W.fenceSegs = []), A = new THREE.Vector3(...Pp(s0 + 1, 0)).applyMatrix4(m), B = new THREE.Vector3(...Pp(s1 - 1, 0)).applyMatrix4(m), n = new THREE.Vector3(r.axis === 'z' ? r.s : 0, 0, r.axis === 'z' ? 0 : r.s).transformDirection(m); FS.push({ a: [A.x, A.z], b: [B.x, B.z], n: [n.x, n.z] }); }   // path side of each fence stretch: greens.js lines it with benches
       const u1 = (s1 - s0) / 2.4;
       loc.quad('hFence', Pp(s0, 0.02), Pp(s1, 0.02), Pp(s1, 1.07), Pp(s0, 1.07), [[0, 0], [u1, 0], [u1, 1], [0, 1]]);
@@ -672,6 +673,8 @@ function plantTrees(world, trees) {
 }
 
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// open ground around Table Park + Arkasha's card table (hangout.js): the crew stands there, no lawn fence splitting it
+const FENCE_HOLES = [[212, -393, 16]];
 function paverTexture() {   // grey rectangular pavers, running bond, a few darker/warmer ones, sanded joints
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#6f6c66'; g.fillRect(0, 0, 256, 256);
   const H = 32, Wd = 64; for (let r = 0; r < 8; r++) for (let k = -1; k < 5; k++) { const x = k * Wd + (r % 2 ? Wd / 2 : 0), y = r * H, v = 150 + Math.random() * 30 | 0, w = Math.random() < 0.12 ? 12 : 0; g.fillStyle = `rgb(${v + w},${v + w * 0.4},${v - 4})`; g.fillRect(x + 2, y + 2, Wd - 4, H - 4); for (let n = 0; n < 40; n++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`; g.fillRect(x + 2 + Math.random() * (Wd - 6), y + 2 + Math.random() * (H - 6), 2, 2); } }

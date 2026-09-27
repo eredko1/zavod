@@ -6,6 +6,7 @@
 // Car frame: +x = front, y up (ground 0), z = width. Returns { geos: {paint, glass, rubber, rim, trim, lampW, lampR, plate}, len, w, h }.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { hasCarModel, instanceCarModel } from './carmodels.js';
 
 const KINDS = {
   //         len   w     clear belt  roof  hood   nose(x of windshield base, top), rear(top, base), wheel x, B-pillar x, tail height
@@ -191,6 +192,11 @@ export function placeCars(world, list, { raycast = true } = {}) {
   for (const c of list) { c.refs = []; if (c.color == null) c.color = null; reg.push(c); }
   for (const kind of CAR_KINDS) {
     const P = list.filter((c) => c.kind === kind); if (!P.length) continue;
+    if (hasCarModel(kind)) {   // a real model: one InstancedMesh per part
+      const T = P.map((c) => m4.compose(p.set(c.x, c.y || 0, c.z), q.setFromAxisAngle(up, c.ry || 0), one).clone());
+      const cols = P.map((c) => { const col = c.color != null ? new THREE.Color(c.color) : new THREE.Color([0xb3120f, 0xe8b400, 0xf2f2f0, 0x111214, 0x1f4fb8, 0xb3120f][(Math.random() * 6) | 0]); c.color = col.getHex(); return col; });
+      const ims = instanceCarModel(kind, T, cols, scene) || []; P.forEach((c, i) => { for (const im of ims) c.refs.push({ im, i }); }); continue;
+    }
     const G = carGeometries(kind).geos;
     for (const slot of Object.keys(G)) {
       if (!G[slot]) continue;

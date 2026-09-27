@@ -61,7 +61,7 @@ function pick(id) {
 function open() {
   if (S.root) return; try { document.exitPointerLock?.(); } catch {}
   const cur = myChar(), t = taken(), me = S.ctx.net?.id || 'me', r = document.createElement('div'); r.className = 'cs-panel';
-  const blurb = { redko: 'long hair, TOOL tee, the new guy on the block', arkasha: 'glasses, a Manhattan, never loses at durak', mcguinness: 'big afro, band tee, pints of Guinness', feliks: 'long hair, rocker, engineer, mushrooms', elf: 'full three-stripe track suit, Jameson', sasha: 'always takes, never beats' };
+  const blurb = { redko: 'NYC history, Tool and SOAD, always has a smoke', arkasha: 'geopolitics, durak as strategy, a Manhattan', mcguinness: 'jazz, punk, the Bronx, pints of Guinness', feliks: 'maps, code, mushrooms, mesh networks', elf: 'three stripes, history trivia, Jameson', sasha: 'economics, bad crypto bets, always takes' };
   r.innerHTML = `<div class="cs-box"><h2>WHO ARE YOU?</h2><div class="cs-grid">${Object.entries(CHARS).map(([id, c]) => { const h = t.get(id), busy = h && h !== me;
     return `<button data-c="${id}" class="${id === cur ? 'on' : ''}"${busy ? ' disabled' : ''}><b>${c.name}</b><small>${busy ? 'taken by ' + (S.ctx.net?.peer?.(h)?.name || 'a friend') : blurb[id] || ''}</small></button>`; }).join('')}</div><button class="cs-x" data-c="">Close</button></div>`;
   r.addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (!b || b.disabled) return; b.dataset.c ? pick(b.dataset.c) : close(); });

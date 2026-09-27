@@ -150,7 +150,7 @@ export function buildPerson(o = {}) {
   }
   // props the capsule figures had: a rasta tam, shades
   const mat = (c, r = 0.9) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
-  if (o.tam) { [0x1f7a33, 0xe0b422, 0xb4221c].forEach((c, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.125 - i * 0.01, 0.13 - i * 0.01, 0.05, 16), mat(c)); m.position.set(0, 0.02 + i * 0.045, -0.02); head.add(m); });
+  if (o.tam) { [0x1f7a33, 0xe0b422, 0xb4221c].forEach((c, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.125 - i * 0.01, 0.13 - i * 0.01, 0.05, 16), mat(c)); m.position.set(0, -0.03 + i * 0.042, -0.03); head.add(m); });
     const top = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(0x1f7a33)); top.scale.set(1.05, 0.7, 1.1); top.position.set(0, 0.14, -0.02); head.add(top); }
   if (o.glasses) {   // thin dark rims: two lens frames, a bridge, temples back to the ears (o.glasses === 'clear' → see-through lenses)
     const gm = mat(0x151515, 0.3), lens = new THREE.MeshStandardMaterial({ color: o.glasses === 'clear' ? 0xdfe8ee : 0x0a0a0a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: o.glasses === 'clear' ? 0.18 : 0.85 });
