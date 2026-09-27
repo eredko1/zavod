@@ -18,6 +18,15 @@ const pick = (a) => a[Math.floor(Math.random() * a.length)];
 let HU = null;
 
 const DEFS = [
+  // the nutcracker guys: walk the boardwalk with a bag of plastic bottles (Hennessy + juice), stop when you come close
+  { name: 'NUTCRACKER', at: () => [-120, 0, BW.z0 + 7], roam: [-260, 60], avatar: 'm18', glasses: false, hat: 'cap', yaw: Math.PI / 2, type: 'st',
+    hi: ['Nutcracker, nutcracker! Hennessy, Bacardi, whatever you want!', 'Ten dollars, fam. Strawberry Henny, it\'s crazy.', 'Nutcrackers! Cold! Don\'t tell the cops.'],
+    call: ['NUTCRACKER! NUTCRACKER!', 'Nutcrackers, cold!', 'Henny, Henny, nutcracker!'],
+    menu: [['nutcracker', 10, 'Nutcracker (strawberry Henny)'], ['nutcracker', 10, 'Nutcracker (Bacardi mango)']] },
+  { name: 'NUTCRACKER MAN', at: () => [180, 0, BW.z0 + 7], roam: [60, 330], avatar: 'm04', glasses: true, yaw: -Math.PI / 2, type: 'st',
+    hi: ['Nutcracker? Best on the boardwalk, I make it myself.', 'Nutcrackers, ten. Two for eighteen.', 'You look thirsty, my guy.'],
+    call: ['Nutcracker!', 'NUTCRACKERS!', 'Cold nutcrackers, ten!'],
+    menu: [['nutcracker', 10, 'Nutcracker (Henny + fruit punch)'], ['nutcracker', 9, 'Nutcracker (the cheap one)']] },
   { name: 'ZHORA', at: () => [LM.wheel.x + 9, 0, BW.z0 + 2.2], avatar: 'm10', glasses: true, hat: 'cap', yaw: Math.PI, type: 'ru',
     hi: ['Сигареты, травка, водочка — всё есть, всё тихо.', 'Psst. Boardwalk special. Cigs, spliffs, a little вода жизни.', 'Бурбон, братва, Гудзон — но бурбона нет. Водка есть.'],
     call: ['Сигареты! Недорого!', 'Loosies, spliffs, psst…'],
@@ -109,10 +118,11 @@ function update(dt, playing) {
   for (const h of HU.list) {
     if (h.gone) { if (now > h.gone && Math.hypot(me.x - h.home.x, me.z - h.home.z) > 45) respawn(h); continue; }
     if (h.e?.off && h.offUntil && now > h.offUntil && !h.e.hurt?.down) { h.e.off = false; h.offUntil = 0; }
+    if (h.d.roam && h.fig && !h.e?.off) { const near = Math.hypot(me.x - h.pos.x, me.z - h.pos.z) < 6; h.dir = h.dir || 1; if (!near) { h.pos.x += h.dir * 1.1 * dt; if (h.pos.x > h.d.roam[1]) h.dir = -1; else if (h.pos.x < h.d.roam[0]) h.dir = 1; h.fig.group.position.copy(h.pos); h.fig.group.rotation.y = h.dir > 0 ? Math.PI / 2 : -Math.PI / 2; } h.fig.update?.(dt, near ? 0 : 1.1); }   // the nutcracker guys stroll
     const d = Math.hypot(me.x - h.pos.x, me.z - h.pos.z);
     if (d < 9 && !h.e?.hurt?.down) { const want = Math.atan2(me.x - h.pos.x, me.z - h.pos.z); h.yaw += Math.atan2(Math.sin(want - h.yaw), Math.cos(want - h.yaw)) * Math.min(1, dt * 3); h.fig.group.rotation.y = h.yaw; }
     h.fig.mood = K.state()?.dialog?.name === h.d.name ? 'talk' : null;
-    if (d < 45) h.fig.update(dt, 0);
+    if (d < 45 && !h.d.roam) h.fig.update(dt, 0);
     h.callT -= dt; if (playing && h.callT <= 0 && d < 25 && d > 4 && !h.e?.off) { h.callT = 14 + Math.random() * 10; if (Math.random() < 0.6) K.toast(`${h.d.name}: "${pick(h.d.call)}"`, 1800); }
   }
 }

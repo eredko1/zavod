@@ -238,6 +238,8 @@ export function sammyTalk(vendorName = 'SAMMY', { cousin = false, extra = null }
     choices: [
       { label: 'Bottle of liquor — $15', go: () => after(sell('bottle', 15, vendorName, lines)) },
       { label: '40oz Olde English — $5', go: () => after(sell('forty', 5, vendorName, { ...lines, ok: `Good choice! Here — in the bag. Don't drink it in front of the store, the cops they know me. Share with your boys!` })) },
+      { label: 'Pack of Reds — $9', go: () => after(sell('cigs', 9, vendorName, { ...lines, ok: 'Marlboro Reds. You want a lighter? Two dollar.' })) },
+      { label: 'Bic lighter — $2', go: () => after(sell('bic', 2, vendorName, lines)) },
       ...(extra ? extra(K0, after) : []),
       { label: 'Nothing, just looking', go: { text: 'Looking is free. The cat is also free. …No. The cat is not free.', choices: [{ label: 'Later, Sammy', go: null }] } },
     ],
