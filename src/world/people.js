@@ -22,7 +22,7 @@ export const peopleDebug = () => P;
 export async function loadPeople(ctx) {
   if (P.ready || P.loading) return P.loading;
   const loader = new GLTFLoader(), load = (f) => new Promise((res, rej) => loader.load(BASE + f, res, undefined, rej));
-  const ids = ctx.isTouch ? MOBILE_SET : Object.keys(AVATARS);
+  const ids = ctx.lite ? MOBILE_SET : Object.keys(AVATARS);
   P.loading = (async () => {
     const [am, af, ...avs] = await Promise.all([load('anims_m.glb'), load('anims_f.glb'), ...ids.map((id) => load(id + '.glb').catch(() => null))]);
     for (const [g, gl] of [['m', am], ['f', af]]) for (const c of gl.animations) {
@@ -55,7 +55,7 @@ function cleanClip(c) {
 function prepAvatar(gltf, ctx) {
   const root = gltf.scene;
   root.traverse((o) => {
-    if (!o.isMesh) return; o.castShadow = !ctx.isTouch; o.receiveShadow = true; o.frustumCulled = true;   // culled off-screen (padded sphere below); no shadow casting on phones
+    if (!o.isMesh) return; o.castShadow = !ctx.lite; o.receiveShadow = true; o.frustumCulled = true;   // culled off-screen (padded sphere below); no shadow casting on phones
     const m = o.material; m.roughness = 0.78; m.metalness = 0; m.envMapIntensity = 0.55;
     if (/opacity/i.test(m.name)) { m.transparent = false; m.alphaTest = 0.45; m.side = THREE.DoubleSide; m.depthWrite = true; }   // hair cards, lashes
   });

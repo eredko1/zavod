@@ -660,7 +660,7 @@ function plantTrees(world, trees) {
   const trunkG = mergeSimple(bits);
   const cards = [], lump = (r, x, y, z) => { const g = new THREE.IcosahedronGeometry(r, 1), P = g.attributes.position; for (let i = 0; i < P.count; i++) { const k = 1 + (rnd() - 0.5) * 0.28; P.setXYZ(i, P.getX(i) * k + x, P.getY(i) * k * 0.82 + y, P.getZ(i) * k + z); } g.computeVertexNormals(); cards.push(g); };
   lump(3.3, 0, 9.0, 0); lump(2.5, 2.4, 7.9, 0.9); lump(2.5, -2.3, 8.0, -0.7); lump(2.4, 0.6, 8.1, 2.4); lump(2.4, -0.5, 7.9, -2.4); lump(2.2, 0.4, 10.9, -0.3);
-  const fringe = ctx.isTouch ? 4 : 10;
+  const fringe = ctx.lite ? 4 : 10;
   for (let i = 0; i < fringe; i++) { const a = i / fringe * Math.PI * 2 + rnd() * 0.4, q = new THREE.PlaneGeometry(3.6, 3.0); q.rotateX((rnd() - 0.5) * 0.6); q.rotateY(a + Math.PI / 2); q.translate(Math.cos(a) * 3.4, 7.6 + rnd() * 2.6, Math.sin(a) * 3.4); cards.push(q); }
   const canopyG = mergeSimple(cards);
   const trunkM = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.9, color: 0xa89f8c });

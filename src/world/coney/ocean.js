@@ -9,7 +9,7 @@
 //    same maths as horizon.js' dome), GGX-ish sun / moon glint, horizon haze identical to the far-ocean disc it fades into.
 // Lights / fog / sky come from the live scene each frame (key light, hemi, fog, the 'horizon:sky' dome), so the day → dusk →
 // night cycle and the lunafilm grade just work. No transmission, no reflection pass, no depth-texture read: 1 draw call.
-// Phones (ctx.isTouch): ~1/3 of the vertices and a cheaper fragment path (fewer normal waves, no cloud reflection).
+// Phones (ctx.lite): ~1/3 of the vertices and a cheaper fragment path (fewer normal waves, no cloud reflection).
 // CPU twin: waveHeight(x, z) evaluates the exact same function (incl. the Gerstner inverse) for the jet skis.
 import * as THREE from 'three';
 
@@ -23,7 +23,7 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
 
 export function buildOcean(world, { waterZ, WATER_Y, SAND_TOP, BZ1 }) {
   const { scene, ctx, W } = world;
-  const low = !!ctx.isTouch;
+  const low = !!ctx.lite;
   const X0 = -1000, NX = 381;
   const wl = new Float32Array(NX * 4); for (let i = 0; i < NX; i++) wl[i * 4] = waterZ(X0 + i * 5);
   const tWL = new THREE.DataTexture(wl, NX, 1, THREE.RGBAFormat, THREE.FloatType); tWL.minFilter = tWL.magFilter = THREE.NearestFilter; tWL.needsUpdate = true;

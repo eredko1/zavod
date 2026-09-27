@@ -5,7 +5,7 @@
 const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap', 'specularMap'];
 
 export function textureBudget(ctx) {
-  if (!ctx.isTouch) return { max: 2048, people: 1024, low: false };
+  if (!ctx.lite) return { max: 2048, people: 1024, low: false };
   const mem = navigator.deviceMemory || 0, cores = navigator.hardwareConcurrency || 0;
   const low = (mem && mem <= 4) || (cores && cores <= 4) || /iPad;|iPad Mini|iPhone OS 1[0-5]_/i.test(navigator.userAgent) || ctx.qs?.get?.('lowmem') === '1';
   return low ? { max: 512, people: 256, low: true } : { max: 1024, people: 512, low: false };
