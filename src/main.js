@@ -99,6 +99,11 @@ function setState(s) {
   if (s !== 'playing' && input.locked) document.exitPointerLock();
 }
 ctx.setState = setState;
+// "Reset map for everyone" (Settings): chill maps clear through hangkit's worldReset; wave maps also restart the waves.
+// Maps without the hangout kit hear the net 'fresh' here (hangkit bridges it itself where it runs; the stamp dedupes).
+let lastReset = 0;
+ctx.bus.on('worldReset', () => { lastReset = performance.now(); if (ctx.mode !== 'chill') setTimeout(() => ctx.restart(), 0); });
+ctx.bus.on('net:fresh', () => setTimeout(() => { if (performance.now() - lastReset > 500) ctx.bus.emit('worldReset', { by: 'net' }); }, 50));
 ctx.restart = () => {
   for (const [name, m] of MODULES) { if (m.reset) { try { m.reset(ctx); } catch (e) { console.error(`[reset:${name}]`, e); } } }
   ctx.time.elapsed = 0; ctx.bus.emit('restart');

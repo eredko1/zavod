@@ -272,6 +272,7 @@ function peerFor(pid, name) {
   const ctx = S.ctx; const asset = ctx.ai?.asset; if (!asset) return null;
   const inst = createInstance(asset, [...pid].reduce((a, c) => a + c.charCodeAt(0), 0) % 3);
   ctx.scene.add(inst.group);
+  import('./world/outfits.js').then((m) => m.dressRemote(inst, pid, ctx)).catch((e) => console.warn('[net] outfit', e));   // lazy: a static import cycles through people.js and stalls net init   // friends show up as the hero (jeans + their own band tee), not a soldier
   for (const h of inst.hitboxes) { h.userData.remote = pid; delete h.userData.soldier; ctx.raycastTargets.push(h); }
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: true })); tag.scale.set(1.3, 0.33, 1); tag.renderOrder = 5; ctx.scene.add(tag);
   const now = performance.now();

@@ -149,6 +149,7 @@ export function buildShore(world, M) {
   {
     const at = (x, dz, yaw) => ({ x, z: waterZ(x) + dz, yaw });
     world.W.jetskiSpots = [at(-347, 13, Math.PI), at(-378, 16, Math.PI * 0.9), at(-322, 32, Math.PI * 0.6), at(-262, 12, Math.PI * 1.1), at(-65, 12, Math.PI), at(75, 13, Math.PI * 0.95)];
+    for (let x = -780; x <= 740; x += 80) if (Math.abs(x + 340) > 70 && ![-262, -65, 75].some((q) => Math.abs(q - x) < 25)) world.W.jetskiSpots.push(at(x + ((x * 7919) % 17), 9 + ((x * 31) % 5 + 5) % 5, Math.PI * (0.85 + (((x * 13) % 30) + 30) % 30 / 100)));   // one on every block of beach
   }
   G.flush({ shadow: false }); S.flush({ shadow: true });
 }

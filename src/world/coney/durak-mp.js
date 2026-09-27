@@ -228,7 +228,7 @@ function near(r = NEAR) { const p = S.ctx.player?.position, a = S.pos?.(); retur
 function view() {
   const T = S.T; if (!T) return { G: null, me: -1, names: [], ai: [], seats: [] };
   const me = myId(), s = seatOf(T);
-  return { G: T.G, me: T.ph === 'play' ? s : -1, names: T.seats.map((x) => x.n), ai: T.seats.map((x) => !x.id), host: T.host === me, hostName: T.seats.find((x) => x.id === T.host)?.n || nameOf(T.host),
+  return { G: T.G, me: T.ph === 'play' ? s : -1, names: T.seats.map((x) => x.n), ids: T.seats.map((x) => x.id || null), ai: T.seats.map((x) => !x.id), host: T.host === me, hostName: T.seats.find((x) => x.id === T.host)?.n || nameOf(T.host),
     stake: T.stake, mode: T.mode, deal: T.deal, want: T.want, humans: humans(T).length, seats: T.seats.map((x) => ({ n: x.n, ai: !x.id, me: x.id === me })), wait: T.wait.map((w) => w.n) };
 }
 const ADAPTER = { view, move: (m) => move(m), deal: () => deal(), again: () => again(), seats: (n) => seats(n) };
