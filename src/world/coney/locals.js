@@ -163,6 +163,8 @@ function buildMarket(world, H) {
       choices: [
         { label: 'Shashlik — $12', go: () => ({ text: 'OLGA: "' + sell('meat', 12, 'OLGA', { ok: 'Here. Grill it on the mangal in the park. Not in the microwave. I will know.', broke: 'Twelve dollar. Is not charity.', full: 'Your hands are full. Put something down.' }) + '"', choices: [{ label: 'Spasibo', go: null }] }) },
         { label: 'Kvass — $3', go: () => ({ text: 'OLGA: "' + sell('kvass', 3, 'OLGA', { ok: 'Kvass. Very healthy. Is basically bread.', broke: 'Three dollar.', full: 'Hands full.' }) + '"', choices: [{ label: 'Spasibo', go: null }] }) },
+        { label: 'Сигареты — $8', go: () => ({ text: 'OLGA: "' + sell('cigs', 8, 'OLGA', { ok: 'Here. Smoking kills. Also here is lighter? Two dollar.', broke: 'Eight dollar.', full: 'Hands full.' }) + '"', choices: [{ label: 'Спасибо', go: null }] }) },
+        { label: 'Зажигалка — $2', go: () => ({ text: 'OLGA: "' + sell('bic', 2, 'OLGA', { ok: 'Bic. Do not light shashlik with it.', broke: 'Two dollar.', full: 'Hands full.' }) + '"', choices: [{ label: 'Спасибо', go: null }] }) },
         { label: 'Just looking', go: { text: 'OLGA: "Looking costs one dollar." (she is joking) (probably)', choices: [{ label: '…', go: null }] } },
       ] }) });
   } else console.warn('[locals] no spot for the market');

@@ -759,7 +759,7 @@ function coreInterior(L, p, Ht) {
     // rotated towers turn every collider cell into a world AABB, so coarse cells bulge ~0.7 m past their faces and
     // pinch the bottom landing shut — everything bordering the stairwell at ground level uses fine cells.
     const gF = (...v) => { const [mn, mx] = bx(...v); L.collide(mn, mx, 0.2); };
-    if (sh0 > mid + GROUND_HI) gF(mid + GROUND_HI, 0, i0, sh0, ST, i1);
+    if (sh0 > mid + GROUND_HI) gF(mid + GROUND_HI, 0, (i0 + i1) / 2 + 0.35, sh0, ST, i1);   // lane A stays open: a corridor from the lobby to the fire stair
     const gap = Math.min(sh1 + 1.4, A[1]); gF(sh1, 0, i0, gap, ST, i1); if (gap < A[1]) col(gap, 0, i0, A[1], ST, i1);
   }
   else { const [mn, mx] = bx(mid + GROUND_HI, 0, i0, A[1], ST, i1); L.collide(mn, mx, 1.0); }   // 1 m cells: coarse ones bulged past the wall on the rotated towers
@@ -773,7 +773,9 @@ function coreInterior(L, p, Ht) {
   vis('hLobbyFloor', mid - LOBBY_HALF, 0, i0, mid + GROUND_HI, 0.03, i1);
   vis('hLobbyCeiling', mid - LOBBY_HALF, ST - 0.07, i0, mid + GROUND_HI, ST - 0.04, i1);   // clear of the slab above (it z-fought)
   for (let a = mid - LOBBY_HALF + 1.5; a < mid + GROUND_HI - 1; a += 3) vis('hLobbyCeil', a - 0.6, ST - 0.1, (i0 + i1) / 2 - 0.3, a + 0.6, ST - 0.075, (i0 + i1) / 2 + 0.3);
-  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); vis('hLobbyWall', mid + GROUND_HI, 0, i0, mid + GROUND_HI + 0.05, ST, i1);
+  vis('hLobbyWall', mid - LOBBY_HALF - 0.05, 0, i0, mid - LOBBY_HALF, ST, i1); { const cq = (i0 + i1) / 2 + 0.35, open = hasB && bToGround && sh0 > mid + GROUND_HI + 0.2;   // the lobby's far wall: a doorway into the stair corridor when the fire stair reaches the ground
+    vis('hLobbyWall', mid + GROUND_HI, 0, open ? cq : i0, mid + GROUND_HI + 0.05, ST, i1);
+    if (open) { vis('hLobbyFloor', mid + GROUND_HI, 0, i0, sh0, 0.03, cq); vis('hLobbyCeiling', mid + GROUND_HI, ST - 0.07, i0, sh0, ST - 0.04, cq); vis('hLobbyWall', mid + GROUND_HI, 0, cq, sh0, ST, cq + 0.05); } }
   const cars = [0, 1, 2].map((k) => i0 + (i1 - i0) * (k + 0.5) / 3);
   // the bank of 3 steel cars on the lobby end wall (a = mid - LOBBY_HALF, facing +a): ground floor and the same shafts on 19
   const bank = (y) => { const e = mid - LOBBY_HALF; for (const cc of cars) {
@@ -792,7 +794,7 @@ function coreInterior(L, p, Ht) {
     for (const a of [mid + 6.5, mid + 10.5]) { vis('hRail', a - 0.9, 0.42, i0 + 0.35, a + 0.9, 0.47, i0 + 0.8); vis('hRail', a - 0.9, 0.47, i0 + 0.3, a + 0.9, 0.9, i0 + 0.36); col(a - 0.9, 0, i0 + 0.3, a + 0.9, 0.5, i0 + 0.8); }   // benches along the glass
     for (const a of [mid - LOBBY_HALF + 0.6, mid + GROUND_HI - 0.9]) for (const c of [i0 + 0.45, i1 - 0.45]) { vis('hDirectory', a - 0.3, 0, c - 0.3, a + 0.3, 0.6, c + 0.3); vis('hLawn', a - 0.26, 0.6, c - 0.26, a + 0.26, 0.95, c + 0.26); }   // planters
   }
-  vis('hMail', mid + GROUND_HI - 0.3, 0.85, i0 + 0.45, mid + GROUND_HI, 1.95, i1 - 0.45);          // mailboxes
+  vis('hMail', mid + GROUND_HI - 0.3, 0.85, hasB && bToGround && sh0 > mid + GROUND_HI + 0.2 ? (i0 + i1) / 2 + 0.6 : i0 + 0.45, mid + GROUND_HI, 1.95, i1 - 0.45);          // mailboxes
   vis('hRail', mid + GROUND_HI - 0.33, 0.8, i0 + 0.4, mid + GROUND_HI, 0.85, i1 - 0.4);
   const nrm = (dc) => { const q = P3(0, 0, dc); return [q[0], q[2]]; };   // local normal pointing along +/-c
   const nrmA = (da) => { const q = P3(da, 0, 0); return [q[0], q[2]]; };  // local normal pointing along +/-a

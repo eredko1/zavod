@@ -345,8 +345,10 @@ function buildDurakPark() {
   let t1 = null; for (const t of H.towers) if (t !== H.b2 && (!t1 || t.centre.distanceTo(B1) < t1.centre.distanceTo(B1))) t1 = t; if (!t1) return;
   const door = t1.lobby.doors[0], dir = door.outside.clone().sub(door.inside).setY(0).normalize(), side = new THREE.Vector3(-dir.z, 0, dir.x);
   const c = door.outside.clone().addScaledVector(dir, 6).addScaledVector(side, 7); c.y = 0;
+  let yaw = Math.atan2(side.x, side.z);
+  if (H.park) { const P = H.park, off = new THREE.Vector3(0, 0, -(P.hz + 9)).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.yaw); c.copy(P.pos).add(off).setY(0); yaw = P.yaw; }   // right next to Table Park (the crew drifts between the two)
   const q = ctx.ai?.nav?.nearestFree?.(c.x, c.z, 8, 0); if (q) c.set(q.x, 0, q.z);
-  const g = new THREE.Group(); g.position.copy(c); g.rotation.y = Math.atan2(side.x, side.z); world.scene.add(g);
+  const g = new THREE.Group(); g.position.copy(c); g.rotation.y = yaw; world.scene.add(g);
   const M = (col, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: col, roughness: r, metalness: m });
   const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
   add(new THREE.BoxGeometry(9, 0.06, 8), M(0x8d8a83, 0.95), 0, 0.03, 0);   // pavers
