@@ -14,6 +14,7 @@ import { createAreaPicker } from './area-picker.js';
 import {createBuildProgress,buildStageLabel,paintProgress as settle} from './build-progress.js';
 
 const $=id=>document.getElementById(id),log=createMergeLog(document);
+if(['localhost','127.0.0.1','[::1]'].includes(location.hostname))$('endpoint').value='https://overpass-api.de/api/interpreter';
 const loading=createBuildProgress($('build-loading'));
 initHelp($('pipeline'));
 const geometryOptions=()=>({storey:Number($('storey').value),curb:Number($('curb-height').value),terrain:$('terrain-enabled').checked});
