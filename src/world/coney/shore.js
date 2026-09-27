@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { Batch, boxGeo } from '../sbu/geo.js';
 import { OSM } from './osm.js';
 import { walk, bbox, pip } from '../osmkit.js';
+import { buildOcean } from './ocean.js';
 
 export const BW = { z0: 137, z1: 161, x0: -900, x1: 800 };   // boardwalk deck (y = 0)
 export const SAND_TOP = -1.3, WATER_Y = -2.35;
@@ -64,7 +65,7 @@ export function buildShore(world, M) {
   }
 
   // ---- ocean ------------------------------------------------------------------------------------------------------
-  buildOcean(world);
+  buildOcean(world, { waterZ, WATER_Y, SAND_TOP, BZ1: BW.z1 });   // coney/ocean.js: swell + surf + swash, one shader
 
   // ---- boardwalk deck, bulkhead, piles, railing, stairs --------------------------------------------------------------
   const deckT = 0.35;
@@ -143,6 +144,13 @@ export function buildShore(world, M) {
     S.add('wheelBlue', boxGeo([main[0], 3.4, sz - 7], [main[1], 3.6, sz + 7]), { uv: false });
     world.cover(cx, BW.z1 + 60, 0, -1); world.cover(cx, BW.z1 + 180, 0, 1);
   }
+  // jet skis (vehicles.js, stealable like the bikes): moored in the shallows either side of the pier, one further out
+  // (wade out to it) and along the swimming beach in front of the rides
+  {
+    const at = (x, dz, yaw) => ({ x, z: waterZ(x) + dz, yaw });
+    world.W.jetskiSpots = [at(-347, 13, Math.PI), at(-378, 16, Math.PI * 0.9), at(-322, 32, Math.PI * 0.6), at(-262, 12, Math.PI * 1.1), at(-65, 12, Math.PI), at(75, 13, Math.PI * 0.95)];
+    for (let x = -780; x <= 740; x += 80) if (Math.abs(x + 340) > 70 && ![-262, -65, 75].some((q) => Math.abs(q - x) < 25)) world.W.jetskiSpots.push(at(x + ((x * 7919) % 17), 9 + ((x * 31) % 5 + 5) % 5, Math.PI * (0.85 + (((x * 13) % 30) + 30) % 30 / 100)));   // one on every block of beach
+  }
   G.flush({ shadow: false }); S.flush({ shadow: true });
 }
 
@@ -150,53 +158,4 @@ function stairs(S, world, sx) {
   const w = 4.5, n = 5, rise = -SAND_TOP / n, run = 0.4;
   for (let i = 0; i < n; i++) { const y = -rise * (i + 1), z = BW.z1 + i * run; S.box('concreteGrey', [sx - w / 2, SAND_TOP - 0.4, z], [sx + w / 2, y + 0.001 + rise * 0.0, z + run], { walkable: true }); }
   for (const s of [-1, 1]) S.add('steelDark', boxGeo([sx + s * w / 2 - 0.04, 0.9 - 0.1, BW.z1], [sx + s * w / 2 + 0.04, 1.0, BW.z1 + n * run]), { uv: false });
-}
-
-function buildOcean(world) {
-  const { scene, ctx } = world;
-  const S = 256; const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); const img = g.createImageData(S, S);
-  // tileable wave height field (sum of periodic sines) -> normal map
-  const H = new Float32Array(S * S);
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let h = 0; for (let k = 1; k <= 6; k++) { const fx = [1, 2, 3, 5, 7, 11][k - 1], fy = [2, 1, 4, 3, 6, 5][k - 1]; h += Math.sin((x * fx + y * fy) / S * Math.PI * 2 + k * 1.7) / k; } H[y * S + x] = h; }
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const dx = H[y * S + (x + 1) % S] - H[y * S + (x - 1 + S) % S], dy = H[((y + 1) % S) * S + x] - H[((y - 1 + S) % S) * S + x]; const n = new THREE.Vector3(-dx * 2.2, -dy * 2.2, 1).normalize(); const i = (y * S + x) * 4; img.data[i] = (n.x * 0.5 + 0.5) * 255; img.data[i + 1] = (n.y * 0.5 + 0.5) * 255; img.data[i + 2] = (n.z * 0.5 + 0.5) * 255; img.data[i + 3] = 255; }
-  g.putImageData(img, 0, 0);
-  const nt = new THREE.CanvasTexture(c); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.repeat.set(1, 1);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x2c5a63, roughness: 0.12, metalness: 0.0, normalMap: nt, normalScale: new THREE.Vector2(0.45, 0.45), envMapIntensity: 0.8, transparent: true, opacity: 0.96, name: 'ocean' });
-  const U = { uT: { value: 0 } };
-  mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uT = U.uT;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; uniform float uT;')
-      .replace('#include <normal_fragment_maps>', `
-        vec3 n1 = texture2D(normalMap, vWP.xz / 23.0 + vec2(uT * 0.011, uT * 0.017)).xyz * 2.0 - 1.0;
-        vec3 n2 = texture2D(normalMap, vWP.xz / 9.0 - vec2(uT * 0.021, -uT * 0.006)).xyz * 2.0 - 1.0;
-        vec3 nt = normalize(vec3((n1.xy + n2.xy) * 0.35, 1.0));
-        normal = normalize(tbn * nt);`)
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        float far = smoothstep(40.0, 600.0, length(vWP.xz - cameraPosition.xz));
-        float shallow = 1.0 - smoothstep(0.0, 45.0, vWP.z - 290.0);
-        diffuseColor.rgb = mix(mix(vec3(0.07, 0.15, 0.17), vec3(0.10, 0.20, 0.24), far), vec3(0.13, 0.27, 0.26), shallow * 0.8);          // green-teal near shore, blue offshore
-        // breaking surf: foam bands parallel to the shore, animated toward the beach
-        float shore = vWP.z;`)
-      ;
-  };
-  mat.customProgramCacheKey = () => 'coney-ocean';
-  const g2 = new THREE.PlaneGeometry(4000, 2200, 1, 1); g2.rotateX(-Math.PI / 2); g2.translate(0, 0, 1350);
-  const m = new THREE.Mesh(g2, mat); m.position.y = WATER_Y; m.name = 'ocean'; m.receiveShadow = false; m.renderOrder = 1; scene.add(m);
-  // surf foam: 3 soft bands following the waterline, drifting shoreward and fading
-  const fc = document.createElement('canvas'); fc.width = 512; fc.height = 64; const fg = fc.getContext('2d'); fg.clearRect(0, 0, 512, 64);
-  for (let i = 0; i < 900; i++) { const x = Math.random() * 512, y = 20 + Math.random() * 24 + Math.sin(x / 30) * 6; fg.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.5})`; fg.beginPath(); fg.ellipse(x, y, 3 + Math.random() * 9, 1 + Math.random() * 2.5, 0, 0, 7); fg.fill(); }
-  const ft = new THREE.CanvasTexture(fc); ft.wrapS = THREE.RepeatWrapping;
-  const bands = [];
-  for (let k = 0; k < 3; k++) {
-    const pos = [], uv = [], idx = [];
-    for (let x = X0, i = 0; x <= X1; x += 10, i++) { const zw = waterZ(x); pos.push(x, 0, zw - 2, x, 0, zw + 9); uv.push(x / 60, 0, x / 60, 1); if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); } }
-    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gg.setIndex(idx);
-    const fm = new THREE.MeshBasicMaterial({ map: ft, transparent: true, depthWrite: false, opacity: 0.8, color: 0xf4f8f8, name: 'foam' });
-    const mesh = new THREE.Mesh(gg, fm); mesh.position.y = WATER_Y + 0.03; mesh.renderOrder = 2; mesh.name = 'surf' + k; scene.add(mesh); bands.push({ mesh, ph: k / 3 });
-  }
-  world.updaters.push((dt) => {
-    U.uT.value += dt;
-    for (const b of bands) { const t = (U.uT.value * 0.09 + b.ph) % 1; b.mesh.position.z = 26 * (1 - t) - 4; b.mesh.material.opacity = Math.sin(t * Math.PI) * 0.75; b.mesh.material.map.offset.x = b.ph + U.uT.value * 0.003; }
-  });
 }

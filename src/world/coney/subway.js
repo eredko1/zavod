@@ -1,8 +1,10 @@
 // CONEY — ride the F. One six-car R160 F train shuttles on the wall clock (every client sees the same train) along the real
 // OSM alignment: Coney Island–Stillwell Av (track 3, the F) → out of the terminal's south throat, east along the el →
 // W 8 St–NY Aquarium (upper level, where the F stops) → north up the Culver el over Shell Rd → Neptune Av, and back.
-// Doors open at every stop: F — board; F again at a stop — get off. You ride standing by a door, free to look around the car
-// or out the windows; the chime and the stop announcements are the real ones. Neptune Av (elevated, side platforms, stairs
+// Doors open at every stop: F (touch: BOARD F) or just walk in through an open door; F / GET OFF or walk out at a stop to get
+// off. Aboard you walk the car's aisle (it carries you and turns you on the curves); the chime and the stop announcements are
+// the real ones. Signposting: green globe lamps + F bullets at every entrance, an "F ↑" sign over Stillwell's F stairs, a
+// next-train HUD in / near the stations, the train on the minimap. Online, riders are sent in car coordinates (net.js). Neptune Av (elevated, side platforms, stairs
 // down to Shell Rd & Neptune Ave) is built here, with the el structure from W 8 St up to it. CONEY agent (subway).
 import * as THREE from 'three';
 import { OSM } from './osm.js';
@@ -32,7 +34,7 @@ export function buildSubway(world) {
   let s = 0; P.forEach((p, i) => { if (i) s += Math.hypot(p.x - P[i - 1].x, p.z - P[i - 1].z); p.s = s; });
   const w8idx = P.map((p, i) => (inW8(p) ? i : -1)).filter((i) => i >= 0), w8s0 = P[w8idx[0]].s, w8s1 = P[w8idx[w8idx.length - 1]].s;
   for (const p of P) { const d = p.s < w8s0 ? w8s0 - p.s : p.s > w8s1 ? p.s - w8s1 : 0; const k = Math.max(0, 1 - d / 90); p.y = RAIL + (W8.UP.rail - RAIL) * (k * k * (3 - 2 * k)); }
-  R.P = P; R.L = s;
+  R.P = P; R.L = s; R.w8u = w8u;
   // stops (s of the train's HEAD = the end with larger s)
   const sAt = (pred) => { for (const p of P) if (pred(p)) return p.s; return null; };
   const sStw = sAt((p) => p.z > STW_ZS - 2) ?? 180;
@@ -59,12 +61,19 @@ export function buildSubway(world) {
   ctx.bus.on('playerDied', () => { if (R.aboard) alight(true); });
   ctx.bus.on('worldReset', () => { if (R.aboard) alight(true); });
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'NEPTUNE AV STATION', x: P[P.length - 1].x, z: NEP_Z, kind: 'transit' });
+  buildEntrances(world);
+  // for net.js (riders are sent in car coordinates, so a friend on the same train stays inside it on every screen) and the map
+  ctx.subway = {
+    local: () => (R.aboard ? [R.aboard.c, +R.aboard.lx.toFixed(2), +R.aboard.lz.toFixed(2)] : null),
+    toWorld: (c, lx, lz, out = new THREE.Vector3()) => { const g = R.cars[c]; if (!g) return null; g.updateMatrixWorld(); return out.set(lx, FLOOR, lz).applyMatrix4(g.matrixWorld); },
+    train: () => { const a = R.cars[0].position, b = R.cars[NCAR - 1].position; return [a.x, a.z, b.x, b.z]; },
+  };
   if (typeof window !== 'undefined' && window.__game) window.__game.subway = {
     state: () => ({ aboard: !!R.aboard, leg: legNow().kind, stop: legNow().stop?.id || null, head: +headS().toFixed(1), cycle: +R.cycle.toFixed(1), L: +R.L.toFixed(1), door: R.boardable ? R.doorPos.toArray().map((v) => +v.toFixed(2)) : null, pos: R.ctx.player.position.toArray().map((v) => +v.toFixed(2)) }),
     stops: () => R.stops.map((q) => ({ id: q.id, s: +q.s.toFixed(1), at: ptAt(q.s - LEN / 2).toArray().map((v) => +v.toFixed(1)) })),
     until: (id) => { const t = now() % R.cycle; const l = R.legs.find((g) => g.kind === 'dwell' && g.stop.id === id); return l ? ((l.t0 - t) % R.cycle + R.cycle) % R.cycle : null; },
     debug: () => ({ side: R.stops.map((q) => q.sideCache || null), cars: R.cars.map((g) => g.position.toArray().map((v) => +v.toFixed(1))), open: R.lastOpen }),
-    board: () => board(), alight: () => alight(), skew: (sec) => { R.skew = (R.skew || 0) + sec; },
+    nepStairs: () => R.nep?.stairs, board: () => board(), alight: () => alight(), skew: (sec) => { R.skew = (R.skew || 0) + sec; },
   };
   console.log('[subway] F route', Math.round(R.L), 'm ·', stops.map((q) => `${q.id}@${Math.round(q.s)}`).join(' '), '· cycle', Math.round(R.cycle), 's');
 }
@@ -200,40 +209,130 @@ function update(dt) {
   const annKey = l.kind + (l.stop?.id || l.a?.id) + (l.b?.id || l.next?.id || '') + Math.floor(t / R.cycle);
   if (R.aboard && annKey !== R.lastAnn) { R.lastAnn = annKey; announce(l); }
   // boarding: the train is at a platform with its doors open and you're on that platform near a door
-  R.boardable = null;
-  if (l.kind === 'dwell' && open > 0.8 && !R.aboard) {
-    const me = ctx.player.position; let best = null, bd = 2.6;
-    R.cars.forEach((g, c) => { for (const dz of [-6.2, -2.1, 2.1, 6.2]) for (const sx of dwellSide === 2 ? [-1, 1] : [dwellSide]) { _a.set(sx * 2.2, FLOOR, dz).applyMatrix4(g.matrixWorld); const d = Math.hypot(_a.x - me.x, _a.z - me.z); if (d < bd && Math.abs(_a.y - me.y) < 2.5) { bd = d; best = { c, dz, sx }; R.doorPos.copy(_a); } } });
-    if (best) { R.boardable = { ...best, next: l.next }; }
+  R.boardable = null; R.open = open; R.side = dwellSide; R.leg = l;
+  const playing = ctx.state === 'playing', p = ctx.player;
+  if (l.kind === 'dwell' && open > 0.8 && !R.aboard && !p.dead && !(p.mounted && !p.mounted.train)) {
+    const me = p.position; let best = null, bd = 2.6;
+    R.cars.forEach((g, c) => { for (const dz of DOORZ) for (const sx of dwellSide === 2 ? [-1, 1] : [dwellSide]) { _a.set(sx * 2.2, FLOOR, dz).applyMatrix4(g.matrixWorld); const d = Math.hypot(_a.x - me.x, _a.z - me.z); if (d < bd && Math.abs(_a.y - me.y) < 2.5) { bd = d; best = { c, dz, sx }; R.doorPos.copy(_a); } } });
+    if (best) R.boardable = { ...best, next: l.next };
   }
-  // riding: stand inside by your door; free look; F at a stop gets you off
+  // the car body is solid to someone on a platform (it has no colliders — it moves): walking into its side pushes you back
+  // out, except through an open door on the platform side, which boards you (no F needed)
+  if (!R.aboard && !p.dead && !p.mounted && Math.hypot(p.position.x - R.cars[2].position.x, p.position.z - R.cars[2].position.z) < 90) {
+    for (let c = 0; c < NCAR; c++) { const g = R.cars[c]; _inv.copy(g.matrixWorld).invert(); _b.copy(p.position).applyMatrix4(_inv);
+      if (Math.abs(_b.z) > CAR / 2 - 0.1 || Math.abs(_b.y - FLOOR) > 1.0 || Math.abs(_b.x) > 1.85) continue;
+      const door = DOORZ.find((dz) => Math.abs(_b.z - dz) < 0.62), sd = Math.sign(_b.x) || 1;
+      if (door != null && R.boardable && open > 0.8 && (dwellSide === 2 || sd === dwellSide)) { if (playing) board(sd * 1.25, _b.z, c); break; }
+      if (Math.abs(_b.x) < 1.85) { _b.x = sd * 1.85; _b.applyMatrix4(g.matrixWorld); p.position.x = _b.x; p.position.z = _b.z; } }
+  }
+  // riding: you stand in the car and can walk its aisle (WASD / stick, relative to where you look); the car carries you and
+  // turns you with it on the curves. At a stop: F, or walk out through an open door on the platform side, gets you off.
   if (R.aboard) {
-    const g = R.cars[R.aboard.c]; g.updateMatrixWorld(true);
-    const p = ctx.player; _a.set(R.aboard.sx * 0.75, FLOOR, R.aboard.dz).applyMatrix4(g.matrixWorld);
-    p.position.set(_a.x, _a.y, _a.z); p.velocity?.set?.(0, 0, 0);
-    const cam = ctx.camera; cam.position.set(_a.x, _a.y + 1.62, _a.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); p.cameraPosition?.copy?.(cam.position);
+    const A = R.aboard, g = R.cars[A.c]; g.updateMatrixWorld(true);
+    const head = Math.atan2(g.matrixWorld.elements[8], g.matrixWorld.elements[10]);   // the car's local +z in world
+    if (A.head != null) { let d = head - A.head; d = Math.atan2(Math.sin(d), Math.cos(d)); p.yaw += d; } A.head = head;
     R.canAlight = l.kind === 'dwell' && open > 0.8;
-    if (l.kind === 'dwell' && open > 0.8 && !R.hintOff) { R.hintOff = true; K.toast(`F — GET OFF at ${l.stop.name}`, 2600); }
-    if (l.kind !== 'dwell') R.hintOff = false;
+    const inp = ctx.input; let ix = 0, iy = 0;
+    if (playing && inp) { if (inp.forward) iy += 1; if (inp.back) iy -= 1; if (inp.right) ix += 1; if (inp.left) ix -= 1; }
+    const il = Math.hypot(ix, iy);
+    if (il > 0) { const sp = (inp.sprint ? 3.4 : 2.2) * Math.min(dt, 0.05) / il;   // walking pace inside a car
+      const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
+      const wx = (fx * iy + rx * ix) * sp, wz = (fz * iy + rz * ix) * sp, sh = Math.sin(head), ch = Math.cos(head);
+      A.lz += wx * sh + wz * ch; A.lx += wx * ch - wz * sh; A.walkT = (A.walkT || 0) + dt; }
+    const LZ = (CAR - 0.4) / 2 - 0.45; A.lz = Math.max(-LZ, Math.min(LZ, A.lz));
+    const door = DOORZ.find((dz) => Math.abs(A.lz - dz) < 0.6), openHere = R.canAlight && door != null && (dwellSide === 2 || Math.sign(A.lx) === dwellSide);
+    if (Math.abs(A.lx) < 1.15) A.inside = true;   // walked in off the doorway: from now on walking back out gets you off
+    if (openHere && A.inside && Math.abs(A.lx) > 1.34) { alight(false, door, Math.sign(A.lx)); }   // stepped out onto the platform
+    else {
+      const wl = door == null ? 0.95 : 1.3 + (openHere && A.inside ? 0.1 : 0); A.lx = Math.max(-wl, Math.min(wl, A.lx));   // the aisle between the benches; the door wells are deeper
+      _a.set(A.lx, FLOOR, A.lz).applyMatrix4(g.matrixWorld);
+      p.position.set(_a.x, _a.y, _a.z); p.velocity?.set?.(0, 0, 0); p.speed = il > 0 ? 2.2 : 0;
+      const cam = ctx.camera, bob = il > 0 ? Math.sin((A.walkT || 0) * 9) * 0.025 : 0; cam.position.set(_a.x, _a.y + 1.62 + bob, _a.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); p.cameraPosition?.copy?.(cam.position);
+      if (R.canAlight && !R.hintOff) { R.hintOff = true; K.toast(`${ctx.isTouch ? 'GET OFF' : 'F'} — get off at ${l.stop.name} (or walk out the open doors)`, 3200); }
+      if (l.kind !== 'dwell') R.hintOff = false;
+      if (R.canAlight && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); alight(); }   // the touch GET OFF button injects F
+    }
   }
+  // doors closing: the chime + the conductor, for riders and for anyone standing at the open doors
+  if (l.kind === 'dwell' && t > l.t1 - 4.6 && t < l.t1 - 4.2 && R.closeKey !== l.t0 && (R.aboard || R.boardable)) { R.closeKey = l.t0; chime(); K.toast('Stand clear of the closing doors, please.', 2400); }
+  // touch: the contextual action button (touch.js) says what F does here
+  const lab = R.aboard && R.canAlight ? 'GET OFF' : null;   // boarding is a hangkit spot: its "F — BOARD THE F" prompt already gets a tap button on phones (netui.js)
+  if (lab) { ctx.actionLabel = lab; R.ownLabel = true; } else if (R.ownLabel) { ctx.actionLabel = null; R.ownLabel = false; }
+  if (R.aboard || lab || R.boardable) ctx.interactNear = true;   // weapons.js leaves F (the touch button) to us
+  hud(t);
+}
+const DOORZ = [-6.2, -2.1, 2.1, 6.2], _inv = new THREE.Matrix4();
+const mss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+/** the next F out of a stop, per direction: [{ to, arrive (s until the doors open), leave (s until they close), boarding }] */
+function departures(id, t) {
+  const out = new Map();
+  for (const l of R.legs) { if (l.kind !== 'dwell' || l.stop.id !== id) continue;
+    const to = l.next.s > l.stop.s ? 'Neptune Av' : 'Stillwell Av', boarding = t >= l.t0 + 1.5 && t < l.t1 - 3;
+    const arrive = boarding ? 0 : ((l.t0 + 1.5 - t) % R.cycle + R.cycle) % R.cycle, leave = boarding ? l.t1 - 3 - t : arrive + (l.t1 - l.t0 - 4.5);
+    if (!out.has(to) || arrive < out.get(to).arrive) out.set(to, { to, arrive, leave, boarding }); }
+  return [...out.values()].sort((a, b) => a.arrive - b.arrive);
+}
+/** which station you're at / walking up to: Stillwell's head house + bus loop + Stillwell Ave frontage, W 8 St with its stair
+ *  towers + the Aquarium footbridge, Neptune Av */
+function stationAt(p) {
+  if (p.x > -125 && p.x < -5 && p.z > -445 && p.z < -200) return { id: 'STW', plat: p.y > 7, fIsland: p.x > -53.6 && p.x < -45.4 };
+  const dx = p.x - W8.P0.x, dz = p.z - W8.P0.y, u = R.w8u, a = dx * u.x + dz * u.y, o = -dx * u.y + dz * u.x;
+  if (a > -25 && a < W8.L + 20 && o > -22 && o < 50) return { id: 'W8', plat: p.y > 13.5, lower: p.y > 7.5 && p.y < 13.5 };
+  if (R.nep && p.x > 443 && Math.hypot(p.x - R.nep.c.x, p.z - R.nep.c.z) < 160) return { id: 'NEP', plat: p.y > 7 };
+  return null;
+}
+/** the subway HUD: next-train countdown near / in a station, where to go, and the rider's next stop */
+function hud(t) {
+  const { ctx } = R; R.hudT = (R.hudT || 0) + 1; if (R.hudT % 8) return;
+  if (!R.el) { const st = document.createElement('style'); st.textContent = `
+    .zvsub{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 94px);transform:translateX(-50%);z-index:38;display:none;pointer-events:none;padding:6px 14px 7px;border-radius:8px;background:rgba(8,10,14,.72);border:1px solid rgba(255,255,255,.14);font:600 14px 'Barlow Condensed',Arial,sans-serif;color:#eef2f5;letter-spacing:.04em;text-align:center;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+    .zvsub.on{display:block}.zvsub b.f{display:inline-block;width:19px;height:19px;line-height:19px;border-radius:50%;background:#ff6319;color:#fff;font:700 13px Arial;text-align:center;margin-right:7px;vertical-align:1px}
+    .zvsub .l{display:block}.zvsub .h{display:block;font-weight:500;font-size:12.5px;color:#ffcf8a;margin-top:2px}.zvsub .now{color:#8dff9c}`;
+    document.head.appendChild(st); R.el = document.createElement('div'); R.el.className = 'zvsub'; document.body.appendChild(R.el); }
+  const p = ctx.player; let html = '';
+  const key = ctx.isTouch ? 'tap BOARD THE F' : 'F';
+  if (ctx.state === 'playing' && p && !p.dead) {
+    if (R.aboard) {
+      const l = R.leg;
+      if (R.canAlight) html = `<span class="l"><b class="f">F</b><span class="now">${l.stop.name}</span> — doors open ${mss(l.t1 - 3 - t)}</span><span class="h">${ctx.isTouch ? 'GET OFF' : 'F'} or walk out the open doors to get off · next: ${l.next.name}</span>`;
+      else { const nx = l.kind === 'run' ? l.b : l.next, lg = R.legs.find((g) => g.kind === 'dwell' && g.stop === nx && g.t0 >= (l.kind === 'run' ? l.t1 - 0.01 : l.t1 + 0.01)) || R.legs.find((g) => g.kind === 'dwell' && g.stop === nx);
+        html = `<span class="l"><b class="f">F</b>next stop <b>${nx.name}</b> — ${mss(((lg.t0 + 1.5 - t) % R.cycle + R.cycle) % R.cycle)}</span><span class="h">walk the car: ${ctx.isTouch ? 'stick' : 'WASD'} · look out the windows</span>`; }
+    } else if (!p.mounted) {
+      const st = stationAt(p.position);
+      if (st) {
+        const deps = departures(st.id, t).slice(0, 2);
+        const lines = deps.map((d) => `<span class="l"><b class="f">F</b>to ${d.to} — ${d.boarding ? `<span class="now">boarding · leaves ${mss(d.leave)}</span>` : d.arrive < 20 ? `<span class="now">arriving ${mss(d.arrive)}</span>` : mss(d.arrive)}</span>`).join('');
+        let h = '';
+        if (R.boardable) h = `${key} to board — or just walk in through the open doors`;
+        else if (st.id === 'STW') h = st.plat ? (st.fIsland ? 'the F boards here — the west edge of this platform' : 'wrong platform: the F leaves from the 3rd island (3rd stairs from Stillwell Ave)') : 'through the turnstiles → 3rd stairs from Stillwell Ave → F platform';
+        else if (st.id === 'W8') h = st.plat ? 'upper level: the F stops here' : st.lower ? 'Q level — the F is one flight up (stairs off the platform, midway along)' : 'stairs at the W 8th St end → up two flights to the F';
+        else if (st.id === 'NEP') h = st.plat ? 'F back to Coney Island stops here' : 'stairs at the south end of the platforms';
+        html = lines + `<span class="h">${h}</span>`;
+      }
+    }
+  }
+  if (html !== R.html) { R.html = html; R.el.innerHTML = html; R.el.classList.toggle('on', !!html); }
 }
 /** which side the platform is on at a stop (+1 = the car's right / −1 left, 2 = both) — measured, not assumed */
 function sideAt(stop) {
   if (stop.id === 'NEP') return 2;
   if (stop.sideCache) return stop.sideCache;
   const g = R.cars[2]; g.updateMatrixWorld(true);
-  const probe = (sx) => { _a.set(sx * 2.4, FLOOR + 0.5, 0).applyMatrix4(g.matrixWorld); const ray = new THREE.Raycaster(new THREE.Vector3(_a.x, _a.y + 1, _a.z), new THREE.Vector3(0, -1, 0), 0, 3); return ray.intersectObjects(R.ctx.raycastTargets.filter((o) => o.isMesh), false).length; };
-  const side = probe(1) >= probe(-1) ? 1 : -1; stop.sideCache = side; return side;
+  const probe = (sx) => { _a.set(sx * 2.4, FLOOR + 0.5, 0).applyMatrix4(g.matrixWorld); const ray = new THREE.Raycaster(new THREE.Vector3(_a.x, _a.y + 1, _a.z), new THREE.Vector3(0, -1, 0), 0, 3); const fy = _a.y - 0.5; return ray.intersectObjects(R.ctx.raycastTargets.filter((o) => o.isMesh && !o.isInstancedMesh), false).filter((h) => Math.abs(h.point.y - fy) < 0.35).length; };   // only a floor at door-sill height counts (a passing Stillwell shuttle flipped the side)
+  const r = probe(1), l = probe(-1); if (!r && !l) return 1;   // nothing measured (yet): don't cache a guess
+  const side = r >= l ? 1 : -1; stop.sideCache = side; return side;
 }
-function board() {
-  const b = R.boardable; if (!b) return; R.aboard = { c: b.c, dz: b.dz, sx: b.sx };
-  R.ctx.player.mounted = { train: true }; R.lastAnn = '';
-  K.toast('Stand clear of the closing doors, please.', 2400);
+function board(lx, lz, c) {
+  const b = R.boardable; if (!b || R.aboard) return;
+  R.aboard = { c: c ?? b.c, lx: lx ?? b.sx * 1.1, lz: lz ?? b.dz, head: null };
+  R.ctx.player.mounted = { train: true }; R.lastAnn = ''; R.hintOff = true;
+  K.toast(`On the F — next stop ${b.next?.name || ''}. Walk around; ${R.ctx.isTouch ? 'GET OFF' : 'F'} or the open doors at a stop to get off.`, 3200);
 }
-function alight(force = false) {
+function alight(force = false, dz, side) {
   const a = R.aboard; if (!a) return; R.aboard = null; const p = R.ctx.player; if (p.mounted?.train) p.mounted = null;
   if (force) return;
-  const g = R.cars[a.c]; g.updateMatrixWorld(true); _a.set(a.sx * 2.7, FLOOR, a.dz).applyMatrix4(g.matrixWorld);
+  const s = side || (R.side === 2 ? (Math.sign(a.lx) || 1) : R.side || 1), d = dz ?? DOORZ.reduce((m, z) => (Math.abs(z - a.lz) < Math.abs(m - a.lz) ? z : m), DOORZ[0]);
+  const g = R.cars[a.c]; g.updateMatrixWorld(true); _a.set(s * 2.7, FLOOR, d).applyMatrix4(g.matrixWorld);
   p.teleport?.(_a.x, _a.y + 0.02, _a.z, p.yaw, p.pitch);
 }
 function announce(l) {
@@ -293,6 +392,7 @@ function buildNeptune(world, P, sNep) {
   const y = c0.y, plat = y + FLOOR, PL = 130, O0 = 1.7, O1 = 5.4;
   const at = (a, o, yy) => new THREE.Vector3(c0.x + u.x * a + n.x * o, yy, c0.z + u.y * a + n.y * o), ang = Math.atan2(u.x, u.y);
   (W.zones || (W.zones = [])).push({ x0: Math.min(c0.x, c1.x) - 160, x1: Math.max(c0.x, c1.x) + 160, z0: c0.z - 180, z1: c0.z + 400, name: 'NEPTUNE AV · SHELL RD', hint: 'the F back to Coney' });
+  { const z = W.zones[W.zones.length - 1]; z.x0 = Math.max(z.x0, (W.bounds?.max?.x ?? 440) + 3); }   // an island zone: overlapping the main map it clamped W 8 St (invisible walls at x 361 / z −83)
   const S = (c, r = 0.8, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
   const conc = S(0xa9a59c, 0.9), edge = S(0xf2c418, 0.7), steel = S(0x3f5a47, 0.6, 0.4), roofM = S(0x5b6168, 0.5, 0.6), asph = S(0x39393b, 0.95), walk = S(0x9d998f, 0.9);
   // a rotated box: merged geometry + collider cells (0.5 m) so the rotated floors stay walkable and the gaps stay open
@@ -305,11 +405,12 @@ function buildNeptune(world, P, sNep) {
     for (let i = 0; i < na; i++) for (let j = 0; j < no; j++) { const pa = at(a0 + (i + 0.5) * (a1 - a0) / na, o0 + (j + 0.5) * (o1 - o0) / no, 0), h = 0.36; const mn = [pa.x - h, y0, pa.z - h], mx = [pa.x + h, y1, pa.z + h]; walkable ? world.walkable(mn, mx) : world.box(mn, mx); }
     return me;
   };
+  const feet = [], stairs = []; W.neptunePlat = { at, plat, a0: -PL / 2 + 6, a1: PL / 2 - 12, o0: O0 + 0.9, o1: O1 - 0.9 };   // riders waiting on the platforms (coney/folk.js)
   for (const s of [-1, 1]) {
     const o0 = s > 0 ? O0 : -O1, o1 = s > 0 ? O1 : -O0;
     rbox(conc, -PL / 2, PL / 2, o0, o1, plat - 0.35, plat, { walkable: true });
     rbox(edge, -PL / 2, PL / 2, s > 0 ? O0 : -O0 - 0.5, s > 0 ? O0 + 0.5 : -O0, plat, plat + 0.01, { collide: false });
-    rbox(steel, -PL / 2, PL / 2, s > 0 ? O1 - 0.1 : -O1, s > 0 ? O1 : -O1 + 0.1, plat, plat + 1.1);                        // back railing
+    for (const [r0, r1] of [[-PL / 2, -PL / 2 + 5], [-PL / 2 + 7.6, PL / 2]]) rbox(steel, r0, r1, s > 0 ? O1 - 0.1 : -O1, s > 0 ? O1 : -O1 + 0.1, plat, plat + 1.1);   // back railing, open where the stair landing leaves (it ran straight across: the stairs were unreachable)
     for (let a = -PL / 2 + 8; a < PL / 2; a += 16) rbox(steel, a - 0.12, a + 0.12, s * (O1 - 0.6) - 0.12, s * (O1 - 0.6) + 0.12, plat, plat + 3.2, { collide: false });   // canopy posts
     rbox(roofM, -PL / 2 + 10, PL / 2 - 10, s > 0 ? O0 + 0.4 : -O1 - 0.3, s > 0 ? O1 + 0.3 : -O0 - 0.4, plat + 3.2, plat + 3.35, { collide: false });
     // name signs + F bullets
@@ -319,6 +420,7 @@ function buildNeptune(world, P, sNep) {
     rbox(conc, aS - 1, aS + 1.6, s > 0 ? O1 - 0.2 : oS - 1.2, s > 0 ? oS + 1.2 : -O1 + 0.2, plat - 0.35, plat, { walkable: true });   // landing off the platform
     for (let k = 0; k < nSt; k++) { const a0 = aS - 1 - (k + 1) * tread; rbox(conc, a0, a0 + tread, oS - 1.1, oS + 1.1, 0, plat - (k + 1) * rise, { walkable: true }); }
     rbox(steel, aS - 1 - nSt * tread, aS - 1, oS + s * 1.15 - 0.05, oS + s * 1.15 + 0.05, 0, plat + 1.0, { collide: true });   // outer railing
+    { const f = at(aS - 1 - nSt * tread - 1.6, oS + s * 1.8, 0); feet.push([f.x, f.z]); stairs.push([at(aS + 0.3, s * (O0 + O1) / 2, plat), at(aS + 0.3, oS, plat), at(aS - 1 - nSt * tread - 1.2, oS, 0)].map((q) => [+q.x.toFixed(2), +q.z.toFixed(2)])); }   // the globe lamp at the stair foot (buildEntrances)
   }
   // street: Shell Rd under the el, Neptune Ave across, sidewalks, a row of storefronts / walk-ups each side
   const plane = (m, a0, a1, o0, o1, yy) => { const g = new THREE.PlaneGeometry(o1 - o0, a1 - a0); g.rotateX(-Math.PI / 2); const me = new THREE.Mesh(g, m); me.position.copy(at((a0 + a1) / 2, (o0 + o1) / 2, yy)); me.rotation.y = ang; me.receiveShadow = true; scene.add(me); };
@@ -328,7 +430,40 @@ function buildNeptune(world, P, sNep) {
   for (const s of [-1, 1]) for (let a = -200; a < 220; a += 13 + ((a * 7) % 5)) { if (Math.abs(at(a, 0, 0).z - NEP_Z) < 16) continue; const h = 7 + ((a * 13) % 7); rbox(facM[((a / 13) | 0) & 3], a, a + 12, s * 15, s * 27, 0, h, { coarse: true }); }
   for (const [m, list] of GM) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; me.receiveShadow = true; scene.add(me); }
   // arrival: coming up the stairs at street level shows the POI; a subtle lamp at each stair foot
-  R.nep = { at, plat, O0, O1 };
+  R.nep = { at, plat, O0, O1, c: c0, feet, stairs };   // stairs: [platform, landing, street] per side (QA walks them)
+}
+// ---------------------------------------------------------------------------------------------------------------------------
+// street-level signposting: the green globe lamps (lit, so they read at night too) with an F bullet at every entrance —
+// Stillwell's bus-loop doors + the Stillwell Ave door, W 8 St's two stair towers + the Aquarium footbridge stairs, Neptune
+// Av's stair feet — and an "F ↑" sign over the one Stillwell stair bank that leads to the F platform
+function buildEntrances(world) {
+  const { scene, W } = world; const u = R.w8u, w8 = (a, o) => [W8.P0.x + u.x * a - u.y * o, W8.P0.y + u.y * a + u.x * o];
+  const spots = [[-72.8, -256.5], [-59.2, -256.5], [-52.8, -256.5], [-39.2, -256.5], [-89.6, -277.8], [-89.6, -270.2]];
+  const oN = -(W8.platOut + 2.3), oS = W8.platOut + 2.3, oE = W8.platOut + 38 - 1.4;
+  for (const o of [oN, oS]) for (const d of [-1.7, 1.7]) spots.push(w8(38.2, o + d));
+  for (const d of [-1.7, 1.7]) spots.push(w8(133.8, oE + d));
+  for (const q of R.nep?.feet || []) spots.push(q);
+  const poles = [], globes = [], bul = [];
+  for (const [x, z] of spots) {
+    const pg = new THREE.CylinderGeometry(0.055, 0.08, 2.9, 8); pg.translate(x, 1.45, z); poles.push(pg);
+    const cap = new THREE.CylinderGeometry(0.2, 0.16, 0.12, 12); cap.translate(x, 2.95, z); poles.push(cap);
+    const gg = new THREE.SphereGeometry(0.27, 16, 12); gg.translate(x, 3.25, z); globes.push(gg);
+    for (const r of [0, Math.PI / 2]) { const b = new THREE.PlaneGeometry(0.5, 0.5); b.rotateY(r); b.translate(x, 2.3, z); bul.push(b); }
+    world.box([x - 0.1, 0, z - 0.1], [x + 0.1, 3.2, z + 0.1]);
+  }
+  const add = (list, m) => { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; scene.add(me); return me; };
+  add(poles, new THREE.MeshStandardMaterial({ color: 0x1f3a2a, roughness: 0.6, metalness: 0.5 }));
+  add(globes, new THREE.MeshStandardMaterial({ color: 0x3fdc6e, emissive: 0x22c653, emissiveIntensity: 1.6, roughness: 0.3 })).castShadow = false;
+  add(bul, new THREE.MeshStandardMaterial({ map: bulletTex(), transparent: true, alphaTest: 0.4, emissive: 0xffffff, emissiveMap: bulletTex(), emissiveIntensity: 0.5, side: THREE.DoubleSide })).castShadow = false;
+  // Stillwell concourse: which stairs go to the F (the 3rd bank from Stillwell Ave, x −49.5)
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
+  g.fillStyle = '#111'; g.fillRect(0, 0, 512, 96); g.fillStyle = '#fff'; g.fillRect(0, 6, 512, 4);
+  g.fillStyle = '#ff6319'; g.beginPath(); g.arc(52, 54, 32, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 44px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('F', 52, 57);
+  g.textAlign = 'left'; g.font = '700 30px Helvetica, Arial'; g.fillText('↑  W 8 St · Neptune Av', 100, 44); g.font = '500 20px Helvetica, Arial'; g.fillStyle = '#ffcf8a'; g.fillText('this stairway · west side of the platform', 100, 76);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const sg = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.68), new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.4, side: THREE.DoubleSide }));
+  sg.position.set(-49.5, 3.9, -275.7); scene.add(sg);
+  void W;
 }
 function nameTex(text) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 68; const g = c.getContext('2d'); g.fillStyle = '#111'; g.fillRect(0, 0, 512, 68); g.fillStyle = '#fff'; g.fillRect(0, 5, 512, 3);

@@ -14,6 +14,7 @@
 // that rank ("козырем перевожу") — it stays in your hand, once per card per bout. Transfers can bounce back and forth.
 // Arkasha plays to win: he remembers every card that's been out or picked up, keeps his trumps, sheds junk, knows when to take,
 // and once the deck is empty (perfect information) he plays the endgame out by search.
+import { shirtSwatchHTML } from '../outfits.js';
 import { hangkit as K } from '../hangkit.js';
 
 import { SUITS, RED, RANK, id, eq, beats, newGame, ranksOnTable, canThrow, canTransfer, legalMoves, toAct, apply, makeMemory, remember, aiMove } from './durak-engine.js';
@@ -147,7 +148,7 @@ function seatHTML(G, s, n) {
   const b = [];
   if (!G.over && !out) { if (s === G.att) b.push('<em class="att">АТАКА</em>'); if (s === G.def) b.push(G.taking ? '<em class="take">БЕРЁТ</em>' : '<em class="def">ЗАЩИТА</em>'); if (passedSet(G).has(s)) b.push('<em class="ok">✓ ПАС</em>'); }
   if (out) b.push('<em class="out">ВЫШЕЛ</em>');
-  const ai = U.mp && U.v?.ai?.[s] ? ' <i>AI</i>' : '';
+  const ai = U.mp && U.v?.ai?.[s] ? ' <i>AI</i>' : U.mp && U.v?.ids?.[s] ? ' ' + shirtSwatchHTML(U.v.ids[s], U.ctx) : '';
   return `<div class="dk-seat${turn ? ' turn' : ''}${out ? ' gone' : ''}" data-seat="${s}">${U.mp || small ? `<div class="nm">${esc(U.names[s])}${ai}${small ? ` <b>${cnt}</b>` : ''}</div>` : ''}<div class="dk-opp">${backs}</div><div class="bd">${b.join('')}</div></div>`;
 }
 function render() {
@@ -175,7 +176,7 @@ function render() {
   }
   const title = U.mp ? `ОБЩИЙ СТОЛ <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${n} за столом · ${U.stake ? '$' + U.stake + ' с каждого' : 'на интерес'}</small>` : `АРКАША <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${st.w}–${st.l}${st.d ? '–' + st.d : ''} · ${U.stake ? '$' + U.stake + ' на кону' : 'на интерес'}</small>`;
   const meB = U.mp && me >= 0 && !G.over ? ((G.out || []).includes(me) ? ' · ты вышел' : me === G.att ? ' · ты в атаке' : me === G.def ? ' · ты отбиваешься' : '') : '';
-  U.root.innerHTML = `
+  U.root.innerHTML = `<button data-act="leave" class="dk-x" title="Выйти из игры">✕ Выйти</button>
     <div class="dk-top"><div class="dk-who">${title}</div><div class="dk-say">${esc(U.say || '')}</div><div class="dk-seats n${n}">${seats}</div></div>
     <div class="dk-mid">${deck}<div class="dk-table">${table}</div><div class="dk-bito">${G.discard.length ? `<div class="dk-back pile"></div><small>бито ${G.discard.length}</small>` : ''}</div></div>
     <div class="dk-status${me >= 0 && who === me && !G.over ? ' mine' : ''}">${status}${meB}</div>
@@ -187,13 +188,14 @@ function renderLobby() {
   const v = U.v || {}, seats = (v.seats || []).map((s) => `<li class="${s.ai ? 'ai' : ''}${s.me ? ' me' : ''}">${esc(s.n)}${s.ai ? ' <i>AI</i>' : ''}${s.me ? ' <i>ты</i>' : ''}</li>`).join('');
   const cnt = [2, 3, 4].map((k) => `<button data-act="seats" data-k="${k}" class="${k === v.want ? '' : 'ghost'}"${k < (v.humans || 1) ? ' disabled' : ''}>${k}</button>`).join('');
   const wait = v.wait?.length ? `<p>Ждут следующей раздачи: ${v.wait.map(esc).join(', ')}</p>` : '';
-  U.root.innerHTML = `
+  U.root.innerHTML = `<button data-act="leave" class="dk-x" title="Выйти из игры">✕ Выйти</button>
     <div class="dk-top"><div class="dk-who">ОБЩИЙ СТОЛ <small>${v.mode === 'podkidnoy' ? 'подкидной' : 'переводной'} · ${v.stake ? '$' + v.stake + ' с каждого' : 'на интерес'}</small></div><div class="dk-say">${esc(U.say || 'ARKASHA: «Садитесь, братва. Места всем хватит.»')}</div></div>
     <div class="dk-lobby"><h2>ЗА СТОЛОМ</h2><ol>${seats}</ol>${wait}
       ${v.host ? `<div class="dk-cnt">мест: ${cnt}</div><button data-act="deal">Раздать (F)</button>` : `<p>Ждём, пока ${esc(v.hostName || 'хозяин стола')} раздаст…</p>`}
       <button data-act="leave" class="ghost">Встать</button></div>`;
 }
 const CSS = `
+.durak .dk-x{position:absolute;top:10px;right:10px;z-index:3;padding:8px 14px;font:700 14px Barlow,Arial;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;cursor:pointer}
 .durak{position:fixed;inset:0;z-index:60;background:radial-gradient(ellipse at 50% 45%,#2e6b45 0%,#1d4a31 55%,#0f2a1c 100%);color:#f2efe6;font:500 15px Barlow,Arial;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 12px 10px;user-select:none;overflow:hidden}
 .durak .dk-top{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
 .durak .dk-who{font:700 18px 'Barlow Condensed',Arial;letter-spacing:.18em;text-align:center}.durak .dk-who small{font:500 12px Barlow;letter-spacing:.05em;opacity:.7;margin-left:8px}

@@ -24,8 +24,11 @@ export function buildW8th(world, M) {
     const na = Math.max(1, Math.ceil((a1 - a0) / cell)), no = Math.max(1, Math.ceil((o1 - o0) / cell));
     for (let i = 0; i < na; i++) for (let k = 0; k < no; k++) {
       const aa = a0 + (a1 - a0) * i / na, ab = a0 + (a1 - a0) * (i + 1) / na, oa = o0 + (o1 - o0) * k / no, ob = o0 + (o1 - o0) * (k + 1) / no;
-      const cs = [at(aa, oa), at(ab, oa), at(aa, ob), at(ab, ob)], sh = 0.18;   // shrink a little: rotated cells overlap their neighbours' AABBs
-      const mn = [Math.min(...cs.map((c) => c.x)) + sh, y0, Math.min(...cs.map((c) => c.z)) + sh], mx = [Math.max(...cs.map((c) => c.x)) - sh, y1, Math.max(...cs.map((c) => c.z)) - sh];
+      const cs = [at(aa, oa), at(ab, oa), at(aa, ob), at(ab, ob)], x0 = Math.min(...cs.map((c) => c.x)), x1 = Math.max(...cs.map((c) => c.x)), z0 = Math.min(...cs.map((c) => c.z)), z1 = Math.max(...cs.map((c) => c.z));
+      // shrink a little: rotated floor cells overlap their neighbours' AABBs. Thin walls / posts shrink much less — the full 0.18
+      // left railings 1 cm thick with 0.34 m gaps (players slid through the W 8 St railings and fell) and canopy posts inside-out
+      const sh = walkable ? 0.18 : Math.min(0.18, 0.2 * Math.min(x1 - x0, z1 - z0));
+      const mn = [x0 + sh, y0, z0 + sh], mx = [x1 - sh, y1, z1 - sh];
       if (walkable) world.walkable(mn, mx); else world.box(mn, mx);
     }
   };

@@ -1,6 +1,7 @@
 // Weapons: arsenal + loadout, first-person viewmodels, feel (sway/bob/ADS/recoil), reload/swap/grenade, hitscan (bullets + pellets) + FX. Owned by: WEAPONS agent.
 import * as THREE from 'three';
 import { makeTextures, makeMaterials } from './weapons/materials.js';
+import { dressViewmodelArms } from './world/outfits.js';
 import { buildRifle, RIFLE_SPEC } from './weapons/rifle.js';
 import { buildPistol, PISTOL_SPEC } from './weapons/pistol.js';
 import { buildShotgun, SHOTGUN_SPEC } from './weapons/shotgun.js';
@@ -65,7 +66,7 @@ function buildArsenal() { return Object.values(REGISTRY).map(r => r.spec).sort((
 
 export async function init(ctx) {
   const { camera, scene } = ctx;
-  const tex = makeTextures(); const mats = makeMaterials(tex);
+  const tex = makeTextures(); const mats = makeMaterials(tex); try { dressViewmodelArms(mats); } catch (e) { console.warn('[weapons] arms', e); }
   const fx = new FX(ctx); const grenades = new Grenades(ctx, mats, fx);
   // optional weapon modules (each is an independent file so a broken one never takes the arsenal down)
   for (const [path, specName, buildName] of OPTIONAL) {

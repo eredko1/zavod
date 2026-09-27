@@ -11,7 +11,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const STILLWELL = { x0: -88, x1: -24, zS: -258, zC: -300, zP0: -266, zP1: -440, RAIL: 7.5, DECK_B: 6.8, DECK_T: 7.3, PLAT: 8.6 };
 const ISLANDS = [[-82, -74], [-68, -60], [-53, -46], [-38, -29]];
-const TRACKS = [{ x: -83.8, r: 'D' }, { x: -71, r: 'D' }, { x: -58.2, r: 'F' }, { x: -54.8, r: 'F' }, { x: -44, r: 'Q' }, { x: -40, r: 'Q' }, { x: -27.2, r: 'N' }];
+const TRACKS = [   // track 2 was an 'F' too: its shuttle train (not rideable) sent players to the wrong island — the rideable F is x −54.8 (coney/subway.js)
+  { x: -83.8, r: 'D' }, { x: -71, r: 'D' }, { x: -58.2, r: 'D' }, { x: -54.8, r: 'F' }, { x: -44, r: 'Q' }, { x: -40, r: 'Q' }, { x: -27.2, r: 'N' }];
 const ROUTE = { D: '#ff6319', F: '#ff6319', N: '#fccc0a', Q: '#fccc0a' };
 const STAIR = { z0: -276, run: 13.4, w: 3.0 }, CAR = 18.4, NCAR = 8;
 

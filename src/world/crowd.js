@@ -344,25 +344,29 @@ export function buildCrowd(world, spots, opts = {}) {
     list.forEach((s, i) => { const o = s.o; for (const [k, v] of [['iTop', o.top], ['iBot', o.bot], ['iSkin', o.skin], ['iHair', o.hair]]) { col.setHex(v); at[k].set([col.r, col.g, col.b], i * 3); } at.iOpt.set([o.sleeve, o.legs, o.mode, o.shoe], i * 4); });
     for (const k in at) geo.setAttribute(k, new THREE.InstancedBufferAttribute(at[k], k === 'iOpt' ? 4 : 3));
     const im = mesh(geo, M.body, n, pose + (sex === 'm' ? 'M' : 'F'), pose !== 'lie');
-    list.forEach((s, i) => im.setMatrixAt(i, spotM(s))); done(im);
+    list.forEach((s, i) => { const m = spotM(s); im.setMatrixAt(i, m); ref(s, im, i, m); }); done(im);
   }
   // hair (short / long / cap) shared across poses: instance matrix = spot * head matrix of the pose
   for (const style of ['short', 'long', 'cap']) {
     const list = spots.filter((s) => s.o.style === style); if (!list.length) continue;
     const im = mesh(G.hair[style], M.hair, list.length, 'hair_' + style, true);
-    list.forEach((s, i) => { im.setMatrixAt(i, spotM(s).multiply(G.head[s._pose])); im.setColorAt(i, col.setHex(style === 'cap' ? s.o.cap : s.o.hair)); }); done(im);
+    list.forEach((s, i) => { const m = spotM(s).multiply(G.head[s._pose]); im.setMatrixAt(i, m); ref(s, im, i, m); im.setColorAt(i, col.setHex(style === 'cap' ? s.o.cap : s.o.hair)); }); done(im);
   }
-  { const list = spots.filter((s) => s.o.skirt); if (list.length) { const im = mesh(G.skirt, M.skirt, list.length, 'skirt', true); list.forEach((s, i) => { const m = spotM(s); if (s._pose === 'walkA' || s._pose === 'walkB') m.multiply(new THREE.Matrix4().makeTranslation(0, -0.022, 0)).multiply(new THREE.Matrix4().makeScale(1.04, 1, 1.12)); im.setMatrixAt(i, m); im.setColorAt(i, col.setHex(s.o.bot)); }); done(im); } }
+  { const list = spots.filter((s) => s.o.skirt); if (list.length) { const im = mesh(G.skirt, M.skirt, list.length, 'skirt', true); list.forEach((s, i) => { const m = spotM(s); if (s._pose === 'walkA' || s._pose === 'walkB') m.multiply(new THREE.Matrix4().makeTranslation(0, -0.022, 0)).multiply(new THREE.Matrix4().makeScale(1.04, 1, 1.12)); im.setMatrixAt(i, m); ref(s, im, i, m); im.setColorAt(i, col.setHex(s.o.bot)); }); done(im); } }
   // suitcases stand 0.45 m to the owner's right
-  const cases = spots.filter((s) => s.bag === 1 && s.pose !== 'walk' && s.pose !== 'lie' && s.pose !== 'sit').map((s) => { const c = Math.cos(s.ry || 0), sn = Math.sin(s.ry || 0); return { x: s.x - c * 0.45, y: s.y || 0, z: s.z + sn * 0.45, ry: (s.ry || 0) + (R() - 0.5) * 0.6, col: new THREE.Color([0x1c2433, 0x5a1d1d, 0x2c2c2c, 0x6b6f75, 0x1f3d33][(R() * 5) | 0]) }; });
+  const cases = spots.filter((s) => s.bag === 1 && s.pose !== 'walk' && s.pose !== 'lie' && s.pose !== 'sit').map((s) => { const c = Math.cos(s.ry || 0), sn = Math.sin(s.ry || 0); return { own: s, x: s.x - c * 0.45, y: s.y || 0, z: s.z + sn * 0.45, ry: (s.ry || 0) + (R() - 0.5) * 0.6, col: new THREE.Color([0x1c2433, 0x5a1d1d, 0x2c2c2c, 0x6b6f75, 0x1f3d33][(R() * 5) | 0]) }; });
   if (cases.length) {
     const S = suitcase();
     for (const [geo, mat, name, tint] of [[S.body, M.case, 'cases', true], [S.dark, M.caseDark, 'caseHandles', false]]) {
       const im = mesh(geo, mat, cases.length, name, true);
-      cases.forEach((c, i) => { q.setFromAxisAngle(up, c.ry); p.set(c.x, c.y, c.z); im.setMatrixAt(i, m4.compose(p, q, sc.set(1, 1, 1))); if (tint) im.setColorAt(i, c.col); }); done(im);
+      cases.forEach((c, i) => { q.setFromAxisAngle(up, c.ry); p.set(c.x, c.y, c.z); im.setMatrixAt(i, m4.compose(p, q, sc.set(1, 1, 1))); ref(c.own, im, i, m4.clone()); if (tint) im.setColorAt(i, c.col); }); done(im);
     }
   }
+  // handle: hide(spot, true) swaps one person out of the instanced crowd (a live NPC stands there instead — coney/folk.js)
+  return { spots, hide(s, on) { if (!s?._refs || !!s._hidden === !!on) return; s._hidden = !!on; for (const [im, i, m] of s._refs) { im.setMatrixAt(i, on ? ZERO_M : m); im.instanceMatrix.needsUpdate = true; } } };
 }
+const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+function ref(s, im, i, m) { (s._refs || (s._refs = [])).push([im, i, m]); }
 
 /** Scatter `n` spots inside a rect at height y, rejecting points where `blocked(x, z)` is true. */
 export function scatter(R, n, x0, x1, z0, z1, y, blocked = () => false, opts = {}) {

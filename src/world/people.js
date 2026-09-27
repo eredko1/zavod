@@ -95,7 +95,8 @@ export function buildPerson(o = {}) {
   // accessory anchors the old figure API exposed: head (centre of the skull) and a right-hand mount
   const head = new THREE.Object3D(); headB.add(head);
   { model.updateMatrixWorld(true); const hw = headB.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.09, 0.0)); headB.worldToLocal(hw); head.position.copy(hw);
-    head.quaternion.copy(headB.getWorldQuaternion(new THREE.Quaternion()).invert()).multiply(group.getWorldQuaternion(new THREE.Quaternion())); }   // keep head accessories upright in the rest pose
+    head.quaternion.copy(headB.getWorldQuaternion(new THREE.Quaternion()).invert()).multiply(group.getWorldQuaternion(new THREE.Quaternion()));
+    const hs = headB.getWorldScale(new THREE.Vector3()).x / (group.getWorldScale(new THREE.Vector3()).x || 1); if (hs > 0 && Math.abs(hs - 1) > 1e-3) head.scale.setScalar(1 / hs); }   // the rig is in cm (bone scale 0.01): accessories are authored in metres   // keep head accessories upright in the rest pose
   const handR = new THREE.Object3D(); R.hand?.add(handR);
   // mixer: idle / walk / run weights driven by speed; sit / talk / drunk as base loops
   const mixer = new THREE.AnimationMixer(model), clips = P.clips[g], act = {};

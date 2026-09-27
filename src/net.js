@@ -49,6 +49,7 @@ import * as THREE from 'three';
 import { createInstance } from './ai/model.js';
 import { carGeometries, carMaterials, CAR_KINDS } from './world/carkit.js';
 import { buildBike } from './vehicles/bike.js';
+import { buildJetski } from './vehicles/jetski.js';
 import * as UI from './netui.js';
 
 const ALL_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
@@ -124,7 +125,7 @@ function api() {
     get peers() { return S.peers.size; }, get connected() { return anyUp(); }, get room() { return S.room; }, get name() { return S.name; }, get id() { return S.id; },
     hit: (peer, dmg, hs) => { const p = S.peers.get(peer); if (!p || p.dead || p.afk) return; send({ t: 'hit', to: peer, dmg: Math.max(0, Math.min(250, dmg | 0)), hs: !!hs }); },
     scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
-    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'dk'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
+    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'dk', 'folk'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
     qaPeers: () => [...S.peers.values()].map((p) => ({ veh: p.veh?.k || null, riderVisible: !!p.inst.group.visible, y: +p.inst.group.position.y.toFixed(2) })),
     peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk } : null; },
     list: () => [...S.peers.keys()],
@@ -271,6 +272,7 @@ function peerFor(pid, name) {
   const ctx = S.ctx; const asset = ctx.ai?.asset; if (!asset) return null;
   const inst = createInstance(asset, [...pid].reduce((a, c) => a + c.charCodeAt(0), 0) % 3);
   ctx.scene.add(inst.group);
+  import('./world/outfits.js').then((m) => m.dressRemote(inst, pid, ctx)).catch((e) => console.warn('[net] outfit', e));   // lazy: a static import cycles through people.js and stalls net init   // friends show up as the hero (jeans + their own band tee), not a soldier
   for (const h of inst.hitboxes) { h.userData.remote = pid; delete h.userData.soldier; ctx.raycastTargets.push(h); }
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: true })); tag.scale.set(1.3, 0.33, 1); tag.renderOrder = 5; ctx.scene.add(tag);
   const now = performance.now();
@@ -321,7 +323,7 @@ function onState(pid, m, now) {
   let v = null;
   if (m.v && typeof m.v === 'object' && m.v.k !== 'pass') {
     const k = String(m.v.k || ''); const vp = vec([m.v.x, m.v.y, m.v.z]); const h = num(m.v.h, 1000);
-    if (vp && !Number.isNaN(h) && (k === 'bike' || CAR_KINDS.includes(k))) v = { k, c: int(m.v.c, 0, 0xffffff) ?? 0x22305c, h, x: vp[0], y: vp[1], z: vp[2] };
+    if (vp && !Number.isNaN(h) && (k === 'bike' || k === 'jetski' || CAR_KINDS.includes(k))) v = { k, c: int(m.v.c, 0, 0xffffff) ?? 0x22305c, h, x: vp[0], y: vp[1], z: vp[2] };
   }
   p = p || peerFor(pid, cleanName(m.n)); if (!p) return;
   if (z !== p.z) { p.z = z; p.lastQ = -1; p.off = null; p.lastTs = null; }   // they reloaded (same id, new instance): reset sequence + clock
@@ -336,7 +338,8 @@ function onState(pid, m, now) {
   p.delayT = Math.min(DELAY_MAX, Math.max(DELAY_MIN, 1.5 * p.iv, p.iv + 2.5 * p.jit + 15));
   const last = p.snaps[p.snaps.length - 1];
   let t = ts + p.off; if (last && t <= last.t) t = last.t + 1;
-  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tp: false };
+  let tr = null; if (Array.isArray(m.tr) && m.tr.length === 3) { const c = int(m.tr[0], 0, 15), lx = num(m.tr[1], 3), lz = num(m.tr[2], 12); if (c != null && !Number.isNaN(lx) && !Number.isNaN(lz)) tr = [c, lx, lz]; }
+  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tr, tp: false };
   if (last && Math.hypot(s.x - last.x, s.y - last.y, s.z - last.z) > TELEPORT) s.tp = true;
   p.snaps.push(s); if (p.snaps.length > 40) p.snaps.shift();
   const afk = !!(fl & F_AFK); if (afk !== p.afk) { p.afk = afk; UI.refresh(); }
@@ -388,7 +391,7 @@ function onEvent(m) {
       const i = int(m.i, 0, 255), k = int(m.k, 0, 15), s = int(m.s ?? 0, 0, 7), p = vec(m.p); if (i === null || k === null || s === null || !p || (m.d !== 'up' && m.d !== 'down')) return;
       ctx.bus.emit('net:elev', { t: 'elev', f, i, k, s, d: m.d, p }); return;
     }
-    case 'smoke': { if (document.hidden) return; const p = vec(m.p); if (p) ctx.bus.emit('net:smoke', { t: 'smoke', f, p, c: ID_RE.test(m.c) ? m.c : null }); return; }   // c: the car it was smoked in (everyone in it shares)
+    case 'smoke': { if (document.hidden) return; const p = vec(m.p); if (p) ctx.bus.emit('net:smoke', { t: 'smoke', f, p, c: ID_RE.test(m.c) ? m.c : null, k: m.k === 'cig' ? 'cig' : undefined }); return; }   // c: the car it was smoked in (everyone in it shares)
   }
   ctx.bus.emit('net:' + m.t, m);   // other game-mode events (coney hangout: igor …)
 }
@@ -445,12 +448,13 @@ function sendState(now, force = false) {
   S.lastSend = now; const p = me.position;
   const flags = (me.dead ? F_DEAD : 0) | (me.crouching ? F_CROUCH : 0) | (me.ads ? F_ADS : 0) | (isAfk() ? F_AFK : 0);
   let vi = null;
-  try { const mv = ctx.vehicles?.mounted; vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null); } catch {}
-  const sc = S.score.get(S.id);
-  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, sc: [sc.k, sc.d] });
+  try { const mv = ctx.vehicles?.mounted; vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : mv.spec?.water ? 'jetski' : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null); } catch {}
+  const sc = S.score.get(S.id); let tr = null; try { tr = me.mounted?.train ? ctx.subway?.local?.() || null : null; } catch {}   // riding the F: car + spot in the car
+  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, tr, sc: [sc.k, sc.d] });
 }
 
 // ---------- per frame ----------
+const _trV = new THREE.Vector3();
 const _lerpAngle = (a, b, k) => { let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d * k; };
 export function update(dt, ctx) {
   if (!S) return;
@@ -483,6 +487,10 @@ function renderPeer(p, now, rdt, ctx) {
     const span = B.t - A.t, e = Math.min(rt - B.t, EXTRAP_MS);
     if (!B.tp && !(B.f & F_DEAD) && span > 0 && span < 400 && sn.length > 1) { const k = e / span; x += (B.x - A.x) * k; y += (B.y - A.y) * k; z += (B.z - A.z) * k; yaw = _lerpAngle(A.yaw, B.yaw, 1 + k); }
   }
+  // on the F: place them in OUR copy of the (wall-clock) train from their spot in the car — a world position ~100 ms old would
+  // put a rider metres behind a moving train, floating over the el
+  if (cur.tr && ctx.subway?.toWorld) { const a = A.tr, b = B.tr, k = rt > A.t && rt < B.t ? (rt - A.t) / Math.max(1, B.t - A.t) : rt >= B.t ? 1 : 0, same = a && b && a[0] === b[0];
+    const q = ctx.subway.toWorld(cur.tr[0], same ? a[1] + (b[1] - a[1]) * k : cur.tr[1], same ? a[2] + (b[2] - a[2]) * k : cur.tr[2], _trV); if (q) { x = q.x; y = q.y; z = q.z; } }
   const g = p.inst.group; g.position.set(x, y, z); g.rotation.y = yaw + Math.PI; p.heading = yaw;
   const dead = !!(cur.f & F_DEAD);
   if (!dead && p.dead && cur.t > p.deadAt + 500) { p.dead = false; p.fall = 0; }   // revive only on a snapshot newer than the kill
@@ -501,8 +509,14 @@ function renderPeer(p, now, rdt, ctx) {
   }
   if (p.vehObj) {   // snapshots already carry the vehicle's pose (x/y/z/yaw = vehicle) while driving
     p.vehObj.position.set(x, y, z); p.vehObj.rotation.set(0, yaw, 0);
-    if (cur.v?.k === 'bike') {   // a bike rider stays visible, sat astride and facing the way it goes (was hidden: "invisible riders")
-      g.visible = true; g.position.set(x, y + 0.28, z); g.rotation.set(0, yaw + Math.PI, 0);
+    const ski = cur.v?.k === 'jetski', O = ski ? ctx.world?.ocean : null;
+    if (O) {   // jet ski: pitch / roll with the swell under it (the sea is on the wall clock, so it matches what they see)
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw), wh = (a, b) => O.waveHeight(x + a, z + b);
+      const pit = Math.atan2(wh(fx * 1.3, fz * 1.3) - wh(-fx * 1.3, -fz * 1.3), 2.6), rol = Math.atan2(wh(-fz * 0.55, fx * 0.55) - wh(fz * 0.55, -fx * 0.55), 1.1);
+      p.vehObj.rotation.set(Math.max(-0.4, Math.min(0.4, pit)), yaw, Math.max(-0.35, Math.min(0.35, rol)), 'YXZ');
+    }
+    if (cur.v?.k === 'bike' || ski) {   // a bike / jet-ski rider stays visible, sat astride and facing the way it goes (was hidden: "invisible riders")
+      g.visible = true; g.position.set(x, y + (ski ? 0.3 : 0.28), z); g.rotation.set(0, yaw + Math.PI, 0);
       if (A_) { A_.Idle?.setEffectiveWeight(1); A_.Walk?.setEffectiveWeight(0); A_.Run?.setEffectiveWeight(0); }
     } else g.visible = false;
   } else g.visible = true;
@@ -534,6 +548,7 @@ const _carGeo = new Map();
 function remoteVehicle(ctx, v) {
   const grp = new THREE.Group();
   if (v.k === 'bike') { try { const b = buildBike(ctx); grp.add(b.group); } catch {} return grp; }
+  if (v.k === 'jetski') { try { const b = buildJetski(ctx, v.c || null); grp.add(b.group); } catch {} return grp; }
   const G = _carGeo.get(v.k) || (_carGeo.set(v.k, carGeometries(v.k).geos), _carGeo.get(v.k)); const CM = carMaterials();
   const paint = CM.paint.clone(); paint.color = new THREE.Color(v.c || 0x22305c);
   for (const [slot, g] of Object.entries(G)) { if (!g) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : CM[slot]); m.rotation.y = Math.PI / 2; m.castShadow = slot === 'paint'; grp.add(m); }

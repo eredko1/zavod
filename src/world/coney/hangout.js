@@ -425,19 +425,19 @@ function tableRegulars(g, c) {
   const { world } = H; const put = (fig, x, z, ry) => { g.add(fig.group); fig.group.position.set(x, 0, z); fig.group.rotation.y = ry; world.updaters.push((dt) => fig.update(dt, 0)); };
   const wpos = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(g.matrixWorld);
   // SASHA: on the bench, always loses — «Бей!» … «Беру!»
-  const sasha = buildPerson({ avatar: 'm17', pose: 'sit', seed: 5 }); put(sasha, 3.2, -2.35, Math.PI);
+  const sasha = buildPerson({ avatar: 'm17', pose: 'sit', seed: 5 }); put(sasha, 3.2, -2.35, 0);   // faces out from the backrest
   K.vendor({ name: 'SASHA', pos: wpos(3.2, -2.35), r: 2.4, fig: sasha, talk: (Kk, again) => ({
     text: again ? 'SASHA: "Я правила зубрил, понимаешь? Зубрил! А он козырем — хлоп." *доедает сосиску*' : 'SASHA: "Ты с Аркашей играть? Совет: не кричи «Бей!». Я кричал «Бей!», потом кричал «Беру!». Теперь у меня вся колода."',
     choices: [{ label: 'Сосиску будешь? — угостишь?', go: () => (K.full() ? { text: 'SASHA: "Руки заняты у тебя."', choices: [{ label: 'Ok', go: null }] } : (K.give('sausage'), { text: 'SASHA: "Держи. Виски-шмиски, вот сосиски — вся закуска наша!"', choices: [{ label: 'Спасибо, Саша', go: null }] })) },
       { label: 'Как он всегда выигрывает?', go: { text: 'SASHA: "Медведь по козырям — ещё какой мастак. Он все карты помнит. И переводит, гад, переводит!"', choices: [{ label: 'Ясно', go: null }] } }, { label: 'Later', go: null }] }) });
   // McGUINNESS: by the lamp with a crate of Guinness — «Guinness будешь?» — «За тебя!»
-  const mcg = buildPerson({ avatar: 'm12', seed: 8 }); addAfro(mcg); put(mcg, -2.9, 1.9, 2.2);   // African-American, big natural afro (world/outfits.js)
+  const mcg = buildPerson({ avatar: 'm12', seed: 8 }); standTall(mcg, 1.73); mcg.group.scale.x *= 1.22; mcg.group.scale.z *= 1.18; addAfro(mcg); dressFigure(mcg, H.ctx, { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 }); put(mcg, -2.9, 1.9, 2.2);   // ~20, 5'8", heavyset, afro, band tee
   K.vendor({ name: 'McGUINNESS', pos: wpos(-2.9, 1.9), r: 2.4, fig: mcg, talk: (Kk, again) => ({
     text: again ? 'McGUINNESS: "Another? Go on, go on, go on."' : 'McGUINNESS: "Guinness будешь? Proper pint, poured slow. Arkasha takes his with bourbon, God help him."',
     choices: [{ label: '«За тебя!» — давай пинту', go: () => (K.full() ? { text: 'McGUINNESS: "Finish what you\'re holding first."', choices: [{ label: 'Sláinte', go: null }] } : (K.give('guinness'), { text: 'McGUINNESS: "Sláinte! B to drink — and share it, it\'s rude not to."', choices: [{ label: 'Sláinte', go: null }] })) },
       { label: '«За тебя, но я-то пас»', go: { text: 'McGUINNESS: "Ah, a bourbon man. Suit yourself."', choices: [{ label: 'Later', go: null }] } }] }) });
-  // THE ELF: 5'7" Russian-American in a full three-stripe track suit, green hat — Jameson, and a spliff rolled like a magic scroll
-  const elf = buildPerson({ avatar: 'm05', seed: 9 }); standTall(elf, 1.70); dressFigure(elf, H.ctx, { top: 'track', bottom: 'track', shoes: 'white' }); put(elf, 2.6, 2.3, -2.4);   // 5'7", full three-stripe track suit
+  // THE ELF: 5'7" Russian/Ukrainian, white, dark hair, brown eyes, in a full three-stripe track suit, green hat — Jameson, and a spliff rolled like a magic scroll
+  const elf = buildPerson({ avatar: 'm10', seed: 9 }); standTall(elf, 1.70); dressFigure(elf, H.ctx, { top: 'track', bottom: 'track', shoes: 'white' }); put(elf, 2.6, 2.3, -2.4);   // 5'7", full three-stripe track suit
   { const hat = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.34, 14), new THREE.MeshStandardMaterial({ color: 0x1f7a33, roughness: 0.8 })); hat.position.set(0, 0.2, -0.02); hat.rotation.x = -0.25; elf.head.add(hat);
     const bell = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xe0b422, metalness: 0.8, roughness: 0.3 })); bell.position.set(0, 0.35, -0.1); elf.head.add(bell); }
   K.vendor({ name: 'THE ELF', pos: wpos(2.6, 2.3), r: 2.4, fig: elf, talk: (Kk, again) => ({

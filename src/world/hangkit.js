@@ -7,23 +7,28 @@ import * as THREE from 'three';
 import { hideParkedCar } from './carkit.js';
 
 const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 3, SHARE_R = 4;
+// kind: 'smoke' | 'booze' | 'drink' | 'food' | 'loot' | 'misc' (inventory categories); effects: drunk/dur, food (HP), cig (smokes per pack, no high), magic, keep (not for B), melt
 const CASH_GIFT = 10, GIFT_RANGE = 3, GIFT_RECEIVE_RANGE = GIFT_RANGE + 1; // allow for interpolated peer positions
 export const ITEMS = {
-  weed: { icon: '🌿', name: 'bag of weed' },
-  bottle: { icon: '🍾', name: 'bottle of liquor', drunk: 0.8, dur: 150 },
-  forty: { icon: '🍺', name: '40 of Olde English', drunk: 1, dur: 180 },
-  kvass: { icon: '🥤', name: 'kvass', drunk: 0.2, dur: 45 },
-  meat: { icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },
-  skewer: { icon: '🍢', name: 'hot shashlik skewer', keep: true },
-  gps: { icon: '📟', name: 'stolen GPS', keep: true },   // SHADES buys them   // not for B: grill it at the mangal
+  weed: { kind: 'smoke', icon: '🌿', name: 'bag of weed' },
+  bottle: { kind: 'booze', icon: '🍾', name: 'bottle of liquor', drunk: 0.8, dur: 150 },
+  forty: { kind: 'booze', icon: '🍺', name: '40 of Olde English', drunk: 1, dur: 180 },
+  kvass: { kind: 'drink', icon: '🥤', name: 'kvass', drunk: 0.2, dur: 45 },
+  meat: { kind: 'food', icon: '🥩', name: 'shashlik (raw — grill it)', keep: true },
+  skewer: { kind: 'food', icon: '🍢', name: 'hot shashlik skewer', keep: true },
+  gps: { kind: 'loot', icon: '📟', name: 'stolen GPS', keep: true },   // SHADES buys them   // not for B: grill it at the mangal
   // «Бурбон, братва, Гудзон» — Arkasha's table
-  manhattan: { icon: '🍸', name: 'Manhattan (bourbon, vermouth, Sammy\'s ice)', drunk: 0.6, dur: 170, glass: 'coupe' },
-  guinness: { icon: '🍺', name: 'pint of Guinness', drunk: 0.35, dur: 120, glass: 'pint' },
-  jameson: { icon: '🥃', name: 'Jameson', drunk: 0.5, dur: 130, glass: 'shot' },
-  sausage: { icon: '🌭', name: 'сосиска', food: 30 },
-  zebra: { icon: '🦓', name: 'zebra milk', food: 12, milk: true },
-  spliff: { icon: '🍃', name: 'the Elf\'s spliff', magic: true },
-  ice: { icon: '🧊', name: 'bag of ice (melting!)', keep: true, melt: 110 },
+  manhattan: { kind: 'booze', icon: '🍸', name: 'Manhattan (bourbon, vermouth, Sammy\'s ice)', drunk: 0.6, dur: 170, glass: 'coupe' },
+  guinness: { kind: 'booze', icon: '🍺', name: 'pint of Guinness', drunk: 0.35, dur: 120, glass: 'pint' },
+  jameson: { kind: 'booze', icon: '🥃', name: 'Jameson', drunk: 0.5, dur: 130, glass: 'shot' },
+  sausage: { kind: 'food', icon: '🌭', name: 'сосиска', food: 30 },
+  zebra: { kind: 'drink', icon: '🦓', name: 'zebra milk', food: 12, milk: true },
+  spliff: { kind: 'smoke', icon: '🍃', name: 'the Elf\'s spliff', magic: true },
+  ice: { kind: 'misc', icon: '🧊', name: 'bag of ice (melting!)', keep: true, melt: 110 },
+  // the boardwalk / beach hustlers (coney/hustlers.js)
+  cigs: { kind: 'smoke', icon: '🚬', name: 'pack of Marlboro Reds', cig: 5 },   // B lights one: smoke, no high
+  tallboy: { kind: 'booze', icon: '🍺', name: 'tallboy of Baltika 9', drunk: 0.3, dur: 110, glass: 'can' },
+  vodka: { kind: 'booze', icon: '🥃', name: 'стопка водки', drunk: 0.45, dur: 120, glass: 'shot', liq: 0xdfe6e8 },
 };
 
 let V = null;
@@ -81,7 +86,7 @@ export const kitQA = { state: () => ({ ...api.state(), ...api.points() }), ride:
 function bindOnce(ctx) {
   ctx.bus.on('net:elev', (m) => V && onRemoteElev(m));
   ctx.bus.on('net:steal', (m) => V && stealLocal(m.i, false));
-  ctx.bus.on('net:smoke', (m) => { if (!V || !Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = V.ctx.player; if (me && !me.dead && (sameCar(m) || at.distanceTo(me.position) < SHARE_R + 1)) { V.high = Math.min(1, V.high + 0.18); V.highT = Math.max(V.highT, 150); } });
+  ctx.bus.on('net:smoke', (m) => { if (!V || !Array.isArray(m.p)) return; const at = new THREE.Vector3(...m.p); puff(at); const me = V.ctx.player; if (m.k !== 'cig' && me && !me.dead && (sameCar(m) || at.distanceTo(me.position) < SHARE_R + 1)) { V.high = Math.min(1, V.high + 0.18); V.highT = Math.max(V.highT, 150); } });
   ctx.bus.on('net:drink', (m) => { if (!V || !Array.isArray(m.p)) return; const me = V.ctx.player; if (!me || me.dead || (!sameCar(m) && new THREE.Vector3(...m.p).distanceTo(me.position) >= SHARE_R + 1)) return;
     const it = ITEMS[m.k] || ITEMS.bottle; drink(false, it); V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} passed you the ${m.k === 'forty' ? '40' : ITEMS[m.k]?.glass ? ITEMS[m.k].name.split(' (')[0] : 'bottle'}`, 1800); });
   ctx.bus.on('net:buy', (m) => V && V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'Someone'} bought ${ITEMS[m.k]?.name ? 'a ' + ITEMS[m.k].name : 'something'} from ${String(m.v || 'the man').slice(0, 16)}`, 1800));
@@ -116,7 +121,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
-    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.status = {}; V.iceT = null; renderCash();
+    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.status = {}; V.iceT = null; V.cigLeft = 0; renderCash();
     for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
     for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
     for (const m of V.puddles || []) m.visible = false;
@@ -238,6 +243,7 @@ function useItem() {
   if (k < 0) { ctx.hud?.toast?.(V.inv.length ? 'Raw meat — grill it at Table Park' : 'Nothing on you', 1400); return; }
   const it = V.inv.splice(k, 1)[0]; renderCash();
   if (it === 'weed') return lightUp();
+  if (ITEMS[it]?.cig) { V.cigLeft = (V.cigLeft > 0 ? V.cigLeft : ITEMS[it].cig) - 1; if (V.cigLeft > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
   if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
   const spec = ITEMS[it];
   if (spec?.food) { ctx.player?.heal?.(spec.food); ctx.hud?.toast?.(spec.milk ? 'Зебровое молоко. Редко одобряет. (+' + spec.food + ' HP)' : '*хрум* Виски-шмиски, вот сосиски! (+' + spec.food + ' HP)', 2000); return; }
@@ -257,9 +263,14 @@ function bottleModel(kind) {
   if (_models[kind]) return _models[kind];
   const g = new THREE.Group();
   const G2 = ITEMS[kind]?.glass;
-  if (G2) {   // coupe (Manhattan, cherry), pint (Guinness, cream head), shot (Jameson)
+  if (G2 === 'can') {   // a tallboy: 0.5 l can, blue with a silver lid
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.17, 16), new THREE.MeshStandardMaterial({ color: 0x1d3f8a, roughness: 0.35, metalness: 0.7 })); g.add(can);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.029, 0.033, 0.012, 16), new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.3, metalness: 0.9 })); lid.position.y = 0.091; g.add(lid);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0335, 0.0335, 0.04, 16), new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.5 })); band.position.y = 0.01; g.add(band);
+    g.position.set(0.1, -0.14, -0.3);
+  } else if (G2) {   // coupe (Manhattan, cherry), pint (Guinness, cream head), shot (Jameson)
     const gl = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.35 });
-    const liq = new THREE.MeshStandardMaterial({ color: G2 === 'pint' ? 0x1a0d06 : G2 === 'coupe' ? 0x8a3a10 : 0xb86a18, roughness: 0.1, transparent: true, opacity: 0.9 });
+    const liq = new THREE.MeshStandardMaterial({ color: ITEMS[kind]?.liq ?? (G2 === 'pint' ? 0x1a0d06 : G2 === 'coupe' ? 0x8a3a10 : 0xb86a18), roughness: 0.1, transparent: true, opacity: 0.9 });
     if (G2 === 'coupe') { g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.08, 8), gl)); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.01, 0.045, 16, 1, true), gl); cup.position.y = 0.06; g.add(cup); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.012, 0.03, 16), liq); l.position.y = 0.055; g.add(l); const ch = new THREE.Mesh(new THREE.SphereGeometry(0.008, 8, 6), new THREE.MeshStandardMaterial({ color: 0x7a0a14 })); ch.position.set(0.01, 0.072, 0); g.add(ch); }
     else if (G2 === 'pint') { const pg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.034, 0.15, 16, 1, true), gl); g.add(pg); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.033, 0.12, 16), liq); l.position.y = -0.012; g.add(l); const hd = new THREE.Mesh(new THREE.CylinderGeometry(0.039, 0.038, 0.022, 16), new THREE.MeshStandardMaterial({ color: 0xf2e6c8, roughness: 0.8 })); hd.position.y = 0.058; g.add(hd); }
     else { const sg = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.055, 12, 1, true), gl); g.add(sg); const l = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.019, 0.03, 12), liq); l.position.y = -0.01; g.add(l); }
@@ -279,14 +290,16 @@ function bottleModel(kind) {
 }
 
 // ---- smoking + the high ---------------------------------------------------------------------------------------------------------
-function lightUp(magic = false) {
-  const { ctx } = V; V.smokeT = magic ? 16 : 11; V.puffT = 0.6; if (magic) { V.high = Math.min(1, V.high + 0.35); V.highT = Math.max(V.highT, 180); }
-  ctx.hud?.toast?.('…', 1200);
+function lightUp(magic = false, cig = false) {
+  const { ctx } = V; V.smokeT = magic ? 16 : cig ? 9 : 11; V.puffT = 0.6; V.cig = cig; if (magic) { V.high = Math.min(1, V.high + 0.35); V.highT = Math.max(V.highT, 180); }
+  ctx.hud?.toast?.(cig ? ['*chk* …a Marlboro on the boardwalk', 'Покурим. Одну.', '*tap tap* …ahh'][Math.floor(Math.random() * 3)] : '…', 1400);
   if (!V.joint) {
     const g = new THREE.Group();
     const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.006, 0.075, 8), new THREE.MeshStandardMaterial({ color: 0xf2eee4, roughness: 0.9 })); paper.rotation.z = Math.PI / 2.3; g.add(paper);
     const ember = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff6a20 })); ember.position.set(0.035, 0.014, 0); g.add(ember);
-    g.position.set(-0.12, -0.13, -0.32); g.rotation.set(0.3, 0.6, 0); V.joint = { g, ember }; }
+    const filter = new THREE.Mesh(new THREE.CylinderGeometry(0.0046, 0.0046, 0.022, 8), new THREE.MeshStandardMaterial({ color: 0xc8864a, roughness: 0.8 })); filter.rotation.z = Math.PI / 2.3; filter.position.set(-0.03, -0.013, 0); filter.visible = false; g.add(filter);
+    g.position.set(-0.12, -0.13, -0.32); g.rotation.set(0.3, 0.6, 0); V.joint = { g, ember, paper, filter }; }
+  V.joint.filter.visible = cig; V.joint.paper.scale.set(cig ? 0.85 : 1, cig ? 1.15 : 1, cig ? 0.85 : 1);   // a cigarette: straight, thinner, a tan filter
   ctx.camera.add(V.joint.g); V.joint.g.visible = true;
   if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = false;
 }
@@ -302,10 +315,10 @@ function updateJoint(dt) {
     if (car) {   // in the whip: the smoke rolls out of the driver's window (not off the chase camera) and the car hotboxes
       const h = car.heading; at = car.pos.clone().add(new THREE.Vector3(-Math.cos(h) * 0.95 - Math.sin(h) * 0.2, car.spec?.car ? 1.25 : 1.5, Math.sin(h) * 0.95 - Math.cos(h) * 0.2)); hotbox = !!car.spec?.car;
     }
-    puff(at); ctx.net?.send?.('smoke', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], c: carId() });
-    V.high = Math.min(1, V.high + (hotbox ? 0.3 : 0.22)); V.highT = 150;
+    puff(at); ctx.net?.send?.('smoke', { p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], c: carId(), k: V.cig ? 'cig' : undefined });
+    if (!V.cig) { V.high = Math.min(1, V.high + (hotbox ? 0.3 : 0.22)); V.highT = 150; }
   }
-  if (V.smokeT <= 0) { if (V.joint) V.joint.g.visible = false; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = true; ctx.hud?.toast?.('…everything is glowing.', 2400); }
+  if (V.smokeT <= 0) { if (V.joint) V.joint.g.visible = false; if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = true; ctx.hud?.toast?.(V.cig ? 'Flick. The butt goes into the sand.' : '…everything is glowing.', 2400); V.cig = false; }
 }
 function updateHigh(dt) {
   const { ctx } = V; const cv = ctx.canvas; if (!cv) return;
@@ -582,6 +595,6 @@ function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the
 }
 function renderCash() {
   if (!V?.ui) return;
-  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => (ITEMS[i]?.icon || '?') + (i === 'ice' && V.iceT != null ? Math.round(V.iceT / ITEMS.ice.melt * 100) + '%' : '')).join(' ') + ' (B)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
+  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => (ITEMS[i]?.icon || '?') + (i === 'ice' && V.iceT != null ? Math.round(V.iceT / ITEMS.ice.melt * 100) + '%' : '') + (ITEMS[i]?.cig ? '×' + (V.cigLeft > 0 ? V.cigLeft : ITEMS[i].cig) : '')).join(' ') + ' (B)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
   if (V.ui.use) V.ui.use.style.display = V.inv.length ? 'block' : 'none';
 }

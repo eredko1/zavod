@@ -25,12 +25,20 @@ const CREWS = {
   mk: { names: ['TOURIST', 'HIPSTER', 'BABUSHKA', 'FINANCE BRO', 'DELIVERY GUY', 'INFLUENCER', 'DENTIST', 'SUMMER INTERN'], tag: '#9fd3ff',
     hi: [], bye: [], rob: [],
     give: ['Take it, take it! Just don\'t hurt me!', 'OK OK OK — here, it\'s all I got!', 'Please, it\'s my rent money!', 'This is going on my story, man.', 'I\'m calling my cousin! He\'s a cop! …He\'s a crossing guard.'],
-    no: ['Not today, pal!', 'I did three years of krav maga, buddy!', 'You picked the wrong grandma!'],
-    run: ['HELP! POLICE!', 'Somebody call 911!', 'Aaaah!'],
+    no: ['Not today, pal!', 'I did three years of krav maga, buddy!', 'You picked the wrong grandma!', 'Ты кого грабишь, щенок?! I grew up on Brighton!', 'Oh, you wanna go? We go. Давай!', 'My husband is in the Russian navy! Retired, but still!'],
+    run: ['HELP! POLICE!', 'Somebody call 911!', 'Aaaah!', 'Милиция! I mean — POLICE!', 'Yo, this guy\'s crazy!', 'Мама!'],
     look: [[0xe86a3a, 0x6b8fb3], [0x6a4a8a, 0x2a2a2a], [0x8a3a4a, 0x3a3a3a], [0x2e5e8e, 0x1c1c1c], [0x2f7a3a, 0x303a4a], [0xe0c0d0, 0xf0f0f0]], cap: null },
 };
 const HP = 100;
-const FIGHT = ['You want smoke? You got smoke!', 'Oh, now you done it.', 'Bratan, big mistake.', 'Get him!', 'Hold my semechki.'];
+const FIGHT = ['You want smoke? You got smoke!', 'Oh, now you done it.', 'Bratan, big mistake.', 'Get him!', 'Hold my semechki.', 'Ну всё, тебе конец, турист.', 'Yo, you picked the wrong boardwalk!', 'Иди сюда, иди сюда!'];
+// tough guys don't hand anything over — the blade comes out
+const BLADE = ['Видишь нож? Теперь видишь.', 'Wrong guy, bratan. WRONG guy.', 'I cut you like kolbasa.', 'Brighton Beach rules, baby.'];
+// muggers: walk up and ask nicely, Brighton style (coney/folk.js turns a local into one; __game.folk.mug() forces it)
+const MUG = { hi: ['Ey. Ты. Come here a sec.', 'Yo, lemme talk to you real quick.', 'Bratan! Bratan, one minute.', 'Hold up, hold up — where you going?'],
+  ask: ['Кошелёк или жизнь, bratan. Your call.', 'Run the pockets. Nice and slow, like Sunday.', 'Beach tax. Everybody pays the beach tax.', 'You look rich. Rich people share. Давай.'],
+  paid: ['Приятно иметь дело. Enjoy the beach!', 'See? Painless. Stay blessed.', 'Спасибо, спонсор.'],
+  laugh: ['Ха! Ты смешной. Ладно, иди.', 'Aight, you funny. Go ahead, comedian.', 'Бурбон, братва, Гудзон — ладно, живи.'],
+  broke: ['Пустой?! Then I take it out of your face.', 'Broke AND ugly? Damn.'] };
 let C = null;
 
 // ---- guns off the books: IGOR (under the bench) and now and then a tough in a crew that rolls up to talk ----
@@ -52,6 +60,21 @@ function buyGun(seller, id) {
 /** jobs (coney/jobs.js): a named person at a spot, e.g. a debtor */
 export function spawnPerson(at, name, cash = 40, type = 'mk') { if (!C) return null; const t = spawnGang(type, 'mark', 1, null, { at, name, cash })[0] || null; if (t) t.keep = true; return t; }
 export const crewsAlive = (t) => !!(C && t && C.thugs.get(t.id) === t);
+/** coney/folk.js: a local on the beach / boardwalk / in the rides gets pulled into the street-life systems (robbed, hit, or turning
+ *  mugger). o = { fig (buildPerson, already standing), pos, yaw, name, type 'mk'|'ru'|'st', intent 'mark'|'mug'|'fight', temper
+ *  'soft'|'scrappy'|'tough', blade, cash, onGone() }. From then on it is a normal crew member: streamed to friends, loot on death. */
+export function adoptFolk(o) {
+  if (!C) return null; const { ctx, world } = C; const type = CREWS[o.type] ? o.type : 'mk';
+  const id = C.nextId++; const m = thugModel(o.name, id, type, { fig: o.fig, blade: !!o.blade }); if (!m.f.group.parent) world.scene.add(m.f.group);
+  const t = { id, name: o.name, type, intent: o.intent || 'mark', m, pos: o.pos.clone(), yaw: o.yaw || 0, st: 'walk', hp: HP, cash: o.cash ?? 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.5, said: false, talkT: 0, lk: id, blade: !!m.blade, temper: o.temper || 'soft', folk: true, onGone: o.onGone || null, avatar: m.f.avatar || null, gun: o.gun ?? (m.blade ? 'knife' : null) };
+  for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); ctx.raycastTargets.push(h); }
+  C.thugs.set(id, t); m.f.group.position.copy(t.pos); m.f.group.rotation.set(0, t.yaw, 0);
+  if (t.intent === 'fight') { t.intent = 'mark'; startFight(t); }
+  return t;
+}
+export const folkRob = (t, force = null) => { if (C && t) robVictim(t, force); };
+export const folkHurt = (t, dmg, dir, hs = false) => { if (C && t) hurt(t, dmg, dir, null, hs); };
+export const crewCalm = () => !C || performance.now() < C.calmUntil;
 
 /** the crews (both modes): chill = frequent solo robbers + gangs; otherwise a gang now and then */
 export function buildCrews(world, { chill = false } = {}) {
@@ -69,9 +92,9 @@ export function buildCrews(world, { chill = false } = {}) {
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
   ctx.bus.on('worldReset', () => { for (const t of [...C.thugs.values()]) removeThug(t); for (const t of [...C.remote.values()]) removeThug(t, C.remote); C.robbed = 0; C.calmUntil = performance.now() + 30000; C.markT = 5; });
   ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null, m.f, !!m.h); });
-  ctx.bus.on('net:loot', (m) => { if (m.to !== ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 300)) return; K.earn(n); K.toast(`+$${n} off ${String(m.w || 'him').slice(0, 14)}`, 1800); });   // you dropped a friend's robber
+  ctx.bus.on('net:loot', (m) => { if (m.to !== ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 300)) return; K.earn(n); K.toast(`+$${n} off ${String(m.w || 'him').slice(0, 14)}`, 1800); if (typeof m.g === 'string' && GUN_IDS.includes(m.g)) setTimeout(() => takeGun(m.g, String(m.w || 'him').slice(0, 14)), 900); });   // you dropped a friend's robber (and took his piece)
   K.onUpdate((dt, playing) => update(dt, playing));
-  if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d), calm: (ms = 0) => { C.calmUntil = performance.now() + ms; }, mark: (d = 4) => spawnGang('mk', 'mark', 1, d)[0]?.id, dealer: (d = 5) => { const t = spawnGang('st', 'talk', 2, d)[0]; if (t) t.dealer = ['m9', 'deagle']; return t?.id; }, robNear: (force = null) => (C.robT ? (robVictim(C.robT, force), C.robT.name) : null), fight: () => { const t = [...C.thugs.values()].find((x) => x.st !== 'dead' && x.type !== 'mk'); if (t) startFight(t); return t?.name; } };
+  if (typeof window !== 'undefined' && window.__game) window.__game.crews = { state: () => ({ thugs: [...C.thugs.values()].map((t) => ({ id: t.id, name: t.name, type: t.type, intent: t.intent, st: t.st, hp: t.hp, gun: t.gun || null, pos: t.pos.toArray().map((v) => +v.toFixed(1)) })), remote: C.remote.size, robbed: C.robbed }), gang: (type, intent, n) => spawnGang(type, intent, n, 14), spawn: (d = 12) => spawnGang('ru', 'rob', 1, d), calm: (ms = 0) => { C.calmUntil = performance.now() + ms; }, mark: (d = 4) => spawnGang('mk', 'mark', 1, d)[0]?.id, dealer: (d = 5) => { const t = spawnGang('st', 'talk', 2, d)[0]; if (t) t.dealer = ['m9', 'deagle']; return t?.id; }, lastGun: () => C.lastGun || null, mugging: () => { const t = C.mugT; return t ? { name: t.name, intent: t.intent, st: t.st, answered: !!t.answered, alive: C.thugs.get(t.id) === t } : null; }, robNear: (force = null) => (C.robT ? (robVictim(C.robT, force), C.robT.name) : null), fight: () => { const t = [...C.thugs.values()].find((x) => x.st !== 'dead' && x.type !== 'mk'); if (t) startFight(t); return t?.name; } };
   return C;
 }
 
@@ -107,11 +130,11 @@ export function buildChill(world, H) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-function thugModel(name, seed, type = 'ru') {
+function thugModel(name, seed, type = 'ru', opt = {}) {
   const T = CREWS[type] || CREWS.ru, cols = T.look[seed % T.look.length];
   const MK = { TOURIST: 'm01', 'FINANCE BRO': 'm08', DENTIST: 'm08', BABUSHKA: 'f09', INFLUENCER: 'f01', 'SUMMER INTERN': 'f17', HIPSTER: 'm05', 'DELIVERY GUY': 'm18' };
-  const avatar = type === 'ru' ? ['m10', 'm17', 'm05'][seed % 3] : type === 'st' ? ['m04', 'm12', 'm18'][seed % 3] : MK[name] || ['m01', 'm20', 'f17'][seed % 3];
-  const f = buildFigure({ avatar, seed, skin: [0xe6c3a2, 0xd9a882, 0x8a5a3c, 0x6b4430, 0x4a2e20][seed % 5], hair: name === 'BABUSHKA' ? 0xb8b4ae : 0x1a1410, bun: name === 'BABUSHKA', shirt: cols[0], pants: type === 'st' ? 0x2a3240 : type === 'mk' ? cols[1] : cols[0], shoe: type === 'mk' ? 0x3a2a20 : cols[1], belly: name === 'FINANCE BRO' || name === 'BABUSHKA' ? 0.3 : 0.05, shortSleeve: type === 'mk' ? true : false });
+  const avatar = opt.avatar || (type === 'ru' ? ['m10', 'm17', 'm05'][seed % 3] : type === 'st' ? ['m04', 'm12', 'm18'][seed % 3] : MK[name] || ['m01', 'm20', 'f17'][seed % 3]);
+  const f = opt.fig || buildFigure({ avatar, seed, skin: [0xe6c3a2, 0xd9a882, 0x8a5a3c, 0x6b4430, 0x4a2e20][seed % 5], hair: name === 'BABUSHKA' ? 0xb8b4ae : 0x1a1410, bun: name === 'BABUSHKA', shirt: cols[0], pants: type === 'st' ? 0x2a3240 : type === 'mk' ? cols[1] : cols[0], shoe: type === 'mk' ? 0x3a2a20 : cols[1], belly: name === 'FINANCE BRO' || name === 'BABUSHKA' ? 0.3 : 0.05, shortSleeve: type === 'mk' ? true : false });
   if (T.cap != null && !f.avatar) { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.125, type === 'st' ? 0.11 : 0.07, 12), new THREE.MeshStandardMaterial({ color: T.cap })); cap.position.set(0, type === 'st' ? 0.08 : 0.1, 0); f.head.add(cap); }
   const tag = nameTag(name, T.tag); tag.position.set(0, 2.15, 0); f.group.add(tag);
   // hitboxes: body + head (weapons' onHit hook)
@@ -119,8 +142,8 @@ function thugModel(name, seed, type = 'ru') {
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8), hbm); body.position.y = 0.85; f.group.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), hbm); head.position.y = 1.72; f.group.add(head);
   head.userData.part = 'head';
-  let blade = null;   // some gopniks carry a folding knife
-  if (type === 'ru' && seed % 3 === 0) { blade = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.028, 0.16), new THREE.MeshStandardMaterial({ color: 0xc9cdd2, metalness: 1, roughness: 0.3 })); blade.position.set(0, -0.3, 0.08); f.limbs.arms[1].fore.add(blade); }
+  let blade = null;   // some gopniks carry a folding knife (out of sight until the fight starts)
+  if (opt.blade ?? (type === 'ru' && seed % 3 === 0)) { blade = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.028, 0.16), new THREE.MeshStandardMaterial({ color: 0xc9cdd2, metalness: 1, roughness: 0.3 })); blade.position.set(0, -0.3, 0.08); f.limbs.arms[1].fore.add(blade); if (f.avatar) { blade.position.set(0, 0, 0.1); blade.rotation.x = Math.PI / 2; } blade.visible = false; }
   return { f, hit: [body, head], blade };
 }
 /** a crew of n (same type) rolls in from one direction, 40–60 m out (or `dist`); intent 'rob' | 'talk' */
@@ -136,6 +159,7 @@ function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.rando
     const id = C.nextId++; const m = thugModel(name, id, type); m.f.group.position.copy(at); world.scene.add(m.f.group);
     const t = { id, name, type, intent, m, pos: at, yaw: 0, st: 'walk', hp: HP, cash: 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.6 * i, said: false, talkT: 0, lk: lk + i, blade: !!m.blade };
     for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); ctx.raycastTargets.push(h); }
+    t.gun = t.blade ? 'knife' : type !== 'mk' && Math.random() < 0.25 ? 'm9' : null;   // what he carries: strip it off him (rob / drop him)
     C.thugs.set(id, t); out.push(t);
   }
   if (opts.cash != null) for (const t of out) t.cash = opts.cash;
@@ -148,6 +172,7 @@ function removeThug(t, map = C.thugs) {
   const { ctx } = C; C.world.scene.remove(t.m.f.group);
   for (const h of t.m.hit) { const k = ctx.raycastTargets.indexOf(h); if (k > -1) ctx.raycastTargets.splice(k, 1); }
   map.delete(t.id);
+  if (t.onGone) { try { t.onGone(t); } catch {} t.onGone = null; }
 }
 function hurt(t, dmg, dir, by = null, hs = false) {   // by: the friend's net id when their hit killed him (else it was you)
   if (t.st === 'dead') return;
@@ -158,14 +183,17 @@ function hurt(t, dmg, dir, by = null, hs = false) {   // by: the friend's net id
     t.st = 'dead'; t.t = 0; t.fallK = 0; t.m.f.guard = false; t.m.f.hands = false; K.toast(`${t.name} is down`, 1200);
     // whoever dropped him takes his money on the spot: what he carried + what he robbed + a street bounty
     const n = t.cash + t.loot.reduce((a, b) => a + b, 0) + 5 * (1 + Math.floor(Math.random() * 3)) + (hs ? 10 : 0); t.cash = 0; t.loot = [];
-    if (by && by !== ctx.net?.id) ctx.net?.send?.('loot', { to: by, n, w: t.name }); else { K.earn(n); K.toast(`+$${n} off ${t.name}`, 1800); }
+    const gun = t.gun; t.gun = null;
+    if (by && by !== ctx.net?.id) ctx.net?.send?.('loot', { to: by, n, w: t.name, g: gun || undefined }); else { K.earn(n); K.toast(`+$${n} off ${t.name}`, 1800); if (gun) setTimeout(() => takeGun(gun, t.name), 900); }
     ctx.ai?.blood?.(t.pos.x, t.pos.z, 1.1, t.pos.y + 0.5);
     try { chaseQA.crime(t.type === 'mk' ? 'kill' : 'crewKill'); } catch {}
+    emitCrime('kill', t);
     for (const o of C.thugs.values()) if (o !== t && o.st !== 'dead' && o.st !== 'flee' && o.pos.distanceTo(t.pos) < 25) { if (o.type !== 'mk' && Math.random() < 0.45) startFight(o); else flee(o); }   // his boys either scatter or go for you
     return;
   }
   t.m.f.play('hit');
-  if (t.type === 'mk') { if (t.intent !== 'fight') { flee(t); say(t, CREWS.mk.run[Math.floor(Math.random() * CREWS.mk.run.length)]); try { chaseQA.crime('shot'); } catch {} } return; }
+  emitCrime(t.hp < HP * 0.5 ? 'fight' : 'hit', t);
+  if (t.type === 'mk' && t.temper !== 'scrappy' && t.temper !== 'tough') { if (t.intent !== 'fight') { flee(t); say(t, CREWS.mk.run[Math.floor(Math.random() * CREWS.mk.run.length)]); try { chaseQA.crime('shot'); } catch {} } return; }
   if (t.hp < 30 && Math.random() < 0.7) { flee(t); K.toast(`${t.name}: "Ay ay ay, OK OK!"`, 1100); return; }
   startFight(t);
   for (const o of C.thugs.values()) if (o !== t && o.type === t.type && o.st !== 'dead' && o.st !== 'flee' && o.intent !== 'fight' && o.pos.distanceTo(t.pos) < 15) startFight(o, true);   // you hit one, you fight them all
@@ -173,15 +201,29 @@ function hurt(t, dmg, dir, by = null, hs = false) {   // by: the friend's net id
 function startFight(t, quiet = false) {
   if (t.intent === 'fight' || t.st === 'dead') return;
   t.intent = 'fight'; t.st = 'fight'; t.punchT = 0.4 + Math.random() * 0.6; t.hitAt = null; t.m.f.guard = true; t.m.f.hands = false;
+  if (t.m.blade) { t.m.blade.visible = true; if (!quiet && t.folk) { say(t, BLADE[Math.floor(Math.random() * BLADE.length)]); return; } }
   if (!quiet) say(t, FIGHT[Math.floor(Math.random() * FIGHT.length)]);
 }
-function flee(t) { t.st = 'flee'; t.t = 0; t.m.f.guard = false; t.m.f.hands = false; }
+/** his weapon into your bag (weapons.collect: new → a bag slot 1–9, one you own → its ammo) */
+const GUN_IDS = ['m9', 'deagle', 'r870', 'mp5', 'ak74', 'm4a1', 'knife'];
+const GUN_NAMES = { m9: 'Makarov', deagle: 'Desert Eagle', r870: 'sawed-off', mp5: 'MP5', ak74: 'AK', m4a1: 'M4', knife: 'folding knife' };
+function takeGun(id, from) {
+  const w = C?.ctx?.weapons; if (!w?.collect || !GUN_IDS.includes(id)) return false;
+  const r = w.collect(id, id === 'knife' ? 0 : id === 'm9' || id === 'deagle' ? 21 : 30);
+  if (r === 'ammo') K.toast(`Took ${from}'s ${GUN_NAMES[id]} — ${id === 'knife' ? 'you already carry one' : '+ammo'}`, 2000);
+  else if (!r) K.toast(`${from}'s ${GUN_NAMES[id]} — your bag is full (9)`, 1800);
+  C.lastGun = { id, from, r }; return r;
+}
+export const crewTakeGun = (id, from) => takeGun(id, from);
+function flee(t) { t.st = 'flee'; t.t = 0; t.m.f.guard = false; t.m.f.hands = false; if (t.m.blade) t.m.blade.visible = false; }
+/** witnesses (coney/folk.js) react to what happens on the street */
+function emitCrime(kind, t) { try { C.ctx.bus.emit('streetCrime', { kind, name: t.name, pos: t.pos.clone(), folk: !!t.folk }); } catch {} }
 function onRemoteThug(m) {
   if (!C || !m || !/^[a-z0-9]{8}$/.test(m.f) || !Number.isSafeInteger(m.i) || m.i < 0 || m.i > 2147483647) return;
   if (![m.x, m.y, m.z].every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 20000) || (m.r != null && !Number.isFinite(m.r))) return;
   const { ctx } = C;
   const key = m.f + ':' + m.i; let t = C.remote.get(key);
-  if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 10), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru'); C.world.scene.add(mm.f.group); t = { key, id: key, type: m.k === 'st' || m.k === 'mk' ? m.k : 'ru', m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
+  if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 14), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru', { avatar: /^[mf]\d\d$/.test(m.a) ? m.a : undefined, blade: m.b != null ? !!+m.b : undefined }); C.world.scene.add(mm.f.group); t = { key, id: key, type: m.k === 'st' || m.k === 'mk' ? m.k : 'ru', m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
     for (const h of mm.hit) { h.userData.onHit = (dmg, headshot) => ctx.net?.send?.('thughit', { o: m.f, i: m.i, d: Math.round(dmg), h: headshot ? 1 : 0 }); ctx.raycastTargets.push(h); } C.remote.set(key, t); }
   if (m.st === 'gone') { removeThug(t, C.remote); return; }
   t.target = new THREE.Vector3(+m.x, +m.y, +m.z); t.yaw = +m.r || 0; t.st = m.st; t.seen = performance.now();
@@ -238,6 +280,12 @@ function update(dt, playing) {
             if (t.blade) ctx.ai?.blood?.(me.position.x, me.position.z, 0.4, me.position.y); } }
       }
     }
+    else if (t.intent === 'mug') {   // walk up, stick you up (dialogue), fight if you refuse, take it if you walk off
+      if (!t.demanded && (safe || d > 60)) { t.intent = 'talk'; t.said = false; }
+      else if (!t.demanded && d > 1.9) { speed = d > 12 ? 3.4 : 2.0; goal = me.position; t.st = d > 12 ? 'run' : 'walk'; if (!t.said && d < 11) { t.said = true; say(t, MUG.hi[Math.floor(Math.random() * MUG.hi.length)]); } }
+      else if (!t.demanded) { t.demanded = true; t.st = 'talk'; t.m.f.mood = 'angry'; t.yaw = Math.atan2(dx, dz); mugDialog(t); }
+      else { t.yaw = Math.atan2(dx, dz); if (!t.answered && K.state()?.dialog?.name !== t.name) { t.answered = true; t.intent = 'rob'; t.said = true; t.punchT = 0.3; } }   // walked off without answering: he takes it
+    }
     else if (t.intent === 'talk') {   // roll up, talk trash, roll out
       if (d > 3.2 && t.st !== 'talk') { speed = d > 25 ? 1.6 : 2.2; goal = me.position; t.st = 'walk'; }
       else { if (t.st !== 'talk') { t.st = 'talk'; t.talkT = 0; } t.talkT += dt; t.yaw = Math.atan2(dx, dz);
@@ -254,33 +302,51 @@ function update(dt, playing) {
       let w = goal; if (t.path && t.path.length) { while (t.pi < t.path.length - 1 && Math.hypot(t.path[t.pi].x - t.pos.x, t.path[t.pi].z - t.pos.z) < 0.6) t.pi++; w = t.path[Math.min(t.pi, t.path.length - 1)]; }
       const wx = w.x - t.pos.x, wz = w.z - t.pos.z, wl = Math.hypot(wx, wz) || 1; t.pos.x += wx / wl * Math.min(wl, speed * dt); t.pos.z += wz / wl * Math.min(wl, speed * dt); if (Number.isFinite(w.y)) t.pos.y += (w.y - t.pos.y) * Math.min(1, dt * 6);
       const want = Math.atan2(wx, wz); t.yaw += Math.atan2(Math.sin(want - t.yaw), Math.cos(want - t.yaw)) * Math.min(1, dt * 8);
+      if (t.folk && C.world.W.sandAt?.(t.pos.x, t.pos.z)) { const gy = C.world.W.groundHeight(t.pos.x, t.pos.z); if (Number.isFinite(gy)) t.pos.y += (gy - t.pos.y) * Math.min(1, dt * 8); }   // out on the sand
     } else if (t.st === 'rob') t.yaw = Math.atan2(dx, dz);
     g.position.copy(t.pos); g.rotation.y = t.yaw; t.m.f.update(dt, speed);
   }
   // stream mine (5 Hz), animate friends'
-  C.sendT -= dt; if (C.sendT <= 0 && ctx.net?.connected) { C.sendT = 0.2; for (const t of C.thugs.values()) ctx.net.send('thug', { i: t.id, n: t.name, k: t.type, st: t.st, x: +t.pos.x.toFixed(2), y: +t.pos.y.toFixed(2), z: +t.pos.z.toFixed(2), r: +t.yaw.toFixed(2) }); }
+  C.sendT -= dt; if (C.sendT <= 0 && ctx.net?.connected) { C.sendT = 0.2; for (const t of C.thugs.values()) ctx.net.send('thug', { i: t.id, n: t.name, k: t.type, a: t.avatar || undefined, b: t.blade ? 1 : 0, st: t.st, x: +t.pos.x.toFixed(2), y: +t.pos.y.toFixed(2), z: +t.pos.z.toFixed(2), r: +t.yaw.toFixed(2) }); }
   for (const t of [...C.remote.values()]) {
     if (now - t.seen > 3000) { removeThug(t, C.remote); continue; }
     const g = t.m.f.group; const moving = t.target && t.target.distanceTo(t.pos) > 0.05;
     if (t.target) t.pos.lerp(t.target, Math.min(1, dt * 8)); g.position.copy(t.pos); g.rotation.y = t.yaw;
-    t.m.f.guard = t.st === 'fight'; t.m.f.hands = t.st === 'robbed';
+    t.m.f.guard = t.st === 'fight'; t.m.f.hands = t.st === 'robbed'; if (t.m.blade) t.m.blade.visible = t.st === 'fight';
     if (t.st === 'dead') { g.rotation.x = -Math.PI / 2; g.position.y = t.pos.y + 0.25; } else t.m.f.update(dt, moving ? 3 : 0);
   }
 }
 /** you rob someone: with a gun out they nearly always pay; with a knife some run or swing; crews mostly swing */
 function robVictim(t, force = null) {
   const { ctx } = C; const gun = ctx.weapons?.current?.mode !== 'MELEE', M = CREWS.mk;
-  const comply = force != null ? +force : t.type === 'mk' ? (gun ? 0.95 : 0.75) : (gun ? 0.55 : 0.3);
+  const comply = force != null ? +force : t.temper === 'tough' ? (gun ? 0.3 : 0.08) : t.temper === 'scrappy' ? (gun ? 0.6 : 0.25) : t.type === 'mk' ? (gun ? 0.95 : 0.75) : (gun ? 0.55 : 0.3);
   t.path = null; t.goal = null;
   if (Math.random() < comply) {
     t.st = 'robbed'; t.robT = 0; t.m.f.hands = true; t.m.f.guard = false;
+    if (t.gun) { const g = t.gun; t.gun = null; if (t.m.blade) t.m.blade.visible = false; setTimeout(() => takeGun(g, t.name), 1400); }   // and whatever he was carrying
+    emitCrime('rob', t);
     if (t.type === 'mk') { t.cash = t.name === 'FINANCE BRO' ? 40 + Math.floor(Math.random() * 11) * 5 : 10 + Math.floor(Math.random() * 8) * 5; say(t, M.give[Math.floor(Math.random() * M.give.length)]); }
     else say(t, gun ? 'Whoa whoa — easy with that thing!' : 'Aight, aight… you got it.');
     return;
   }
+  if (t.temper === 'tough' || t.temper === 'scrappy') { emitCrime('fight', t); startFight(t); return; }   // locals with a spine: they swing (the tough ones pull a blade)
   if (t.type === 'mk' && Math.random() < 0.55) { flee(t); say(t, M.run[Math.floor(Math.random() * M.run.length)]); try { chaseQA.crime('rob'); } catch {} return; }
   if (t.type === 'mk') say(t, M.no[Math.floor(Math.random() * M.no.length)]);
   startFight(t, t.type === 'mk'); for (const o of C.thugs.values()) if (o !== t && o.type === t.type && t.type !== 'mk' && o.st !== 'dead' && o.pos.distanceTo(t.pos) < 15) startFight(o, true);
+}
+/** the stick-up: pay, hand over the stash, talk your way out, or tell him where to go (then it's a fight) */
+function mugDialog(t) {
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const cash = K.cash, n = cash >= 10 ? Math.min(60, Math.max(10, Math.round(cash * 0.4 / 5) * 5)) : 0, inv = K.state()?.inv || [];
+  const done = (line) => { t.answered = true; t.m.f.mood = null; t.intent = 'talk'; t.st = 'leave'; t.t = 0; say(t, line); return null; };
+  const fight = () => { t.answered = true; t.m.f.mood = 'angry'; emitCrime('fight', t); startFight(t); return null; };
+  const choices = [];
+  if (n) choices.push({ label: `Pay him — $${n}`, go: () => { if (!K.pay(n)) return fight(); t.loot.push(n); C.robbed++; C.calmUntil = performance.now() + 60000; return done(pick(MUG.paid)); } });
+  else if (inv.length) choices.push({ label: 'Hand over your stash', go: () => { const it = inv[inv.length - 1]; K.take(it); t.loot.push(8); C.robbed++; C.calmUntil = performance.now() + 60000; return done(pick(MUG.paid)); } });
+  choices.push({ label: 'Talk your way out («Бурбон, братва, Гудзон…»)', go: () => (Math.random() < 0.4 ? done(pick(MUG.laugh)) : (say(t, 'Ты мне зубы не заговаривай.'), fight())) });
+  choices.push({ label: 'Tell him to get lost', go: () => fight() });
+  K.openDialog(t.name, { text: `${t.name}: "${n || inv.length ? pick(MUG.ask) : pick(MUG.broke)}"`, choices });
+  C.mugT = t;
 }
 function rob(t) {
   const { ctx } = C; const me = ctx.player, T = CREWS[t.type] || CREWS.ru;
