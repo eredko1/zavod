@@ -99,7 +99,7 @@ function markers() {
   const th = ctx.world?.mapThugs?.(); if (th) out.thugs = th;
   const net = ctx.net; if (net?.list) for (const id of net.list()) { const q = net.peer(id); if (q?.pos) out.friends.push([q.pos.x, q.pos.z, q.name || '', q.dead, off(q.pos.y)]); }
   for (const v of ctx.vehicles?.list || []) if (v !== ctx.vehicles.mounted && v.pos) out.bikes.push([v.pos.x, v.pos.z, !!v.spec?.car]);
-  const K = kit(); if (K) for (const v of K.vendors) out.vendors.push([v.pos.x, v.pos.z, v.name]);
+  const K = kit(); if (K) for (const v of K.vendors) if (!v.noMap) out.vendors.push([v.pos.x, v.pos.z, v.name]);
   return out;
 }
 function drawMarkers(g, P, scale, rot = 0, big = false) {
