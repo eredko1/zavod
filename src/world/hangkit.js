@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { hideParkedCar } from './carkit.js';
 
-const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 3, SHARE_R = 4;
+const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 12, SHARE_R = 4;
 // kind: 'smoke' | 'booze' | 'drink' | 'food' | 'loot' | 'misc' (inventory categories); effects: drunk/dur, food (HP), cig (smokes per pack, no high), magic, keep (not for B), melt
 const CASH_GIFT = 10, GIFT_RANGE = 3, GIFT_RECEIVE_RANGE = GIFT_RANGE + 1; // allow for interpolated peer positions
 export const ITEMS = {
@@ -29,6 +29,9 @@ export const ITEMS = {
   cigs: { kind: 'smoke', icon: '🚬', name: 'pack of Marlboro Reds', cig: 5 },   // B lights one: smoke, no high
   tallboy: { kind: 'booze', icon: '🍺', name: 'tallboy of Baltika 9', drunk: 0.3, dur: 110, glass: 'can' },
   vodka: { kind: 'booze', icon: '🥃', name: 'стопка водки', drunk: 0.45, dur: 120, glass: 'shot', liq: 0xdfe6e8 },
+  vape: { kind: 'smoke', icon: '💨', name: 'disposable vape (watermelon ice)', cig: 15 },   // B takes a hit: vapour, no high
+  bic: { kind: 'tool', icon: '🔥', name: 'Bic lighter', keep: true },
+  zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
 };
 
 let V = null;
@@ -45,6 +48,7 @@ export function buildKit(world, o = {}) {
   buildUI(o); buildPuffs();
   if (!ctx.__hangkitBound) { ctx.__hangkitBound = true; bindOnce(ctx); }
   world.updaters.push((dt) => { if (V?.world === world) update(dt); });
+  import('./inventory.js').then((m) => m.mountInventory(world.ctx || V.ctx, api)).catch((e) => console.warn('[hangkit] inventory', e));   // I: the bag panel
   return api;
 }
 
@@ -69,7 +73,7 @@ const api = {
   shaft(s) { V.shafts.push({ kind: 'elevator', floors: 10, ...s }); return V.shafts.length - 1; },
   onUpdate(fn) { V.onUpdate.push(fn); },
   toast: (t, ms) => V?.ctx.hud?.toast?.(t, ms),
-  puff: (at) => puff(at), useItem: () => useItem(), callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
+  puff: (at) => puff(at), useItem: (want) => useItem(want), drop: (item) => { if (!V) return false; const i = V.inv.lastIndexOf(item); if (i < 0) return false; V.inv.splice(i, 1); renderCash(); return true; }, left: (item) => V?.left?.[item] || 0, callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
   nearestParked: (r) => nearestParked(r), endRide: (f) => endRide(f), leavePassenger: () => leavePassenger(), pickRespawn: () => pickRespawn(),
   openDialog: (name, node) => openDialog(name, node), closeDialog: () => closeDialog(), choose: (i) => choose(i), dropCash: (at, n) => dropCash(at, n),
   /** QA: where the interaction points are */
@@ -121,7 +125,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
-    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.status = {}; V.iceT = null; V.cigLeft = 0; renderCash();
+    V.cash = V.startCash; V.inv.length = 0; V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
     for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
     for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
     for (const m of V.puddles || []) m.visible = false;
@@ -238,12 +242,12 @@ function update(dt) {
 /** the car you're in, named by its driver's net id — everyone in one car shares, however laggy the positions are at 100 km/h */
 function carId() { const ctx = V.ctx; return ctx.vehicles?.mounted?.spec?.car ? ctx.net?.id || null : V.passenger?.id || null; }
 function sameCar(m) { const c = carId(); return !!(m.c && c && m.c === c); }
-function useItem() {
-  const { ctx } = V; const k = V.inv.map((x) => !ITEMS[x]?.keep).lastIndexOf(true);
+function useItem(want) {
+  const { ctx } = V; const k = want ? (ITEMS[want]?.keep ? -1 : V.inv.lastIndexOf(want)) : V.inv.map((x) => !ITEMS[x]?.keep).lastIndexOf(true);
   if (k < 0) { ctx.hud?.toast?.(V.inv.length ? 'Raw meat — grill it at Table Park' : 'Nothing on you', 1400); return; }
   const it = V.inv.splice(k, 1)[0]; renderCash();
   if (it === 'weed') return lightUp();
-  if (ITEMS[it]?.cig) { V.cigLeft = (V.cigLeft > 0 ? V.cigLeft : ITEMS[it].cig) - 1; if (V.cigLeft > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
+  if (ITEMS[it]?.cig) { const L = V.left || (V.left = {}); L[it] = (L[it] > 0 ? L[it] : ITEMS[it].cig) - 1; if (L[it] > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
   if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
   const spec = ITEMS[it];
   if (spec?.food) { ctx.player?.heal?.(spec.food); ctx.hud?.toast?.(spec.milk ? 'Зебровое молоко. Редко одобряет. (+' + spec.food + ' HP)' : '*хрум* Виски-шмиски, вот сосиски! (+' + spec.food + ' HP)', 2000); return; }
@@ -595,6 +599,6 @@ function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the
 }
 function renderCash() {
   if (!V?.ui) return;
-  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => (ITEMS[i]?.icon || '?') + (i === 'ice' && V.iceT != null ? Math.round(V.iceT / ITEMS.ice.melt * 100) + '%' : '') + (ITEMS[i]?.cig ? '×' + (V.cigLeft > 0 ? V.cigLeft : ITEMS[i].cig) : '')).join(' ') + ' (B)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
+  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => (ITEMS[i]?.icon || '?') + (i === 'ice' && V.iceT != null ? Math.round(V.iceT / ITEMS.ice.melt * 100) + '%' : '') + (ITEMS[i]?.cig ? '×' + (V.left?.[i] > 0 ? V.left[i] : ITEMS[i].cig) : '')).join(' ') + ' (B · I bag)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
   if (V.ui.use) V.ui.use.style.display = V.inv.length ? 'block' : 'none';
 }
