@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Map generator · Query, merge, render</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./ui/map-generator.css">
 <script type="importmap">{"imports":{"three":"../../vendor/three/build/three.module.js","three/addons/":"../../vendor/three/examples/jsm/"}}</script>
 </head>
@@ -19,7 +20,7 @@
   <textarea id="query" spellcheck="false"></textarea>
 
   <label for="endpoint">API server</label>
-  <select id="endpoint"><option value="https://overpass-api.de/api/interpreter">overpass-api.de</option><option value="https://overpass.private.coffee/api/interpreter">overpass.private.coffee</option></select>
+  <select id="endpoint"><option value="https://overpass.private.coffee/api/interpreter">overpass.private.coffee</option><option value="https://overpass-api.de/api/interpreter">overpass-api.de</option></select>
   <div class="buttons"><button id="fetch">Fetch custom query</button></div>
 
   <div class="buttons"><button id="all">Fit results</button><button id="download" disabled>Download JSON</button></div>
