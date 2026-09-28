@@ -23,7 +23,7 @@ const LINES_CFG = [
   { id: 'F', color: '#ff6319', fg: '#fff', stwX: STW_X, dir: 'S', dst: [520, NEP_Z - 40, (v) => v[0] > 440 && v[1] < NEP_Z + 60], w8: 'UP', ext: 40, off: 0,
     dest: { out: 'Jamaica-179 St', in: 'Coney Island|Stillwell Av' }, bound: { out: 'Jamaica–179th Street–bound F local', in: 'Coney Island–bound F' },
     strip: ['Stillwell Av', 'W 8 St', 'Neptune Av', 'Avenue X', 'Avenue U', 'Kings Hwy', 'Avenue P', 'Avenue N', 'Bay Pkwy', 'Avenue I'] },
-  { id: 'Q', color: '#fccc0a', fg: '#111', stwX: -40, dir: 'S', dst: [823, -105, (v) => v[0] > 800], w8: 'LO', ext: 520, off: 97,
+  { id: 'Q', color: '#fccc0a', fg: '#111', stwX: -40, dir: 'S', dst: [823, -105, (v) => v[0] > 800], w8: 'LO', ext: 520, off: 97, bend: { x: 1035, h: -0.138 },
     dest: { out: '96 St-2 Av', in: 'Coney Island|Stillwell Av' }, bound: { out: '96th Street–bound Q', in: 'Coney Island–bound Q' },
     strip: ['Stillwell Av', 'W 8 St', 'Ocean Pkwy', 'Brighton Bch', 'Sheepshead Bay', 'Neck Rd', 'Avenue U', 'Kings Hwy', 'Avenue M', 'Avenue J'] },
   { id: 'D', color: '#ff6319', fg: '#fff', stwX: -58.2, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 340, off: 41,
@@ -32,7 +32,7 @@ const LINES_CFG = [
 ];
 const NAMES = { STW: ['Coney Island–Stillwell Av', 'Coney Island–Stillwell Avenue'], W8: ['W 8 St–NY Aquarium', 'West 8th Street–New York Aquarium'], NEP: ['Neptune Av', 'Neptune Avenue'],
   OCP: ['Ocean Pkwy', 'Ocean Parkway'], BRT: ['Brighton Beach', 'Brighton Beach'], B50: ['Bay 50 St', 'Bay 50th Street'], A25: ['25 Av', '25th Avenue'] };
-const LINES = [], STN = {}, G = { hudT: 0 };   // G: the shared HUD / clocks / PA state
+const LINES = [], STN = {}, G = { hudT: 0 }; let MAPR = null, MAPS = null;   // G: the shared HUD / clocks / PA state
 let R = null, SKEW = 0;
 const W8U = new THREE.Vector2(W8.P1.x - W8.P0.x, W8.P1.y - W8.P0.y).normalize();   // R: the line being updated (every function below works on R)
 
@@ -51,6 +51,9 @@ export function buildSubway(world) {
     local: () => { const L = LINES.find((q) => q.aboard); return L ? [L.li * 10 + L.aboard.c, +L.aboard.lx.toFixed(2), +L.aboard.lz.toFixed(2)] : null; },
     toWorld: (c, lx, lz, out = new THREE.Vector3()) => { const L = LINES[Math.floor(c / 10)], g = L?.cars[c % 10]; if (!g) return null; g.updateMatrixWorld(); return out.set(lx, FLOOR, lz).applyMatrix4(g.matrixWorld); },
     train: () => { const a = F.cars[0].position, b = F.cars[NCAR - 1].position; return [a.x, a.z, b.x, b.z]; },
+    routes: () => MAPR || (MAPR = LINES.map((L) => ({ id: L.id, color: L.id === 'D' ? '#c9500f' : L.cfg.color, dash: L.id === 'D', w: L.id === 'Q' ? 3.2 : 2, pts: L.P.filter((p, i) => i % 8 === 0 || i === L.P.length - 1).map((p) => [p.x, p.z]) })).sort((a, b) => b.w - a.w)),
+    stations: () => MAPS || (MAPS = [{ id: 'STW', x: -47, z: -330, r: 'DFNQ' }, { id: 'W8', x: w8Pt(W8.L / 2, 0, 0).x, z: w8Pt(W8.L / 2, 0, 0).z, r: 'FQ' }, ...[['NEP', 'F'], ['OCP', 'Q'], ['B50', 'D']].filter(([id]) => STN[id]).map(([id, r]) => ({ id, x: STN[id].c.x, z: STN[id].c.z, r }))].map((q) => ({ ...q, name: NAMES[q.id][0] }))),
+    trains: () => LINES.map((L) => { const a = L.cars[0].position, b = L.cars[NCAR - 1].position; return { id: L.id, color: L.cfg.color, seg: [a.x, a.z, b.x, b.z] }; }),
   };
   const api = (L) => { const w = (f) => (...a) => { const pr = R; R = L; try { return f(...a); } finally { R = pr; } };
     return {
@@ -129,7 +132,11 @@ function routePath(cfg) {
   if (cfg.dir === 'S') for (let z = STW_Z0; z < out[0].z - 1; z += 6) pre.push(new THREE.Vector3(cfg.stwX, RAIL, z));
   else for (let z = STW_ZS + 4; z > out[0].z + 1; z -= 6) pre.push(new THREE.Vector3(cfg.stwX, RAIL, z));
   // run on past the last OSM vertex along the last direction (a tail clearance, or the hidden run to the map edge)
-  const a = out[out.length - 2], b = out[out.length - 1], d = b.clone().sub(a).setY(0).normalize(); out.push(b.clone().addScaledVector(d, cfg.ext));
+  const a = out[out.length - 2], b = out[out.length - 1], d = b.clone().sub(a).setY(0).normalize();
+  if (cfg.bend) {   // follow the avenue: straight on to bend.x, then ease the heading round to bend.h (rad, atan2(dz, dx)) at ≤ 0.1°/m
+    let h = Math.atan2(d.z, d.x); const q = b.clone();
+    for (let run = 0; run < cfg.ext; run += 10) { if (q.x > cfg.bend.x) h += Math.max(-0.0175, Math.min(0.0175, cfg.bend.h - h)); q.x += Math.cos(h) * 10; q.z += Math.sin(h) * 10; out.push(q.clone()); }
+  } else out.push(b.clone().addScaledVector(d, cfg.ext));
   return [...pre, ...out];
 }
 function resample(pts, step) {   // even spacing ON the rail polyline (no smoothing — the train stays locked to the track)
@@ -179,10 +186,10 @@ function destTex() {
   g.fillStyle = '#ffb347'; g.textAlign = 'left'; g.font = '600 22px Helvetica, Arial'; g.fillText('JAMAICA–179 ST', 66, 34);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (destTex.t = t);
 }
-function bulletTex() {
-  if (bulletTex.t) return bulletTex.t; const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
-  g.fillStyle = '#ff6319'; g.beginPath(); g.arc(64, 64, 60, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 84px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('F', 64, 70);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (bulletTex.t = t);
+function bulletAtlas() {   // D F N Q bullets in a row, 128 px each, transparent between
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d'); g.textAlign = 'center'; g.textBaseline = 'middle';
+  [['D', '#ff6319', '#fff'], ['F', '#ff6319', '#fff'], ['N', '#fccc0a', '#111'], ['Q', '#fccc0a', '#111']].forEach(([l, bg, fg], i) => { g.fillStyle = bg; g.beginPath(); g.arc(i * 128 + 64, 64, 60, 0, 7); g.fill(); g.fillStyle = fg; g.font = '700 84px Helvetica, Arial'; g.fillText(l, i * 128 + 64, 70); });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -527,19 +534,22 @@ function buildEntrances(world) {
   const oN = -(W8.platOut + 2.3), oS = W8.platOut + 2.3, oE = W8.platOut + 38 - 1.4;
   for (const o of [oN, oS]) for (const d of [-1.7, 1.7]) spots.push(w8(38.2, o + d));
   for (const d of [-1.7, 1.7]) spots.push(w8(133.8, oE + d));
-  for (const q of STN.NEP?.feet || []) spots.push(q);
+  const RT = spots.map((q, i) => (i < 6 ? 'DFNQ' : 'FQ'));   // Stillwell: D F N Q · W 8 St: F Q
+  for (const [id, r] of [['NEP', 'F'], ['OCP', 'Q'], ['B50', 'D']]) for (const q of STN[id]?.feet || []) { spots.push(q); RT.push(r); }
   const poles = [], globes = [], bul = [];
-  for (const [x, z] of spots) {
+  spots.forEach(([x, z], si) => {
     const pg = new THREE.CylinderGeometry(0.055, 0.08, 2.9, 8); pg.translate(x, 1.45, z); poles.push(pg);
     const cap = new THREE.CylinderGeometry(0.2, 0.16, 0.12, 12); cap.translate(x, 2.95, z); poles.push(cap);
     const gg = new THREE.SphereGeometry(0.27, 16, 12); gg.translate(x, 3.25, z); globes.push(gg);
-    for (const r of [0, Math.PI / 2]) { const b = new THREE.PlaneGeometry(0.5, 0.5); b.rotateY(r); b.translate(x, 2.3, z); bul.push(b); }
+    const rs = RT[si], nb = rs.length, bw = 0.34;   // a row of route bullets on two crossed planes (atlas: D F N Q)
+    for (const r of [0, Math.PI / 2]) for (let k = 0; k < nb; k++) { const b = new THREE.PlaneGeometry(bw, bw), uv = b.attributes.uv, cell = 'DFNQ'.indexOf(rs[k]); for (let i = 0; i < uv.count; i++) uv.setX(i, (cell + uv.getX(i)) / 4);
+      b.translate((k - (nb - 1) / 2) * (bw + 0.03), 0, 0); b.rotateY(r); b.translate(x, 2.3, z); bul.push(b); }
     world.box([x - 0.1, 0, z - 0.1], [x + 0.1, 3.2, z + 0.1]);
-  }
+  });
   const add = (list, m) => { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; scene.add(me); return me; };
   add(poles, new THREE.MeshStandardMaterial({ color: 0x1f3a2a, roughness: 0.6, metalness: 0.5 }));
   add(globes, new THREE.MeshStandardMaterial({ color: 0x3fdc6e, emissive: 0x22c653, emissiveIntensity: 1.6, roughness: 0.3 })).castShadow = false;
-  add(bul, new THREE.MeshStandardMaterial({ map: bulletTex(), transparent: true, alphaTest: 0.4, emissive: 0xffffff, emissiveMap: bulletTex(), emissiveIntensity: 0.5, side: THREE.DoubleSide })).castShadow = false;
+  const bt = bulletAtlas(); add(bul, new THREE.MeshStandardMaterial({ map: bt, transparent: true, alphaTest: 0.4, emissive: 0xffffff, emissiveMap: bt, emissiveIntensity: 0.5, side: THREE.DoubleSide })).castShadow = false;
   // Stillwell concourse: which stairs go to the F (the 3rd bank from Stillwell Ave, x −49.5)
   const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
   g.fillStyle = '#111'; g.fillRect(0, 0, 512, 96); g.fillStyle = '#fff'; g.fillRect(0, 6, 512, 4);
