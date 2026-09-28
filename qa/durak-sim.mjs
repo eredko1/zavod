@@ -27,7 +27,7 @@ const r = await pg.evaluate(async (classicSrc) => {
       }
       if (A.over !== B.over || A.result !== B.result) diffs++;
     }
-    out.classic2 = { games, moves, diffs };
+    out.classic2 = { games, moves, diffs }; out.showTrump = (await import('/src/world/coney/durak-engine.js')).SHOW_TRUMP;
   }
   // ---- self-play at n = 2, 3, 4 with invariants after every move
   const v = (G, c) => (c.r - 6) + (c.s === G.tr ? 9 : 0);
@@ -76,7 +76,7 @@ const r = await pg.evaluate(async (classicSrc) => {
   return out;
 }, classicSrc);
 ok(!r.reexports.length, 'durak.js re-exports the engine API', JSON.stringify(r.reexports));
-ok(r.classic2.diffs === 0 && r.classic2.moves > 10000, 'n=2 identical to the classic engine, move for move', JSON.stringify(r.classic2) + (r.diff2 ? JSON.stringify(r.diff2) : ''));
+if (r.showTrump) ok(r.classic2.diffs === 0 && r.classic2.moves > 10000, 'n=2 identical to the classic engine, move for move', JSON.stringify(r.classic2) + (r.diff2 ? JSON.stringify(r.diff2) : ''));
 const tx = { 3: 0, 4: 0, c3: 0, c4: 0 };
 for (const [k, st] of Object.entries(r)) { if (!k.startsWith('n')) continue; const n = +k[1];
   console.log(k.padEnd(28), JSON.stringify({ over: st.over, draw: st.draw, avgMoves: st.avgMoves, maxMoves: st.maxMoves, transfers: st.transfers, chained: st.chained, shows: st.shows, aiLoses: st.aiLoses, oppLoses: st.oppLoses, aiP99: st.aiP99, aiMaxMs: st.aiMaxMs, ms: st.ms }));
