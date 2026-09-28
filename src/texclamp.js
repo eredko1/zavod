@@ -7,7 +7,9 @@ const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emis
 export function textureBudget(ctx) {
   if (!ctx.lite) return { max: 2048, people: 1024, low: false };
   const mem = navigator.deviceMemory || 0, cores = navigator.hardwareConcurrency || 0;
-  const low = (mem && mem <= 4) || (cores && cores <= 4) || /iPad;|iPad Mini|iPhone OS 1[0-5]_/i.test(navigator.userAgent) || ctx.qs?.get?.('lowmem') === '1';
+  // every iPhone / iPad gets the low budget: iOS reports no deviceMemory, and a tab past ~1 GB is killed outright (and before
+  // that, texture uploads start failing: alpha-tested leaves come out empty and the trees look bare)
+  const low = (mem && mem <= 4) || (cores && cores <= 4) || /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) || ctx.qs?.get?.('lowmem') === '1';
   return low ? { max: 512, people: 256, low: true } : { max: 1024, people: 512, low: false };
 }
 
