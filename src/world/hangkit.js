@@ -352,7 +352,7 @@ function smokeModel(kind, ctx) {
   tipX = L; const tip = new THREE.Group(); g.add(tip);
   const ashM = new THREE.Mesh(along(new THREE.CylinderGeometry(R1 * 0.95, R1, 0.008, 12)), ash); ashM.position.x = 0.004; tip.add(ashM);
   const ember = new THREE.Mesh(new THREE.CircleGeometry(R1 * 0.95, 14), emb); ember.rotation.y = Math.PI / 2; ember.position.x = 0.0085; tip.add(ember);
-  let light = null; if (!ctx.lite) { light = new THREE.PointLight(0xff6a20, 0.3, 0.5, 2); light.position.x = 0.02; tip.add(light); }
+  const light = null;   // no PointLight: adding a light recompiles every shader in the scene (a long freeze on the first drag)
   const burn = (k) => { const len = L * k; body.scale.set(k, 1, 1); body.position.x = (kind === 'blunt' ? -0.01 : 0) + len / 2; tip.position.x = len + (kind === 'blunt' ? -0.01 : 0); if (g.userData.twist) g.userData.twist.visible = k > 0.97; };
   burn(1); g.position.set(-0.12, -0.13, -0.32); g.rotation.set(0.3, 0.6, 0.05);
   return { g, ember, paper: body, filter: body, light, burn };
