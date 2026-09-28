@@ -191,7 +191,8 @@ function renderLobby() {
   U.root.innerHTML = `<button data-act="leave" class="dk-x" title="Выйти из игры">✕ Выйти</button>
     <div class="dk-top"><div class="dk-who">ОБЩИЙ СТОЛ <small>${v.mode === 'podkidnoy' ? 'подкидной' : 'переводной'} · ${v.stake ? '$' + v.stake + ' с каждого' : 'на интерес'}</small></div><div class="dk-say">${esc(U.say || 'ARKASHA: «Садитесь, братва. Места всем хватит.»')}</div></div>
     <div class="dk-lobby"><h2>ЗА СТОЛОМ</h2><ol>${seats}</ol>${wait}
-      ${v.host ? `<div class="dk-cnt">мест: ${cnt}</div><button data-act="deal">Раздать (F)</button>` : `<p>Ждём, пока ${esc(v.hostName || 'хозяин стола')} раздаст…</p>`}
+      ${v.autoIn ? `<p>Раздача через ${v.autoIn}… · dealing in ${v.autoIn} s</p>` : ''}
+      ${v.host ? `<div class="dk-cnt">мест: ${cnt}</div><button data-act="deal">Раздать · Deal (F)</button>` : `<p>Ждём, пока ${esc(v.hostName || 'хозяин стола')} раздаст… · waiting for the deal</p>`}
       <button data-act="leave" class="ghost">Встать</button></div>`;
 }
 const CSS = `
