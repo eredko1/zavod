@@ -1,4 +1,4 @@
-// CONEY — Luna Park Radio. One station, a shuffle-free rotation of the crew's tracks, on the wall clock: everyone in the room
+// CONEY — Luna Park Radio. One station, a shuffled rotation of the crew's tracks, on the wall clock: everyone in the room
 // hears the same song at the same second (position = Date.now() mod the rotation). Settings → Audio → Luna Park Radio:
 // Off / In cars (default: the car radio, louder) / Always (quieter on foot); Radio volume. Keys: L on/off, . next track
 // (skips the station for you only). Plain <audio> elements (streamed, nothing decoded up front). CONEY agent.
@@ -11,13 +11,16 @@ const TRACKS = [
   { src: './assets/audio/radio/olya-angliyskaya.mp3', title: 'Оля английская' },
   { src: './assets/audio/radio/burbon-bratva-gudzon-2.mp3', title: 'Бурбон, братва, Гудзон (версия 2)' },
   { src: './assets/audio/radio/trinidad-daddy-remastered.mp3', title: 'Trinidad Daddy (Remastered)' },
+  { src: './assets/audio/radio/nutcracker-sandman-remastered.mp3', title: 'Nutcracker Sandman (Remastered)' },
 ];
 
 export function buildRadio(world) {
   const { ctx, W } = world; const S = ctx.settings;
-  const R = { els: TRACKS.map((t) => { const a = new Audio(); a.preload = 'metadata'; a.src = t.src; a.crossOrigin = 'anonymous'; return a; }), dur: TRACKS.map(() => 0), cur: -1, skip: 0, on: false, lastTitle: '' };
+  const R = { els: TRACKS.map((t) => { const a = new Audio(); a.preload = 'metadata'; a.src = t.src; a.crossOrigin = 'anonymous'; return a; }), dur: TRACKS.map(() => 0), cur: -1, skip: 0, on: false, lastTitle: '', juke: null };
   R.els.forEach((a, i) => a.addEventListener('loadedmetadata', () => { R.dur[i] = a.duration || 0; }));
   W.radio = { cue: (title) => { const i = TRACKS.findIndex((t) => t.title === title); const total = R.dur.reduce((a, b) => a + b, 0); if (i < 0 || !(total > 0)) return false; const now = Date.now() / 1000 + R.skip, pass = Math.floor(now / total); let start = 0; for (const k of order(pass)) { if (k === i) break; start += R.dur[k]; } R.skip += pass * total + start - now + 0.05; R.cur = -1; return true; },   // durak mode: jump (just for you) to the start of a track
+    // Soc Tav jukebox: your pick, then the book in order (no shuffle) from a shared start time; juke(null) goes back to the station
+    juke: (title, t0 = Date.now() / 1000) => { const i = title == null ? -1 : TRACKS.findIndex((t) => t.title === title); R.juke = i < 0 ? null : { i, t0 }; R.cur = -1; return R.juke ? t0 : null; },
     tracks: TRACKS.map((t) => t.title), get now() { return R.cur >= 0 ? TRACKS[R.cur].title : null; }, qa: () => R.els.map((a) => ({ playing: !a.paused, t: +a.currentTime.toFixed(1), vol: +a.volume.toFixed(2) })) };
   // where the station is right now: [track, offset]
   // shuffled: every pass through the playlist plays in a new random order, seeded by which pass it is on the wall clock —
@@ -27,6 +30,7 @@ export function buildRadio(world) {
   const order = (pass) => { const idx = shuffle(pass); if (idx.length > 1 && idx[0] === shuffle(pass - 1).at(-1)) [idx[0], idx[1]] = [idx[1], idx[0]]; return idx; };   // no song twice in a row across passes
   const at = () => {
     const total = R.dur.reduce((a, b) => a + b, 0); if (!(total > 0)) return [0, 0];
+    if (R.juke) { let t = (Date.now() / 1000 - R.juke.t0) % total; for (let k = 0; k < TRACKS.length; k++) { const i = (R.juke.i + k) % TRACKS.length; if (t < R.dur[i]) return [i, t]; t -= R.dur[i]; } return [R.juke.i, 0]; }
     const T = Date.now() / 1000 + R.skip, pass = Math.floor(T / total); let t = T - pass * total;
     for (const i of order(pass)) { if (t < R.dur[i]) return [i, t]; t -= R.dur[i]; }
     return [0, 0];
@@ -36,7 +40,7 @@ export function buildRadio(world) {
     if (e.repeat || ctx.state !== 'playing' || world.W !== ctx.world) return;
     // L: on if you can't hear it, off if you can (M is the map)
     if (e.code === 'KeyL') { S.radio = R.on ? 'off' : 'always'; saveAudio(S); ctx.hud?.toast?.(S.radio === 'off' ? 'RADIO OFF' : '📻 LUNA PARK RADIO — ON', 1400); }
-    if (e.code === 'Period' && R.on) { const [, off] = at(); R.skip += (R.dur[R.cur] || 0) - off + 0.05; R.cur = -1; }   // next track (just for you)
+    if (e.code === 'Period' && R.on && !R.juke) { const [, off] = at(); R.skip += (R.dur[R.cur] || 0) - off + 0.05; R.cur = -1; }   // next track (just for you)
   });
   world.updaters.push(() => {
     if (ctx.world !== W) return;

@@ -39,6 +39,8 @@ export function buildTavern(world) {
   { const gh = W.groundHeight; W.groundHeight = (x, z) => { if (z > TZ.z0 - 30 && z < TZ.z1 + 30 && x > TZ.x0 - 30 && x < TZ.x1 + 30) { const lz = z - TZ.oz; const road = Math.abs(lz) < ROAD || (x > ST60[0] && x < ST60[1]) || (x > ST61[0] && x < ST61[1]); return road && !inBar({ x, z }) ? 0 : SW; } return gh ? gh(x, z) : 0; }; }
   const root = new THREE.Group(); root.name = 'sunsetPark'; root.position.set(0, 0, TZ.oz); scene.add(root);
   Z = { world, ctx, W, root, lite, busy: false, lastTrip: -9, t: 0, tvT: 0, inside: false, radioPrev: null, hint: 0 };
+  // a friend fed the jukebox: everyone in the bar hears the same song from the same second
+  ctx.bus.on('net:juke', (m) => { if (!Z.inside) return; if (m?.title == null) restoreRadio(); else if (typeof m.title === 'string' && Number.isFinite(m.t0)) { jukeOn(m.title, m.t0); K.toast(`🎵 ${m.title}`, 2200); } });
   const rnd = mulberry(6004);
   const G = new Map(); const put = (m, g) => { g = g.index ? g.toNonIndexed() : g; (G.get(m) || G.set(m, []).get(m)).push(g); return g; };
   const wbox = (x0, y0, z0, x1, y1, z1) => world.box([Math.min(x0, x1), y0, Math.min(z0, z1) + TZ.oz], [Math.max(x0, x1), y1, Math.max(z0, z1) + TZ.oz]);
@@ -217,7 +219,7 @@ export function buildTavern(world) {
   K.spot({ pos: Z.nPos, r: 2.6, dy: 2, prompt: 'F — 8 AV · N TRAIN → CONEY ISLAND (STILLWELL AV)', act: () => leave('N') });
   K.spot({ pos: new THREE.Vector3(BAR.x1 - 0.5, SW, TZ.oz + 29.6), r: 1.2, dy: 2, low: true, prompt: 'F — RESTROOM', act: () => K.toast(pick(['有人! Occupied. Somebody\'s been in there since the second half.', 'The lock is broken. The sign says "KNOCK". Somebody knocks back.', '"OUT OF ORDER" — in marker, in three languages.']), 2600) });
   world.updaters.push((dt) => { if (Z?.world === world) update(dt); });
-  if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards };
+  if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards, juke: (t) => { const t0 = jukeOn(t); ctx.net?.send?.('juke', { title: t, t0 }); return t0; }, radio: () => ({ now: W.radio?.now, qa: W.radio?.qa?.() }) };
   console.log('[tavern] 8th Ave + Soccer Tavern built ·', bld.length, 'buildings ·', G.size, 'materials');
 }
 
@@ -374,11 +376,13 @@ function update(dt) {
 }
 function jukebox() {
   const { ctx, W } = Z; const R = W.radio; const titles = R?.tracks || [];
-  const play = (t) => () => { if (Z.radioPrev == null) Z.radioPrev = ctx.settings.radio || 'car'; ctx.settings.radio = 'always'; try { R?.cue?.(t); } catch {} K.toast(`🎵 ${t}`, 2200); return null; };
+  const play = (t) => () => { const t0 = jukeOn(t); if (t0 != null) try { ctx.net?.send?.('juke', { title: t, t0 }); } catch {} K.toast(`🎵 ${t}`, 2200); return null; };
   K.openDialog('JUKEBOX', { text: titles.length ? 'A quarter a song, three for a dollar. The good stuff is in the back of the book — Luna Park Radio.' : 'The jukebox hums. Nothing loaded.',
-    choices: [...titles.slice(0, 6).map((t) => ({ label: t, go: play(t) })), ...(Z.radioPrev != null ? [{ label: 'Pull the plug', go: () => { restoreRadio(); return null; } }] : []), { label: 'Leave it', go: null }] });
+    choices: [...titles.map((t) => ({ label: t, go: play(t) })), ...(Z.radioPrev != null ? [{ label: 'Pull the plug', go: () => { restoreRadio(); try { ctx.net?.send?.('juke', { title: null }); } catch {} return null; } }] : []), { label: 'Leave it', go: null }] });
 }
-function restoreRadio() { if (Z.radioPrev != null) { Z.ctx.settings.radio = Z.radioPrev; Z.radioPrev = null; } }
+// the jukebox takes over the radio for you: the picked song, then the rest in order (Luna Park Radio elsewhere stays shuffled)
+function jukeOn(title, t0) { const { ctx, W } = Z; if (Z.radioPrev == null) Z.radioPrev = ctx.settings.radio || 'car'; ctx.settings.radio = 'always'; return W.radio?.juke?.(title, t0) ?? null; }
+function restoreRadio() { try { Z.W.radio?.juke?.(null); } catch {} if (Z.radioPrev != null) { Z.ctx.settings.radio = Z.radioPrev; Z.radioPrev = null; } }
 
 // ---- trips -------------------------------------------------------------------------------------------------------------
 function fade(lines, fn, hold = 1100) {
