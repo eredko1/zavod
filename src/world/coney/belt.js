@@ -153,7 +153,12 @@ const inZone = (p) => p.z > ZONE.z0 && p.z < ZONE.z1 && p.x > ZONE.x0 && p.x < Z
 function update(dt) {
   Z.t += dt; const { ctx } = Z; const p = ctx.player; const now = performance.now() / 1000;
   for (const c of Z.traffic) { c.s = (c.s + c.v * dt) % PER; const q = at(c.s), r = right(q), off = -ROAD / 2 + SH + LW * (c.lane + 0.5);
-    c.m.position.set(q.x + r.x * off, DECK, q.z + r.z * off); c.m.rotation.y = Math.atan2(-q.tx, -q.tz); }
+    c.m.position.set(q.x + r.x * off, DECK, q.z + r.z * off); c.m.rotation.y = Math.atan2(-q.tx, -q.tz);
+    c.v0 = c.v0 || c.v; if (c.v < c.v0) c.v = Math.min(c.v0, c.v + 4 * dt);   // a hit car stalls, then pulls away again
+    const mv = ctx.vehicles?.mounted; if (mv?.pos && mv.spec?.car !== undefined) { const dx = mv.pos.x - c.m.position.x, dz = mv.pos.z - c.m.position.z, d = Math.hypot(dx, dz);   // traffic is solid: crash into it
+      if (d < 2.7 && Math.abs(mv.pos.y - DECK) < 2.5) { const nx = dx / (d || 1), nz = dz / (d || 1), push = 2.7 - d; mv.pos.x += nx * push; mv.pos.z += nz * push;
+        const vn = mv.vel.x * nx + mv.vel.z * nz; if (vn < 0) { mv.vel.x -= 1.6 * vn * nx; mv.vel.z -= 1.6 * vn * nz; mv.vel.multiplyScalar(0.55); }
+        if (!c.hitT || now - c.hitT > 0.8) { c.hitT = now; c.v *= 0.15; try { ctx.audio?.play?.('impact', { position: c.m.position, volume: 1.2 }); } catch {} try { ctx.audio?.play?.('glass', { position: c.m.position, volume: 0.8 }); } catch {} } } } }
   for (const T of Z.trains) { const L = T.x1 - T.x0, k = ((Date.now() / 1000) * 14) % (L * 2); T.m.position.x = k < L ? T.x0 + k : T.x1 - (k - L); T.m.visible = true; }   // wall clock: friends see the same train
   if (!p || p.dead || now - Z.lastTrip < 3) return;
   const v = ctx.vehicles?.mounted, here = v ? v.pos : p.position;

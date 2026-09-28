@@ -450,6 +450,7 @@ function visuals(v, dt, thr, brk, hard) {
 }
 
 // ---------- running people over ----------
+const _hp = new THREE.Vector3();
 function runOver(v, dt) {
   const sp = v.spec, spd = v.speed; if (spd < 3.5) return;
   const now = C.time?.elapsed ?? performance.now() / 1000;
@@ -472,6 +473,15 @@ function runOver(v, dt) {
     try { C.hud?.hitmarker?.(!!s.dead); } catch {}
     try { C.audio?.play?.('impact', { position: s.position, volume: 0.8 }); } catch {}
     v.vel.multiplyScalar(sp.hitSlow); v.suspV -= 0.8; v.hitT = Math.max(v.hitT, 0.12);
+  }
+  // chill-mode people (vendors, crews, beachgoers, babushkas…): anything with a hitbox that takes hits (userData.onHit) gets run down
+  if (!S.hitboxT || now - S.hitboxT > 1) { S.hitboxT = now; S.hitboxes = (C.raycastTargets || []).filter((m) => m?.userData?.onHit && !m.userData.soldier && !m.userData.remote); }
+  for (const hb of S.hitboxes || []) {
+    if (!hb.parent) continue; hb.getWorldPosition(_hp); const k = hitAt(_hp.x, _hp.y - 0.9, _hp.z, 0.35); if (!k) continue;
+    if ((S.hits.get(hb) || -9) > now - 0.8) continue; S.hits.set(hb, now);
+    try { hb.userData.onHit(Math.round(k * sp.hitMul * 1.4), false, _hp.clone()); } catch (e) { console.warn('[vehicles] run over', e); }
+    try { C.audio?.play?.('impact', { position: _hp, volume: 0.9 }); } catch {}
+    v.vel.multiplyScalar(sp.hitSlow); v.suspV -= 0.6; v.hitT = Math.max(v.hitT, 0.12);
   }
   const net = C.net; if (!net?.list || !net.peer) return;
   let ids; try { ids = net.list(); } catch { return; }
@@ -726,6 +736,11 @@ export function update(dt, ctx) {
   }
   simulate(bike, dt, thr, brake, hard, steer);
   runOver(bike, dt);
+  { const drop = (bike.lastSpd ?? bike.speed) - bike.speed; bike.lastSpd = bike.speed;   // a crash: lost a lot of speed in one frame against something solid
+    if (drop > 6 && !bike.air && performance.now() - (bike.crashT || 0) > 600) { bike.crashT = performance.now(); const k = Math.min(1, drop / 20);
+      try { C.audio?.play?.('impact', { position: bike.pos, volume: 0.6 + k }); } catch {} try { C.audio?.play?.('glass', { position: bike.pos, volume: k }); } catch {}
+      const p = C.player; if (p) { p.pitch += (Math.random() - 0.3) * 0.12 * k; p.yaw += (Math.random() - 0.5) * 0.1 * k; } bike.suspV -= 2 * k; bike.hitT = Math.max(bike.hitT || 0, 0.25);
+      if (!bike.spec.car && drop > 12) C.hud?.toast?.('*CRUNCH* …you ate the bumper', 1400); } }
   // speed FOV kick: written through settings.fov so weapons' ADS fov logic composes with it
   {
     if (S.fovWritten > 0 && Math.abs(ctx.settings.fov - S.fovWritten) > 1e-6) S.fovBase = ctx.settings.fov; // user moved the slider while riding
