@@ -263,7 +263,7 @@ function useItem(want) {
   if (it === 'weed') return lightUp(false, false, 0.22);
   if (ITEMS[it]?.hi) return lightUp(false, false, ITEMS[it].hi);
   if (ITEMS[it]?.cig) { const L = V.left || (V.left = {}); L[it] = (L[it] > 0 ? L[it] : ITEMS[it].cig) - 1; if (L[it] > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
-  if (ITEMS[it]?.drone) { import('./drones.js').then((m) => m.launchDrone(ctx)).catch((e) => console.warn('[hangkit] drone', e)); return; }
+  if (ITEMS[it]?.drone) { import('./drones.js').then((m) => { if (!m.launchDrone(ctx)) { V.inv.push(it); renderCash(); } }).catch((e) => console.warn('[hangkit] drone', e)); return; }   // one up at a time: a refused launch goes back in the bag
   if (ITEMS[it]?.trip) { V.tripT = ITEMS[it].trip; V.tripMax = V.tripT; ctx.hud?.toast?.('*chews* …земля дышит. The ground is breathing, bro.', 3000); return; }
   if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
   const spec = ITEMS[it];
