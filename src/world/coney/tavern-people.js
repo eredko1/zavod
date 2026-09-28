@@ -1,0 +1,161 @@
+// CONEY — the people of Soccer Tavern (6004 8th Ave, Sunset Park): KENNY behind the bar (Chinese American, dry, cash only,
+// knows everybody), three regulars on the stools (UNCLE LOU the Liverpool lifer, MR. WONG who's been "about to leave" since
+// 2014, AH FAI the dart-league captain) and the 8th Ave crew at the front high-top — BIG TONY, SONNY and DUCK: they walk up
+// to strangers, talk (English with Cantonese), warn you off or give you a job. All hurtable like any hangkit vendor.
+// Drinks: Tsingtao, Coors Light, a Guinness pint, Jameson and vodka shots, a bucket. CONEY agent (tavern).
+import * as THREE from 'three';
+import { hangkit as K, sell, ITEMS, kitQA } from '../hangkit.js';
+import { buildPerson, peopleReady } from '../people.js';
+import { dressFigure, standTall } from '../outfits.js';
+import { nameTag } from '../deli.js';
+
+// bar items (registered here, not in hangkit.js: they only exist once the tavern is built)
+const NEW_ITEMS = {
+  tsingtao: { kind: 'booze', icon: '🍺', name: 'Tsingtao (青島啤酒)', drunk: 0.25, dur: 100, glass: 'can', liq: 0xe8c860 },
+  coors: { kind: 'booze', icon: '🍺', name: 'Coors Light', drunk: 0.18, dur: 80, glass: 'can', liq: 0xf2e08a },
+  erguotou: { kind: 'booze', icon: '🥃', name: 'Er Guo Tou 二鍋頭 (56%, a shot)', drunk: 0.7, dur: 150, glass: 'shot', liq: 0xeef2f2 },
+  boilermaker: { kind: 'booze', icon: '🍺', name: 'Kenny\'s boilermaker (Tsingtao + a baijiu shot dropped in)', drunk: 0.95, dur: 180, glass: 'pint', liq: 0xe8c860 },
+};
+const SKIN = 0xd6a987;
+let P = null;
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const say = (t, ms = 3600) => K.toast(t, ms);
+
+export function buildTavernPeople(world) {
+  const { ctx, W } = world; const T = W.tavern; if (!T || !peopleReady()) return;
+  for (const [k, v] of Object.entries(NEW_ITEMS)) if (!ITEMS[k]) ITEMS[k] = v;
+  const { bar: B, zone: Z } = T, oz = Z.oz, SW = 0.15;
+  const MX = (x) => B.x0 + B.x1 - x;   // tavern.js mirrors the room: the bar runs along the +x wall
+  const stoolX = MX(B.x0 + 1.4 + 0.62 + 0.5);
+  P = { world, ctx, T, figs: [], t: 0, greeted: false, job: null };
+  const person = (o, outfit, h = 1.72) => { const f = buildPerson(o); try { standTall(f, h); if (outfit) dressFigure(f, ctx, { skin: SKIN, ...outfit }); } catch (e) { console.warn('[tavern] dress', e); } world.scene.add(f.group); P.figs.push(f); return f; };
+  const tag = (f, name, col) => { const s = nameTag(name, col); s.position.set(0, 1.95 / (f.heightScale || 1), 0); s.scale.multiplyScalar(1 / (f.heightScale || 1)); f.group.add(s); };
+
+  // ---- KENNY, behind the bar ----
+  const kenny = person({ avatar: 'm10', seed: 60 }, { top: 'track', jacket: 0x141414, stripe: 0x141414, bottom: 'jeans', denim: 0x22262e }, 1.70);
+  const kHome = new THREE.Vector3(MX(B.x0 + 0.95), SW, oz + 17.5); kenny.group.position.copy(kHome); kenny.group.rotation.y = -Math.PI / 2; tag(kenny, 'KENNY', '#ffd27a');
+  P.kenny = { f: kenny, home: kHome, to: kHome.clone(), wait: 3 };
+  const kPos = new THREE.Vector3(stoolX + 0.1, SW, oz + 17.5);
+  const venK = K.vendor({ name: 'KENNY', pos: kPos, r: 2.0, fig: kenny, talk: (Kk, again) => kennyTalk(again) });
+  P.kenny.v = venK;
+  // ---- the regulars, on the stools ----
+  const reg = [
+    { id: 'lou', name: 'UNCLE LOU', z: 15.3, o: { avatar: 'm10', seed: 61, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: null },
+    { id: 'wong', name: 'MR. WONG', z: 19.1, o: { avatar: 'm02', seed: 62, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: { top: 'track', jacket: 0x4a4a52, stripe: 0x4a4a52, bottom: 'jeans', denim: 0x2e2e34 } },
+    { id: 'fai', name: 'AH FAI', z: 21.95, o: { avatar: 'm10', seed: 63, pose: 'sit' }, dress: { top: 'track', jacket: 0x1f4a8a, stripe: 0xf2f2ee, bottom: 'jeans' } },
+  ];
+  for (const r of reg) { const f = person(r.o, r.dress, 1.7); f.group.position.set(stoolX - 0.08, SW + 0.36, oz + r.z); f.group.rotation.y = Math.PI / 2; tag(f, r.name, '#cfe3ff');
+    r.v = K.vendor({ name: r.name, pos: new THREE.Vector3(stoolX - 0.5, SW, oz + r.z), r: 1.3, fig: f, noMap: true, talk: (Kk, again) => regularTalk(r.id, again) }); r.f = f; }
+  P.reg = reg;
+  // ---- the crew at the front high-top ----
+  const crew = [
+    { id: 'tony', name: 'BIG TONY', at: [1.25, 14.55], face: -2.3, o: { avatar: 'm10', seed: 70 }, dress: { top: 'track', jacket: 0x0c0c0c, stripe: 0xc9a040, bottom: 'track', pants: 0x0c0c0c }, h: 1.80 },
+    { id: 'sonny', name: 'SONNY', at: [0.55, 15.4], face: 1.2, o: { avatar: 'm02', seed: 71, glasses: true }, dress: { top: 'track', jacket: 0x2a2a2e, stripe: 0x2a2a2e, bottom: 'jeans', denim: 0x15161a }, h: 1.74 },
+    { id: 'duck', name: 'DUCK', at: [1.4, 16.2], face: -3.4, o: { avatar: 'm10', seed: 72 }, dress: null, h: 1.66 },
+  ];
+  for (const c of crew) { const f = person(c.o, c.dress, c.h); c.face = -c.face; f.group.position.set(MX(c.at[0]), SW, oz + c.at[1]); f.group.rotation.y = c.face; f.mood = 'talk'; tag(f, c.name, '#ff9f8a');
+    c.home = f.group.position.clone(); c.face0 = c.face; c.f = f;
+    c.v = K.vendor({ name: c.name, pos: f.group.position, r: 1.6, fig: f, noMap: true, talk: (Kk, again) => crewTalk(c.id, again) }); }
+  P.crew = crew;
+  // the job drop: the N entrance on 8th Ave
+  const drop = new THREE.Vector3(17.2, SW, oz - 7.6);
+  { const wb = person({ avatar: 'm10', seed: 80 }, { top: 'track', jacket: 0x23446e, stripe: 0xe8e8e8, bottom: 'jeans' }, 1.68); wb.group.position.set(18.0, SW, oz - 8.0); wb.group.rotation.y = -0.9; P.wb = wb; }
+  K.spot({ pos: drop, r: 1.8, dy: 2, when: () => P.job === 'envelope', prompt: 'F — HAND THE ENVELOPE TO THE GUY IN THE WINDBREAKER', act: () => { P.job = 'paid'; K.earn(40); say('Guy in the windbreaker: «Tony sent you? …Good. Now forget my face.» (+$40 — Big Tony pays on delivery)', 4200); } });
+  world.updaters.push((dt) => { try { update(dt); } catch (e) { if (!P.warned) { P.warned = true; console.warn('[tavern] people', e); } } });
+  if (typeof window !== 'undefined' && window.__game) window.__game.tavernPeople = { kit: kitQA, kenny: () => kPos.toArray(), crew: () => crew.map((c) => ({ name: c.name, pos: c.f.group.position.toArray().map((v) => +v.toFixed(2)) })), job: () => P.job, greeted: () => P.greeted };
+  console.log('[tavern] people:', P.figs.length);
+}
+
+// ---- dialog ----------------------------------------------------------------------------------------------------------------
+const KENNY_Q = [
+  'KENNY: «Norwegians opened this place in 1929. The Irish kept it. Now me. 我係老闆嘅朋友 — I\'m the owner\'s friend. Same thing.»',
+  'KENNY: «Mr. Wong has been "about to leave" since 2014. Don\'t hold the door for him. He takes it personal.»',
+  'KENNY: «Darts league is Tuesday. Ah Fai throws like his wife is watching. She is. From Guangzhou. On FaceTime.»',
+  'KENNY: «WiFi password? "cashonly". No spaces. Like the bar.»',
+  'KENNY: «飲多啲，講少啲. Drink more, talk less. Old Cantonese proverb. I made it up Tuesday.»',
+  'KENNY: «Liverpool. Always Liverpool on that TV. Don\'t ask Uncle Lou about Istanbul 2005, he cries, then he buys a round. Actually — ask him.»',
+  'KENNY: «The flags? Norway for the old guys, Ireland for the owner, America for the landlord.»',
+  'KENNY: «Big Tony? He\'s a businessman. What business? 唔好問. Don\'t ask.»',
+  'KENNY: «Somebody asked me for a mojito once. We don\'t talk about him. He went to Park Slope.»',
+];
+function menu(after) {
+  const buy = (item, price, ok) => () => ({ text: `KENNY: «${sell(item, price, 'KENNY', { ok, broke: `That\'s $${price}. 冇錢就冇酒 — no money, no drink. ATM\'s on the corner. It\'s broken.`, full: 'Your hands are full, 朋友. Drink something first (B).' })}»`, choices: [{ label: 'Another round', go: () => after() }, { label: 'Thanks, Kenny', go: null }] });
+  return [
+    { label: 'Er Guo Tou 二鍋頭, 56% — $2', go: buy('erguotou', 2, 'Er Guo Tou. Two dollars. Tastes like a bus fire. 乾杯 — bottoms up.') },
+    { label: 'Boilermaker (Tsingtao + baijiu) — $4', go: buy('boilermaker', 4, 'Drop the shot in, drink it all. House special. Nobody finishes two. Tony finished three, once.') },
+    { label: 'Tsingtao 青島 — $3', go: buy('tsingtao', 3, 'Tsingtao. Cold. 飲勝! (B to drink)') },
+    { label: 'Vodka, a shot — $3', go: buy('vodka', 3, 'Vodka. The Russians from Brighton drink it like this too. Then they sing.') },
+    { label: 'Jameson, a shot — $4', go: buy('jameson', 4, 'Jameson. The Irish holy water. Sláinte — 飲勝.') },
+    { label: 'Pint of Guinness — $5', go: buy('guinness', 5, 'Give it a minute to settle. …Okay, you didn\'t. That\'s on you.') },
+    { label: 'Coors Light — $2', go: buy('coors', 2, 'Coors Light. Basically water with a sponsorship deal.') },
+    { label: 'A bucket (5 Tsingtao) — $12', go: () => { if ((K.state()?.cash ?? 0) < 12) return { text: 'KENNY: «Twelve for the bucket. Count again.»', choices: [{ label: 'Ok', go: null }] };
+      let n = 0; K.pay(12); for (let i = 0; i < 5; i++) if (K.give('tsingtao')) n++; if (n < 5) K.earn((5 - n) * 2);
+      return { text: `KENNY: «Bucket of five. ${n < 5 ? `Your hands only took ${n} — rest is back in your pocket.` : 'Share it. B passes it round when your friends are close.'} 乾杯!»`, choices: [{ label: '乾杯!', go: null }] }; } },
+  ];
+}
+function kennyTalk(again) {
+  const node = () => ({ text: again ? pick(KENNY_Q) : 'KENNY: «Soccer Tavern. Cash only, cheapest pour on 8th Ave. 你好 — what are you having?»', choices: [...menu(node), { label: 'Who\'s who in here?', go: () => ({ text: 'KENNY: «Stools: Uncle Lou — Liverpool. Mr. Wong — leaving, supposedly. Ah Fai — darts captain, don\'t bet him. Front table: Big Tony, Sonny, Duck. Be polite. Tip Duck, he remembers.»', choices: [{ label: 'Got it', go: null }] }) }, { label: 'Put it on my tab?', go: () => ({ text: 'KENNY: «冇數賒. No tabs. Not since 1929. There\'s a sign. There are three signs.»', choices: [{ label: 'Fair', go: null }] }) }, { label: 'Later', go: null }] });
+  return node();
+}
+const REG = {
+  lou: { hi: 'UNCLE LOU: «Sit, sit. You see that? That\'s Liverpool. I been a Red since \'77. My wife says I love Liverpool more than her. I say 老婆, Liverpool never took the car.»',
+    lines: ['UNCLE LOU: «Istanbul, 2005. Three-nil down at half time. I was on this stool. THIS stool. Kenny, tell them.»', 'UNCLE LOU: «Sunset Park in the eighties — Norwegian bakeries, Irish bars, us. Now it\'s bubble tea. I like bubble tea. Don\'t tell Kenny.»', 'UNCLE LOU: «You\'ll never walk alone. Unless you owe Tony money. Then you walk VERY alone.»'] },
+  wong: { hi: 'MR. WONG: «I\'m just finishing this one. Then I\'m going. …Kenny, one more.»',
+    lines: ['MR. WONG: «My son is a dentist in New Jersey. He says "Dad, come live with us." New Jersey? 唔該, no thanks.»', 'MR. WONG: «The N train is late. The N is always late. I have been waiting for the N since 1991. Spiritually.»', 'MR. WONG: «Leaving now. …After the half.»'] },
+  fai: { hi: 'AH FAI: «You throw? Tuesday is league night. Brooklyn Dart League — we won six. The trophies are over the boards. Count them.»',
+    lines: ['AH FAI: «Treble twenty is for show. Nineteens win games. Old guys know.»', 'AH FAI: «Double out. You don\'t finish on a double, you don\'t finish. Like life.»', 'AH FAI: «501 is a marathon. 301 is a sprint. Tony only plays 301, he has a short attention span. Don\'t tell him I said that.»'] },
+};
+function regularTalk(id, again) {
+  const r = REG[id]; const ch = [{ label: 'Tell me something', go: () => ({ text: pick(r.lines), choices: [{ label: 'Ha', go: null }, { label: 'Another', go: () => ({ text: pick(r.lines), choices: [{ label: 'Ha', go: null }] }) }] }) }];
+  if (id === 'lou') ch.push({ label: 'Buy Uncle Lou a Guinness — $8', go: () => { if (!K.pay(8)) return { text: 'UNCLE LOU: «With what, your good looks? Ha!»', choices: [{ label: 'Ok', go: null }] }; return { text: 'UNCLE LOU: «A gentleman! In this bar! Kenny, write this down — 靚仔 here bought me a pint.» (He tells the whole bar. Big Tony nods at you.)', choices: [{ label: 'Cheers, Lou', go: null }] }; } });
+  ch.push({ label: 'Later', go: null });
+  return { text: again ? pick(r.lines) : r.hi, choices: ch };
+}
+const CREW = {
+  tony: ['BIG TONY: «You\'re not from 8th Avenue. I know everybody on 8th Avenue. I know their mothers.»', 'BIG TONY: «Relax. We\'re businessmen. 做生意 — we do business. You look like somebody who needs business.»', 'BIG TONY: «The bakery on the corner? My cousin. The fruit stand? Other cousin. The driving school? Don\'t take lessons there. Cousin.»'],
+  sonny: ['SONNY: «Nice shoes. Coney Island? 大佬 says Coney people are all gamblers. You gamble? We play darts. For money.»', 'SONNY: «Sunglasses inside? It\'s a look. 你唔明. You wouldn\'t get it.»', 'SONNY: «I have three phones. One for my mother, one for Tony, one for the phone I lost.»'],
+  duck: ['DUCK: «They call me Duck because of the roast duck place. I don\'t work there. I just go there. A lot.»', 'DUCK: «Tony says be nice to strangers. I\'m being nice. This is nice. 係咪?»', 'DUCK: «I lost forty dollars to Ah Fai at darts. Forty. He threw with his wrong hand. To teach me.»'],
+};
+function crewTalk(id, again) {
+  const lines = CREW[id];
+  const ch = [{ label: 'What do you guys do?', go: () => ({ text: pick(lines), choices: [{ label: 'Okay…', go: null }] }) }];
+  if (id === 'tony') {
+    if (!P.job || P.job === 'paid') ch.push({ label: 'Got any work?', go: () => { P.job = 'envelope'; return { text: 'BIG TONY: «Easy job. Take this envelope to the guy in the windbreaker by the N train, across the street. Don\'t open it. Don\'t count it. 唔好問. Forty dollars when he gets it.» (F at the N entrance)', choices: [{ label: 'On it', go: null }] }; } });
+    else if (P.job === 'envelope') ch.push({ label: 'About the envelope…', go: () => ({ text: 'BIG TONY: «Why are you still here? The N. Across the street. Windbreaker. 快啲!»', choices: [{ label: 'Going', go: null }] }) });
+  }
+  if (id === 'sonny') ch.push({ label: 'Can I sit here?', go: () => ({ text: 'SONNY: «This table is reserved. Since 1998. For us. The bar is right there, 朋友. Kenny will take care of you.»', choices: [{ label: 'Sure', go: null }] }) });
+  ch.push({ label: 'Later', go: null });
+  return { text: again ? pick(lines) : lines[0], choices: ch };
+}
+
+// ---- behaviour: Kenny works the bar, the regulars watch the match, the crew walks up to strangers --------------------------
+const _v = new THREE.Vector3();
+function walkTo(f, to, dt, sp = 1.1) { const g = f.group.position; _v.set(to.x - g.x, 0, to.z - g.z); const d = _v.length(); if (d < 0.08) { f.update(dt, 0); return true; } _v.multiplyScalar(Math.min(d, sp * dt) / d); g.add(_v); f.group.rotation.y = Math.atan2(_v.x, _v.z); f.update(dt, sp); return false; }
+function face(f, x, z, dt) { const want = Math.atan2(x - f.group.position.x, z - f.group.position.z); let d = want - f.group.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); f.group.rotation.y += d * Math.min(1, dt * 4); }
+function update(dt) {
+  const { ctx, T } = P; const me = ctx.player?.position; if (!me) return;
+  const inZone = T.inZone(me), vis = inZone && Math.abs(me.z - T.zone.oz - 20) < 40;
+  for (const f of P.figs) f.group.visible = vis;
+  if (!vis) return; P.t += dt;
+  const inBar = T.inBar(me), dlg = K.state()?.dialog?.name;
+  // Kenny: drifts along the aisle (pouring, wiping), turns to whoever's at the bar; stops for you
+  const k = P.kenny; if (k.v.hurt?.down) { k.f.update(dt, 0); } else if (dlg === 'KENNY' || (inBar && Math.hypot(me.x - k.v.pos.x, me.z - k.v.pos.z) < 2.2)) { k.f.update(dt, 0); face(k.f, me.x, me.z, dt); }
+  else { if (walkTo(k.f, k.to, dt, 0.8)) { k.wait -= dt; if (k.wait < 0) { k.wait = 3 + Math.random() * 6; k.to.set(k.home.x, k.home.y, k.home.z - 3 + Math.random() * 7); } } }
+  P.wb?.update(dt, 0);
+  for (const r of P.reg) { r.f.update(dt, 0); if (dlg === r.name) face(r.f, me.x, me.z, dt); }
+  // the crew: when a stranger walks in, BIG TONY comes over, says his piece, goes back to the table
+  for (const c of P.crew) {
+    if (c.v.hurt?.down) { c.f.update(dt, 0); continue; }
+    if (c.id === 'tony' && !P.greeted && inBar && !dlg) { const tgt = _v.set(me.x, 0, me.z); const d = Math.hypot(me.x - c.f.group.position.x, me.z - c.f.group.position.z);
+      if (d > 1.5) { walkTo(c.f, { x: me.x - (me.x - c.f.group.position.x) / d * 1.4, z: me.z - (me.z - c.f.group.position.z) / d * 1.4 }, dt, 1.3); c.approach = (c.approach || 0) + dt; if (c.approach > 12) P.greeted = true; }
+      else { P.greeted = true; c.back = true; say(pick(['BIG TONY: «New face. 你邊度嚟㗎? Where you from? …Coney Island. Okay. Kenny\'s good people. Be good people.»', 'BIG TONY: «Hey. 8th Avenue has rules. Rule one: tip Kenny. Rule two: don\'t sit at our table. Rule three: I\'ll tell you rule three later.»', 'BIG TONY: «You play darts? Ah Fai will take your money. If Ah Fai doesn\'t, I will. Welcome to Soccer Tavern.»']), 5200); }
+      continue; }
+    if (c.back) { if (walkTo(c.f, c.home, dt, 1.0)) { c.back = false; c.f.group.rotation.y = c.face0; } continue; }
+    if (dlg === c.name) { c.f.update(dt, 0); face(c.f, me.x, me.z, dt); continue; }
+    c.f.update(dt, 0); if (!inBar) { c.f.group.position.copy(c.home); c.f.group.rotation.y = c.face0; }
+  }
+  if (!inBar && P.greeted && !P.crew[0].back && Math.hypot(me.x - 0, me.z - T.zone.oz - 10) > 30) P.greeted = false;   // gone a while: they'll greet you again next time
+  // bar chatter while you're inside
+  P.chatT = (P.chatT ?? 8) - dt; if (inBar && !dlg && P.chatT < 0) { P.chatT = 14 + Math.random() * 12; say(pick([...KENNY_Q.slice(0, 5), ...REG.lou.lines, ...REG.wong.lines, ...CREW.duck, 'SONNY: «Duck, 你又輸錢? You lost AGAIN?»', 'DUCK: «Kenny, 再嚟一支 — one more Tsingtao.»', 'UNCLE LOU: «GOAL! …Offside. Aiya.»']), 3800); }
+}
+export const tavernPeople = () => P;

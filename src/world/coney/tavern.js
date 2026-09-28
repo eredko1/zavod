@@ -3,9 +3,9 @@
 // own zone far north of the map (like the Belt loop): a stretch of 8th Ave between 60th and 61st St — two-storey brick
 // rowhouses with Chinese shop signs (bakery, fruit stand, pharmacy, driving school, tax office, travel agency, roast meat),
 // awnings, fire escapes, London planes, parked cars, the N train entrance — and the tavern itself, walkable: the long dark-wood
-// L-bar on the right with black ladder-back stools, the back-bar mirror and packed liquor shelves, the drop ceiling with two
-// fans, Christmas string lights + tinsel all year, a Coors Light sign, framed photos, high-tops on the left, two dartboards,
-// the jukebox (Luna Park Radio), four TVs showing a match, the EXIT door and the restroom. Facade from the owner's photo:
+// L-bar on the left with black ladder-back stools, the back-bar mirror and packed liquor shelves, the drop ceiling with two
+// fans, Christmas string lights + tinsel all year, a Coors Light sign, framed photos, high-tops and two dartboards on the right,
+// the jukebox (Luna Park Radio), four TVs showing a match, the back door out to the smoking yard and the restroom. Facade from the owner's photo:
 // red brick, white board "SOCCER TAVERN" in red letters, Norwegian / US / Irish flags over the open green doors, the blue
 // "329 Services Corp. TRAFFIC TICKET" sign upstairs, yellow driving-school signs.
 // Getting here: ride the D past Bay 50 St (→ 62 St, change for the N → 8 Av), or take EXIT 7B off the Belt loop in a car.
@@ -16,6 +16,7 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
 import { hangkit as K } from '../hangkit.js';
 import { placeCars } from '../carkit.js';
 import { pa } from './r160.js';
+import { buildTavernPeople } from './tavern-people.js';
 
 export const TZ = { x0: -125, x1: 125, z0: -12052, z1: -11948, oz: -12000 };   // world rect of the zone; local z = world z − oz (x is shared)
 const SW = 0.15;                                                                // sidewalk / bar floor height
@@ -24,6 +25,9 @@ const ST60 = [-30, -18], ST61 = [62, 74];                                       
 const BAR = { x0: -4.0, x1: 2.4, z0: 10.8, z1: 30.5, ceil: 3.1 };               // the bar room
 const DOOR = [-0.9, 0.3];                                                        // the front door (local x)
 const OCHE_X = BAR.x1 - 2.37;                                                    // the throw line: 2.37 m from the board face
+// the room is laid out as in the photo, then mirrored (the bar on the left as you walk in, darts on the right): MX maps x across
+const MX = (x) => BAR.x0 + BAR.x1 - x;
+const GAP_EXIT = [MX(BAR.x0 + 2.1), MX(BAR.x0 + 1.1)], GAP_WC = [MX(BAR.x1 - 0.1), MX(BAR.x1 - 0.9)];   // back-wall doorways (game x)
 const BOARDS = [{ z: 22.2 }, { z: 25.6 }];                                       // two dartboards on the left (+x) wall, centre 1.73 m up
 const NSTAT = { x: 13, z: -8.6 };                                                // the N train entrance (across the avenue)
 const CJK = '"PingFang TC","Hiragino Sans TC","Hiragino Sans GB","Heiti TC","Microsoft JhengHei","Noto Sans CJK TC","Noto Sans TC",sans-serif';
@@ -41,6 +45,9 @@ export function buildTavern(world) {
   Z = { world, ctx, W, root, lite, busy: false, lastTrip: -9, t: 0, tvT: 0, inside: false, radioPrev: null, hint: 0 };
   // a friend fed the jukebox: everyone in the bar hears the same song from the same second
   ctx.bus.on('net:juke', (m) => { if (!Z.inside) return; if (m?.title == null) restoreRadio(); else if (typeof m.title === 'string' && Number.isFinite(m.t0)) { jukeOn(m.title, m.t0); K.toast(`🎵 ${m.title}`, 2200); } });
+  // one warm fill light for the people / lit props in here, created with the world (a light added later recompiles every shader);
+  // it only turns up while you're on 8th Ave (intensity changes are free)
+  Z.hemi = new THREE.HemisphereLight(0xffe2b8, 0x4a3020, 0); scene.add(Z.hemi);
   const rnd = mulberry(6004);
   const G = new Map(); const put = (m, g) => { g = g.index ? g.toNonIndexed() : g; (G.get(m) || G.set(m, []).get(m)).push(g); return g; };
   const wbox = (x0, y0, z0, x1, y1, z1) => world.box([Math.min(x0, x1), y0, Math.min(z0, z1) + TZ.oz], [Math.max(x0, x1), y1, Math.max(z0, z1) + TZ.oz]);
@@ -90,7 +97,10 @@ export function buildTavern(world) {
     if (B.hero !== 'tavern') { const g = new THREE.BoxGeometry(w, h, depth); g.translate(cx, h / 2, (fz + back) / 2); put(M.side, g); wbox(B.x0 + 0.02, 0, fz, B.x1 - 0.02, h, back); }
     else { const g = new THREE.BoxGeometry(w, 0.4, depth); g.translate(cx, h - 0.2, (fz + back) / 2); put(M.side, g);
       for (const [x0, x1] of [[B.x0, BAR.x0 - 0.02], [BAR.x1 + 0.02, B.x1]]) { const s = new THREE.BoxGeometry(x1 - x0, h, depth); s.translate((x0 + x1) / 2, h / 2, (fz + back) / 2); put(M.side, s); }
-      wbox(B.x0, 0, fz, BAR.x0 - 0.02, h, back); wbox(BAR.x1 + 0.02, 0, fz, B.x1, h, back); wbox(BAR.x0, 0, BAR.z1, BAR.x1, h, back); }
+      wbox(B.x0, 0, fz, BAR.x0 - 0.02, h, back); wbox(BAR.x1 + 0.02, 0, fz, B.x1, h, back);
+      // the back wall between the room and the yard: solid except the two doorways (yard, restroom)
+      for (const [a, b2] of [[BAR.x0, GAP_WC[0]], [GAP_WC[1], GAP_EXIT[0]], [GAP_EXIT[1], BAR.x1]]) { wbox(a, 0, BAR.z1, b2, h, back); const r = new THREE.BoxGeometry(b2 - a, h, back - BAR.z1); r.translate((a + b2) / 2, h / 2, (BAR.z1 + back) / 2); put(M.side, r); }
+      for (const [a, b2] of [GAP_WC, GAP_EXIT]) { const l = new THREE.BoxGeometry(b2 - a, h - SW - 2.2, back - BAR.z1); l.translate((a + b2) / 2, (h + SW + 2.2) / 2, (BAR.z1 + back) / 2); put(M.side, l); } }
     const colour = brickTint[Math.floor(rnd() * brickTint.length)];
     if (B.hero === 'tavern') { B.job = job(w, h, 64 * D, (g, W2, H2) => drawTavernFacade(g, W2, H2, w, h)); continue; }
     // upper floors: the shared brick-and-windows material (lit by the sun: it's day or night out here)
@@ -204,6 +214,7 @@ export function buildTavern(world) {
 
   // ---- the bar room ------------------------------------------------------------------------------------------------------------------
   buildBarRoom(world, root, put, wbox, M, lite, rnd);
+  buildBack(world, root, put, wbox, M, lite, rnd);
   K.spot({ pos: Z.juke, r: 1.6, dy: 2, prompt: 'F — JUKEBOX · LUNA PARK RADIO', act: () => jukebox() });
 
   // ---- merge everything per material --------------------------------------------------------------------------------------------------
@@ -215,18 +226,37 @@ export function buildTavern(world) {
     try { placeCars(world, list.map((c) => ({ ...c, kind: ['sedan', 'suv', 'cab'].includes(c.kind) ? c.kind : 'sedan' })), { raycast: true }); for (const c of list) wbox(c.x - 2.2, 0, c.z - TZ.oz - 0.9, c.x + 2.2, 1.4, c.z - TZ.oz + 0.9); } catch (e) { console.warn('[tavern] cars', e); } }
 
   // ---- getting here and back ----------------------------------------------------------------------------------------------------------------
-  W.tavern = { arrive: (how) => arrive(how), stayOn: () => stayOn(), leave: (how) => leave(how), inZone: (p) => inZone(p), inBar: (p) => inBar(p), zone: TZ, boards: boardsWorld(), oche: OCHE_X, bar: BAR, root };
+  W.tavern = { arrive: (how) => arrive(how), stayOn: () => stayOn(), leave: (how) => leave(how), inZone: (p) => inZone(p), inBar: (p) => inBar(p), zone: TZ, boards: boardsWorld(), oche: MX(OCHE_X), bar: BAR, root };
   K.spot({ pos: Z.nPos, r: 2.6, dy: 2, prompt: 'F — 8 AV · N TRAIN → CONEY ISLAND (STILLWELL AV)', act: () => leave('N') });
-  K.spot({ pos: new THREE.Vector3(BAR.x1 - 0.5, SW, TZ.oz + 29.6), r: 1.2, dy: 2, low: true, prompt: 'F — RESTROOM', act: () => K.toast(pick(['有人! Occupied. Somebody\'s been in there since the second half.', 'The lock is broken. The sign says "KNOCK". Somebody knocks back.', '"OUT OF ORDER" — in marker, in three languages.']), 2600) });
+  K.spot({ pos: Z.urinal, r: 1.0, dy: 2, prompt: 'F — TAKE A PISS', act: () => pee() });
+  K.spot({ pos: Z.yardSpot, r: 2.2, dy: 2, low: true, prompt: 'F — HAVE A SMOKE OUT BACK', act: () => yardSmoke() });
   world.updaters.push((dt) => { if (Z?.world === world) update(dt); });
-  if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards, juke: (t) => { const t0 = jukeOn(t); ctx.net?.send?.('juke', { title: t, t0 }); return t0; }, radio: () => ({ now: W.radio?.now, qa: W.radio?.qa?.() }) };
+  try { buildTavernPeople(world); } catch (e) { console.warn('[tavern] people', e); }
+  if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards, juke: (t) => { const t0 = jukeOn(t); ctx.net?.send?.('juke', { title: t, t0 }); return t0; }, radio: () => ({ now: W.radio?.now, qa: W.radio?.qa?.() }), back: () => ({ urinal: Z.urinal.toArray(), yard: Z.yardSpot.toArray(), exitX: (GAP_EXIT[0] + GAP_EXIT[1]) / 2, wcX: (GAP_WC[0] + GAP_WC[1]) / 2, z1: BAR.z1 + TZ.oz }), pee: () => pee(), peeT: () => Z.pee || 0 };
   console.log('[tavern] 8th Ave + Soccer Tavern built ·', bld.length, 'buildings ·', G.size, 'materials');
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // the room: a drop ceiling, wood panelling, the L-bar, stools, back-bar with mirror and bottles, TVs, fans, lights, darts, jukebox
 function buildBarRoom(world, root, put, wbox, M, lite, rnd) {
-  BAKE = true; try { buildRoom(world, root, put, wbox, M, lite, rnd); } finally { BAKE = false; }
+  // built in the photo's layout, then mirrored across the room: geometry after it's all placed (some pieces are moved after put),
+  // colliders as they come, and the loose meshes (bottles, lights, TVs, chalkboard, fans) by position / yaw
+  const mine = new Map(), kids = root.children.length, c2 = BAR.x0 + BAR.x1;
+  const put2 = (m, g) => { const r = put(m, g); if (!NOMIR) mine.set(r, m === M.inside); return r; };
+  const wbox2 = (x0, y0, z0, x1, y1, z1) => wbox(c2 - x1, y0, z0, c2 - x0, y1, z1);
+  BAKE = true; try { buildRoom(world, root, put2, wbox2, M, lite, rnd); } finally { BAKE = false; }
+  for (const [g, flipU] of mine) mirrorGeo(g, c2, flipU);
+  for (const o of root.children.slice(kids)) { o.position.x = c2 - o.position.x; o.rotation.y = -o.rotation.y;
+    if (o.isInstancedMesh) { const m = new THREE.Matrix4(); for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); m.elements[12] = c2 - m.elements[12]; o.setMatrixAt(i, m); } o.position.x = 0; o.instanceMatrix.needsUpdate = true; } }
+  Z.juke.x = c2 - Z.juke.x;
+}
+let NOMIR = false;
+// mirror a (non-indexed) geometry across x = c2/2: positions, normals, winding; flipU un-mirrors a picture/sign (u within its own rect)
+function mirrorGeo(g, c2, flipU) {
+  const p = g.attributes.position, n = g.attributes.normal; for (let i = 0; i < p.count; i++) { p.setX(i, c2 - p.getX(i)); if (n) n.setX(i, -n.getX(i)); }
+  if (!g.index) for (const a of Object.values(g.attributes)) { const s = a.itemSize, arr = a.array; for (let t = 0; t + 2 < a.count; t += 3) for (let k = 0; k < s; k++) { const i1 = (t + 1) * s + k, i2 = (t + 2) * s + k, v = arr[i1]; arr[i1] = arr[i2]; arr[i2] = v; } }
+  if (flipU && g.attributes.uv) { const uv = g.attributes.uv; let a = 1e9, b = -1e9; for (let i = 0; i < uv.count; i++) { a = Math.min(a, uv.getX(i)); b = Math.max(b, uv.getX(i)); } for (let i = 0; i < uv.count; i++) uv.setX(i, a + b - uv.getX(i)); }
+  for (const a of Object.values(g.attributes)) a.needsUpdate = true; g.computeBoundingSphere?.();
 }
 function buildRoom(world, root, put, wbox, M, lite, rnd) {
   const { x0, x1, z0, z1, ceil } = BAR, y0 = SW, H = ceil - y0, cx = (x0 + x1) / 2;
@@ -236,9 +266,15 @@ function buildRoom(world, root, put, wbox, M, lite, rnd) {
   { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate(cx, y0 + 0.002, (z0 + z1) / 2); put(M.floor, g); }
   { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(Math.PI / 2); g.translate(cx, ceil, (z0 + z1) / 2); scaleUV(g, (x1 - x0) / 0.6, (z1 - z0) / 0.6); put(M.ceil, g); }
   const wallQ = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az); const g = new THREE.PlaneGeometry(L, H); scaleUV(g, L / 1.2, 1); g.rotateY(Math.atan2(-(bz - az), bx - ax)); g.translate((ax + bx) / 2, y0 + H / 2, (az + bz) / 2); put(M.wall, g); };
-  wallQ(x1, z0, x1, z1); wallQ(x0, z1, x0, z0); wallQ(x1, z1, x0, z1);   // +x (left as you walk in), −x (right), back — normals inward
-  wallQ(x0, z0 + 0.1, DOOR[0], z0 + 0.1); wallQ(DOOR[1], z0 + 0.1, x1, z0 + 0.1); { const g = new THREE.PlaneGeometry(DOOR[1] - DOOR[0], ceil - (y0 + 2.35)); g.translate((DOOR[0] + DOOR[1]) / 2, (ceil + y0 + 2.35) / 2, z0 + 0.1); put(M.wall, g); }
-  wbox(x1, 0, z0, x1 + 0.3, ceil, z1); wbox(x0 - 0.3, 0, z0, x0, ceil, z1); wbox(x0, 0, z1, x1, ceil, z1 + 0.3);
+  wallQ(x1, z0, x1, z1); wallQ(x0, z1, x0, z0);   // +x (left as you walk in, in the photo), −x (right) — normals inward
+  // back wall: two doorways (restroom on the +x side, the yard door on the −x side, as in the photo), lintels over them
+  { const eg = [x0 + 1.1, x0 + 2.1], wg = [x1 - 0.9, x1 - 0.1]; wallQ(x1, z1, wg[1], z1); wallQ(wg[0], z1, eg[1], z1); wallQ(eg[0], z1, x0, z1);
+    for (const [a, b] of [eg, wg]) { const g = new THREE.PlaneGeometry(b - a, ceil - (y0 + 2.2)); g.rotateY(Math.PI); g.translate((a + b) / 2, (ceil + y0 + 2.2) / 2, z1); put(M.wall, g); }
+    wbox(x0, 0, z1, eg[0], ceil, z1 + 0.3); wbox(eg[1], 0, z1, wg[0], ceil, z1 + 0.3); wbox(wg[1], 0, z1, x1, ceil, z1 + 0.3); }
+  NOMIR = true; try {   // the front wall stays put: the street door doesn't move
+    wallQ(x0, z0 + 0.1, DOOR[0], z0 + 0.1); wallQ(DOOR[1], z0 + 0.1, x1, z0 + 0.1); { const g = new THREE.PlaneGeometry(DOOR[1] - DOOR[0], ceil - (y0 + 2.35)); g.translate((DOOR[0] + DOOR[1]) / 2, (ceil + y0 + 2.35) / 2, z0 + 0.1); put(M.wall, g); }
+  } finally { NOMIR = false; }
+  wbox(x1, 0, z0, x1 + 0.3, ceil, z1); wbox(x0 - 0.3, 0, z0, x0, ceil, z1);
   // the white half-partition with green trim by the front tables (photo, left foreground)
   { const g = new THREE.BoxGeometry(0.12, 1.05, 1.4); g.translate(x1 - 1.9, y0 + 0.52, z0 + 2.2); shade(g, 0xe9e6dc, 0.8); put(M.pnt, g); const t = new THREE.BoxGeometry(0.16, 0.06, 1.44); t.translate(x1 - 1.9, y0 + 1.06, z0 + 2.2); shade(t, 0x2f7a3e, 0.8); put(M.pnt, t); wbox(x1 - 1.97, 0, z0 + 1.5, x1 - 1.83, 1.1, z0 + 2.9); }
   // ---- the bar: counter along the right wall, returning to the wall at the front in a curve (the L) ----
@@ -322,8 +358,10 @@ function buildRoom(world, root, put, wbox, M, lite, rnd) {
   iq(cashJob, 0.5, 0.3, x0 + 0.02, y0 + 2.15, cZ0 + 5.5, LX);
   scarfJobs.forEach((j, i) => { const g = iq(j, 1.3, 0.2, 0, 0, 0, 0); g.rotateY(LX); g.rotateX(0); g.translate(x0 + 0.03, y0 + 2.95, cZ0 + 0.8 + i * 1.5); });
   // back doors: the EXIT door (with a wreath) and the restroom door, as panels
-  { const d = new THREE.BoxGeometry(0.95, 2.1, 0.05); d.translate(x0 + 1.6, y0 + 1.05, z1 - 0.03); shade(d, 0x3a2418); put(M.pnt, d); const wr = new THREE.TorusGeometry(0.16, 0.05, 6, 16); wr.translate(x0 + 1.6, y0 + 1.6, z1 - 0.08); shade(wr, 0x1f5a2a); put(M.pnt, wr);
-    const d2 = new THREE.BoxGeometry(0.85, 2.05, 0.05); d2.translate(x1 - 0.5, y0 + 1.02, z1 - 0.03); shade(d2, 0xb0703a); put(M.pnt, d2); }
+  // both propped open into the room (the yard door with its wreath, the restroom door)
+  { const open = (w, h, hx, col, ry) => { const d = new THREE.BoxGeometry(w, h, 0.05); d.translate(w / 2, h / 2, 0); d.rotateY(ry); d.translate(hx, y0, z1 - 0.05); shade(d, col); put(M.pnt, d); return d; };
+    open(0.95, 2.1, x0 + 1.12, 0x3a2418, 1.35); const wr = new THREE.TorusGeometry(0.16, 0.05, 6, 16); wr.rotateY(Math.PI / 2 + 1.35 - Math.PI / 2); wr.translate(x0 + 1.12 + Math.cos(1.35) * 0.47, y0 + 1.6, z1 - 0.05 - Math.sin(1.35) * 0.47); shade(wr, 0x1f5a2a); put(M.pnt, wr);
+    open(0.78, 2.05, x1 - 0.12, 0xb0703a, Math.PI - 1.35); }
   // jukebox against the left wall (between the front tables and the darts)
   { const jz = z0 + 9.0 - 1.2; Z.juke = new THREE.Vector3(x1 - 0.4, SW, jz + TZ.oz); const b = new THREE.BoxGeometry(0.55, 1.5, 0.8); b.translate(x1 - 0.3, y0 + 0.75, jz); shade(b, 0x2a1a14); put(M.pnt, b);
     iq(jukeJob, 0.72, 1.4, x1 - 0.585, y0 + 0.8, jz, RX); wbox(x1 - 0.6, 0, jz - 0.42, x1, 1.5, jz + 0.42); }
@@ -364,6 +402,7 @@ function update(dt) {
   const { ctx } = Z; Z.t += dt; const p = ctx.player; if (!p) return;
   const v = ctx.vehicles?.mounted, here = v ? v.pos : p.position, iz = inZone(here), ib = !v && inBar(here);
   Z.root.visible = iz || Math.hypot(ctx.camera.position.x - 0, ctx.camera.position.z - TZ.oz) < 300;
+  Z.hemi.intensity = !iz ? 0 : ib ? 2.2 : here.z - TZ.oz > BAR.z1 ? 1.1 : 0.5;
   if (!iz) { if (Z.hint) { Z.hint = 0; restoreRadio(); } return; }
   if (!Z.hint) { Z.hint = 1; }
   // TVs: a few frames a second while you're in the bar (or looking in)
@@ -382,6 +421,58 @@ function jukebox() {
 }
 // the jukebox takes over the radio for you: the picked song, then the rest in order (Luna Park Radio elsewhere stays shuffled)
 function jukeOn(title, t0) { const { ctx, W } = Z; if (Z.radioPrev == null) Z.radioPrev = ctx.settings.radio || 'car'; ctx.settings.radio = 'always'; return W.radio?.juke?.(title, t0) ?? null; }
+// ---- out back: the restroom (a white cinderblock box off the back wall) and the smoking yard behind the bar ----------------
+function buildBack(world, root, put, wbox, M, lite, rnd) {
+  const y0 = SW, back = WALK + 21, oz = TZ.oz, box = (x0, y, z0, x1, y1, z1, col, mat = M.pnt) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y, z1 - z0); g.translate((x0 + x1) / 2, (y + y1) / 2, (z0 + z1) / 2); shade(g, col); put(mat, g); return g; };
+  const floor = (x0, z0, x1, z1, col, mat = M.pnt) => { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, y0 + 0.004, (z0 + z1) / 2); shade(g, col); put(mat, g); };
+  // the two doorways through the back wall (floors), then the restroom
+  BAKE = true; try {
+    for (const [a, b] of [GAP_WC, GAP_EXIT]) floor(a, BAR.z1, b, back, 0x5a4a3a);
+    const R = { x0: -4.0, x1: -1.8, z0: back, z1: back + 2.7 }, top = y0 + 2.6, tile = 0xe6e2d4;
+    floor(R.x0, R.z0, R.x1, R.z1, 0x77736a); box(R.x0 - 0.15, 0, R.z0, R.x0, top, R.z1 + 0.15, tile); box(R.x1, 0, R.z0, R.x1 + 0.15, top, R.z1 + 0.15, tile); box(R.x0 - 0.15, 0, R.z1, R.x1 + 0.15, top, R.z1 + 0.15, tile);
+    box(R.x0 - 0.15, top, R.z0, R.x1 + 0.15, top + 0.12, R.z1 + 0.15, 0xcfcac0);
+    wbox(R.x0 - 0.15, 0, R.z0, R.x0, top, R.z1 + 0.15); wbox(R.x1, 0, R.z0, R.x1 + 0.15, top, R.z1 + 0.15); wbox(R.x0 - 0.15, 0, R.z1, R.x1 + 0.15, top, R.z1 + 0.15);
+    box(R.x0, y0 + 1.1, R.z0, R.x1, y0 + 1.14, R.z1, 0x2f6a4a);   // a green tile stripe round the room
+    // the urinal (east wall), the stall (north-west corner) with the bowl, the sink and mirror (west wall), a bare bulb
+    const uz = R.z0 + 1.5; box(R.x1 - 0.32, y0 + 0.45, uz - 0.2, R.x1, y0 + 1.05, uz + 0.2, 0xf4f4f0); box(R.x1 - 0.28, y0 + 0.45, uz - 0.16, R.x1 - 0.05, y0 + 0.5, uz + 0.16, 0xd8e4e6);
+    { const p = new THREE.CylinderGeometry(0.015, 0.015, 0.5, 5); p.translate(R.x1 - 0.06, y0 + 1.3, uz); shade(p, 0xb8bcc0); put(M.pnt, p); }
+    box(R.x0 + 0.9, 0, R.z1 - 1.1, R.x0 + 0.94, y0 + 1.9, R.z1, 0x6a7a6e); box(R.x0 + 0.94, y0 + 0.15, R.z1 - 1.12, R.x0 + 1.5, y0 + 1.9, R.z1 - 1.08, 0x6a7a6e);
+    { const b = new THREE.CylinderGeometry(0.2, 0.16, 0.42, 12); b.translate(R.x0 + 0.45, y0 + 0.21, R.z1 - 0.45); shade(b, 0xf4f4f0); put(M.pnt, b); } box(R.x0 + 0.25, y0 + 0.42, R.z1 - 0.2, R.x0 + 0.65, y0 + 0.82, R.z1, 0xf4f4f0);
+    const sz = R.z0 + 0.7; box(R.x0, y0 + 0.78, sz - 0.25, R.x0 + 0.4, y0 + 0.92, sz + 0.25, 0xf4f4f0); box(R.x0, y0 + 1.25, sz - 0.3, R.x0 + 0.02, y0 + 1.9, sz + 0.3, 0x5c6a72);
+    { const b = new THREE.SphereGeometry(0.06, 8, 6); b.translate((R.x0 + R.x1) / 2, top - 0.15, (R.z0 + R.z1) / 2); shade(b, 0xfff2c0, 1.6); put(M.pnt, b); }
+    // scrawl on the tiles (coloured marker strokes)
+    for (let i = 0; i < (lite ? 6 : 16); i++) { const z = R.z0 + 0.3 + rnd() * (R.z1 - R.z0 - 0.6), y = y0 + 1.25 + rnd() * 0.9; box(R.x1 - 0.004, y, z, R.x1, y + 0.006 + rnd() * 0.01, z + 0.05 + rnd() * 0.16, [0x111111, 0x1a3aa8, 0xb3121e][i % 3]); }
+    Z.urinal = new THREE.Vector3(R.x1 - 0.55, y0, uz + oz);
+  } finally { BAKE = false; }
+  // the yard: concrete, a board fence all round, a picnic table under string lights, the butt bucket, a keg, milk crates
+  const Y = { x0: -6.0, x1: 2.7, z0: back, z1: back + 9 }, fence = 0x6b4f35, fh = y0 + 2.3;
+  floor(Y.x0, Y.z0, Y.x1, Y.z1, 0x7a766e, M.prop);
+  for (const [x0, z0, x1, z1] of [[Y.x0 - 0.1, Y.z0, Y.x0, Y.z1 + 0.1], [Y.x1, Y.z0, Y.x1 + 0.1, Y.z1 + 0.1], [Y.x0 - 0.1, Y.z1, Y.x1 + 0.1, Y.z1 + 0.1]]) {
+    wbox(x0, 0, z0, x1, fh + 0.2, z1); const alongX = x1 - x0 > z1 - z0, L = alongX ? x1 - x0 : z1 - z0, n = Math.floor(L / (lite ? 0.6 : 0.16));
+    for (let i = 0; i < n; i++) { const k = (i + 0.5) / n, w = L / n - 0.012, cx = alongX ? x0 + k * L : (x0 + x1) / 2, cz = alongX ? (z0 + z1) / 2 : z0 + k * L, hh = fh + (i % 3) * 0.04;
+      box(cx - (alongX ? w / 2 : 0.05), 0, cz - (alongX ? 0.05 : w / 2), cx + (alongX ? w / 2 : 0.05), hh, cz + (alongX ? 0.05 : w / 2), i % 2 ? fence : 0x5e4430, M.prop); } }
+  const tx = 0.2, tz = Y.z0 + 4.6;   // picnic table
+  box(tx - 0.9, y0 + 0.72, tz - 0.4, tx + 0.9, y0 + 0.77, tz + 0.4, 0x7a5a3a, M.prop); for (const s of [-1, 1]) { box(tx - 0.9, y0 + 0.42, tz + s * 0.62 - 0.14, tx + 0.9, y0 + 0.46, tz + s * 0.62 + 0.14, 0x7a5a3a, M.prop); for (const e of [-0.75, 0.75]) box(tx + e - 0.04, 0, tz + s * 0.35 - 0.04, tx + e + 0.04, y0 + 0.72, tz + s * 0.35 + 0.04, 0x5a4028, M.prop); }
+  wbox(tx - 0.9, 0, tz - 0.4, tx + 0.9, y0 + 0.77, tz + 0.4);
+  { const c = new THREE.CylinderGeometry(0.05, 0.05, 0.12, 10); c.translate(tx + 0.3, y0 + 0.83, tz); setColor(c, 0x8a8c8e); put(M.prop, c); }   // the coffee-can ashtray
+  { const b = new THREE.CylinderGeometry(0.2, 0.17, 0.38, 12); b.translate(-0.9, y0 + 0.19, Y.z0 + 1.0); setColor(b, 0xb3221e); put(M.prop, b); wbox(-1.1, 0, Y.z0 + 0.8, -0.7, 0.4, Y.z0 + 1.2); }   // the sand bucket by the door
+  { const k = new THREE.CylinderGeometry(0.22, 0.22, 0.6, 14); k.translate(2.2, y0 + 0.3, Y.z1 - 0.6); setColor(k, 0xa8adb2); put(M.prop, k); wbox(1.95, 0, Y.z1 - 0.85, 2.45, 0.6, Y.z1 - 0.35); }
+  for (const [x, z, h2] of [[-5.4, Y.z1 - 0.5, 0], [-5.4, Y.z1 - 0.5, 0.33], [-4.9, Y.z1 - 0.5, 0]]) { box(x - 0.2, y0 + h2, z - 0.2, x + 0.2, y0 + h2 + 0.32, z + 0.2, 0x1e4a9a, M.prop); } wbox(-5.65, 0, Y.z1 - 0.75, -4.65, 0.66, Y.z1 - 0.25);
+  for (const [x, z, ry] of [[tx - 1.6, tz - 0.2, 0.4], [tx + 1.7, tz + 0.5, -0.3]]) { const parts = [[0.44, 0.04, 0.42, 0, 0.45, 0], [0.44, 0.42, 0.04, 0, 0.66, -0.2]]; for (const [w, h, d, ox, oy, oz2] of parts) { const g = new THREE.BoxGeometry(w, h, d); g.translate(ox, oy, oz2); g.rotateY(ry); g.translate(x, y0, z); setColor(g, 0xeeeeea); put(M.prop, g); } }
+  { const pts = []; for (const z of [Y.z0 + 2.2, Y.z0 + 6.0]) for (let i = 0; i <= 22; i++) { const k = i / 22; pts.push([Y.x0 + k * (Y.x1 - Y.x0), y0 + 2.6 - Math.sin(k * Math.PI) * 0.35, z]); }
+    const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffe6a8, toneMapped: false }), pts.length); const o = new THREE.Object3D();
+    pts.forEach((p, i) => { o.position.set(...p); o.updateMatrix(); im.setMatrixAt(i, o.matrix); }); root.add(im); }
+  { const t = makeCanvasTex(256, 128, (g, w, h) => { g.fillStyle = '#f2efe6'; g.fillRect(0, 0, w, h); g.fillStyle = '#b3121e'; g.font = `700 ${h * 0.26}px ${FONT}`; g.textAlign = 'center'; g.fillText('SMOKING AREA', w / 2, h * 0.36); g.font = `700 ${h * 0.3}px ${CJK}`; g.fillStyle = '#222'; g.fillText('吸煙區', w / 2, h * 0.74); g.font = `600 ${h * 0.09}px ${FONT}`; g.fillText('BUTTS IN THE BUCKET — KENNY', w / 2, h * 0.93); });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({ map: t.tex })); m.position.set((GAP_EXIT[0] + GAP_EXIT[1]) / 2 + 1.1, y0 + 1.9, back + 0.02); root.add(m); }
+  Z.yardSpot = new THREE.Vector3(tx, y0, tz + oz);
+}
+const PEE = ['Ahhh. The seal is broken. Now you\'ll be back every twenty minutes.', 'Somebody wrote «TONY OWES ME $40» above the urinal. In three languages. In three handwritings.', 'You read the graffiti: «LIVERPOOL 4 LIFE» — «UNCLE LOU IS A LIAR» — «不要問». Very Sunset Park.', 'Mr. Wong walks in, looks at you, says «I was just leaving», walks out.', 'The flush handle comes off in your hand. You put it back. Nobody has to know.'];
+function pee() { if (Z.pee && performance.now() - Z.pee < 6000) { K.toast('You just went. Hydrate first (B).', 1800); return; } Z.pee = performance.now(); K.toast('🚽 ' + pick(PEE), 3600); }
+function yardSmoke() {
+  const st = K.state(); if (st?.smoking) { K.toast('One at a time.', 1400); return; }
+  if (!st?.inv?.includes('cigs')) { K.give('cigs'); K.toast('DUCK, out back: «No smokes? Here — 555s from Chinatown. Don\'t tell Kenny I carry a pack for strangers.»', 3600); }
+  K.useItem('cigs'); if (Math.random() < 0.5) setTimeout(() => K.toast(pick(['Out back, under the string lights. Somebody\'s radio is playing Cantopop from a window upstairs.', 'A cat walks the fence. It looks at you like it knows about the envelope.', 'The kitchen fan of the roast-duck place next door blows five-spice at you. Worth it.']), 3400), 1800);
+}
 function restoreRadio() { try { Z.W.radio?.juke?.(null); } catch {} if (Z.radioPrev != null) { Z.ctx.settings.radio = Z.radioPrev; Z.radioPrev = null; } }
 
 // ---- trips -------------------------------------------------------------------------------------------------------------
@@ -421,7 +512,7 @@ function leave(how) {
   fade(['8 AV · N TRAIN', 'CONEY ISLAND–STILLWELL AV'], () => { moveTo(-47, 0, -226, Math.PI, 0); K.toast('Coney Island–Stillwell Av. The D back to Sunset Park leaves from here (ride it past Bay 50 St).', 4200); });
   return true;
 }
-function boardsWorld() { return BOARDS.map((b, i) => ({ i, face: new THREE.Vector3(BAR.x1 - 0.09, 1.73, b.z + TZ.oz), normal: new THREE.Vector3(-1, 0, 0), oche: new THREE.Vector3(OCHE_X - 0.1, SW, b.z + TZ.oz) })); }
+function boardsWorld() { return BOARDS.map((b, i) => ({ i, face: new THREE.Vector3(MX(BAR.x1 - 0.09), 1.73, b.z + TZ.oz), normal: new THREE.Vector3(1, 0, 0), oche: new THREE.Vector3(MX(OCHE_X - 0.1), SW, b.z + TZ.oz) })); }
 export const tavernChalk = (fn) => { if (Z?.chalk) Z.chalk.draw((g, w, h) => drawChalk(g, w, h, fn)); };
 export const tavernZ = () => Z;
 
