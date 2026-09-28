@@ -17,6 +17,7 @@ import { hangkit as K } from '../hangkit.js';
 import { placeCars } from '../carkit.js';
 import { pa } from './r160.js';
 import { buildTavernPeople } from './tavern-people.js';
+import { buildDarts } from './darts.js';
 
 export const TZ = { x0: -125, x1: 125, z0: -12052, z1: -11948, oz: -12000 };   // world rect of the zone; local z = world z − oz (x is shared)
 const SW = 0.15;                                                                // sidewalk / bar floor height
@@ -234,6 +235,7 @@ export function buildTavern(world) {
   K.spot({ pos: Z.yardSpot, r: 2.2, dy: 2, low: true, prompt: 'F — HAVE A SMOKE OUT BACK', act: () => yardSmoke() });
   world.updaters.push((dt) => { if (Z?.world === world) update(dt); });
   try { buildTavernPeople(world); } catch (e) { console.warn('[tavern] people', e); }
+  try { buildDarts(world); } catch (e) { console.warn('[tavern] darts', e); }
   if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards, juke: (t) => { const t0 = jukeOn(t); ctx.net?.send?.('juke', { title: t, t0 }); return t0; }, radio: () => ({ now: W.radio?.now, qa: W.radio?.qa?.() }), back: () => ({ urinal: Z.urinal.toArray(), yard: Z.yardSpot.toArray(), exitX: (GAP_EXIT[0] + GAP_EXIT[1]) / 2, wcX: (GAP_WC[0] + GAP_WC[1]) / 2, z1: BAR.z1 + TZ.oz }), pee: () => pee(), peeT: () => Z.pee || 0 };
   console.log('[tavern] 8th Ave + Soccer Tavern built ·', bld.length, 'buildings ·', G.size, 'materials');
 }
@@ -412,7 +414,7 @@ function update(dt) {
   for (const f of Z.fans) f.rotation.y += dt * 3.2;
   if (ib !== Z.inside) { Z.inside = ib; if (ib) K.toast('SOCCER TAVERN · since 1929 · cash only', 2400); }
   if (p.dead || Z.busy || performance.now() / 1000 - Z.lastTrip < 3) return;
-  if (ctx.state === 'playing' && ctx.input?.pressed?.has?.('KeyT') && !ctx.durakOpen && !Z.dartsOpen) { ctx.input.pressed.delete('KeyT'); leave(v ? 'car' : 'N'); return; }
+  if (ctx.state === 'playing' && ctx.input?.pressed?.has?.('KeyT') && !ctx.durakOpen) { ctx.input.pressed.delete('KeyT'); leave(v ? 'car' : 'N'); return; }
   if (v && (v.pos.x > TZ.x1 - 14 || v.pos.x < TZ.x0 + 14) && Math.abs(v.pos.z - TZ.oz) < ROAD + 1) leave('belt');   // drive off either end of 8th Ave → the Belt
 }
 function jukebox() {
@@ -765,6 +767,6 @@ function drawChalk(g, w, h, fn) {
   g.fillStyle = '#1e2b24'; g.fillRect(0, 0, w, h); for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; g.fillRect(Math.random() * w, Math.random() * h, 6, 1); }
   g.fillStyle = '#eeeae0'; g.font = `700 ${h * 0.1}px "Marker Felt","Chalkboard SE",cursive`; g.textAlign = 'center';
   if (fn) { try { fn(g, w, h); } catch (e) { console.warn('[tavern] chalk', e); } return; }
-  g.fillText('DARTS', w / 2, h * 0.2); g.font = `600 ${h * 0.07}px "Marker Felt","Chalkboard SE",cursive`; g.fillText('501 · double out', w / 2, h * 0.36); g.fillText('1 v 1  ·  2 v 2', w / 2, h * 0.5); g.fillText('F at the line to play', w / 2, h * 0.66);
+  g.fillText('DARTS', w / 2, h * 0.2); g.font = `600 ${h * 0.07}px "Marker Felt","Chalkboard SE",cursive`; g.fillText('301 · straight out', w / 2, h * 0.36); g.fillText('1 v 1  ·  2 v 2', w / 2, h * 0.5); g.fillText('F at the line to play', w / 2, h * 0.66);
   g.fillText('LEAGUE NIGHT TUESDAY', w / 2, h * 0.86);
 }
