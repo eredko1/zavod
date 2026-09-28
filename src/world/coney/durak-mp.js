@@ -35,6 +35,10 @@ export function initDurakMP(ctx, { pos } = {}) {
   setInterval(() => { try { tick(); } catch (e) { console.warn('[durak-mp] tick', e); } }, 500);
   if (typeof window !== 'undefined' && window.__game) window.__game.durakMP = durakMPQA;
   easyJoin(ctx);
+  ctx.bus.on('durakFriends', () => {   // pause menu → Play durak: to the table, then join / open (online) or talk to Arkasha (offline)
+    const a = S.pos?.(); if (a) try { S.ctx.player?.teleport?.(a.x + 1.6, a.y || 0, a.z + 1.2, 0, 0); } catch {}
+    setTimeout(() => { if (!netUp()) { toast('At Arkasha\'s table — F to talk to him and play · подойди к Аркаше, F', 2600); return; } if (S.T) openUI(); else if (liveTable()) join(); else open({ seats: 3 }); }, 250);
+  });
 }
 
 // ------------------------------------------------------------------ making it obvious: a big F prompt at the table, a JOIN banner for
@@ -94,7 +98,7 @@ function freshMems() { const T = S.T; S.mems = T.seats.map(() => makeMemory()); 
 // ------------------------------------------------------------------ wire
 function wire(T) {
   return { table: T.id, seq: T.seq, host: T.host, seats: T.seats.map((s) => [s.id || '', s.n]), want: T.want, stake: T.stake, mode: T.mode, ph: T.ph, deal: T.deal,
-    wait: T.wait.map((w) => [w.id, w.n]), lm: T.lm, g: T.G ? pack(toJSON(T.G)) : null };
+    wait: T.wait.map((w) => [w.id, w.n]), lm: T.lm, ready: T.ready || [], g: T.G ? pack(toJSON(T.G)) : null };
 }
 function broadcast() {
   const T = S.T; if (!T || T.host !== myId()) return; S.beatAt = performance.now();
@@ -108,7 +112,7 @@ function decode(m) {
   if (m.g) { const o = unpack(m.g); if (!o || o.n !== m.seats.length || !Array.isArray(o.hands) || o.hands.length !== o.n) return null; G = fromJSON(o); }
   return { id: str(m.table, 24), seq: m.seq, host: m.host, seats: m.seats.map((s) => ({ id: okId(s?.[0]) ? s[0] : '', n: str(s?.[1]) || '?' })), want: Math.max(2, Math.min(4, m.want | 0)), stake: Math.max(0, Math.min(500, m.stake | 0)),
     mode: m.mode === 'podkidnoy' ? 'podkidnoy' : 'perevodnoy', ph: m.ph === 'play' ? 'play' : 'lobby', deal: m.deal | 0, wait: (Array.isArray(m.wait) ? m.wait : []).slice(0, 4).filter((w) => okId(w?.[0])).map((w) => ({ id: w[0], n: str(w[1]) || '?' })),
-    lm: Array.isArray(m.lm) ? [m.lm[0] | 0, str(m.lm[1], 10)] : null, G };
+    lm: Array.isArray(m.lm) ? [m.lm[0] | 0, str(m.lm[1], 10)] : null, ready: (Array.isArray(m.ready) ? m.ready : []).filter(okId).slice(0, 4), G };
 }
 function normMove(m) {
   if (!m || typeof m !== 'object' || !KINDS.includes(m.kind) || !Number.isInteger(m.who)) return null;
@@ -129,7 +133,7 @@ function onMsg(m) {
   if (m.k === 'nack') { if (m.to === myId()) { S.lastNack = { seq: m.seq, why: str(m.why, 40) }; if (durakMine()) durakSync(`Так нельзя${m.why === 'turn' ? ' — сейчас не твой ход' : ''}.`); } return; }
   if (!host) return;
   if (m.k === 'join') return hostJoin(m.f, str(m.n) || nameOf(m.f));
-  if (m.k === 'again') { if (T.ph === 'lobby' || T.G?.over) hostDeal(); return; }
+  if (m.k === 'again') { if (T.ph === 'lobby') hostDeal(); else if (T.G?.over) markReady(m.f); return; }   // after a game: everyone taps Ready, then the deal
   if (m.k === 'move') {
     if (m.seq !== T.seq) return;   // stale: they'll get the newer state anyway
     const s = seatOf(T, m.f), mv = normMove(m.m);
@@ -213,7 +217,7 @@ function hostLeave(pid) {
 function hostDeal() {
   const T = S.T; if (!T || T.host !== myId() || (T.ph === 'play' && !T.G?.over)) return;
   const hs = [...humans(T), ...T.wait].filter((h) => !S.gone.has(h.id)).slice(0, 4);
-  T.seats = makeSeats(hs, T.want); T.wait = []; T.G = newGame(Math.random, T.mode, T.seats.length); T.ph = 'play'; T.deal++; T.lm = null;
+  T.ready = []; T.seats = makeSeats(hs, T.want); T.wait = []; T.G = newGame(Math.random, T.mode, T.seats.length); T.ph = 'play'; T.deal++; T.lm = null;
   freshMems(); bump(); pump();
 }
 function hostMove(s, m) {
@@ -264,7 +268,7 @@ function view() {
   const T = S.T; if (!T) return { G: null, me: -1, names: [], ai: [], seats: [] };
   const me = myId(), s = seatOf(T);
   return { G: T.G, me: T.ph === 'play' ? s : -1, names: T.seats.map((x) => x.n), ids: T.seats.map((x) => x.id || null), ai: T.seats.map((x) => !x.id), host: T.host === me, hostName: T.seats.find((x) => x.id === T.host)?.n || nameOf(T.host),
-    stake: T.stake, mode: T.mode, deal: T.deal, want: T.want, autoIn: T.autoAt ? Math.max(0, Math.ceil((T.autoAt - performance.now()) / 1000)) : 0, humans: humans(T).length, seats: T.seats.map((x) => ({ n: x.n, ai: !x.id, me: x.id === me })), wait: T.wait.map((w) => w.n) };
+    stake: T.stake, mode: T.mode, deal: T.deal, want: T.want, ready: (T.ready || []).length, readyMe: (T.ready || []).includes(me), humansN: humans(T).length, autoIn: T.autoAt ? Math.max(0, Math.ceil((T.autoAt - performance.now()) / 1000)) : 0, humans: humans(T).length, seats: T.seats.map((x) => ({ n: x.n, ai: !x.id, me: x.id === me })), wait: T.wait.map((w) => w.n) };
 }
 const ADAPTER = { view, move: (m) => move(m), deal: () => deal(), again: () => again(), seats: (n) => seats(n) };
 function openUI() { if (durakOpen()) { if (!durakMine()) return; durakSync(); return; } openDurak(S.ctx, { mp: ADAPTER, onEnd: () => leave() }); }
@@ -290,7 +294,8 @@ function move(m) {
   if (T.host === myId()) { if (!hostMove(s, mv)) { S.lastNack = { seq: T.seq, why: 'illegal' }; if (durakMine()) durakSync('Так нельзя.'); return false; } return true; }
   S.pendingAt = performance.now(); send('move', { seq: T.seq, m: mv }); return true;
 }
-function deal() { const T = S.T; if (!T) return; if (T.host === myId()) hostDeal(); else send('again'); }
+function deal() { const T = S.T; if (!T) return; if (T.host === myId()) { if (T.ph === 'play' && T.G?.over) markReady(myId()); else hostDeal(); } else send('again'); }
+function markReady(pid) { const T = S.T; if (!T || T.host !== myId()) return; T.ready = [...new Set([...(T.ready || []), pid])]; const need = humans(T).filter((h) => !S.gone.has(h.id)).map((h) => h.id); if (need.every((id) => T.ready.includes(id))) hostDeal(); else bump(); }
 function again() { deal(); }
 function seats(n) { const T = S.T; if (!T || T.host !== myId() || T.ph !== 'lobby') return; T.want = Math.max(humans(T).length, Math.max(2, Math.min(4, n | 0))); T.seats = makeSeats(humans(T), T.want); bump(); }
 export function leave() {
