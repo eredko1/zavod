@@ -290,6 +290,7 @@ function talkIgor() {
       { label: `A bag — $${PRICE}`, go: () => igorSell('weed') },
       { label: `A bottle — $${PRICE}`, go: () => igorSell('bottle') },
       { label: 'Got any work?', go: () => jobsTalk() },
+      { label: 'Killer drone — $50', go: () => ({ text: 'IGOR: "' + sell('drone', 50, 'IGOR', { ok: 'From a guy in Kyiv. It finds the bad ones by itself. Bag → Use.', broke: 'Fifty. Drones are not cheap, my friend.', full: 'Your pockets are full.' }) + '"', choices: [{ label: 'Nice', go: null }] }) },
       { label: 'Need a piece', go: () => gunShop('IGOR', ['m9', 'r870', 'ak74', 'm24'], 'IGOR: "Shh. Not so loud. Under the bench I have… options. Cash only, no questions, no refunds."') },
       { label: 'What\'s the word?', go: () => ({ text: `IGOR: "${IGOR_GOSSIP[Math.floor(Math.random() * IGOR_GOSSIP.length)]}"`, choices: [{ label: 'Heard', go: null }] }) },
       { label: 'Later', go: null },
