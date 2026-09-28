@@ -86,7 +86,7 @@ const api = {
   /** QA: where the interaction points are */
   points: () => V && { shafts: V.shafts.map((t) => ({ kind: t.kind, label: t.label, lobby: t.lobby.cars.map((c) => c.pos.toArray()), top: t.tops[0].cars.map((c) => c.pos.toArray()) })), vendors: V.vendors.map((v) => ({ name: v.name, pos: v.pos.toArray() })), cars: (V.world.parkedCars || []).filter((c) => !c.gone).length, start: V.world.W?.onlineStart },
   hurtState: () => V && V.hurtables.map((H) => ({ name: H.o.name, hp: Math.round(H.hp), down: H.down })),
-  state: () => V && { iceLeft: V.iceT != null ? V.iceT / ITEMS.ice.melt * 100 : null, cash: V.cash, inv: V.inv.slice(), item: V.inv[V.inv.length - 1] || null, drunk: +(V.drunk || 0).toFixed(2), high: +V.high.toFixed(2), riding: !!V.riding, passenger: !!V.passenger,
+  state: () => V && { iceLeft: V.iceT != null ? V.iceT / ITEMS.ice.melt * 100 : null, cash: V.cash, inv: V.inv.slice(), item: V.inv[V.inv.length - 1] || null, drunk: +(V.drunk || 0).toFixed(2), high: +V.high.toFixed(2), smoke: +Math.min(1, (V.smokes || []).reduce((a, t) => a + Math.max(0, 1 - (performance.now() - t) / 240000) * 0.3, 0)).toFixed(2), riding: !!V.riding, passenger: !!V.passenger,
     dialog: V.dialog ? { name: V.dialog.name, text: V.dialog.node.text, choices: (V.dialog.node.choices || []).map((c) => c.label) } : null, drops: V.drops.map((d) => [+d.pos.x.toFixed(1), +d.pos.y.toFixed(1), +d.pos.z.toFixed(1), d.n]) },
 };
 export const hangkit = api;
@@ -313,7 +313,8 @@ function bottleModel(kind) {
 
 // ---- smoking + the high ---------------------------------------------------------------------------------------------------------
 function lightUp(magic = false, cig = false, hi = 0) {
-  const { ctx } = V; V.smokeT = magic ? 16 : cig ? 9 : 11 + hi * 8; V.puffT = 0.6; V.cig = cig; if (magic) { V.high = Math.min(1, V.high + 0.35); V.highT = Math.max(V.highT, 180); }
+  const { ctx } = V; (V.smokes || (V.smokes = [])).push(performance.now()); if (V.smokes.length > 8) V.smokes.shift();   // darts.js: a few smokes and your hand shakes
+  V.smokeT = magic ? 16 : cig ? 9 : 11 + hi * 8; V.puffT = 0.6; V.cig = cig; if (magic) { V.high = Math.min(1, V.high + 0.35); V.highT = Math.max(V.highT, 180); }
   V.smokeHi = hi || 0.22;   // per puff: a bag 0.22, a blunt 0.4
   ctx.hud?.toast?.(cig ? ['*chk* …a Marlboro on the boardwalk', 'Покурим. Одну.', '*tap tap* …ahh'][Math.floor(Math.random() * 3)] : '…', 1400);
   const kind = V.smokeKind === 'vape' ? 'vape' : V.smokeKind === 'blunt' ? 'blunt' : cig ? 'cig' : 'spliff';

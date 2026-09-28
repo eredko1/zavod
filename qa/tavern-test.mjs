@@ -93,5 +93,48 @@ if (parts.includes('back')) {
   // the bar is on the left now (mirrored): a look from the door
   await toDoor(pg, -1.5); await pg.waitForTimeout(1200); await pg.screenshot({ path: `${out}/tavern-room.png` });
 }
+// my dart for what's left: T20 when far, then the number that finishes
+const finish = (pg, b = 0) => pg.evaluate((b) => { const G = window.__game.darts, T = G.table(b), me = T.seats[T.turn], t = T.mode === '2v2' ? T.turn % 2 : T.turn, left = T.score[t];
+  const a = left > 60 ? G.aim(20, 'triple') : left === 50 ? G.aim(50) : left <= 20 ? G.aim(left, 'single') : left <= 40 && left % 2 === 0 ? G.aim(left / 2, 'double') : left % 3 === 0 ? G.aim(left / 3, 'triple') : G.aim(left > 40 ? 20 : 1, 'single'); return G.throwAt(a[0], a[1]); }, b);
+async function playOut(pg, name, b = 0) { for (let i = 0; i < 120; i++) { const T = await pg.evaluate((b) => window.__game.darts.table(b), b); if (!T || T.phase === 'over') return T; if (T.seats[T.turn]?.id === await pg.evaluate(() => window.__ctx.net?.id || 'me')) await finish(pg, b); await pg.waitForTimeout(450); } return null; }
+if (parts.includes('darts')) {
+  // ---- F at the line opens the board; a leg against Ah Fai to a finish ----
+  const bd = await pg.evaluate(() => { const o = window.__game.tavern.boards[0].oche; window.__game.teleport(o.x + 0.3, o.y, o.z, -Math.PI / 2, 0); return o; }); await pg.waitForTimeout(800);
+  await pg.keyboard.press('KeyF'); await pg.waitForTimeout(700);
+  ok(await pg.evaluate(() => !!document.querySelector('.darts') && !!window.__game.darts.ui()), 'F at the oche opens the board');
+  await pg.screenshot({ path: `${out}/darts-lobby.png` });
+  const sc = await pg.evaluate(() => { const G = window.__game.darts; return [G.scoreAt(0, 0).v, G.scoreAt(0, 0.605).label, G.scoreAt(0, 0.976).label, G.scoreAt(0.4, 0).label, G.scoreAt(0, 1.2).v]; });
+  ok(JSON.stringify(sc) === JSON.stringify([50, 'T20', 'D20', '6', 0]), 'board scoring (bull, T20, D20, 6, miss)', JSON.stringify(sc));
+  await pg.evaluate(() => window.__game.darts.vsAI()); await pg.waitForTimeout(400);
+  const d0 = await pg.evaluate(() => window.__game.darts.difficulty().sway);
+  await pg.mouse.move(600, 300); await pg.waitForTimeout(400); await pg.screenshot({ path: `${out}/darts-sober.png` });
+  const T = await playOut(pg, 'solo'); ok(T?.phase === 'over' && T.win >= 0, 'a leg of 301 vs Ah Fai to a checkout', JSON.stringify(T && { note: T.note, score: T.score }));
+  await pg.screenshot({ path: `${out}/darts-over.png` });
+  // drink up: the aim sways harder, double vision
+  await pg.evaluate(() => window.__game.darts.drink('erguotou')); await pg.waitForTimeout(3500); await pg.evaluate(() => window.__game.darts.drink('boilermaker')); await pg.waitForTimeout(3500);
+  const d1 = await pg.evaluate(() => window.__game.darts.difficulty());
+  ok(d1.sway > d0 * 2, 'two drinks in: the aim sways a lot more', JSON.stringify({ d0, d1 }));
+  await pg.evaluate(() => { window.__game.darts.close(); window.__game.darts.open(0); }); await pg.waitForTimeout(300); await pg.evaluate(() => window.__game.darts.vsAI()); await pg.mouse.move(600, 300); await pg.waitForTimeout(800);
+  await pg.screenshot({ path: `${out}/darts-drunk.png` }); await pg.evaluate(() => window.__game.darts.close());
+  ok(d0 > 0 && d0 < 0.1, 'sober: a steady hand', d0);
+  ok(!errs.length, 'no page errors (darts)', JSON.stringify(errs.slice(0, 3)));
+}
+if (parts.includes('mp')) {
+  // ---- two players: A opens a board, B (on the boardwalk in Coney) gets the banner, JOIN walks B to the line, they play ----
+  const A = await open('DA'), B = await open('DB');
+  await B.evaluate(() => window.__game.teleport(-47, 0, -226, 0, 0)); await A.waitForTimeout(6000);
+  await A.evaluate(() => { const o = window.__game.tavern.boards[1].oche; window.__game.teleport(o.x + 0.3, o.y, o.z, -Math.PI / 2, 0); window.__game.darts.open(1); });
+  let ban = false; for (let i = 0; i < 20 && !ban; i++) { await B.waitForTimeout(500); ban = await B.evaluate(() => !!document.querySelector('.dt-banner')); }
+  ok(ban, 'B in Coney gets the darts banner');
+  await B.screenshot({ path: `${out}/darts-banner.png` });
+  if (ban) await B.click('.dt-banner button');
+  let seats = 0; for (let i = 0; i < 20 && seats < 2; i++) { await A.waitForTimeout(500); seats = await A.evaluate(() => window.__game.darts.table(1)?.seats.length || 0); }
+  ok(seats === 2, 'JOIN: B is at the line with A', seats);
+  ok(await B.evaluate(() => window.__game.tavern.state().inBar), 'B walked to the tavern');
+  await A.evaluate(() => window.__game.darts.start()); await A.waitForTimeout(800);
+  const both = await Promise.all([playOut(A, 'A', 1), playOut(B, 'B', 1)]);
+  ok(both[0]?.phase === 'over' && both[1]?.phase === 'over' && both[0].win === both[1].win, 'A and B play a leg to a finish, same result', JSON.stringify(both.map((t) => t && { n: t.note, s: t.score })));
+  await B.screenshot({ path: `${out}/darts-mp.png` });
+}
 ok(!errs.length, 'no page errors', JSON.stringify(errs.slice(0, 3)));
 await b.close(); console.log(fails ? `\n${fails} FAILED` : '\nALL PASS'); process.exit(fails ? 1 : 0);
