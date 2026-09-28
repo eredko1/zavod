@@ -109,7 +109,15 @@ function drawMarkers(g, P, scale, rot = 0, big = false) {
   const k = big ? 1 : 2;   // minimap canvas is 2x
   // subway: station icons on the minimap too (the big map bakes them with the POIs) + the F train itself, an orange bar
   if (!big) for (const q of ctx.world?.mapPOIs || []) { if (q.kind !== 'transit') continue; const [u, v] = P(q.x, q.z); g.beginPath(); g.arc(u, v, 8 * k, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,.7)'; g.fill(); g.lineWidth = 2 * k; g.strokeStyle = '#8ac7ff'; g.stroke(); g.font = `700 ${11 * k}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#8ac7ff'; g.fillText('Ⓜ', u, v + 0.5); }
-  const tr = ctx.subway?.train?.(); if (tr) { const [u0, v0] = P(tr[0], tr[1]), [u1, v1] = P(tr[2], tr[3]); g.save(); g.lineCap = 'round'; g.lineWidth = 5 * k; g.strokeStyle = 'rgba(0,0,0,.6)'; g.beginPath(); g.moveTo(u0, v0); g.lineTo(u1, v1); g.stroke(); g.lineWidth = 3 * k; g.strokeStyle = '#ff6319'; g.stroke(); g.restore(); }
+  // subway lines in their colours (Q wide yellow under the F where they share the el, the D dashed darker orange), station
+  // dots, and every train as a bar in its line's colour
+  const sw = ctx.subway; if (sw?.routes) { g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const r of sw.routes()) { g.setLineDash(r.dash ? [5 * k, 4 * k] : []); g.lineWidth = r.w * k; g.strokeStyle = r.color; g.globalAlpha = 0.8; g.beginPath(); r.pts.forEach(([x, z], i) => { const [u, v] = P(x, z); if (i) g.lineTo(u, v); else g.moveTo(u, v); }); g.stroke(); }
+    g.setLineDash([]); g.globalAlpha = 1;
+    for (const s of sw.stations()) { const [u, v] = P(s.x, s.z); g.beginPath(); g.arc(u, v, 3.2 * k, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 1.2 * k; g.strokeStyle = '#111'; g.stroke(); if (big) label(u, v - 8, `${s.name} ${s.r.split('').join(' ')}`, '#e8e8e8', 11); }
+    for (const t of sw.trains()) { const [u0, v0] = P(t.seg[0], t.seg[1]), [u1, v1] = P(t.seg[2], t.seg[3]); g.lineWidth = 5 * k; g.strokeStyle = 'rgba(0,0,0,.6)'; g.beginPath(); g.moveTo(u0, v0); g.lineTo(u1, v1); g.stroke(); g.lineWidth = 3 * k; g.strokeStyle = t.color; g.stroke(); }
+    g.restore(); }
+  const tr = !sw?.trains && ctx.subway?.train?.(); if (tr) { const [u0, v0] = P(tr[0], tr[1]), [u1, v1] = P(tr[2], tr[3]); g.save(); g.lineCap = 'round'; g.lineWidth = 5 * k; g.strokeStyle = 'rgba(0,0,0,.6)'; g.beginPath(); g.moveTo(u0, v0); g.lineTo(u1, v1); g.stroke(); g.lineWidth = 3 * k; g.strokeStyle = '#ff6319'; g.stroke(); g.restore(); }
   for (const [x, z, car] of mk.bikes) { const [u, v] = P(x, z); g.fillStyle = car ? '#6fd08a' : '#9fe39a'; g.fillRect(u - 3 * k, v - 3 * k, 6 * k, 6 * k); }
   for (const [x, z, n] of mk.vendors) { const [u, v] = dot(x, z, 4.5 * k, '#ffd27a'); if (big) label(u, v - 9, n, '#ffd27a', 12); }
   for (const [x, z, cop, far] of mk.enemies) { g.globalAlpha = far ? 0.35 : 1; dot(x, z, 4 * k, cop ? '#b36bff' : '#ff4a3a', '#2a0000'); } g.globalAlpha = 1;
