@@ -27,23 +27,29 @@ export function init(ctx) {
   big.addEventListener('click', () => { if (M.open) toggle(); }); big.addEventListener('touchstart', (e) => { e.preventDefault(); if (M.open) toggle(); }, { passive: false });
   ctx.bus.on('state', ({ state }) => {
     mini.style.display = state === 'playing' && M.img ? 'block' : 'none';
-    if (state === 'playing' && !M.img && !M.pending) { M.pending = true; setTimeout(() => { try { snapshot(); } catch (e) { console.warn('[map] snapshot', e); } M.pending = false; mini.style.display = ctx.state === 'playing' ? 'block' : 'none'; }, 1500); }
+    if (state === 'playing' && !M.img && !M.pending) { M.pending = true; setTimeout(async () => { try { await snapshot(); } catch (e) { console.warn('[map] snapshot', e); } M.pending = false; mini.style.display = ctx.state === 'playing' ? 'block' : 'none'; }, 1500); }
   });
   return { toggle, get open() { return M.open; }, snapshot: () => snapshot(), qa: () => ({ img: !!M.img, w: M.img?.width, h: M.img?.height }) };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // the background: the world from above
-function snapshot() {
+async function snapshot() {
   const { ctx } = M; const W = ctx.world, b = W?.bounds; if (!b) return;
   // multi-level interiors (W.mapLevels, else the wave floor levels): one cutaway floor plan per level; everything else one view
   const levels = Array.isArray(W.mapLevels) ? W.mapLevels : (Array.isArray(W.waveTuning?.levels) && W.waveTuning.levels.length > 1 ? W.waveTuning.levels : null);
-  M.levels = levels ? levels.slice().sort((a, c) => c - a) : null; M.imgs = {};
-  if (M.levels) for (const y of M.levels) M.imgs[y] = shoot(y + 3.2); else M.imgs.all = shoot(null);
-  M.img = M.levels ? M.imgs[M.levels[0]] : M.imgs.all;
+  const sorted = levels ? levels.slice().sort((a, c) => c - a) : null, imgs = {};
+  if (sorted) for (const y of sorted) imgs[y] = await shoot(y + 3.2); else imgs.all = await shoot(null);
+  M.levels = sorted; M.imgs = imgs; M.img = sorted ? imgs[sorted[0]] : imgs.all;
   console.log('[map] snapshot', M.map.RW, 'x', M.map.RH, M.levels ? 'levels ' + M.levels.join(',') : '');
 }
-function shoot(clipY) {
+// half float bits -> linear value, built once (the per-pixel decode + tone curve used to take ~1 s of main thread)
+let F16 = null;
+const f16table = () => { if (F16) return F16; F16 = new Float32Array(65536); for (let h = 0; h < 65536; h++) { const s = (h & 0x8000) ? -1 : 1, e = (h >> 10) & 0x1f, m = h & 0x3ff; F16[h] = e === 0 ? s * Math.pow(2, -14) * (m / 1024) : e === 31 ? 0 : s * Math.pow(2, e - 15) * (1 + m / 1024); } return F16; };
+// Nothing here may change a shader's program key: no fog swap (density 0 instead), no hidden lights (the camera carries the
+// viewmodel fill lights, so its meshes are hidden instead of the camera) and no clipping planes (the camera's near plane cuts
+// the floors above instead). Any of those recompiled every material in the map on the spot (0.8-6 s freeze on first play).
+async function shoot(clipY) {
   const { ctx } = M; const W = ctx.world, b0 = W.bounds;
   // frame = play bounds + everything that has a label, padded 60 m so nothing sits on the edge
   const b = { min: { x: b0.min.x, z: b0.min.z }, max: { x: b0.max.x, z: b0.max.z } };
@@ -51,26 +57,31 @@ function shoot(clipY) {
   b.min.x -= 60; b.min.z -= 60; b.max.x += 60; b.max.z += 60;
   const w = b.max.x - b.min.x, d = b.max.z - b.min.z, cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
   const res = ctx.isTouch ? 1024 : 2048, RW = w >= d ? res : Math.round(res * w / d), RH = w >= d ? Math.round(res * d / w) : res;
-  const cam = new THREE.OrthographicCamera(-w / 2, w / 2, d / 2, -d / 2, 1, 4000); cam.position.set(cx, 1500, cz); cam.up.set(0, 0, -1); cam.lookAt(cx, 0, cz); cam.updateMatrixWorld(true);
-  const scene = ctx.scene, R = ctx.renderer, hidden = [];
+  // from straight above; on a multi-level map the camera sits at the cut height so the near plane removes the floors above
+  const top = clipY != null ? clipY : 1500, cam = new THREE.OrthographicCamera(-w / 2, w / 2, d / 2, -d / 2, clipY != null ? 0.001 : 1, top + 2500);
+  cam.position.set(cx, top, cz); cam.up.set(0, 0, -1); cam.lookAt(cx, top - 1, cz); cam.updateMatrixWorld(true);
+  const scene = ctx.scene, R = ctx.renderer, hidden = [], lit = new Set();
+  scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) lit.add(p); });
+  const hide = (o) => { if (!lit.has(o)) { hidden.push(o); o.visible = false; return; } o.traverse((x) => { if (x.visible && (x.isMesh || x.isPoints || x.isSprite || x.isLine)) { hidden.push(x); x.visible = false; } }); };
   scene.traverse((o) => { if (o === scene || !o.visible) return; const n = o.name || '';
-    if (o === ctx.camera || o.isSprite || o.isPoints || (o.isMesh && o.material?.blending === THREE.AdditiveBlending) || /far|sky|dome|horizon|cloud|star|moon|sun|firework|rain|shaft|godray|beam|glow/i.test(n) || (o.isMesh && o.renderOrder < 0) || (o.isMesh && o.material && (o.material.depthTest === false))) { hidden.push(o); o.visible = false; } });
-  const fog = scene.fog, bg = scene.background; scene.fog = null; scene.background = new THREE.Color(0x0e1a24);
+    if (o === ctx.camera || o.isSprite || o.isPoints || (o.isMesh && o.material?.blending === THREE.AdditiveBlending) || /far|sky|dome|horizon|cloud|star|moon|sun|firework|rain|shaft|godray|beam|glow/i.test(n) || (o.isMesh && o.renderOrder < 0) || (o.isMesh && o.material && (o.material.depthTest === false))) hide(o); });
+  const fog = scene.fog, density = fog?.density, bg = scene.background; if (fog?.isFogExp2) fog.density = 0; scene.background = new THREE.Color(0x0e1a24);
   const rt = new THREE.WebGLRenderTarget(RW, RH, { type: THREE.HalfFloatType });
-  const prevClip = R.clippingPlanes; if (clipY != null) R.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY)];   // cut away everything above this floor
-  const prevT = R.getRenderTarget(); R.setRenderTarget(rt); R.clear(); R.render(scene, cam); R.setRenderTarget(prevT); R.clippingPlanes = prevClip;
-  for (const o of hidden) o.visible = true; scene.fog = fog; scene.background = bg;
-  const buf = new Uint16Array(RW * RH * 4); R.readRenderTargetPixels(rt, 0, 0, RW, RH, buf); rt.dispose();
+  const prevT = R.getRenderTarget(), prevAuto = R.shadowMap.autoUpdate; R.shadowMap.autoUpdate = false;   // the shadow maps from the last frame are fine for a plan view
+  try { R.setRenderTarget(rt); R.clear(); R.render(scene, cam); }
+  finally { R.setRenderTarget(prevT); R.shadowMap.autoUpdate = prevAuto; for (const o of hidden) o.visible = true; if (fog?.isFogExp2) fog.density = density; scene.background = bg; }
+  const buf = new Uint16Array(RW * RH * 4);
+  try { await R.readRenderTargetPixelsAsync(rt, 0, 0, RW, RH, buf); } catch { R.readRenderTargetPixels(rt, 0, 0, RW, RH, buf); }   // async: no GPU pipeline stall
+  rt.dispose();
   const c = document.createElement('canvas'); c.width = RW; c.height = RH; const g = c.getContext('2d'); const img = g.createImageData(RW, RH);
-  const f16 = (h) => { const s = (h & 0x8000) ? -1 : 1, e = (h >> 10) & 0x1f, m = h & 0x3ff; return e === 0 ? s * Math.pow(2, -14) * (m / 1024) : e === 31 ? 0 : s * Math.pow(2, e - 15) * (1 + m / 1024); };
+  const F = f16table();
   // exposure: night / dark interiors get lifted so the plan reads (target mean ≈ 0.3 after the curve)
-  let sum = 0, cnt = 0; for (let i = 0; i < buf.length; i += 4 * 97) { sum += 0.3 * f16(buf[i]) + 0.59 * f16(buf[i + 1]) + 0.11 * f16(buf[i + 2]); cnt++; }
+  let sum = 0, cnt = 0; for (let i = 0; i < buf.length; i += 4 * 97) { sum += 0.3 * F[buf[i]] + 0.59 * F[buf[i + 1]] + 0.11 * F[buf[i + 2]]; cnt++; }
   const mean = Math.max(1e-3, sum / cnt), exp = Math.min(8, Math.max(1.25, 0.45 / mean));
-  for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
-    const si = ((RH - 1 - y) * RW + x) * 4, di = (y * RW + x) * 4;   // read is bottom-up
-    for (let k = 0; k < 3; k++) { let v = Math.max(0, f16(buf[si + k])) * exp; v = v / (1 + v); v = Math.pow(v, 1 / 2.2); img.data[di + k] = Math.min(255, v * 255); }
-    img.data[di + 3] = 255;
-  }
+  const lut = new Uint8ClampedArray(65536); for (let h = 0; h < 65536; h++) { let v = Math.max(0, F[h]) * exp; v = v / (1 + v); lut[h] = Math.pow(v, 1 / 2.2) * 255; }
+  const out = img.data;
+  for (let y = 0; y < RH; y++) { let si = (RH - 1 - y) * RW * 4, di = y * RW * 4;   // read is bottom-up
+    for (let x = 0; x < RW; x++, si += 4, di += 4) { out[di] = lut[buf[si]]; out[di + 1] = lut[buf[si + 1]]; out[di + 2] = lut[buf[si + 2]]; out[di + 3] = 255; } }
   g.putImageData(img, 0, 0);
   // map style: a touch darker + desaturated so the markers and labels pop
   g.globalCompositeOperation = 'saturation'; g.fillStyle = 'rgba(128,128,128,0.35)'; g.fillRect(0, 0, RW, RH); g.globalCompositeOperation = 'source-over';

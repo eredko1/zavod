@@ -8,6 +8,8 @@ import { clampTextures } from './texclamp.js';
 
 const updaters = [];
 let W = null;
+// ?prof=1: tag every updater with the file:line that registered it so the frame profiler (main.js) can name slow ones
+if (typeof location !== 'undefined' && /[?&]prof=1/.test(location.search)) updaters.push = function (...fns) { const at = (new Error().stack || '').split('\n')[2] || ''; for (const f of fns) f.__src = (at.match(/src\/([^?)]+?):(\d+)/) || []).slice(1, 3).join(':'); return Array.prototype.push.apply(this, fns); };
 
 export async function init(ctx) {
   const { scene, renderer } = ctx;
@@ -81,7 +83,8 @@ export async function init(ctx) {
 
 export function update(dt, ctx) {
   if (!W) return;
-  for (let i = 0; i < updaters.length; i++) updaters[i](dt, ctx);
+  const P = ctx.prof; if (!P) { for (let i = 0; i < updaters.length; i++) updaters[i](dt, ctx); return; }
+  for (let i = 0; i < updaters.length; i++) { const f = updaters[i], t = performance.now(); f(dt, ctx); P.mark('u:' + (f.__src || i), performance.now() - t); }
 }
 
 export function reset(ctx) { /* maps are static; dynamic state lives in other modules */ }

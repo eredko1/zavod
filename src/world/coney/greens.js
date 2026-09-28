@@ -17,7 +17,12 @@ export function buildGreens(world, M) {
   for (const m of lawns) { if (!m.geometry.boundsTree) m.geometry.boundsTree = new MeshBVH(m.geometry); m.raycast = acceleratedRaycast; m.updateMatrixWorld(true); }
   const rc = new THREE.Raycaster(); rc.firstHitOnly = true; const down = new THREE.Vector3(0, -1, 0), o = new THREE.Vector3();
   const isLawn = (x, z) => { o.set(x, 3, z); rc.set(o, down); rc.far = 4; return rc.intersectObjects(lawns, false).length > 0; };
-  const blocked = (x, z, r = 0.6) => ctx.colliders.some((b) => b.max.y > 0.2 && b.min.y < 2 && x > b.min.x - r && x < b.max.x + r && z > b.min.z - r && z < b.max.z + r);
+  // ground-level colliders bucketed on a 4 m grid (a linear scan of every collider per sample took ~3 s of the coney load);
+  // boxes added while placing (fences, benches) are indexed on the next query
+  const CELL = 4, grid = new Map(); let indexed = 0;
+  const index = () => { const C = ctx.colliders; for (; indexed < C.length; indexed++) { const b = C[indexed]; if (!(b.max.y > 0.2 && b.min.y < 2)) continue;
+    for (let i = Math.floor((b.min.x - 1) / CELL); i <= Math.floor((b.max.x + 1) / CELL); i++) for (let j = Math.floor((b.min.z - 1) / CELL); j <= Math.floor((b.max.z + 1) / CELL); j++) { const k = i * 65536 + j; (grid.get(k) || grid.set(k, []).get(k)).push(b); } } };
+  const blocked = (x, z, r = 0.6) => { index(); const l = grid.get(Math.floor(x / CELL) * 65536 + Math.floor(z / CELL)); return !!l && l.some((b) => x > b.min.x - r && x < b.max.x + r && z > b.min.z - r && z < b.max.z + r); };
   const W = world.W, keepOut = [W.onlineStart, W.stillwell?.concourse?.toArray?.()].filter(Boolean);
   const nearTower = (x, z) => { let best = towers[0], bd = 1e9; for (const t of towers) { const d = Math.hypot(t.centre.x - x, t.centre.z - z); if (d < bd) { bd = d; best = t; } } return best; };
   const axisOf = (t) => { const a = t.toWorld(0, 0, 0), b = t.toWorld(1, 0, 0); return Math.atan2(b.x - a.x, b.z - a.z); };
@@ -147,9 +152,13 @@ export function buildGreens(world, M) {
   const done = new Set();
   for (const t of [nearTower(cx0, cz0), towers[1]]) { if (!t || done.has(t) || !t.core) continue; done.add(t);
     // the highest roof of this tower (the photo's tanks sit on top of the tallest wing): raycast down over its footprint
+    // only meshes over this footprint, each with a BVH (the full target list without trees took ~15 s of the coney load)
+    const foot = new THREE.Box3(new THREE.Vector3(t.centre.x - 19, -5, t.centre.z - 19), new THREE.Vector3(t.centre.x + 19, 200, t.centre.z + 19)), bb = new THREE.Box3();
+    const over = ctx.raycastTargets.filter((m) => m.isMesh && !m.isSkinnedMesh && m.geometry?.attributes?.position && bb.setFromObject(m).intersectsBox(foot));
+    for (const m of over) { const g = m.geometry; if (!g.boundsTree && (g.index ? g.index.count : g.attributes.position.count) > 1500) { try { g.computeBoundsTree({ maxLeafTris: 8 }); } catch { /* plain raycast */ } } }
     const rcu = new THREE.Raycaster(); rcu.firstHitOnly = true; let top = null;
     for (let du = -18; du <= 18; du += 3) for (let dv = -18; dv <= 18; dv += 3) { const q = new THREE.Vector3(t.centre.x + du, 140, t.centre.z + dv); rcu.set(q, down); rcu.far = 150;
-      const h = rcu.intersectObjects(ctx.raycastTargets, false)[0]; if (h && h.point.y > 20 && (!top || h.point.y > top.y + 0.5)) top = h.point.clone(); }
+      const h = rcu.intersectObjects(over, false)[0]; if (h && h.point.y > 20 && (!top || h.point.y > top.y + 0.5)) top = h.point.clone(); }
     if (!top) continue; const y = top.y, ax = axisOf(t), ux = Math.sin(ax), uz = Math.cos(ax);
     for (const da of [-2.7, 2.7]) { const P = { x: top.x + ux * da, z: top.z + uz * da, yaw: 0 };
       for (const [lx, lz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) cyl(mats.steelDark, P, lx, y + 1.5, lz, 0.1, 0.1, 3, 6);
