@@ -16,6 +16,13 @@ export function mountInventory(ctx, K) {
   ctx.bus.on('inventory', () => { if (I.ctx.state === 'playing') toggle(); });   // hangkit's BAG button on phones
   btn.addEventListener('touchstart', (e) => { e.preventDefault(); toggle(); }, { passive: false });
   root.addEventListener('click', onClick); root.addEventListener('touchend', (e) => { const t = e.target.closest('[data-a]'); if (t) { e.preventDefault(); onClick(e); } });
+  // 0: the stash — a quick numbered list of what you can smoke / drink / eat / use; 1-9 uses it, 0 or Esc closes
+  const quick = document.createElement('div'); quick.className = 'inv-quick'; quick.style.display = 'none'; document.body.appendChild(quick); I.quick = quick; I.quickItems = [];
+  quick.addEventListener('click', (e) => { const t = e.target.closest('[data-q]'); if (t) useQuick(+t.dataset.q); });
+  addEventListener('keydown', (e) => {
+    if (I.quickOpen) { const m = /^(Digit|Numpad)([0-9])$/.exec(e.code); if (m || e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; if (!m || m[2] === '0') showQuick(false); else useQuick(+m[2] - 1); } return; }
+    if ((e.code === 'Digit0' || e.code === 'Numpad0') && !e.repeat && I.ctx.state === 'playing' && !I.open && !I.ctx.durakOpen && !document.querySelector('.hkui.dialog')) { e.preventDefault(); e.stopImmediatePropagation(); showQuick(true); return; }
+  }, true);
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyI' && !e.repeat && I.ctx.state === 'playing' && !I.ctx.durakOpen && !document.querySelector('.hkui.dialog')) { e.preventDefault(); toggle(); }
     else if (I.open && e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); toggle(false); }
@@ -31,6 +38,14 @@ export function mountInventory(ctx, K) {
   window.__game && (window.__game.inventory = { open: () => toggle(true), close: () => toggle(false), state: () => ({ open: I.open, html: root.textContent }) });
 }
 
+function showQuick(v) {
+  I.quickOpen = v; if (!v) { I.quick.style.display = 'none'; return; }
+  const inv = I.K.state?.()?.inv || [], seen = new Set(); I.quickItems = inv.filter((it) => !ITEMS[it]?.keep && !seen.has(it) && seen.add(it)).slice(0, 9);
+  const count = (it) => inv.filter((x) => x === it).length;
+  I.quick.innerHTML = `<h4>STASH <small>1-9 use · 0 close</small></h4>` + (I.quickItems.length ? I.quickItems.map((it, i) => `<button data-q="${i}"><b>${i + 1}</b>${ITEMS[it]?.icon || ''} ${esc(ITEMS[it]?.name || it)}${count(it) > 1 ? ` ×${count(it)}` : ''}</button>`).join('') : '<p>Nothing to use. Hustlers on the beach, Sammy and NET GOST sell smokes and booze.</p>');
+  I.quick.style.display = 'block';
+}
+function useQuick(i) { const it = I.quickItems[i]; if (!it) return; I.K.useItem?.(it); showQuick(false); }
 function toggle(v = !I.open) {
   I.open = v; I.root.style.display = v ? 'flex' : 'none';
   if (v) { try { document.exitPointerLock?.(); } catch {} render(); } else if (I.ctx.state === 'playing') { try { I.ctx.requestPointerLock?.(); } catch {} }
@@ -75,5 +90,7 @@ const CSS = `
 .inv-box button.ghost{background:transparent;color:#f1eee6}.inv-box .empty{opacity:.65}.inv-box footer{margin-top:10px;font-size:12px;opacity:.55}
 .inv-strip{position:fixed;right:22px;bottom:150px;z-index:41;display:none;gap:4px;font:700 11px 'Barlow Condensed',Arial;letter-spacing:.08em}.inv-strip.touch{top:108px;bottom:auto;right:10px;flex-direction:column}
 .inv-strip button{display:flex;gap:4px;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.5);color:#e8e6df;font:inherit;cursor:pointer}.inv-strip button b{opacity:.6}.inv-strip button.on{background:rgba(212,170,70,.85);color:#111}.inv-strip button.bag{background:rgba(40,90,60,.75)}
+.inv-quick{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:57;min-width:280px;max-width:calc(100vw - 32px);background:rgba(16,18,20,.92);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:10px 12px;font:500 14px Barlow,Arial;color:#f1eee6}
+.inv-quick h4{margin:0 0 6px;font:700 14px 'Barlow Condensed',Arial;letter-spacing:.18em}.inv-quick h4 small{opacity:.6;letter-spacing:.05em;margin-left:6px}.inv-quick button{display:flex;gap:8px;width:100%;text-align:left;padding:6px 8px;margin:2px 0;border:0;border-radius:6px;background:rgba(255,255,255,.06);color:inherit;font:inherit;cursor:pointer}.inv-quick button b{color:#d4aa46}.inv-quick p{opacity:.7;margin:4px 0}
 .inv-btn{position:fixed;left:calc(env(safe-area-inset-left,0px) + 14px);top:calc(env(safe-area-inset-top,0px) + 200px);z-index:40;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.45);font-size:20px}
 `;

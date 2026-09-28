@@ -13,7 +13,7 @@ export const AK_SPEC = {
   recoilPitch: 0.5, recoilYaw: 0.2, recoilRecover: 1.0, kickBack: 0.04, kickUp: 0.08, kickRoll: 0.045,
   reloadTime: 2.4, reloadTimeTac: 2.0, swapTime: 0.45,
   // ADS: cheek on the stock comb (~0.28 m behind the rear leaf), world fov 55 at the default 75, viewmodel drawn at a steady ~40° so the irons don't balloon
-  adsTime: 0.18, adsDist: 0.28, adsFovMul: 0.5, adsVmFov: 36,
+  adsTime: 0.18, adsDist: 0.28, adsFovMul: 55 / 75, adsVmFov: 36,
   flashSize: 0.17, flashStrength: 1.15, brassScale: 1,
   hip: { pos: [0.088, -0.105, -0.27], rot: [0.0, 0.05, 0.01] },
   sprint: { pos: [0.16, -0.16, -0.30], rot: [-0.25, 0.75, 0.35] },
