@@ -50,9 +50,9 @@ const res = await pg.evaluate(async () => {
   // ---- transfer blocked when the next seat is short; show-trump still allowed (no card added)
   { const G = P({ n: 3, hands: [['9C', 'JC', 'QC'], ['8H', '8D', 'KS'], ['6C', '7C']], table: [['8S', null], ['8C', null]] });
     t(!has(G, 'transfer'), '3p: transfer blocked — seat 2 holds 2 cards, table would be 3', D.legalMoves(G).map((m) => m.kind + (m.c ? nm(m.c) : '')));
-    t(has(G, 'show', '8D') && !has(G, 'show', '8H'), '3p: show the trump 8♦ allowed (table stays 2), non-trump cannot be shown');
+    if (D.SHOW_TRUMP) t(has(G, 'show', '8D') && !has(G, 'show', '8H'), '3p: show the trump 8♦ allowed (table stays 2), non-trump cannot be shown');
     const n1 = G.hands[1].length; D.apply(G, mv(G, 1, 'show', '8D'));
-    t(G.def === 2 && G.att === 1 && G.hands[1].length === n1 && G.table.length === 2 && G.shown.length === 1, 'show: the trump stays in hand, attack passed on', H(G, 1)); }
+    if (D.SHOW_TRUMP) t(G.def === 2 && G.att === 1 && G.hands[1].length === n1 && G.table.length === 2 && G.shown.length === 1, 'show: the trump stays in hand, attack passed on', H(G, 1)); }
   { const G = P({ n: 3, hands: [['9C'], ['8S'], ['6C', '7C', '9H']], table: [['8C', null]] });   // not the same rank as everything / beaten → no transfer
     G.table[0].d = C('10C'); G.table.push({ a: C('10H'), d: null });
     t(!has(G, 'transfer') && !has(G, 'show'), 'no transfer once anything on the table is beaten'); }
@@ -60,7 +60,7 @@ const res = await pg.evaluate(async () => {
   // ---- 3p full circle with show once per card per bout
   { const G = P({ n: 3, hands: [['8C', 'AS', 'AC', 'AH', 'KC'], ['8D', 'QS', 'QC', 'QH'], ['8H', 'JS', 'JC', 'JH', '9S']], table: [['8S', null]] });
     D.apply(G, mv(G, 1, 'show', '8D')); D.apply(G, mv(G, 2, 'transfer', '8H')); const r = D.apply(G, mv(G, 0, 'transfer', '8C'));
-    t(r && G.def === 1 && G.att === 0 && G.table.length === 3, '3p: chain 1(show)→2→0 comes back to seat 1', { att: G.att, def: G.def });
+    if (D.SHOW_TRUMP) t(r && G.def === 1 && G.att === 0 && G.table.length === 3, '3p: chain 1(show)→2→0 comes back to seat 1', { att: G.att, def: G.def });
     t(!has(G, 'show', '8D') && has(G, 'transfer', '8D'), 'show: the same trump can\'t be shown twice in a bout, but can still be laid');
     D.apply(G, mv(G, 1, 'take')); t(G.taking && D.toAct(G) === 0, 'take: throw-in token to the primary attacker (seat 0)'); }
 

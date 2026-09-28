@@ -26,6 +26,8 @@
 // Arkasha plays to win: he remembers every card that's been picked up, keeps his trumps, sheds junk, knows when to take or pass the
 // attack on, and once the deck is empty with exactly two players left (perfect information) he plays the endgame out by search.
 
+// house rule: transfer by just SHOWING a trump of the rank (козырем перевожу). Off: a transfer means laying a real card.
+export const SHOW_TRUMP = false;
 export const SUITS = ['♠', '♣', '♥', '♦'], RED = [false, false, true, true], RANK = { 6: '6', 7: '7', 8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 export const id = (c) => c.r * 4 + c.s, eq = (a, b) => a.r === b.r && a.s === b.s;
 export const beats = (d, a, tr) => (d.s === a.s && d.r > a.r) || (d.s === tr && a.s !== tr);
@@ -88,7 +90,7 @@ export function legalMoves(G) {
   if (!G.table.length) { for (const c of G.hands[W]) out.push({ who: W, kind: 'play', c }); return out; }
   const open = G.table.findIndex((p) => !p.d);
   if (open >= 0) { for (const c of G.hands[D]) if (beats(c, G.table[open].a, G.tr)) out.push({ who: D, kind: 'beat', c, i: open });
-    for (const c of G.hands[D]) { if (canTransfer(G, c)) out.push({ who: D, kind: 'transfer', c }); if (canTransfer(G, c, true)) out.push({ who: D, kind: 'show', c }); }
+    for (const c of G.hands[D]) { if (canTransfer(G, c)) out.push({ who: D, kind: 'transfer', c }); if (SHOW_TRUMP && canTransfer(G, c, true)) out.push({ who: D, kind: 'show', c }); }
     out.push({ who: D, kind: 'take' }); return out; }
   for (const c of G.hands[W]) if (canThrow(G, c)) out.push({ who: W, kind: 'play', c }); out.push({ who: W, kind: 'bito' });
   return out;

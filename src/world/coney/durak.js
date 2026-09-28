@@ -165,8 +165,8 @@ function render() {
   const tgt = me >= 0 && txs.size ? nextSeat(G, me) : -1, tgtName = tgt >= 0 && n > 2 ? ` → ${esc(U.names[tgt])}` : '';
   const iAtt = me === G.att, btn = (k, t) => (mine.some((m) => m.kind === k) ? `<button data-act="${k}">${t}</button>` : '');
   const who = toAct(G), whoName = esc(U.names[who] || '');
-  const status = G.over ? '' : me < 0 ? `Смотришь — сядешь со следующей раздачи · ходит ${whoName}` : U.busy ? (U.mp ? 'Ход отправлен…' : 'Аркаша думает…') : myTurn ? (G.def === me && !G.taking ? (txs.size ? `Отбивайся, переводи${tgtName} — или бери` : 'Отбивайся — или бери') : G.taking ? `${n > 2 ? esc(U.names[G.def]) : 'Он'} берёт — подкидывай или хватит` : G.table.length ? (iAtt ? 'Подкидывай — или бито' : 'Подкидывай — или пас') : 'Твой ход — заходи') : U.mp ? `${U.v?.ai?.[who] ? 'Думает' : 'Ходит'} ${whoName}…` : '';
-  const KN = { beat: 'Бить', transfer: `Перевести${tgtName}`, show: `Показать козыря (перевод${tgtName})` };
+  const status = G.over ? '' : me < 0 ? `Смотришь — сядешь со следующей раздачи<small class="en"> · watching, you're in next deal · ${whoName} to move</small>` : U.busy ? (U.mp ? 'Ход отправлен…<small class="en"> · move sent</small>' : 'Аркаша думает…<small class="en"> · Arkasha is thinking</small>') : myTurn ? (G.def === me && !G.taking ? (txs.size ? `Отбивайся, переводи${tgtName} — или бери<small class="en"> · beat it, transfer it or take it</small>` : 'Отбивайся — или бери<small class="en"> · beat it or take it</small>') : G.taking ? `${n > 2 ? esc(U.names[G.def]) : 'Он'} берёт — подкидывай или хватит<small class="en"> · they're taking: throw in more or say enough</small>` : G.table.length ? (iAtt ? 'Подкидывай — или бито<small class="en"> · throw in a matching card or say done</small>' : 'Подкидывай — или пас<small class="en"> · throw in a matching card or pass</small>') : 'Твой ход — заходи<small class="en"> · your lead: play any card</small>') : U.mp ? `${U.v?.ai?.[who] ? 'Думает' : 'Ходит'} ${whoName}…` : '';
+  const KN = { beat: 'Бить · Beat', transfer: `Перевести${tgtName} · Transfer`, show: `Показать козыря${tgtName} · Show trump (transfer)` };
   const choose = U.choose ? `<div class="dk-choose">${U.choose.ms.map((m) => `<button data-act="pick" data-k="${m.kind}">${KN[m.kind] || m.kind}</button>`).join('')}<button data-act="cancel" class="ghost">Отмена</button></div>` : '';
   const radio = U.ctx.world?.radio?.now && U.ctx.settings?.radio !== 'off' ? `<div class="dk-radio">📻 ${U.ctx.world.radio.now} · L — выкл · . — дальше</div>` : `<div class="dk-radio off">📻 L — радио</div>`;
   let end = '';
@@ -181,7 +181,7 @@ function render() {
     <div class="dk-mid">${deck}<div class="dk-table">${table}</div><div class="dk-bito">${G.discard.length ? `<div class="dk-back pile"></div><small>бито ${G.discard.length}</small>` : ''}</div></div>
     <div class="dk-status${me >= 0 && who === me && !G.over ? ' mine' : ''}">${status}${meB}</div>
     <div class="dk-hand" style="--ov:${Math.round(ov)}px">${hand}</div>
-    <div class="dk-btns">${btn('take', 'Беру (F)')}${btn('bito', iAtt ? 'Бито (F)' : 'Пас (F)')}${btn('done', 'Хватит (F)')}</div>
+    <div class="dk-btns">${btn('take', 'Беру · Take (F)')}${btn('bito', iAtt ? 'Бито · Done (F)' : 'Пас · Pass (F)')}${btn('done', 'Хватит · Enough (F)')}</div>
     <div class="dk-help">${U.ctx.isTouch ? 'тап — карта · синяя рамка — можно перевести' : 'клик / 1–9 — карта · синяя рамка — можно перевести · F / пробел — беру · бито · пас · L — радио · Esc — встать'}</div>${radio}${choose}${end}`;
 }
 function renderLobby() {
@@ -195,11 +195,12 @@ function renderLobby() {
       <button data-act="leave" class="ghost">Встать</button></div>`;
 }
 const CSS = `
+.durak .en{opacity:.72;font-weight:500;font-style:normal}
 .durak .dk-x{position:absolute;top:10px;right:10px;z-index:3;padding:8px 14px;font:700 14px Barlow,Arial;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;cursor:pointer}
 .durak{position:fixed;inset:0;z-index:60;background:radial-gradient(ellipse at 50% 45%,#2e6b45 0%,#1d4a31 55%,#0f2a1c 100%);color:#f2efe6;font:500 15px Barlow,Arial;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 12px 10px;user-select:none;overflow:hidden}
 .durak .dk-top{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
 .durak .dk-who{font:700 18px 'Barlow Condensed',Arial;letter-spacing:.18em;text-align:center}.durak .dk-who small{font:500 12px Barlow;letter-spacing:.05em;opacity:.7;margin-left:8px}
-.durak .dk-say{min-height:22px;background:rgba(0,0,0,.35);padding:4px 12px;border-radius:14px;font-style:italic;max-width:94%;text-align:center}
+.durak .dk-say{display:none;min-height:22px;background:rgba(0,0,0,.35);padding:4px 12px;border-radius:14px;font-style:italic;max-width:94%;text-align:center}
 .durak .dk-seats{display:flex;justify-content:center;gap:10px;width:100%}
 .durak .dk-seat{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 6px;border-radius:10px;min-width:0;flex:0 1 auto}
 .durak .dk-seats.n3 .dk-seat,.durak .dk-seats.n4 .dk-seat{flex:1 1 0;max-width:220px;background:rgba(0,0,0,.18)}
