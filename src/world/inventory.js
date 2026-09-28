@@ -30,11 +30,11 @@ export function mountInventory(ctx, K) {
   I.ctx.bus.on('state', ({ state }) => { if (state !== 'playing') toggle(false); btn.style.display = state === 'playing' ? '' : 'none'; });
   // the weapon strip: every gun you carry, always on screen — click / tap to draw it (1–9 on a keyboard), BAG opens the rest
   const strip = document.createElement('div'); strip.className = 'inv-strip' + (ctx.isTouch ? ' touch' : ''); document.body.appendChild(strip); I.strip = strip; let sig = '';
-  strip.addEventListener('click', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else I.ctx.weapons?.selectBag?.(+t.dataset.g); });
-  strip.addEventListener('touchstart', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.preventDefault(); e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else I.ctx.weapons?.selectBag?.(+t.dataset.g); }, { passive: false });
+  strip.addEventListener('click', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else if (t.dataset.g === 'drone') I.K.useItem?.('drone'); else I.ctx.weapons?.selectBag?.(+t.dataset.g); });
+  strip.addEventListener('touchstart', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.preventDefault(); e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else if (t.dataset.g === 'drone') I.K.useItem?.('drone'); else I.ctx.weapons?.selectBag?.(+t.dataset.g); }, { passive: false });
   setInterval(() => { const W = I.ctx.weapons; let bag = []; try { bag = W?.bag || []; } catch {} const cur = W?.currentId, show = I.ctx.state === 'playing' && !I.open;
-    const n = bag.map((id, i) => `${i}:${id}:${id === cur ? 1 : 0}`).join(',') + show; if (n === sig) return; sig = n; strip.style.display = show ? 'flex' : 'none';
-    strip.innerHTML = bag.map((id, i) => `<button data-g="${i}" class="${id === cur ? 'on' : ''}"><b>${i + 1}</b>${esc(String(id).toUpperCase().replace('AK74', 'AK').replace('M24', 'SNIPER'))}</button>`).join('') + `<button data-g="bag" class="bag">🎒 BAG${I.ctx.isTouch ? '' : ' (I)'}</button>`; }, 350);
+    const drones = (I.K.state?.()?.inv || []).filter((x) => x === 'drone').length; const n = bag.map((id, i) => `${i}:${id}:${id === cur ? 1 : 0}`).join(',') + show + drones; if (n === sig) return; sig = n; strip.style.display = show ? 'flex' : 'none';
+    strip.innerHTML = bag.map((id, i) => `<button data-g="${i}" class="${id === cur ? 'on' : ''}"><b>${i + 1}</b>${esc(String(id).toUpperCase().replace('AK74', 'AK').replace('M24', 'SNIPER'))}</button>`).join('') + (drones ? `<button data-g="drone" class="bag">🛸 DRONE ×${drones}</button>` : '') + `<button data-g="bag" class="bag">🎒 BAG${I.ctx.isTouch ? '' : ' (I)'}</button>`; }, 350);
   window.__game && (window.__game.inventory = { open: () => toggle(true), close: () => toggle(false), state: () => ({ open: I.open, html: root.textContent }) });
 }
 
