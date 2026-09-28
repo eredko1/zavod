@@ -413,7 +413,9 @@ function carSees(c) {
   return true;
 }
 function carFire(c, dp) {
-  if (!c.manned || !carSees(c) || K.stars < 2) return;   // no drive-bys over a one-star beef const ctx = K.ctx, p = ctx.player, rng = ctx.rng || Math.random;
+  // no drive-bys over a one-star beef
+  if (!c.manned || !carSees(c) || K.stars < 2) return;
+  const ctx = K.ctx, p = ctx.player, rng = ctx.rng || Math.random;
   c.seenT = K.t; K.seenT = K.t; K.lastKnown.copy(p.position);
   const o = new THREE.Vector3(c.pos.x, c.pos.y + 1.25, c.pos.z);
   for (let k = 0; k < 3; k++) setTimeout(() => {
