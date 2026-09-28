@@ -501,6 +501,13 @@ function arrive(how) {
   if (how === 'belt') { const sp = Math.max(8, Math.min(14, Math.abs(ctx.vehicles?.mounted?.fwdSpeed || 0) * 0.5));
     fade(['EXIT 7B · GOWANUS EXPWY', '8 AV · SUNSET PARK'], () => { moveTo(-88, 0, TZ.oz + 2.3, -Math.PI / 2, ctx.vehicles?.mounted ? sp : 0); K.toast('8th Ave, Sunset Park — Soccer Tavern is on your right, green door, three flags. Drive off either end for the Belt.', 4800); });
     return true; }
+  if (how === 'bus') { fade(['THE BUS RUNS ON · BELT PKWY', '8 AV · SUNSET PARK'], () => { moveTo(-16, SW, TZ.oz + ROAD + 1.6, Math.PI / 2, 0);
+      K.toast('8th Ave & 60th, Sunset Park — last stop. Soccer Tavern is up the block: green door, three flags. The N home is across the avenue.', 5200); }, 1000);
+    return true; }
+  if (how === 'Nx') { try { pa(ctx, 'This is 8th Avenue. Stand clear of the closing doors, please.'); } catch {}   // the N express, straight here
+    fade(['N EXPRESS', '8 AV · SUNSET PARK'], () => { const yaw = Math.atan2(-(-2 - NSTAT.x), -(WALK - 2 - NSTAT.z)); moveTo(NSTAT.x, SW, TZ.oz + NSTAT.z + 1.8, yaw, 0);
+      K.toast('8th Ave & 61st, Sunset Park — Soccer Tavern is across the street: green door, three flags. The N back to Coney is right here (F).', 5200); }, 1000);
+    return true; }
   // the D to 62 St, the N one stop to 8 Av, up the stairs
   try { pa(ctx, 'This is 62nd Street, New Utrecht Avenue. Transfer is available to the N train.'); } catch {}
   fade(['62 ST · NEW UTRECHT AV', 'TRANSFER TO THE N ↔', '8 AV · SUNSET PARK'], () => { const yaw = Math.atan2(-(-2 - NSTAT.x), -(WALK - 2 - NSTAT.z)); moveTo(NSTAT.x, SW, TZ.oz + NSTAT.z + 1.8, yaw, 0);
@@ -510,7 +517,7 @@ function arrive(how) {
 function leave(how) {
   if (!Z || Z.busy) return false; const { ctx, W } = Z; restoreRadio();
   if (how === 'belt' || (how === 'car' && ctx.vehicles?.mounted)) {
-    if (W.belt?.enter) { Z.busy = true; Z.lastTrip = performance.now() / 1000; W.belt.enter(); setTimeout(() => { Z.busy = false; }, 2000); return true; }
+    if (W.belt?.exit) { Z.busy = true; Z.lastTrip = performance.now() / 1000; W.belt.exit(); setTimeout(() => { Z.busy = false; }, 2000); return true; }   // the Belt is westbound only: heading home you're off at EXIT 7
     how = 'N'; }
   if (ctx.vehicles?.mounted) { try { ctx.vehicles.dismount?.(); } catch {} }
   fade(['8 AV · N TRAIN', 'CONEY ISLAND–STILLWELL AV'], () => { moveTo(-47, 0, -226, Math.PI, 0); K.toast('Coney Island–Stillwell Av. The D back to Sunset Park leaves from here (ride it past Bay 50 St).', 4200); });
