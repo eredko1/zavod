@@ -3,15 +3,16 @@
 // flat (45 s) it dives into its target and explodes. Passers-by and friends are never targets. Owned by: main.
 import * as THREE from 'three';
 
-const LIFE = 45, SPEED = 11, RANGE = 60, SHOT_DMG = 16, FIRE_EVERY = 0.5, BLAST_R = 5, BLAST_DMG = 110;
+const LIFE = 45, SPEED = 11, RANGE = 60, SHOT_DMG = 10, FIRE_EVERY = 0.6, BLAST_R = 4, BLAST_DMG = 80;   // tuned down: a helper, not a win button
 const D = [];
 let bound = false;
 
 export function launchDrone(ctx) {
   if (!bound) { bound = true; ctx.world?.updaters?.push?.((dt) => update(dt, ctx)); ctx.bus.on('worldReset', () => { for (const d of D.splice(0)) kill(d, ctx, false); }); }
+  if (D.length) { ctx.hud?.toast?.('One drone at a time: yours is still up', 1600); return false; }
   const p = ctx.player.position, g = model(); g.position.set(p.x + 0.8, p.y + 1.6, p.z + 0.8); ctx.scene.add(g);
   D.push({ g, t: 0, fire: 0, target: null, dive: false, rotors: g.userData.rotors, look: 0 });
-  ctx.hud?.toast?.('Drone up. It hunts the nearest bad guy.', 1800);
+  ctx.hud?.toast?.('Drone up for 45 s. It hunts the nearest bad guy.', 1800); return true;
 }
 
 function model() {
