@@ -55,7 +55,7 @@ export function buildFolk(world, spots, crowd) {
   F.av = { m: av.filter((id) => AVATARS[id].g === 'm'), f: av.filter((id) => AVATARS[id].g === 'f') };
   if (!F.av.m.length) F.av.m = av; if (!F.av.f.length) F.av.f = F.av.m;
   // F — ROB the local right in front of you (walking past doesn't count: stop and face them)
-  K.spot({ pos: F.robPos, r: 2.5, dy: 2.2, when: () => !!F.robE, prompt: () => `F — ROB ${F.robE?.p.name || ''}`, act: () => { const E = F.robE; if (!E) return; if (E.s.sub) { lightRob(E); return; } const t = promote(E, 'rob'); if (t) folkRob(t); } });
+  K.spot({ pos: F.robPos, r: 2.5, dy: 2.2, low: true, when: () => !!F.robE, prompt: () => `F — ROB ${F.robE?.p.name || ''}`, act: () => { const E = F.robE; if (!E) return; if (E.s.sub) { lightRob(E); return; } const t = promote(E, 'rob'); if (t) folkRob(t); } });
   ctx.bus.on('streetCrime', (e) => onCrime(e));
   ctx.bus.on('net:folk', (m) => { if (typeof m.v === 'string') { hustlerTaken(m.v.slice(0, 12)); return; } if (!Array.isArray(m.p)) return; const s = (typeof m.k === 'string' && F.spots.find((q) => q.key === m.k)) || findSpot(+m.p[0], +m.p[1]); if (s) take(s); });
   ctx.bus.on('worldReset', () => { for (const s of F.spots) if (s.gone) { s.gone = 0; if (!s.E) crowd.hide(s, false); } F.mugT = 90; });

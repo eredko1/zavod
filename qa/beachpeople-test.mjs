@@ -10,6 +10,7 @@ pg.on('console', (m) => { if (/\[folk\]|\[hustlers\]/.test(m.text())) console.lo
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
 await pg.goto(`http://localhost:8790/?qa=1&map=coney${mode === 'chill' ? '&mode=chill' : '&ai=0'}&time=day`, { timeout: 150000 });
 await pg.waitForFunction(() => window.__game?.ready && window.__game.crews && window.__game.folk, null, { timeout: 150000 });
+await pg.waitForTimeout(3500);   // chill deals you a character ~1.5 s in and walks you to their spot: let that happen before teleporting
 await pg.evaluate(() => { window.__game.setState('playing'); window.__game.hangout.give(300); window.__game.crews.calm(1e9); });
 const pose = (x, z, yaw = 0) => pg.evaluate(([x, z, yaw]) => { const W = window.__ctx.world; const y = z > 161 ? W.groundHeight(x, z) : 0; window.__game.teleport(x, y, z, yaw, -0.05); }, [x, z, yaw]);
 const folk = () => pg.evaluate(() => window.__game.folk.state());
@@ -106,9 +107,9 @@ await pg.evaluate(() => { const s = window.__game.hangout.state(); while (s.inv.
 const hs = await pg.evaluate(() => window.__game.hangout.state()); ok(hs.high === 0 && hs.inv.includes('cigs'), 'a cig: smoke, no high, pack keeps the rest', `high ${hs.high} inv ${JSON.stringify(hs.inv)}`);
 await pg.screenshot({ path: `${out}/cig.png` });
 await pg.waitForTimeout(6000);
-await pg.evaluate(() => { window.__game.hangout.state(); }); await pg.evaluate(() => { const K = window.__game.hangout; while (K.state().inv.length) K.use(); });
+await pg.evaluate(() => { window.__game.hangout.state(); }); await pg.evaluate(async () => { (await import('/src/world/hangkit.js')).kit().inv.length = 0; });   // empty the bag (use() can't burn keep items like the starter Bic, so a use-until-empty loop never ends)
 await pg.waitForTimeout(500);
-r = await buy('TOLIK', 'Tallboy'); ok(r.s.inv.includes('tallboy'), 'TOLIK (cooler on the sand) sells a tallboy', JSON.stringify(r.s.inv)); await pg.screenshot({ path: `${out}/hustler-tolik.png` });
+r = await buy('TOLIK', 'Tallboy'); ok(r.s.inv.includes('tallboy'), 'TOLIK (cooler on the sand) sells a tallboy', JSON.stringify({ inv: r.s.inv, d: r.d, cash: r.s.cash, tolik: (await pg.evaluate(() => window.__game.hustlers.list())).find((x) => x.name === 'TOLIK'), me: await pg.evaluate(() => window.__ctx.player.position.toArray().map((v) => +v.toFixed(1))) })); await pg.screenshot({ path: `${out}/hustler-tolik.png` });
 r = await buy('DEE', 'Pre-rolled spliff'); ok(r.s.inv.includes('spliff'), 'DEE (beach) sells a spliff', JSON.stringify(r.s.inv));
 await pg.evaluate(() => { const K = window.__game.hangout; K.use(); K.use(); }); await pg.waitForTimeout(300);
 r = await buy('ARTUR', 'Shot of Jameson'); ok(r.s.inv.includes('jameson'), 'ARTUR (rides) sells booze', JSON.stringify(r.s.inv)); await pg.screenshot({ path: `${out}/hustler-artur.png` });
