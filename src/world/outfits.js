@@ -378,6 +378,8 @@ export function buildChar(id, ctx) {
 }
 const LOOKS = new Map();   // peer id -> character id (net 'look')
 export const looks = () => LOOKS;
+/** the figure wrapper of a remote player (jet pack etc. hang off it) */
+export function remoteWrap(pid) { for (const H of REMOTES) if (H.pid === pid) return H.wrap; return null; }
 export function setRemoteChar(pid, id, ctx) {
   if (!CHARS[id] || LOOKS.get(pid) === id) return; LOOKS.set(pid, id);
   for (const H of REMOTES) if (H.pid === pid && H.wrap) { const fig = buildChar(id, ctx); if (!fig) return; H.wrap.remove(H.fig.group); H.fig = fig; H.wrap.add(fig.group); fig.group.traverse((o) => { if (o.isMesh) o.castShadow = !ctx.lite; }); }

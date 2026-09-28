@@ -91,7 +91,7 @@ ok(mg && mg.intent === 'fight', 'refuse → he fights', JSON.stringify(mg));
 await pg.evaluate(() => { window.__game.crews.calm(1e9); window.__ctx.player.heal?.(); window.__game.chase?.clear?.(); });
 // 6) buy cigs / beer / spliff from each hustler type
 const H = await pg.evaluate(() => window.__game.hustlers.list());
-ok(H.length === 4, 'four hustlers placed', H.map((h) => h.name).join(','));
+ok(H.length >= 6 && ['ZHORA', 'TOLIK', 'DEE', 'ARTUR', 'NUTCRACKER'].every((n) => H.some((h) => h.name === n)), 'hustlers placed (4 + the nutcracker guys)', H.map((h) => h.name).join(','));
 const buy = async (name, label) => {
   const h = (await pg.evaluate(() => window.__game.hustlers.list())).find((x) => x.name === name);
   await pg.evaluate(([x, y, z]) => { window.__game.teleport(x + 1.4, y, z, Math.PI / 2, -0.1); }, h.pos); await pg.waitForTimeout(700);
