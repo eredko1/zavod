@@ -15,6 +15,7 @@
 //   close  host → all   { table }                    last human left: the table is gone
 // Stakes: every human pays `stake` when a deal starts (their own wallet, K.pay); the pot is stake × seats (AI seats stake too — from
 // nowhere); the durak gets nothing, everyone else takes pot / (n − 1). A human who walks away mid-game forfeits.
+import * as THREE from 'three';
 import { hangkit as K } from '../hangkit.js';
 import { SUITS, newGame, legalMoves, toAct, apply, aiMove, makeMemory, remember, toJSON, fromJSON } from './durak-engine.js';
 import { openDurak, durakSync, durakOpen, durakMine, closeDurak, potShare } from './durak.js';
@@ -33,6 +34,36 @@ export function initDurakMP(ctx, { pos } = {}) {
   ctx.bus.on('net:dk', (m) => { try { onMsg(m); } catch (e) { console.warn('[durak-mp]', e); } });
   setInterval(() => { try { tick(); } catch (e) { console.warn('[durak-mp] tick', e); } }, 500);
   if (typeof window !== 'undefined' && window.__game) window.__game.durakMP = durakMPQA;
+  easyJoin(ctx);
+}
+
+// ------------------------------------------------------------------ making it obvious: a big F prompt at the table, a JOIN banner for
+// everyone in the room, a floating sign over the table, and the host deals automatically 10 s after two people sit down
+function easyJoin(ctx) {
+  S.spotPos = new THREE.Vector3();
+  K.spot?.({ pos: S.spotPos, r: 6, dy: 3, when: () => netUp() && !S.T && (!!liveTable() || (ctx.net?.list?.() || []).length > 0),
+    prompt: () => { const lt = liveTable(); return lt ? `F — JOIN THE DURAK TABLE · ${lt[1].names.join(', ')}${lt[1].ph === 'play' ? ' (next deal)' : ''}` : 'F — OPEN A DURAK TABLE FOR YOUR FRIENDS'; },
+    act: () => { if (liveTable()) join(); else open({ seats: 3 }); } });
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  S.sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true })); S.sign.scale.set(3.2, 0.8, 1); S.sign.visible = false; S.sign.userData = { c, tex, txt: '' }; ctx.scene?.add(S.sign);
+  setInterval(() => { try { signTick(); } catch {} }, 500);
+}
+function signTick() {
+  const a = S.pos?.(); if (a) { S.spotPos.set(a.x, a.y || 0, a.z); S.sign.position.set(a.x, (a.y || 0) + 2.6, a.z); }
+  const lt = S.T ? [S.T.id, { humans: humans(S.T).length, n: S.T.seats.length, ph: S.T.ph }] : liveTable(), txt = lt ? (lt[1].ph === 'play' ? `DURAK · GAME ON ${lt[1].humans}/${lt[1].n} · watch` : `DURAK · OPEN TABLE ${lt[1].humans}/${lt[1].n} · F to join`) : '';
+  S.sign.visible = !!txt && netUp(); if (txt === S.sign.userData.txt) return; S.sign.userData.txt = txt; const { c, tex } = S.sign.userData, g = c.getContext('2d');
+  g.clearRect(0, 0, 512, 128); if (!txt) return; g.fillStyle = 'rgba(12,40,24,.85)'; g.fillRect(8, 16, 496, 96); g.strokeStyle = '#d4aa46'; g.lineWidth = 4; g.strokeRect(8, 16, 496, 96);
+  g.fillStyle = '#f4efe2'; g.font = '700 34px Barlow, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 256, 64); tex.needsUpdate = true;
+}
+/** a banner for everyone in the room when a table opens: JOIN walks you over and sits you down */
+function banner(id, host) {
+  document.querySelector('.dk-banner')?.remove(); const b = document.createElement('div'); b.className = 'dk-banner';
+  b.style.cssText = 'position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:59;background:rgba(12,40,24,.94);border:1px solid #d4aa46;border-radius:10px;padding:10px 14px;display:flex;gap:12px;align-items:center;font:600 14px Barlow,Arial;color:#f4efe2';
+  b.innerHTML = `<span>🃏 ${host} opened a durak table at Arkasha's</span><button style="padding:8px 14px;border-radius:6px;border:0;background:#d4aa46;color:#111;font:700 13px Barlow;cursor:pointer">JOIN</button><button style="padding:8px 10px;border-radius:6px;border:1px solid #888;background:transparent;color:#ddd;cursor:pointer">✕</button>`;
+  const [go, x] = b.querySelectorAll('button'); const kill = () => b.remove();
+  const doJoin = () => { kill(); const a = S.pos?.(); if (a) try { S.ctx.player?.teleport?.(a.x + 1.6, a.y || 0, a.z + 1.2, 0, 0); } catch {} setTimeout(() => join(id), 200); };
+  go.addEventListener('click', doJoin); go.addEventListener('touchstart', (e) => { e.preventDefault(); doJoin(); }, { passive: false }); x.addEventListener('click', kill); x.addEventListener('touchstart', (e) => { e.preventDefault(); kill(); }, { passive: false });
+  document.body.appendChild(b); setTimeout(kill, 15000);
 }
 
 // ------------------------------------------------------------------ packing (cards → '~' + one char '0'…'S')
@@ -114,7 +145,7 @@ function onState(m) {
   if (T) return;   // I'm at another table
   const seated = N.seats.some((s) => s.id === me) || N.wait.some((w) => w.id === me);
   if (S.joining?.id === N.id && seated) { S.joining = null; S.gone.clear(); adopt(N); openUI(); return; }
-  if (N.ph === 'lobby' && !S.told.has(N.id) && near()) { S.told.add(N.id); toast(`${S.rooms.get(N.id).hostName} открыл общий стол у Аркаши — подходи, F → «Сесть за общий стол»`, 3200); }
+  if (N.ph === 'lobby' && !S.told.has(N.id)) { S.told.add(N.id); banner(N.id, S.rooms.get(N.id).hostName); } if (false) { toast(`${S.rooms.get(N.id).hostName} открыл общий стол у Аркаши — подходи, F → «Сесть за общий стол»`, 3200); }
 }
 function adopt(N) {
   S.T = N; const me = myId();
@@ -220,6 +251,10 @@ function tick() {
     return;
   }
   for (const h of [...humans(T), ...T.wait]) if (h.id !== me && !present(h.id)) hostLeave(h.id);
+  if (S.T && T.ph === 'lobby') {   // auto-deal: 10 s after two or more people are seated
+    if (humans(T).length >= 2) { if (!T.autoAt) { T.autoAt = now + 10000; toast('Two at the table: dealing in 10 s · раздача через 10 секунд', 2200); } if (durakMine()) durakSync(); if (now >= T.autoAt) { T.autoAt = 0; hostDeal(); } }
+    else T.autoAt = 0;
+  }
   if (S.T && now - S.beatAt > BEAT_MS) broadcast();
 }
 function near(r = NEAR) { const p = S.ctx.player?.position, a = S.pos?.(); return !!(p && a && Math.hypot(p.x - a.x, p.z - a.z) < r); }
@@ -229,7 +264,7 @@ function view() {
   const T = S.T; if (!T) return { G: null, me: -1, names: [], ai: [], seats: [] };
   const me = myId(), s = seatOf(T);
   return { G: T.G, me: T.ph === 'play' ? s : -1, names: T.seats.map((x) => x.n), ids: T.seats.map((x) => x.id || null), ai: T.seats.map((x) => !x.id), host: T.host === me, hostName: T.seats.find((x) => x.id === T.host)?.n || nameOf(T.host),
-    stake: T.stake, mode: T.mode, deal: T.deal, want: T.want, humans: humans(T).length, seats: T.seats.map((x) => ({ n: x.n, ai: !x.id, me: x.id === me })), wait: T.wait.map((w) => w.n) };
+    stake: T.stake, mode: T.mode, deal: T.deal, want: T.want, autoIn: T.autoAt ? Math.max(0, Math.ceil((T.autoAt - performance.now()) / 1000)) : 0, humans: humans(T).length, seats: T.seats.map((x) => ({ n: x.n, ai: !x.id, me: x.id === me })), wait: T.wait.map((w) => w.n) };
 }
 const ADAPTER = { view, move: (m) => move(m), deal: () => deal(), again: () => again(), seats: (n) => seats(n) };
 function openUI() { if (durakOpen()) { if (!durakMine()) return; durakSync(); return; } openDurak(S.ctx, { mp: ADAPTER, onEnd: () => leave() }); }
