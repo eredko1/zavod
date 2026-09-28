@@ -123,7 +123,7 @@ function buildTrains(world, M) {
   const stripe = new THREE.BoxGeometry(3.07, 0.14, CAR - 0.4); stripe.translate(0, 3.25 + 0.35, 0);
   const mk = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; scene.add(m); return m; };
   const alu = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.35, metalness: 0.85 }), glass = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff0c0, emissiveIntensity: 0.9, roughness: 0.2 }), dark = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.5, metalness: 0.6 });
-  const PARKED = [0, 4, 6], MOVING = [{ i: 2, off: 0 }, { i: 5, off: 70 }];   // track indices
+  const PARKED = [0, 4, 6], MOVING = [];   // track indices (the D on track 2 and the Q on track 5 are the rideable ones now: coney/subway.js)
   const total = (PARKED.length + MOVING.length) * NCAR;
   const I = { body: mk(body, alu, total), win: mk(win, glass, total), doors: mk(mergeBoxes(doors), dark, total), stripe: mk(stripe, new THREE.MeshStandardMaterial({ color: 0xff6319, roughness: 0.5 }), total) };
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();

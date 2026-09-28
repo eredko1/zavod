@@ -94,8 +94,7 @@ export function buildW8th(world, M) {
   for (const [lv, route, col, name] of [[S.LO, 'Q', '#fccc0a', 'W 8 St – NY Aquarium'], [S.UP, 'F', '#ff6319', 'W 8 St – NY Aquarium']]) for (const s of [-1, 1]) for (let a = 20; a < L - 10; a += 45) {
     const p = at(a, s * (S.platIn + S.platOut) / 2, lv.plat + 2.6); sign(scene, `${route}  ·  ${name}`, p, ang + Math.PI / 2 + (s > 0 ? Math.PI : 0), 4.6, 0.5, col); }
   wayfinding(world, M, S, u, n, at, B);
-  // ---- trains: an F up top and a Q below, each stopping ~25 s then moving on (wall clock, 160 s cycle) ------------------------
-  buildTrains(world, S, u, n, at);
+  // (the F up top and the Q below are the rideable trains in coney/subway.js)
   W.w8th = { lower: at(80, S.platIn + 1.5, S.LO.plat), upper: at(120, S.platIn + 1.5, S.UP.plat), street: at(40, oN, 0), bridge: W.aquariumBridge }; if (typeof window !== 'undefined' && window.__game) window.__game.w8th = W.w8th;
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'W 8 ST – NY AQUARIUM STATION', x: at(L / 2, 0).x, z: at(L / 2, 0).z, kind: 'transit' });
 }
@@ -149,27 +148,6 @@ function mergeGeos(list) {
   const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); out.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return out;
 }
 
-function buildTrains(world, S, u, n, at) {
-  const { scene, ctx } = world;
-  const body = new THREE.BoxGeometry(3.0, 3.4, CAR - 0.3); body.translate(0, 2.05, 0);
-  const win = new THREE.BoxGeometry(3.04, 1.0, CAR - 1.6); win.translate(0, 2.7, 0);
-  const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, 2 * NCAR); m.castShadow = true; m.frustumCulled = false; scene.add(m); return m; };
-  const I = [mk(body, new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.35, metalness: 0.85 })), mk(win, new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff0c0, emissiveIntensity: 0.9 }))];
-  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(u.x, u.y)), one = new THREE.Vector3(1, 1, 1), m4 = new THREE.Matrix4();
-  const T = [{ lv: S.LO, o: S.halfTrack, off: 80, k: 1 }];   // the Q below; the F upstairs is the rideable one (coney/subway.js)
-  const CYC = 160, IN = 28, DW = 25, OUT = 28, STOP = S.L - 4, FAR = 190;   // along the elevated only (the Culver/Brighton alignment)
-  const zero = new THREE.Vector3(0, 0, 0);
-  world.updaters.push(() => {
-    const t = Date.now() / 1000;
-    for (const tr of T) {
-      const ph = ((t + tr.off) % CYC + CYC) % CYC; let a;   // front of the train along a; arrives from the west (−a), leaves east
-      if (ph < IN) { const e = 1 - (1 - ph / IN) ** 2; a = -FAR + (STOP + FAR) * e; } else if (ph < IN + DW) a = STOP; else if (ph < IN + DW + OUT) { const e = ((ph - IN - DW) / OUT) ** 2; a = STOP + FAR * e; } else a = null;
-      for (let c = 0; c < NCAR; c++) { const p = at((a ?? 0) - CAR / 2 - c * CAR, tr.o, tr.lv.rail); m4.compose(p, q, a == null ? zero : one); for (const im of I) im.setMatrixAt(tr.k * NCAR + c, m4); }   // off the map between runs
-      tr.a = a;
-    }
-    for (const im of I) im.instanceMatrix.needsUpdate = true;
-  });
-}
 function sign(scene, text, p, yaw, w, h, col) {
   const c = document.createElement('canvas'); c.width = 1024; c.height = Math.round(1024 * h / w); const g = c.getContext('2d');
   g.fillStyle = '#111'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#fff'; g.fillRect(0, 6, c.width, 4);
