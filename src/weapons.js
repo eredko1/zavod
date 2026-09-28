@@ -518,6 +518,7 @@ export function update(dt, ctx) {
   const fovK = sp.scope ? sstep((S.ads - 0.8) / 0.2) : sstep(S.adsT); // irons/dots: smoothstep over adsTime — no velocity pop at either end
   // Z (hold): squint / field-glasses zoom with any gun — ~4x, the wheel steps it 2x…8x (rooftop spotting, long shots)
   const zHeld = !!(ctx.input?.keys?.has?.('KeyZ') || ctx.input?.touch?.zoom) && ctx.state === 'playing'; S.zK = lerp(S.zK || 0, zHeld ? 1 : 0, Math.min(1, dt * 12));
+  if (S.vmRoot) S.vmRoot.visible = S.zK < 0.35;   // Z zoom: the gun drops out of the way so it doesn't block the zoomed view
   const targetFov = Math.max(1.5, fovBase * lerp(1, sp.scope ? adsMul / (S.zoomMul || 1) : adsMul, fovK) * lerp(1, 1 / (S.zMag || 4), S.zK));
   if (Math.abs(cam.fov - targetFov) > 0.01 || S.lastFov !== targetFov) { cam.fov = targetFov; cam.updateProjectionMatrix(); S.lastFov = targetFov; }
   // viewmodel projection: x/y scale emulates VM_FOV under the world fov. With spec.adsVmFov the gun is drawn at a steady fov while aimed

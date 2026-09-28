@@ -130,6 +130,7 @@ function bindOnce(ctx) {
     if (e.code === 'KeyP' && !V.ctx.vehicles?.mounted && !V.riding && !V.passenger && !V.piss) startPiss();
   });
   // START FRESH (pause menu): everyone in the room goes back to square one
+  ctx.bus.on('playerRespawn', () => { if (!V) return; let n = V.inv.filter((x) => x === 'drone').length; while (n < 2 && V.inv.length < MAX_INV) { V.inv.push('drone'); n++; } renderCash(); });   // every life: back up to two drones
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
