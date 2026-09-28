@@ -87,7 +87,7 @@ export function buildCrews(world, { chill = false } = {}) {
     const os = C.world.W.onlineStart; if (os) ctx.player.teleport?.(os[0], os[1] || 0, os[2], os[3] || 0, 0);
     C.calmUntil = performance.now() + 60000;
   });
-  K.spot({ pos: C.robPos, r: 3.3, dy: 2, when: () => !!C.robT, prompt: () => (C.robT?.dealer ? `F — TALK TO ${C.robT.name}` : `F — ROB ${C.robT?.name || ''}`), act: () => { const t = C.robT; if (!t) return; if (t.dealer) { t.talkT = -20; t.st = 'talk'; K.openDialog(t.name, gunShop(t.name, t.dealer, `${t.name}: "${t.type === 'ru' ? 'Bratan. You need something that goes bang? I have.' : 'Psst. You need a piece? I got a couple. Cash only.'}"`)); } else robVictim(t); } });   // no shakedowns for a minute after you respawn
+  K.spot({ pos: C.robPos, r: 3.3, dy: 2, low: true, when: () => !!C.robT, prompt: () => (C.robT?.dealer ? `F — TALK TO ${C.robT.name}` : `F — ROB ${C.robT?.name || ''}`), act: () => { const t = C.robT; if (!t) return; if (t.dealer) { t.talkT = -20; t.st = 'talk'; K.openDialog(t.name, gunShop(t.name, t.dealer, `${t.name}: "${t.type === 'ru' ? 'Bratan. You need something that goes bang? I have.' : 'Psst. You need a piece? I got a couple. Cash only.'}"`)); } else robVictim(t); } });   // no shakedowns for a minute after you respawn
   W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead' && t.type !== 'mk').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
   ctx.bus.on('worldReset', () => { for (const t of [...C.thugs.values()]) removeThug(t); for (const t of [...C.remote.values()]) removeThug(t, C.remote); C.robbed = 0; C.calmUntil = performance.now() + 30000; C.markT = 5; });
