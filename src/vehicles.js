@@ -12,6 +12,7 @@ import { createWaterFX } from './vehicles/waterfx.js';
 import { BoxGrid, resolveCircle, rectBlocked, segmentHit } from './vehicles/collide.js';
 import { carGeometries, carMaterials, carSpec, carEye, carInterior } from './world/carkit.js';
 import { hasCarModel, carModel } from './world/carmodels.js';
+import { buildBus, BUS } from './vehicles/bus.js';
 
 const DEG = Math.PI / 180;
 const LOOK_PITCH = 35 * DEG, LEAN_MAX = 12 * DEG;
@@ -40,7 +41,12 @@ const CAR_BASE = {
   band: 0.28, stepUp: 0.36, leanK: -0.2, lookYaw: 110 * DEG, chaseD: 6.8, chaseH: 0.3, chaseLook: 1.6, hitMul: 12, hitSlow: 0.9, engineBrake: 1.4,
 };
 const CAR_SPECS = {};
+// a hijacked MTA bus: slow, heavy, wide; the driver sits high up front on the left
+const BUS_SPEC = { ...CAR_BASE, kind: 'bus', max: 17, revMax: 4, accel: 3.2, brake: 7, hard: 4, hardYaw: 0.5, grip: 9, hardGrip: 2, latG: 0.6, steerLow: 0.62,
+  wheelbase: BUS.axleF - BUS.axleR, circles: [-4.7, -1.6, 1.6, 4.7], bodyR: 1.28, h: 3.2, eyeH: BUS.eye.y, eyeBack: -BUS.eye.x, eyeSide: BUS.eye.z, reach: 1.9,
+  hx: BUS.w / 2, hz: BUS.len / 2, boxH: 3.2, chaseD: 15, chaseH: 0.32, chaseLook: 2.9, hitMul: 18, hitSlow: 0.95, engineBrake: 1.0 };
 function carSpecFor(kind) {
+  if (kind === 'bus') return BUS_SPEC;
   if (CAR_SPECS[kind]) return CAR_SPECS[kind];
   const K = carSpec(kind) || carSpec('sedan'), hw = K.w / 2, hl = K.len / 2, e = carEye(kind);
   return (CAR_SPECS[kind] = { ...CAR_BASE, kind, wheelbase: K.wheels[0] - K.wheels[1], circles: [-(hl - hw), 0, hl - hw], bodyR: hw, h: K.roof,
@@ -107,15 +113,16 @@ function makeJetski(x, z, yaw, i = 0) {
 }
 /** A drivable car from the shared car kit (geometry faces +x in the kit; vehicles face -z, so the kit is turned +90 deg). */
 function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
-  if (!carSpec(kind)) kind = 'sedan';
-  const geos = carGeometries(kind).geos, CM = carMaterials();
+  if (!carSpec(kind) && kind !== 'bus') kind = 'sedan';
+  const geos = kind === 'bus' ? null : carGeometries(kind).geos, CM = carMaterials();
   const group = new THREE.Group(), body = new THREE.Group(); group.add(body);
   const kit = new THREE.Group(); kit.rotation.y = Math.PI / 2; body.add(kit);     // kit frame (+x front) → vehicle frame (-z front)
   const meshes = []; const paint = CM.paint.clone(); paint.color = new THREE.Color(color);
   const lampR = CM.lampR.clone(), lampW = CM.lampW.clone(); lampR.emissive = new THREE.Color(0xff1a0a); lampR.emissiveIntensity = 0.08; lampW.emissive = new THREE.Color(0xfff0d0); lampW.emissiveIntensity = 0.05;
   const mat = { paint, lampR, lampW, glass: CM.glassSee || CM.glass };   // see-through: the cabin (and whoever's in it) shows
   let cab;
-  if (hasCarModel(kind)) { const mdl = carModel(kind, color); kit.add(mdl); mdl.traverse((o) => { if (o.isMesh && o.name !== 'aoShadow') meshes.push(o); }); cab = { wheel: new THREE.Group() }; }   // a real model (with its own cabin)
+  if (kind === 'bus') { const B = buildBus({ sign: 'NOT IN SERVICE', lite: !!C.lite }); kit.add(B.group); for (const m of B.meshes) if (m.parent !== B.interior) meshes.push(m); cab = { wheel: new THREE.Group() }; }
+  else if (hasCarModel(kind)) { const mdl = carModel(kind, color); kit.add(mdl); mdl.traverse((o) => { if (o.isMesh && o.name !== 'aoShadow') meshes.push(o); }); cab = { wheel: new THREE.Group() }; }   // a real model (with its own cabin)
   else { for (const [slot, g] of Object.entries(geos)) { if (!g) continue; const m = new THREE.Mesh(g, mat[slot] || CM[slot]); m.castShadow = slot === 'paint'; m.receiveShadow = true; m.userData.surface = 'metal'; kit.add(m); meshes.push(m); }
     cab = carInterior(kind, geos); kit.add(cab.group); }
   const sp = carSpecFor(kind);
