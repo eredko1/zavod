@@ -52,11 +52,13 @@ function cleanClip(c) {
   }
   return new THREE.AnimationClip(c.name, c.duration, tracks);
 }
+const TAN = new THREE.Color(0xf4e0cc);
 function prepAvatar(gltf, ctx) {
   const root = gltf.scene;
   root.traverse((o) => {
     if (!o.isMesh) return; o.castShadow = !ctx.lite; o.receiveShadow = true; o.frustumCulled = true;   // culled off-screen (padded sphere below); no shadow casting on phones
     const m = o.material; m.roughness = 0.78; m.metalness = 0; m.envMapIntensity = 0.55;
+    if (!/opacity/i.test(m.name)) m.color.multiply(TAN);   // a touch of Brighton Beach sun on everyone (subtle warm tint, clothes stay clean)
     if (/opacity/i.test(m.name)) { m.transparent = false; m.alphaTest = 0.45; m.side = THREE.DoubleSide; m.depthWrite = true; }   // hair cards, lashes
   });
   root.updateMatrixWorld(true);

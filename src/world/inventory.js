@@ -13,6 +13,7 @@ export function mountInventory(ctx, K) {
   const btn = document.createElement('button'); btn.className = 'inv-btn'; btn.textContent = '🎒'; btn.title = 'Bag (I)';
   if (ctx.isTouch) document.body.appendChild(btn);
   I = { ctx, K, root, btn, open: false };
+  ctx.bus.on('inventory', () => { if (I.ctx.state === 'playing') toggle(); });   // hangkit's BAG button on phones
   btn.addEventListener('touchstart', (e) => { e.preventDefault(); toggle(); }, { passive: false });
   root.addEventListener('click', onClick); root.addEventListener('touchend', (e) => { const t = e.target.closest('[data-a]'); if (t) { e.preventDefault(); onClick(e); } });
   addEventListener('keydown', (e) => {

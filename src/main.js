@@ -136,7 +136,8 @@ async function boot() {
   bvhFor(); ctx.bus.on?.('boot', () => setTimeout(bvhFor, 4000)); setTimeout(bvhFor, 12000);   // async GLTF props arrive later
   ctx.progress(1, 'ready');
   document.getElementById('boot').classList.add('hide');
-  setState(ctx.qa ? 'playing' : 'menu');
+  const go = ctx.qs.get('go') === '1'; if (go) try { const u = new URL(location.href); u.searchParams.delete('go'); history.replaceState(null, '', u); } catch {}   // ?go=1: picked on the menu before the reload
+  setState(ctx.qa || go ? 'playing' : 'menu');
   ctx.bus.emit('boot');
   const pose = ctx.qs.get('pose'); if (pose && ctx.world?.poses?.[pose]) window.__game.teleport(...ctx.world.poses[pose]);
   window.__game.ready = true;
