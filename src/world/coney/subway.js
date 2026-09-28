@@ -55,7 +55,7 @@ export function buildSubway(world) {
   buildNeptune(world, P, sNep);
   // ---- boarding / alighting ----
   R.doorPos = new THREE.Vector3(0, -999, 0);
-  K.spot({ pos: R.doorPos, r: 2.4, dy: 3, when: () => !R.aboard && !!R.boardable, prompt: () => `F — BOARD THE F  ·  next: ${R.boardable?.next?.name || ''}`, act: () => board() });
+  K.spot({ pos: R.doorPos, r: 4.6, dy: 3, when: () => !R.aboard && !!R.boardable, prompt: () => `F — BOARD THE F  ·  next: ${R.boardable?.next?.name || ''}`, act: () => board() });
   world.updaters.push((dt) => update(dt));
   addEventListener('keydown', (e) => { if (R?.aboard && R.canAlight && e.code === 'KeyF' && !e.repeat && R.ctx.state === 'playing') { e.preventDefault(); e.stopImmediatePropagation(); alight(); } }, true);   // F at a stop: off (before the weapon's inspect grabs F)
   ctx.bus.on('playerDied', () => { if (R.aboard) alight(true); });
@@ -212,7 +212,7 @@ function update(dt) {
   R.boardable = null; R.open = open; R.side = dwellSide; R.leg = l;
   const playing = ctx.state === 'playing', p = ctx.player;
   if (l.kind === 'dwell' && open > 0.8 && !R.aboard && !p.dead && !(p.mounted && !p.mounted.train)) {
-    const me = p.position; let best = null, bd = 2.6;
+    const me = p.position; let best = null, bd = 4.5;
     R.cars.forEach((g, c) => { for (const dz of DOORZ) for (const sx of dwellSide === 2 ? [-1, 1] : [dwellSide]) { _a.set(sx * 2.2, FLOOR, dz).applyMatrix4(g.matrixWorld); const d = Math.hypot(_a.x - me.x, _a.z - me.z); if (d < bd && Math.abs(_a.y - me.y) < 2.5) { bd = d; best = { c, dz, sx }; R.doorPos.copy(_a); } } });
     if (best) R.boardable = { ...best, next: l.next };
   }

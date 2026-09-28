@@ -14,7 +14,7 @@ const KINDS = {
   cab:   { len: 4.8, w: 1.82, clr: 0.2, belt: 0.95, roof: 1.47, hood: 0.88, ws: [0.92, 0.1], rs: [-0.8, -1.5], wheels: [1.45, -1.42], b: [0.02], trunk: 0.99, sign: true },
   hatch: { len: 4.2, w: 1.76, clr: 0.19, belt: 0.95, roof: 1.46, hood: 0.84, ws: [0.9, 0.18], rs: [-1.25, -1.85], wheels: [1.3, -1.28], b: [0.1], trunk: 1.0 },
   suv:   { len: 4.75, w: 1.9, clr: 0.28, belt: 1.12, roof: 1.74, hood: 1.04, ws: [1.05, 0.35], rs: [-1.9, -2.15], wheels: [1.45, -1.42], b: [0.2, -0.95], trunk: 1.12 },
-  coupe: { len: 4.45, w: 1.94, clr: 0.14, belt: 0.78, roof: 1.22, hood: 0.72, ws: [0.55, -0.35], rs: [-0.95, -1.7], wheels: [1.33, -1.3], b: [-0.35], trunk: 0.84, sport: true },   // mid-engine supercar
+  coupe: { len: 4.45, w: 1.94, clr: 0.14, belt: 0.78, roof: 1.22, hood: 0.72, ws: [0.55, -0.35], rs: [-0.95, -1.7], wheels: [1.33, -1.3], b: [-0.35], trunk: 0.84, sport: true, eye: { x: 0.05, y: 1.02, z: -0.36 } },   // mid-engine supercar (Ferrari model: cockpit ahead of the engine)
   muscle: { len: 4.8, w: 1.9, clr: 0.16, belt: 0.86, roof: 1.33, hood: 0.84, ws: [0.75, -0.1], rs: [-0.75, -1.6], wheels: [1.45, -1.4], b: [-0.1], trunk: 0.88, sport: true },   // Camaro-ish
   // Soviet classics: boxy three-box sedans, narrow track, chrome bumpers
   lada: { len: 4.12, w: 1.62, clr: 0.17, belt: 0.92, roof: 1.44, hood: 0.86, ws: [0.62, 0.12], rs: [-0.74, -1.22], wheels: [1.21, -1.21], b: [-0.2], trunk: 0.9, boxy: true },
@@ -223,6 +223,7 @@ export function hideParkedCar(c) { const z = new THREE.Matrix4().makeScale(0, 0,
  */
 export function carEye(kind = 'sedan') {
   const K = KINDS[kind] || KINDS.sedan;
+  if (K.eye) return { ...K.eye };   // real models: the driver's seat of that model
   return { x: K.ws[1] - 0.46, y: K.roof - 0.25, z: -K.w / 2 * 0.4 };
 }
 
