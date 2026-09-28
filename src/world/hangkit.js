@@ -35,6 +35,7 @@ export const ITEMS = {
   semechki: { kind: 'food', icon: '🌻', name: 'семечки (sunflower seeds)', food: 6 },
   blunt: { kind: 'smoke', icon: '🍂', name: 'fat blunt', hi: 0.4 },   // hits harder than a bag
   gin: { kind: 'booze', icon: '🍸', name: 'Tanqueray, neat', drunk: 0.55, dur: 150, glass: 'shot', liq: 0xe8eef0 },
+  drone: { kind: 'gear', icon: '🛸', name: 'killer drone (hunts bad guys, 45 s)', drone: true },
   shrooms: { kind: 'trip', icon: '🍄', name: 'Feliks\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
   zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
 };
@@ -48,7 +49,7 @@ export const kit = () => V;
  */
 export function buildKit(world, o = {}) {
   const { ctx } = world;
-  V = { world, ctx, cash: o.cash ?? 20, startCash: o.cash ?? 20, inv: ['bic', 'cigs'], drunk: 0, drunkT: -1, high: 0, highT: -1, smokeT: 0, puffT: 0, puffs: [], riding: null, passenger: null,
+  V = { world, ctx, cash: o.cash ?? 20, startCash: o.cash ?? 20, inv: ['bic', 'cigs', 'drone', 'drone'], drunk: 0, drunkT: -1, high: 0, highT: -1, smokeT: 0, puffT: 0, puffs: [], riding: null, passenger: null,
     shafts: [], spots: [], vendors: [], hurtables: [], drops: [], dialog: null, promptT: 0, lastPrompt: '', respawn: o.respawn || null, respawnPick: false, talked: new Set(), onUpdate: [] };
   buildUI(o); buildPuffs();
   if (!ctx.__hangkitBound) { ctx.__hangkitBound = true; bindOnce(ctx); }
@@ -132,7 +133,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
-    V.cash = V.startCash; V.inv.length = 0; V.inv.push('bic', 'cigs'); V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; endTrip(); V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
+    V.cash = V.startCash; V.inv.length = 0; V.inv.push('bic', 'cigs', 'drone', 'drone'); V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; endTrip(); V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
     for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
     for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
     for (const m of V.puddles || []) m.visible = false;
@@ -261,6 +262,7 @@ function useItem(want) {
   if (it === 'weed') return lightUp(false, false, 0.22);
   if (ITEMS[it]?.hi) return lightUp(false, false, ITEMS[it].hi);
   if (ITEMS[it]?.cig) { const L = V.left || (V.left = {}); L[it] = (L[it] > 0 ? L[it] : ITEMS[it].cig) - 1; if (L[it] > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
+  if (ITEMS[it]?.drone) { import('./drones.js').then((m) => m.launchDrone(ctx)).catch((e) => console.warn('[hangkit] drone', e)); return; }
   if (ITEMS[it]?.trip) { V.tripT = ITEMS[it].trip; V.tripMax = V.tripT; ctx.hud?.toast?.('*chews* …земля дышит. The ground is breathing, bro.', 3000); return; }
   if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
   const spec = ITEMS[it];

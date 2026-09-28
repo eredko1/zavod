@@ -1,3 +1,4 @@
+const _gp = new THREE.Vector3();
 // Frag grenade: mesh, arc + bounce vs colliders/ground, fuse, explosion damage. Owned by: WEAPONS agent.
 import * as THREE from 'three';
 import { Builder, rbox, cylY, sphere, torus, lathe } from './geo.js';
@@ -76,6 +77,10 @@ export class Grenades {
     this.fx.explosion(pos);
     ctx.ai?.damageRadius?.(pos.clone(), EXPLODE_R, EXPLODE_DMG);
     const pp = ctx.player?.position; if (pp) { const d = Math.hypot(pp.x - pos.x, (pp.y + 0.9) - pos.y, pp.z - pos.z); if (d < EXPLODE_R) { const dmg = Math.round(100 * (1 - d / EXPLODE_R) ** 1.3); if (dmg > 0) ctx.player.damage?.(dmg, pos.clone()); } }
+    for (const h of ctx.raycastTargets || []) {   // everyone else with a hitbox (chill crews, vendors, passers-by): blast damage with falloff
+      if (!h?.userData?.onHit || h.userData.soldier || h.userData.remote || !h.parent) continue; h.getWorldPosition(_gp); const d = _gp.distanceTo(pos);
+      if (d < EXPLODE_R) try { h.userData.onHit(Math.round(EXPLODE_DMG * (1 - d / EXPLODE_R) ** 1.2), false, _gp.clone(), _gp.clone().sub(pos).normalize()); } catch {}
+    }
     ctx.bus.emit('explosion', { position: pos.clone(), radius: EXPLODE_R });
   }
   recycle(g) { g.mesh.visible = false; this.ctx.scene.remove(g.mesh); this.pool.push(g.mesh); }

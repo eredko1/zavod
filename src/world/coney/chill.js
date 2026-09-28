@@ -67,7 +67,7 @@ export function adoptFolk(o) {
   if (!C) return null; const { ctx, world } = C; const type = CREWS[o.type] ? o.type : 'mk';
   const id = C.nextId++; const m = thugModel(o.name, id, type, { fig: o.fig, blade: !!o.blade }); if (!m.f.group.parent) world.scene.add(m.f.group);
   const t = { id, name: o.name, type, intent: o.intent || 'mark', m, pos: o.pos.clone(), yaw: o.yaw || 0, st: 'walk', hp: HP, cash: o.cash ?? 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.5, said: false, talkT: 0, lk: id, blade: !!m.blade, temper: o.temper || 'soft', folk: true, onGone: o.onGone || null, avatar: m.f.avatar || null, gun: o.gun ?? (m.blade ? 'knife' : null) };
-  for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); ctx.raycastTargets.push(h); }
+  for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); h.userData.thug = t; ctx.raycastTargets.push(h); }
   C.thugs.set(id, t); m.f.group.position.copy(t.pos); m.f.group.rotation.set(0, t.yaw, 0);
   if (t.intent === 'fight') { t.intent = 'mark'; startFight(t); }
   return t;
@@ -158,7 +158,7 @@ function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.rando
     let name = opts.name; if (!name) { do { name = T.names[Math.floor(Math.random() * T.names.length)]; } while (used.has(name) && used.size < T.names.length); } used.add(name);
     const id = C.nextId++; const m = thugModel(name, id, type); m.f.group.position.copy(at); world.scene.add(m.f.group);
     const t = { id, name, type, intent, m, pos: at, yaw: 0, st: 'walk', hp: HP, cash: 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.6 * i, said: false, talkT: 0, lk: lk + i, blade: !!m.blade };
-    for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); ctx.raycastTargets.push(h); }
+    for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); h.userData.thug = t; ctx.raycastTargets.push(h); }
     t.gun = t.blade ? 'knife' : type !== 'mk' && Math.random() < 0.25 ? 'm9' : null;   // what he carries: strip it off him (rob / drop him)
     C.thugs.set(id, t); out.push(t);
   }
