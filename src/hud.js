@@ -403,7 +403,8 @@ function bindMenus(H) {
         if (!H.freshArm || now - H.freshArm > 3000) { H.freshArm = now; if (b) b.textContent = 'Really? Click again: resets everyone'; setTimeout(() => { if (b && H.freshArm === now) { H.freshArm = 0; b.textContent = 'Reset map for everyone'; } }, 3000); break; }
         H.freshArm = 0; if (b) b.textContent = 'Reset map for everyone';
         try { ctx.net?.send?.('fresh', {}); } catch {} ctx.bus.emit('worldReset', { by: 'me' }); ctx.hud?.toast?.('Fresh start — the block is reset for everyone', 2400); ctx.setState('playing'); break; }
-      case 'character': ctx.setState('playing'); ctx.bus.emit('charSelect'); break;   // world/charselect.js (hangout maps)
+      case 'character': ctx.setState('playing'); ctx.bus.emit('charSelect'); break;
+      case 'durak': ctx.setState('playing'); ctx.bus.emit('durakFriends'); break;   // world/coney/durak-mp.js: walk to the table and sit down   // world/charselect.js (hangout maps)
       case 'menu': ctx.setState('menu'); break;
       case 'retry': ctx.restart(); break;
     }
@@ -627,7 +628,7 @@ function buildDOM() {
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
       <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
-      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('character', 4, 'Character')}${mi('menu', 5, 'Quit to menu')}</nav>
+      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('character', 4, 'Character')}${mi('durak', 5, 'Play durak')}${mi('menu', 6, 'Quit to menu')}</nav>
     </div>
     <div class="tag-br in up" style="--i:6"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Resume</span></div>
   </div>

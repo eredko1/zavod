@@ -172,7 +172,7 @@ function render() {
   let end = '';
   if (G.over) {
     const r = G.result, share = potShare(U.stake, n), money = !U.stake || me < 0 ? '' : r === 'draw' ? (U.mp ? `ставка $${U.stake} назад` : '') : r === me ? `−$${U.stake}` : `+$${share}`;
-    end = `<div class="dk-end"><h2>${r === 'draw' ? 'НИЧЬЯ' : r === me ? 'ТЫ ДУРАК' : `${esc(U.names[r])} — ДУРАК`}</h2><p>${money}</p>${U.mp && U.say ? `<p class="say">${esc(U.say)}</p>` : ''}<button data-act="again">Ещё партию</button><button data-act="leave">Встать из-за стола</button></div>`;
+    end = `<div class="dk-end"><h2>${r === 'draw' ? 'НИЧЬЯ' : r === me ? 'ТЫ ДУРАК' : `${esc(U.names[r])} — ДУРАК`}</h2><p>${money}</p>${U.mp && U.say ? `<p class="say">${esc(U.say)}</p>` : ''}<button data-act="again"${U.mp && U.v?.readyMe ? ' disabled' : ''}>${U.mp ? (U.v?.readyMe ? `Готов · Ready ✓ (${U.v.ready}/${U.v.humansN})` : `Ещё партию · Ready (${U.v?.ready || 0}/${U.v?.humansN || 1})`) : 'Ещё партию · Again'}</button><button data-act="leave">Встать из-за стола</button></div>`;
   }
   const title = U.mp ? `ОБЩИЙ СТОЛ <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${n} за столом · ${U.stake ? '$' + U.stake + ' с каждого' : 'на интерес'}</small>` : `АРКАША <small>${G.mode === 'perevodnoy' ? 'переводной' : 'подкидной'} · ${st.w}–${st.l}${st.d ? '–' + st.d : ''} · ${U.stake ? '$' + U.stake + ' на кону' : 'на интерес'}</small>`;
   const meB = U.mp && me >= 0 && !G.over ? ((G.out || []).includes(me) ? ' · ты вышел' : me === G.att ? ' · ты в атаке' : me === G.def ? ' · ты отбиваешься' : '') : '';

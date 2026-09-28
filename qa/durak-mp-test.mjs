@@ -91,9 +91,9 @@ for (;;) {
   if (games === 1) await A.screenshot({ path: `${out}/durakmp-end.png` });
   if (hh || games >= 5) break;
   // again: same seats, stakes re-collected
-  await B.evaluate(() => window.__game.durakMP.again());
+  await B.evaluate(() => window.__game.durakMP.again()); await A.evaluate(() => window.__game.durakMP.again());   // ready check: both tap Ready
   const re = await until(async () => { const [x, y] = [await st(A), await st(B)]; return x?.ph === 'play' && !x.over && y?.seq === x.seq && x; }, 8000);
-  ok(!!re && re.deal === games + 1, `B asks for another deal → host re-deals (deal ${games + 1})`);
+  ok(!!re && re.deal === games + 1, `both tap Ready → host re-deals (deal ${games + 1})`);
   await new Promise((r) => setTimeout(r, 300)); c1.splice(0, 2, ...(await cash()));
 }
 ok(!!rejected && !!rejected.nack && rejected.handSame, 'an illegal move from B is rejected by the host (nack, nothing changes)', JSON.stringify(rejected));
@@ -103,7 +103,7 @@ ok(faceUpBad === 0, 'each client shows only its own hand face up (opponents are 
 
 // ---- again, then B walks away mid-game → AI takes the seat, A finishes; B forfeits the stake
 const cb0 = await cash();
-await A.evaluate(() => window.__game.durakMP.again());
+await A.evaluate(() => window.__game.durakMP.again()); await B.evaluate(() => window.__game.durakMP.again());
 await until(async () => { const [x, y] = [await st(A), await st(B)]; return x?.ph === 'play' && !x.over && y?.seq === x.seq; }, 8000);
 await new Promise((r) => setTimeout(r, 300)); const cb1 = await cash();
 ok(cb1[0] === cb0[0] - 20 && cb1[1] === cb0[1] - 20, '"again": stakes re-collected', `${cb0} → ${cb1}`);
