@@ -9,7 +9,7 @@ const A = await mk('ALPHA'), B = await mk('BRAVO');
 await A.waitForFunction(() => window.__ctx.net.peers === 1, null, { timeout: 30000 }).catch(() => {});
 // nitro: two 3.5 s runs down Surf Ave-ish open road from the same spot, plain vs Shift
 const run = async (shift) => {
-  await A.evaluate(() => { const V = window.__ctx.vehicles; if (V.mounted) V.dismount(); window.__game.teleport(-60, 0, 100, -Math.PI / 2, 0); });
+  await A.evaluate(() => { const V = window.__ctx.vehicles; if (V.mounted) V.dismount(); window.__game.teleport(-200, 0, -128, -Math.PI / 2, 0); });
   await A.waitForTimeout(400);
   await A.evaluate(() => { const V = window.__ctx.vehicles; const p = window.__ctx.player.position; const c = V.spawnCar(p.x, p.z, -Math.PI / 2, 'sedan', 0x333333, 0); V.mount(c); });
   await A.waitForTimeout(400); await A.keyboard.down('KeyW'); if (shift) await A.keyboard.down('ShiftLeft');
