@@ -4,7 +4,7 @@ import { Builder, rbox, box, cylZ, cylY, cylX, torus, extrude, lathe, sphere, ad
 import { buildArm, supportGrip } from './arms.js';
 
 export const RIFLE_SPEC = {
-  id: 'm4a1', name: 'M4A1', class: 'AR', slot: 0, mode: 'AUTO',
+  id: 'm4a1', adsFovMul: 0.45, name: 'M4A1', class: 'AR', slot: 0, mode: 'AUTO',
   desc: '5.56 carbine. Balanced damage, controllable full-auto, T2 red dot.',
   mag: 30, reserve: 180, rpm: 800, auto: true, damage: 34, headMul: 2.2, range: 200, falloff: [40, 160, 0.6],
   reloadStyle: 'mag', reloadKeys: { magGrab: [-0.02, -0.18, -0.02], down: [-0.1, -0.42, 0.06], rack: [-0.02, 0.055, 0.12], tiltK: 1 },
