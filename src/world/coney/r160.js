@@ -9,13 +9,12 @@ import * as THREE from 'three';
 
 const cnv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
 const tex = (c, srgb = true, rep = false) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; if (rep) t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
-export const STOPS_STRIP = ['Stillwell Av', 'W 8 St', 'Neptune Av', 'Avenue X', 'Avenue U', 'Kings Hwy', 'Avenue P', 'Avenue N', 'Bay Pkwy', 'Avenue I'];
 const CARNO = [8412, 8413, 8414, 8415, 8416, 8417];
 
 // ---- textures ------------------------------------------------------------------------------------------------------------
 // trim atlas: 4 × 4 cells of 64 px. [colour, roughness, metalness]
 const TRIM = { black: 0, steel: 1, skirt: 2, truck: 3, wheel: 4, bullet: 5, yellow: 6, white: 7, rubber: 8, num0: 9, num1: 10, num2: 11, grey: 12, red: 13, dkglass: 14, amber: 15 };
-function trimAtlas() {
+function trimAtlas(rt) {
   const [c, g] = cnv(256, 256), [cm, gm] = cnv(256, 256);
   const cells = [['#0c0d0f', 0.3, 0.3], ['#c4c8cc', 0.3, 0.92], ['#2b2c2e', 0.8, 0.35], ['#221e1b', 0.85, 0.45], ['#6d6f71', 0.35, 0.95], ['#0c0d0f', 0.4, 0.1], ['#f2c418', 0.55, 0.1], ['#e9e9e6', 0.6, 0.05],
     ['#101112', 0.9, 0], ['#c4c8cc', 0.32, 0.9], ['#c4c8cc', 0.32, 0.9], ['#c4c8cc', 0.32, 0.9], ['#7b8085', 0.55, 0.6], ['#b3261e', 0.5, 0.1], ['#0f1318', 0.08, 0.5], ['#e08a1a', 0.5, 0.1]];
@@ -25,7 +24,7 @@ function trimAtlas() {
   for (const i of [2, 3]) { const x = (i % 4) * 64, y = (i >> 2) * 64; for (let k = 0; k < 90; k++) { g.fillStyle = `rgba(${70 + Math.random() * 40 | 0},${50 + Math.random() * 20 | 0},30,${Math.random() * 0.35})`; g.fillRect(x + Math.random() * 64, y + Math.random() * 64, 2 + Math.random() * 6, 1 + Math.random() * 4); } }
   { const x = 0, y = 128; for (let k = 0; k < 64; k += 6) { g.fillStyle = '#26282a'; g.fillRect(x, y + k, 64, 2); } }
   // F bullet (orange disc on black)
-  { const x = 64, y = 64; g.fillStyle = '#ff6319'; g.beginPath(); g.arc(x + 32, y + 32, 28, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 38px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('F', x + 32, y + 35); }
+  { const x = 64, y = 64; g.fillStyle = rt.color; g.beginPath(); g.arc(x + 32, y + 32, 28, 0, 7); g.fill(); g.fillStyle = rt.fg; g.font = '700 38px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(rt.id, x + 32, y + 35); }
   // car numbers: two per cell (top / bottom half), black on stainless
   g.font = '700 22px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#16181a';
   CARNO.forEach((n, k) => { const i = 9 + (k >> 1), x = (i % 4) * 64, y = (i >> 2) * 64 + (k & 1) * 32; g.fillText(String(n), x + 32, y + 17); });
@@ -87,14 +86,15 @@ function ledCanvas() { const [c, g] = cnv(512, 256); const t = tex(c); return { 
 function rowUV(geo, r, u0 = 0, u1 = 1) { const uv = geo.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setXY(k, u0 + uv.getX(k) * (u1 - u0), 1 - (r + 1) * 0.25 + uv.getY(k) * 0.25); return geo; }
 
 // ---- the car --------------------------------------------------------------------------------------------------------------
-export function makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite }) {
-  const trim = trimAtlas(), body = bodyTex(), led = ledCanvas();
+const SHARED = {};   // textures every line shares (the trim atlas carries the line's bullet, the LED canvas its signs)
+export function makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite, route = { id: 'F', color: '#ff6319', fg: '#fff' } }) {
+  const trim = trimAtlas(route), body = SHARED.body || (SHARED.body = bodyTex()), led = ledCanvas();
   const M = {
     body: new THREE.MeshStandardMaterial({ map: body.map, normalMap: body.nm, normalScale: new THREE.Vector2(0.3, 0.3), roughness: 0.34, metalness: 0.88 }),
     trim: new THREE.MeshStandardMaterial({ map: trim.map, roughnessMap: trim.mr, metalnessMap: trim.mr, roughness: 1, metalness: 1 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x9fb4bd, roughness: 0.04, metalness: 0.3, transparent: true, opacity: 0.26, depthWrite: false, side: THREE.DoubleSide }),
-    int: new THREE.MeshStandardMaterial({ map: intAtlas(lite), roughness: 0.62, metalness: 0.02 }),
-    floor: new THREE.MeshStandardMaterial({ map: floorTex(), roughness: 0.92 }),
+    int: new THREE.MeshStandardMaterial({ map: SHARED.int || (SHARED.int = intAtlas(lite)), roughness: 0.62, metalness: 0.02 }),
+    floor: new THREE.MeshStandardMaterial({ map: SHARED.floor || (SHARED.floor = floorTex()), roughness: 0.92 }),
     lamp: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf2f6ff, emissiveIntensity: 1.5 }),
     led: new THREE.MeshStandardMaterial({ color: 0x000000, map: led.t, emissive: 0xffffff, emissiveMap: led.t, emissiveIntensity: 1.25, roughness: 0.4 }),
     ind: new THREE.MeshStandardMaterial({ color: 0x3a2a08, emissive: 0xffb020, emissiveIntensity: 0 }),
@@ -205,18 +205,18 @@ export function makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite }) {
 
 // ---- LED text --------------------------------------------------------------------------------------------------------------
 /** redraw the shared LED canvas: dest ('JAM' | 'STW'), strip map with index cur (at / last stop) and nxt lit, next-stop line */
-export function drawLED(L, dest, cur, nxt, line, blink) {
+export function drawLED(L, rt, fw, cur, nxt, line, blink) {   // rt: the line's cfg (id, color, fg, dest, strip); fw: outbound
   const { g, t } = L; g.fillStyle = '#050505'; g.fillRect(0, 0, 512, 256);
   // row 0: the destination sign, amber LED
-  g.fillStyle = '#ff6319'; g.beginPath(); g.arc(34, 32, 24, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 32px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('F', 34, 34);
-  g.fillStyle = '#ffae3a'; g.textAlign = 'left'; g.font = '700 30px "Courier New", monospace'; g.fillText(dest === 'JAM' ? 'Jamaica-179 St' : 'Coney Island', 72, dest === 'JAM' ? 34 : 22); if (dest !== 'JAM') { g.font = '700 22px "Courier New", monospace'; g.fillText('Stillwell Av', 72, 48); }
+  g.fillStyle = rt.color; g.beginPath(); g.arc(34, 32, 24, 0, 7); g.fill(); g.fillStyle = rt.fg; g.font = '700 32px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(rt.id, 34, 34);
+  const [d1, d2] = (fw ? rt.dest.out : rt.dest.in).split('|'); g.fillStyle = '#ffae3a'; g.textAlign = 'left'; g.font = '700 30px "Courier New", monospace'; g.fillText(d1, 72, d2 ? 22 : 34); if (d2) { g.font = '700 22px "Courier New", monospace'; g.fillText(d2, 72, 48); }
   // row 1: FIND strip map: a line with a dot per stop, names above, the next stop lit red (blinking), passed stops dim
-  const y0 = 64, n = STOPS_STRIP.length, x0 = 22, dx = (512 - 44) / (n - 1), fw = dest === 'JAM';
-  g.fillStyle = '#1a1a1a'; g.fillRect(0, y0, 512, 64); g.fillStyle = '#ff6319'; g.fillRect(x0, y0 + 44, 512 - 44, 4);
+  const STR = rt.strip, y0 = 64, n = STR.length, x0 = 22, dx = (512 - 44) / (n - 1);
+  g.fillStyle = '#1a1a1a'; g.fillRect(0, y0, 512, 64); g.fillStyle = rt.color; g.fillRect(x0, y0 + 44, 512 - 44, 4);
   for (let i = 0; i < n; i++) { const k = fw ? i : n - 1 - i, x = x0 + dx * i, passed = fw ? k < cur : k > cur;
     const lit = k === nxt ? (blink ? '#ff2020' : '#5a0a0a') : k === cur ? '#ffd24a' : passed ? '#3a3a3a' : '#e8e8e8';
     g.fillStyle = lit; g.beginPath(); g.arc(x, y0 + 46, k === nxt || k === cur ? 6 : 4, 0, 7); g.fill();
-    g.save(); g.translate(x, y0 + 36); g.rotate(-0.55); g.font = `${k === nxt ? 700 : 500} 11px Helvetica, Arial`; g.fillStyle = k === nxt ? '#ff5a4a' : passed ? '#555' : '#ddd'; g.textAlign = 'left'; g.fillText(STOPS_STRIP[k], 0, 0); g.restore(); }
+    g.save(); g.translate(x, y0 + 36); g.rotate(-0.55); g.font = `${k === nxt ? 700 : 500} 11px Helvetica, Arial`; g.fillStyle = k === nxt ? '#ff5a4a' : passed ? '#555' : '#ddd'; g.textAlign = 'left'; g.fillText(STR[k], 0, 0); g.restore(); }
   // row 2: red LED text line
   g.fillStyle = '#ff3a2a'; g.font = '700 26px "Courier New", monospace'; g.textAlign = 'center'; g.fillText(line, 256, 160);
   t.needsUpdate = true;
