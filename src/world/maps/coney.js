@@ -17,6 +17,7 @@ import { buildBelt } from '../coney/belt.js';
 import { buildSubway } from '../coney/subway.js';
 import { buildGreens } from '../coney/greens.js';
 import { buildRadio } from '../coney/radio.js';
+import { buildTraffic } from '../coney/traffic.js';
 import { OSM, PLAY } from '../coney/osm.js';
 import { bbox, segDist, pip } from '../osmkit.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
@@ -95,6 +96,7 @@ export function build(world) {
   for (let x = PLAY.x0 + 10; x < PLAY.x1; x += 22) world.cover(x, BW.z1 - 2.8, 0, -1);
   ctx.progress(0.24, 'coney: crowds'); try { buildBeachLife(world, M); } catch (e) { console.warn('[coney] life', e); }
   ctx.progress(0.25, 'coney: spawns + bikes'); placeSpawnsBikesCover(world, M, piers);   // after every collider exists (city, housing, park, shore, life)
+  try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
 
   W.surfaceAt = (p) => {
     if (p.z > BW.z1 && p.y < -0.5) return 'ground';

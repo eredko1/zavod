@@ -475,7 +475,7 @@ function runOver(v, dt) {
     v.vel.multiplyScalar(sp.hitSlow); v.suspV -= 0.8; v.hitT = Math.max(v.hitT, 0.12);
   }
   // chill-mode people (vendors, crews, beachgoers, babushkas…): anything with a hitbox that takes hits (userData.onHit) gets run down
-  if (!S.hitboxT || now - S.hitboxT > 1) { S.hitboxT = now; S.hitboxes = (C.raycastTargets || []).filter((m) => m?.userData?.onHit && !m.userData.soldier && !m.userData.remote); }
+  if (!S.hitboxT || now - S.hitboxT > 1) { S.hitboxT = now; S.hitboxes = (C.raycastTargets || []).filter((m) => m?.userData?.onHit && !m.userData.soldier && !m.userData.remote && !m.userData.traffic); }
   for (const hb of S.hitboxes || []) {
     if (!hb.parent) continue; hb.getWorldPosition(_hp); const k = hitAt(_hp.x, _hp.y - 0.9, _hp.z, 0.35); if (!k) continue;
     if ((S.hits.get(hb) || -9) > now - 0.8) continue; S.hits.set(hb, now);

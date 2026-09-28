@@ -74,6 +74,8 @@ export function adoptFolk(o) {
 }
 export const folkRob = (t, force = null) => { if (C && t) robVictim(t, force); };
 export const folkHurt = (t, dmg, dir, hs = false) => { if (C && t) hurt(t, dmg, dir, null, hs); };
+/** coney/traffic.js: a driver pulled out of their car runs for it */
+export const folkFlee = (t) => { if (C && t && t.st !== 'dead') { t.intent = 'mark'; flee(t); } };
 export const crewCalm = () => !C || performance.now() < C.calmUntil;
 
 /** the crews (both modes): chill = frequent solo robbers + gangs; otherwise a gang now and then */
