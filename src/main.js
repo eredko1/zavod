@@ -134,6 +134,7 @@ async function boot() {
   // spatial index for large static raycast targets (skinned/soldier hitboxes excluded)
   const bvhFor = () => { for (const o of ctx.raycastTargets) { const g = o.geometry; if (!o.isMesh || o.isSkinnedMesh || !g || g.boundsTree || o.userData.soldier) continue; const n = (g.index ? g.index.count : g.attributes.position?.count || 0) / 3; if (n > 500) { try { g.computeBoundsTree({ maxLeafTris: 8 }); } catch (e) { /* non-indexable geometry: plain raycast */ } } } };
   bvhFor(); ctx.bus.on?.('boot', () => setTimeout(bvhFor, 4000)); setTimeout(bvhFor, 12000);   // async GLTF props arrive later
+  await prewarm();
   ctx.progress(1, 'ready');
   document.getElementById('boot').classList.add('hide');
   const go = ctx.qs.get('go') === '1'; if (go) try { const u = new URL(location.href); u.searchParams.delete('go'); history.replaceState(null, '', u); } catch {}   // ?go=1: picked on the menu before the reload
@@ -141,13 +142,38 @@ async function boot() {
   ctx.bus.emit('boot');
   const pose = ctx.qs.get('pose'); if (pose && ctx.world?.poses?.[pose]) window.__game.teleport(...ctx.world.poses[pose]);
   window.__game.ready = true;
-  requestAnimationFrame(frame);
+  last = performance.now(); requestAnimationFrame(frame);
+}
+
+// Pre-warm behind the loading screen: compile every material in the scene (KHR_parallel_shader_compile lets the driver do it
+// off the main thread), then draw one hidden frame with culling off and hidden objects shown, so shadow-depth programs, post
+// passes, textures and vertex buffers are all resident before the first visible frame. Without it each of those compiled or
+// uploaded the first time it came into view: a 1-8 s first frame and 0.1-0.3 s hitches when turning.
+async function prewarm() {
+  ctx.progress(0.98, 'warming up shaders');
+  const t0 = performance.now();
+  try { await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 20000))]); } catch (e) { console.warn('[boot] compileAsync', e); }
+  const t1 = performance.now(), culled = [], shown = [], lit = new Set();
+  scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) lit.add(p); });   // never reveal a hidden light: a new light count recompiles every program
+  scene.traverse((o) => { if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) { o.frustumCulled = false; culled.push(o); } if (!o.visible && !lit.has(o)) { o.visible = true; shown.push(o); } });
+  try { if (ctx.post?.render) ctx.post.render(0, ctx); else renderer.render(scene, camera); renderer.setRenderTarget(null); }
+  catch (e) { console.warn('[boot] warm frame', e); }
+  finally { for (const o of culled) o.frustumCulled = true; for (const o of shown) o.visible = false; }
+  ctx.perf.warm = { compileMs: Math.round(t1 - t0), frameMs: Math.round(performance.now() - t1), programs: renderer.info.programs?.length || 0 };
 }
 
 // ---------- loop ----------
 let last = performance.now(); let fpsAcc = 0, fpsN = 0;
+// ?prof=1: per-frame CPU profile (each module, each world updater, render) + renderer resource counts, read by qa/perf.mjs.
+// A frame whose program count grew compiled a shader; texture/geometry growth means an upload in that frame.
+const PROF = ctx.qs.get('prof') === '1' ? { frames: [], cur: null, mark(k, ms) { const c = this.cur; if (c) c.parts[k] = (c.parts[k] || 0) + ms; }, reset() { this.frames.length = 0; } } : null;
+if (PROF) { ctx.prof = PROF; window.__prof = PROF; }
+// GPU time per frame (EXT_disjoint_timer_query_webgl2): queries resolve a few frames later and are written back onto their frame
+const GL = renderer.getContext(), TQ = PROF && GL.getExtension('EXT_disjoint_timer_query_webgl2'), gpuQ = [];
+function pollGpu() { while (gpuQ.length && GL.getQueryParameter(gpuQ[0][0], GL.QUERY_RESULT_AVAILABLE)) { const [q, c] = gpuQ.shift(); if (!GL.getParameter(TQ.GPU_DISJOINT_EXT)) c.gpu = GL.getQueryParameter(q, GL.QUERY_RESULT) / 1e6; GL.deleteQuery(q); } }
 function frame(now) {
   requestAnimationFrame(frame);
+  const f0 = PROF ? performance.now() : 0; if (PROF) PROF.cur = { t: now, dt: now - last, parts: {} };
   let dt = (now - last) / 1000; last = now;
   if (dt < 0) dt = 0; if (dt > 0.1) dt = 0.1;
   dt *= ctx.time.scale;
@@ -155,12 +181,15 @@ function frame(now) {
   const simDt = paused ? 0 : dt;
   ctx.time.dt = simDt; ctx.time.elapsed += simDt; ctx.time.frame++;
   ctx.time.realDt = dt;
-  for (const name of UPDATE_ORDER) { const m = mods[name]; if (m && m.update) { try { m.update(simDt, ctx); } catch (e) { if (ctx.time.frame % 300 === 1) console.error(`[update:${name}]`, e); } } }
+  for (const name of UPDATE_ORDER) { const m = mods[name]; if (m && m.update) { const t0 = PROF ? performance.now() : 0; try { m.update(simDt, ctx); } catch (e) { if (ctx.time.frame % 300 === 1) console.error(`[update:${name}]`, e); } if (PROF) PROF.mark(name, performance.now() - t0); } }
   input.mouse.dx = 0; input.mouse.dy = 0; input.mouse.wheel = 0; input.pressed.clear();
   // depth precision: near 0.03 can't resolve ground detail 100 m+ away, so from high up (coney 19th floor / roof) streets
   // and roofs z-fought ("pulsating"). 4x the near plane up there; ≤ 0.15 leaves the hip/ADS viewmodels unclipped.
   { const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }
+  const r0 = PROF ? performance.now() : 0; let gq = null; if (TQ && !ctx.post?._S?.profiling) { pollGpu(); gq = GL.createQuery(); GL.beginQuery(TQ.TIME_ELAPSED_EXT, gq); }
   if (ctx.post && ctx.post.render) ctx.post.render(dt, ctx); else renderer.render(scene, camera);
+  if (gq) { GL.endQuery(TQ.TIME_ELAPSED_EXT); gpuQ.push([gq, PROF.cur]); }
+  if (PROF) { const c = PROF.cur, I = renderer.info; c.parts.render = performance.now() - r0; c.cpu = performance.now() - f0; c.progs = I.programs?.length || 0; c.tex = I.memory.textures; c.geo = I.memory.geometries; c.calls = I.render.calls; c.tris = I.render.triangles; PROF.frames.push(c); if (PROF.frames.length > 20000) PROF.frames.splice(0, 5000); PROF.cur = null; }
   // perf
   fpsAcc += dt; fpsN++;
   if (fpsAcc >= 0.5) { ctx.perf.fps = fpsN / fpsAcc; ctx.perf.frameMs = 1000 * fpsAcc / fpsN; fpsAcc = 0; fpsN = 0; ctx.perf.drawCalls = renderer.info.render.calls; ctx.perf.triangles = renderer.info.render.triangles; }
