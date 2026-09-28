@@ -39,7 +39,7 @@ export function buildRadio(world) {
   });
   world.updaters.push(() => {
     if (ctx.world !== W) return;
-    const car = !!ctx.vehicles?.mounted, mode = S.radio || 'car';
+    const pm = ctx.player?.mounted, car = !!(ctx.vehicles?.mounted || pm?.passenger || pm?.car || pm?.seat), mode = S.radio || 'car';   // driving, or riding along in a friend's car
     const want = (ctx.state === 'playing' || ctx.state === 'paused') && (mode === 'always' || (mode === 'car' && (car || ctx.durakOpen)));   // plays at Arkasha's card table too
     if (!want) { if (R.on) stop(); return; }
     if (!(R.dur.every((d) => d > 0))) { for (const a of R.els) if (a.preload !== 'auto') { a.preload = 'auto'; a.load(); } return; }   // wait for durations
