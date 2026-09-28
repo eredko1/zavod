@@ -27,7 +27,7 @@ export function carSpec(kind) { return KINDS[kind]; }
 
 const smooth = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
 
-export function carGeometries(kind = 'sedan') {
+export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   const K = KINDS[kind]; const L = K.len, HW = K.w / 2, xf = L / 2, xr = -L / 2;
   const NS = 44;                       // stations along the length (22 read faceted up close)
   const xs = []; for (let i = 0; i <= NS; i++) { const t = i / NS; xs.push(xr + (xf - xr) * (0.5 - 0.5 * Math.cos(Math.PI * t))); } // denser at the ends
@@ -106,6 +106,7 @@ export function carGeometries(kind = 'sedan') {
   // wheels: tyre with a rounded shoulder, rim face with 5 spokes, dark hub; dark arch liner behind each wheel
   for (const wx of K.wheels) for (const sz of [1, -1]) {
     const zc = sz * (halfW(wx) - 0.13);
+    if (!wheels) { const liner = new THREE.CylinderGeometry(archR - 0.01, archR - 0.01, HW * 1.5, 8, 1, true, -Math.PI / 2, Math.PI); liner.rotateX(Math.PI / 2); liner.translate(wx, 0.33, 0); parts.trim.push(liner); continue; }   // traffic: the wheels are separate instances that spin (wheelGeometry)
     const tyre = new THREE.LatheGeometry([[0.2, -0.11], [wheelR - 0.035, -0.115], [wheelR, -0.08], [wheelR + 0.004, 0], [wheelR, 0.08], [wheelR - 0.035, 0.115], [0.2, 0.11]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
     tyre.rotateX(Math.PI / 2); tyre.translate(wx, wheelR, zc); parts.rubber.push(tyre);
     const face = new THREE.CylinderGeometry(0.215, 0.215, 0.02, 12); face.rotateX(Math.PI / 2); face.translate(wx, wheelR, zc + sz * 0.1); parts.trim.push(face);
@@ -154,6 +155,28 @@ export function carGeometries(kind = 'sedan') {
   };
 }
 
+/** Traffic cars: one wheel at the origin (axle along z, outer face toward +z) for a wheel of radius r, split per material
+ *  slot like carGeometries: { rubber, rim, trim }. Rotate it pi about y for the left side; spin it about z. */
+export function wheelGeometry(r = 0.33) {
+  const tyre = new THREE.LatheGeometry([[0.2, -0.11], [r - 0.035, -0.115], [r, -0.08], [r + 0.004, 0], [r, 0.08], [r - 0.035, 0.115], [0.2, 0.11]].map(([a, y]) => new THREE.Vector2(a, y)), 12);
+  tyre.rotateX(Math.PI / 2);
+  const rim = [], trim = [];
+  const face = new THREE.CylinderGeometry(0.215, 0.215, 0.02, 12); face.rotateX(Math.PI / 2); face.translate(0, 0, 0.1); trim.push(face);
+  for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + (k % 2) * 0.12; const sp = new THREE.BoxGeometry(0.19, 0.03, 0.025); sp.translate(0.105, 0, 0); sp.rotateZ(a); sp.translate(0, 0, 0.115); rim.push(sp); }
+  const lip = new THREE.TorusGeometry(0.212, 0.012, 6, 24); lip.translate(0, 0, 0.112); rim.push(lip);
+  const barrel = new THREE.CylinderGeometry(0.205, 0.205, 0.16, 16, 1, true); barrel.rotateX(Math.PI / 2); barrel.translate(0, 0, 0.03); trim.push(barrel);
+  const disc = new THREE.CylinderGeometry(0.16, 0.16, 0.02, 18); disc.rotateX(Math.PI / 2); disc.translate(0, 0, 0.06); rim.push(disc);
+  const hub = new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10); hub.rotateX(Math.PI / 2); hub.translate(0, 0, 0.12); rim.push(hub);
+  const m = (arr) => mergeGeometries(arr.map((g) => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); return g; }), false);
+  return { rubber: m([tyre]), rim: m(rim), trim: m(trim) };
+}
+/** wheel centres of a kind in the kit frame: [{ x, y, z, side }] (side +1 = +z / right) and the tyre radius */
+export function wheelLayout(kind = 'sedan') {
+  const K = KINDS[kind] || KINDS.sedan, HW = K.w / 2, xf = K.len / 2, xr = -K.len / 2, r = K.clr > 0.25 ? 0.37 : 0.33;
+  const halfW = (x) => { const u = x > 0 ? x / xf : x / xr; return K.boxy ? HW * (1 - 0.04 * Math.pow(u, 12)) : HW * (1 - 0.1 * Math.pow(u, 6)); };
+  const out = []; for (const wx of K.wheels) for (const sz of [1, -1]) out.push({ x: wx, y: r, z: sz * (halfW(wx) - 0.13), side: sz });
+  return { r, wheels: out };
+}
 function shadowTex() {   // soft contact shadow under the car (ambient occlusion on the road)
   const c = document.createElement('canvas'); c.width = 128; c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 32, 4, 64, 32, 62); gr.addColorStop(0, 'rgba(0,0,0,0.75)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   g.save(); g.scale(1, 0.55); g.fillStyle = gr; g.fillRect(0, 0, 128, 117); g.restore(); const t = new THREE.CanvasTexture(c); return t;
