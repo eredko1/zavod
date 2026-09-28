@@ -259,6 +259,7 @@ function useItem(want) {
   const { ctx } = V; const k = want ? (ITEMS[want]?.keep ? -1 : V.inv.lastIndexOf(want)) : V.inv.map((x) => !ITEMS[x]?.keep).lastIndexOf(true);
   if (k < 0) { ctx.hud?.toast?.(V.inv.length ? 'Raw meat — grill it at Table Park' : 'Nothing on you', 1400); return; }
   const it = V.inv.splice(k, 1)[0]; renderCash();
+  V.smokeKind = it;
   if (it === 'weed') return lightUp(false, false, 0.22);
   if (ITEMS[it]?.hi) return lightUp(false, false, ITEMS[it].hi);
   if (ITEMS[it]?.cig) { const L = V.left || (V.left = {}); L[it] = (L[it] > 0 ? L[it] : ITEMS[it].cig) - 1; if (L[it] > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
@@ -314,20 +315,52 @@ function lightUp(magic = false, cig = false, hi = 0) {
   const { ctx } = V; V.smokeT = magic ? 16 : cig ? 9 : 11 + hi * 8; V.puffT = 0.6; V.cig = cig; if (magic) { V.high = Math.min(1, V.high + 0.35); V.highT = Math.max(V.highT, 180); }
   V.smokeHi = hi || 0.22;   // per puff: a bag 0.22, a blunt 0.4
   ctx.hud?.toast?.(cig ? ['*chk* …a Marlboro on the boardwalk', 'Покурим. Одну.', '*tap tap* …ahh'][Math.floor(Math.random() * 3)] : '…', 1400);
-  if (!V.joint) {
-    const g = new THREE.Group();
-    const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.006, 0.075, 8), new THREE.MeshStandardMaterial({ color: 0xf2eee4, roughness: 0.9 })); paper.rotation.z = Math.PI / 2.3; g.add(paper);
-    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff6a20 })); ember.position.set(0.035, 0.014, 0); g.add(ember);
-    const filter = new THREE.Mesh(new THREE.CylinderGeometry(0.0046, 0.0046, 0.022, 8), new THREE.MeshStandardMaterial({ color: 0xc8864a, roughness: 0.8 })); filter.rotation.z = Math.PI / 2.3; filter.position.set(-0.03, -0.013, 0); filter.visible = false; g.add(filter);
-    g.position.set(-0.12, -0.13, -0.32); g.rotation.set(0.3, 0.6, 0); V.joint = { g, ember, paper, filter }; }
-  V.joint.filter.visible = cig; V.joint.paper.scale.set(cig ? 0.85 : 1, cig ? 1.15 : 1, cig ? 0.85 : 1);   // a cigarette: straight, thinner, a tan filter
+  const kind = V.smokeKind === 'vape' ? 'vape' : V.smokeKind === 'blunt' ? 'blunt' : cig ? 'cig' : 'spliff';
+  if (V.joint?.g) V.joint.g.parent?.remove(V.joint.g);
+  V.smokeModels = V.smokeModels || {}; V.joint = V.smokeModels[kind] || (V.smokeModels[kind] = smokeModel(kind, ctx)); V.smokeLen = V.smokeT;
   ctx.camera.add(V.joint.g); V.joint.g.visible = true;
   if (ctx.weapons?.viewmodel) ctx.weapons.viewmodel.visible = false;
+}
+// hand-rolled smokes, close to the camera: cig (printed paper, cork filter, ash), spliff (cone, twisted tip, crutch),
+// blunt (brown leaf wrap), vape (pen with a glowing LED). Each burns down over the smoke (burn(k), k = 1 → 0.35).
+function smokeTex(draw, w = 128, h = 32) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+function smokeModel(kind, ctx) {
+  const g = new THREE.Group(), along = (geo) => { geo.rotateZ(-Math.PI / 2); return geo; };   // everything along +x (tip) … -x (mouth)
+  const mat = (o) => new THREE.MeshStandardMaterial({ roughness: 0.85, ...o });
+  const emb = new THREE.MeshBasicMaterial({ color: 0xff6a20 }), ash = mat({ color: 0x8d8a86, roughness: 1 });
+  let body, L, R0, R1, tipX;
+  if (kind === 'vape') {
+    const dev = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.016, 0.022), mat({ color: 0x1f3d52, metalness: 0.6, roughness: 0.35 })); g.add(dev);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.01, 0.014), mat({ color: 0x111111 })); mouth.position.x = -0.045; g.add(mouth);
+    const led = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.004, 0.012), emb); led.position.set(0.038, 0, 0); g.add(led);
+    g.position.set(-0.12, -0.13, -0.32); g.rotation.set(0.3, 0.6, 0); return { g, ember: led, paper: dev, filter: mouth };
+  }
+  if (kind === 'cig') { L = 0.062; R0 = R1 = 0.0038;
+    const paper = smokeTex((c, w, h) => { c.fillStyle = '#f4f1ea'; c.fillRect(0, 0, w, h); c.fillStyle = '#c9a04a'; c.fillRect(8, 0, 2, h); c.fillStyle = 'rgba(0,0,0,.05)'; for (let x = 0; x < w; x += 3) c.fillRect(x, 0, 1, h); });
+    body = new THREE.Mesh(along(new THREE.CylinderGeometry(R1, R0, L, 14, 1, true)), mat({ map: paper })); body.position.x = L / 2; g.add(body);
+    const cork = smokeTex((c, w, h) => { c.fillStyle = '#c98a45'; c.fillRect(0, 0, w, h); for (let i = 0; i < 260; i++) { c.fillStyle = `rgba(${90 + Math.random() * 60},${50 + Math.random() * 30},20,.55)`; c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); } c.fillStyle = '#e8c874'; c.fillRect(w - 6, 0, 3, h); });
+    const filter = new THREE.Mesh(along(new THREE.CylinderGeometry(R0, R0, 0.022, 14)), mat({ map: cork })); filter.position.x = -0.011; g.add(filter);
+  } else if (kind === 'blunt') { L = 0.1; R0 = 0.0062; R1 = 0.0068;
+    const leaf = smokeTex((c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#5a3a1e'); gr.addColorStop(0.5, '#6e4826'); gr.addColorStop(1, '#4a2e17'); c.fillStyle = gr; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(40,24,10,.6)'; c.lineWidth = 1; for (let i = 0; i < 9; i++) { c.beginPath(); c.moveTo(i * 16, 0); c.lineTo(i * 16 + 22, h); c.stroke(); } for (let i = 0; i < 140; i++) { c.fillStyle = `rgba(20,12,5,${Math.random() * 0.3})`; c.fillRect(Math.random() * w, Math.random() * h, 2, 1); } });
+    body = new THREE.Mesh(along(new THREE.CylinderGeometry(R1, R0, L, 16)), mat({ map: leaf, roughness: 0.75 })); body.position.x = L / 2 - 0.01; g.add(body);
+  } else { L = 0.085; R0 = 0.0033; R1 = 0.0062;   // spliff / joint: a cone, the paper creased, a cardboard crutch at the mouth
+    const paper = smokeTex((c, w, h) => { c.fillStyle = '#efe9da'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(120,110,90,.25)'; for (let i = 0; i < 14; i++) { c.beginPath(); c.moveTo(Math.random() * w, 0); c.lineTo(Math.random() * w, h); c.stroke(); } c.fillStyle = 'rgba(90,120,60,.12)'; for (let i = 0; i < 60; i++) c.fillRect(Math.random() * w, Math.random() * h, 2, 2); });
+    body = new THREE.Mesh(along(new THREE.CylinderGeometry(R1, R0, L, 14, 1, true)), mat({ map: paper, transparent: true, opacity: 0.97 })); body.position.x = L / 2; g.add(body);
+    const crutch = new THREE.Mesh(along(new THREE.CylinderGeometry(R0, R0, 0.014, 12, 1, true)), mat({ color: 0xd8c9a8, side: THREE.DoubleSide })); crutch.position.x = -0.007; g.add(crutch);
+    const twist = new THREE.Mesh(along(new THREE.ConeGeometry(R1 * 0.9, 0.012, 10)), mat({ color: 0xefe9da })); twist.position.x = L + 0.006; g.add(twist); g.userData.twist = twist;
+  }
+  tipX = L; const tip = new THREE.Group(); g.add(tip);
+  const ashM = new THREE.Mesh(along(new THREE.CylinderGeometry(R1 * 0.95, R1, 0.008, 12)), ash); ashM.position.x = 0.004; tip.add(ashM);
+  const ember = new THREE.Mesh(new THREE.CircleGeometry(R1 * 0.95, 14), emb); ember.rotation.y = Math.PI / 2; ember.position.x = 0.0085; tip.add(ember);
+  let light = null; if (!ctx.lite) { light = new THREE.PointLight(0xff6a20, 0.3, 0.5, 2); light.position.x = 0.02; tip.add(light); }
+  const burn = (k) => { const len = L * k; body.scale.set(k, 1, 1); body.position.x = (kind === 'blunt' ? -0.01 : 0) + len / 2; tip.position.x = len + (kind === 'blunt' ? -0.01 : 0); if (g.userData.twist) g.userData.twist.visible = k > 0.97; };
+  burn(1); g.position.set(-0.12, -0.13, -0.32); g.rotation.set(0.3, 0.6, 0.05);
+  return { g, ember, paper: body, filter: body, light, burn };
 }
 function updateJoint(dt) {
   if (V.smokeT <= 0) return; const { ctx } = V;
   V.smokeT -= dt; V.puffT -= dt;
-  if (V.joint) { V.joint.ember.material.color.setHSL(0.05, 1, 0.45 + 0.15 * Math.sin(performance.now() / 180)); V.joint.g.visible = !ctx.vehicles?.mounted; }   // driving: no floating joint in the chase view
+  if (V.joint) { const t = performance.now(), k = Math.max(0.35, V.smokeT / (V.smokeLen || 1)); V.joint.ember.material.color.setHSL(0.05, 1, 0.42 + 0.18 * Math.sin(t / 160) * (V.puffT > 1.2 ? 1 : 0.4)); if (V.joint.light) V.joint.light.intensity = 0.25 + 0.2 * Math.sin(t / 90); if (V.joint.burn) V.joint.burn(k); V.joint.g.visible = !ctx.vehicles?.mounted; }   // ember glows on the drag, it burns down   // driving: no floating joint in the chase view
   if (V.puffT <= 0) {
     V.puffT = 1.6 + Math.random() * 0.8;
     const cam = ctx.camera; const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new THREE.Quaternion()));
