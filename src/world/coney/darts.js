@@ -171,7 +171,7 @@ function frame(now) {
 }
 function drawBoard(d) {
   const c = U.cv, g = c.getContext('2d'), W = c.width, s = W / 2.5, cx = W / 2, cy = W / 2, t = U.t;
-  c.style.filter = `${d.drunk > 0.3 ? `blur(${Math.min(2.5, (d.drunk - 0.3) * 2).toFixed(2)}px)` : ''} ${d.high > 0.1 ? `hue-rotate(${Math.round(Math.sin(t * 0.6) * d.high * 160)}deg) saturate(${1 + d.high})` : ''}`.trim() || 'none';
+  if (!D.ctx.lite) c.style.filter = `${d.drunk > 0.3 ? `blur(${Math.min(2.5, (d.drunk - 0.3) * 2).toFixed(2)}px)` : ''} ${d.high > 0.1 ? `hue-rotate(${Math.round(Math.sin(t * 0.6) * d.high * 160)}deg) saturate(${1 + d.high})` : ''}`.trim() || 'none';
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W);
   const rot = Math.sin(t * 0.4) * d.high * 0.25;
   const board = (ox, oy, alpha) => { g.save(); g.globalAlpha = alpha; g.translate(cx + ox, cy + oy); g.rotate(rot); paintBoard(g, s); g.restore(); };

@@ -2,7 +2,8 @@
 // "BELT PKWY" gantry and you're up on an elevated loop of the parkway: three one-way lanes on a concrete viaduct (Jersey
 // barriers, piers, cobra-head lights, overhead signs, traffic) about a kilometre round — ~35 s a lap flat out — over
 // Brighton / Sheepshead Bay: brick walk-ups and six-storey apartment blocks, the B/Q el with a train rattling past, and the
-// bay with its piers and fishing boats along Emmons Ave. Keep right at the EXIT 7 · CONEY ISLAND sign (or press T) to go home.
+// bay with its piers and fishing boats along Emmons Ave. Westbound only: you come up on the north straight heading west,
+// keep right at EXIT 7B for 8 Av / Soccer Tavern, and the end of the westbound run always drops you there too. T goes home.
 // The loop is its own zone far south of the map: W.zones lets players / vehicles live there without widening W.bounds; the
 // deck height comes from W.groundHeight (a wrapper that knows the viaduct). Passengers are carried with the driver.
 import * as THREE from 'three';
@@ -12,7 +13,7 @@ export const ZONE = { x0: -2000, x1: 3400, z0: 11400, z1: 12700, oz: 12000 };   
 const CX = 900, LS = 300, R = 72, DECK = 9;                                      // loop centre (local x), straight length, bend radius, deck height
 const LANES = 3, LW = 3.6, SH = 1.2, ROAD = LANES * LW + SH * 2;                 // 13.2 m deck between barriers
 const PER = 2 * LS + 2 * Math.PI * R;                                            // ≈ 1052 m round
-const EXIT_S = LS + Math.PI * R + LS * 0.55, EXIT_L = 45, EXIT_B = LS + Math.PI * R + LS * 0.12;   // EXIT_B: 7B Gowanus / Sunset Park (tavern.js)                       // the exit ramp: keep right on the north straight
+const EXIT_S = LS + Math.PI * R + LS * 0.55, EXIT_L = 45, EXIT_B = LS + Math.PI * R + LS * 0.3, WEST0 = LS + Math.PI * R - 30, WEST_END = LS + Math.PI * R + LS * 0.92;   // EXIT_B: 7B Gowanus / Sunset Park (tavern.js)                       // the exit ramp: keep right on the north straight
 const RAMP = { x0: 394, x1: 420, z0: -560, z1: -541 };                           // coney: the on-ramp trigger (north end of W 8th St)
 const BACK = { x: 404, z: -522, h: Math.PI };                                     // coney: where the exit puts you (heading south)
 
@@ -38,7 +39,7 @@ const right = (p) => ({ x: -p.tz, z: p.tx });   // right-hand normal (outside of
 
 export function buildBelt(world) {
   const { ctx, W, scene } = world;
-  (W.zones || (W.zones = [])).push({ x0: ZONE.x0, x1: ZONE.x1, z0: ZONE.z0, z1: ZONE.z1, name: 'BELT PKWY LOOP', hint: 'EXIT 7 or T → Coney' });
+  (W.zones || (W.zones = [])).push({ x0: ZONE.x0, x1: ZONE.x1, z0: ZONE.z0, z1: ZONE.z1, name: 'BELT PKWY WEST', hint: 'EXIT 7B → Soc Tav · T → Coney' });
   { const gh = W.groundHeight; W.groundHeight = (x, z) => {
       if (z > ZONE.z0 - 50 && z < ZONE.z1 + 50 && x > ZONE.x0 - 50 && x < ZONE.x1 + 50) { const q = project(x, z - ZONE.oz); return Math.abs(q.d) < ROAD / 2 + 0.2 ? DECK : 0; }   // the viaduct deck, the streets below
       return gh ? gh(x, z) : 0; }; }
@@ -68,11 +69,11 @@ export function buildBelt(world) {
   for (const o of [-ROAD / 2 - 0.3, ROAD / 2 + 0.3]) {
     for (const oo of [o - 0.28, o + 0.28]) { const g = wall(oo, DECK, DECK + 1.05); put(M.concrete, g); const g2 = g.clone(); g2.index.array.reverse(); g2.computeVertexNormals(); put(M.concrete, g2); }
     const top = ribbon(o - 0.28, o + 0.28, DECK + 1.05); put(M.concrete, top);
-    for (let s = 0; s < PER; s += 3) { if (o > 0 && ((s > EXIT_S - 2 && s < EXIT_S + EXIT_L) || (s > EXIT_B - 2 && s < EXIT_B + EXIT_L))) continue;   // the exit gore opens the outside barrier
+    for (let s = 0; s < PER; s += 3) { if (o > 0 && ((s > EXIT_B - 2 && s < EXIT_B + EXIT_L))) continue;   // the exit gore opens the outside barrier
       const p = at(s), r = right(p), x = p.x + r.x * o, z = p.z + r.z * o; wbox(x - 0.45, DECK, z - 0.45, x + 0.45, DECK + 1.1, z + 0.45); }
   }
   // exit ramp: a short spur curving off the outside of the north straight, dropping away (the trigger sends you home)
-  for (const ES of [EXIT_S, EXIT_B]) { const p0 = at(ES), r = right(p0); const g = new THREE.BufferGeometry(); const pos = [], idx = [];
+  for (const ES of [EXIT_B]) { const p0 = at(ES), r = right(p0); const g = new THREE.BufferGeometry(); const pos = [], idx = [];
     for (let i = 0; i <= 12; i++) { const k = i / 12, s = ES + k * EXIT_L, p = at(s), rr = right(p), off = ROAD / 2 + k * k * 14, y = DECK + 0.03 - k * k * 3;
       pos.push(p.x + rr.x * (off - 5), y, p.z + rr.z * (off - 5), p.x + rr.x * (off + 4), y, p.z + rr.z * (off + 4)); if (i) { const q = i * 2; idx.push(q - 2, q, q - 1, q - 1, q, q + 1); } }
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(pos.length / 3 * 2).fill(0), 2)); g.setIndex(idx); g.computeVertexNormals(); if (g.attributes.normal.getY(0) < 0) { g.index.array.reverse(); g.computeVertexNormals(); } put(M.asphalt, g); void r; }
@@ -92,11 +93,10 @@ export function buildBelt(world) {
     const pn = new THREE.Mesh(new THREE.PlaneGeometry(8, 2.75), new THREE.MeshStandardMaterial({ map: signTex(lines), emissive: 0xffffff, emissiveMap: signTex(lines), emissiveIntensity: 0.12 }));
     pn.position.set(p.x + r.x * 2, DECK + 6.2, p.z + r.z * 2); pn.rotation.y = Math.atan2(-p.tx, -p.tz); root.add(pn); };
   gantry(40, ['BELT PKWY', 'SHEEPSHEAD BAY RD · EXIT 8']);
-  gantry(EXIT_S - 160, ['EXIT 7', 'OCEAN PKWY · CONEY ISLAND ↘']);
-  gantry(EXIT_S - 12, ['EXIT 7 ↘', 'CONEY ISLAND · KEEP RIGHT']);
+  gantry(EXIT_S - 12, ['BELT PKWY WEST', 'ALL LANES → 8 AV · SUNSET PARK']);
   gantry(LS + 30, ['BRIGHTON BEACH', 'EXIT 7A · BRIGHTON BEACH AV']);
   gantry(EXIT_B - 12, ['EXIT 7B ↘', 'GOWANUS EXPWY · SUNSET PARK']);
-  gantry(EXIT_B - 110, ['EXIT 7B · 8 AV', 'SUNSET PARK · KEEP RIGHT ↘']);
+  gantry(EXIT_B - 70, ['EXIT 7B · 8 AV', 'SOCCER TAVERN · KEEP RIGHT ↘']);
 
   // ---- below: Brighton / Sheepshead Bay ------------------------------------------------------------------------------------
   const BAY_Z = R + 120;   // the bay starts south of the loop
@@ -140,7 +140,7 @@ export function buildBelt(world) {
   for (let i = 0; i < 12; i++) { const car = trafficCar(M, i); root.add(car); Z.traffic.push({ m: car, lane: i % 3, s: (i * 89) % PER, v: 19 + (i % 5) * 2.4 }); }
 
   // ---- the on-ramp gantry on W 8th St (coney side) ----
-  { const x = (RAMP.x0 + RAMP.x1) / 2, z = -536; const tex = signTex(['BELT PKWY', 'SHEEPSHEAD BAY · BRIGHTON ↑']);
+  { const x = (RAMP.x0 + RAMP.x1) / 2, z = -536; const tex = signTex(['BELT PKWY WEST ↑', '8 AV · SUNSET PARK · SOC TAV']);
     for (const dx of [-11, 11]) { const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 7.2, 0.4), M.steel); p2.position.set(x + dx, 3.6, z); scene.add(p2); world.box([x + dx - 0.3, 0, z - 0.3], [x + dx + 0.3, 7.2, z + 0.3]); }
     const bm = new THREE.Mesh(new THREE.BoxGeometry(22, 0.35, 0.35), M.steel); bm.position.set(x, 7.0, z); scene.add(bm);
     const pn = new THREE.Mesh(new THREE.PlaneGeometry(9, 3), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.15 })); pn.position.set(x, 6.1, z + 0.25); scene.add(pn); }
@@ -166,10 +166,11 @@ function update(dt) {
   if (!p || p.dead || now - Z.lastTrip < 3) return;
   const v = ctx.vehicles?.mounted, here = v ? v.pos : p.position;
   if (inZone(here) && ctx.state === 'playing' && ctx.input?.pressed?.has?.('KeyT')) { ctx.input.pressed.delete('KeyT'); exit(); return; }
-  if (inZone(here) && !Z.hintT) { Z.hintT = 1; ctx.hud?.toast?.('BELT PKWY LOOP — keep right at EXIT 7 (or T) for Coney', 3200); }
+  if (inZone(here) && !Z.hintT) { Z.hintT = 1; ctx.hud?.toast?.('BELT PKWY WESTBOUND — keep right at EXIT 7B for 8 Av · Soccer Tavern (T: back to Coney)', 3600); }
   if (!inZone(here)) Z.hintT = 0;
   if (v && !Z.busy && v.pos.x > RAMP.x0 && v.pos.x < RAMP.x1 && v.pos.z > RAMP.z0 && v.pos.z < RAMP.z1) enter();   // on-ramp
-  if (!Z.busy && inZone(here)) { const q = project(here.x, here.z - ZONE.oz); if (q.d > 2.2 && q.s > EXIT_S && q.s < EXIT_S + EXIT_L) exit(); if (q.d > 2.2 && q.s > EXIT_B && q.s < EXIT_B + EXIT_L && v && Z.world.W.tavern) { Z.busy = true; Z.lastTrip = now; Z.world.W.tavern.arrive('belt'); setTimeout(() => { Z.busy = false; }, 4000); } }   // right lane through the EXIT 7 gore = off you go
+  if (!Z.busy && inZone(here)) { const q = project(here.x, here.z - ZONE.oz); const off7B = q.d > 2.2 && q.s > EXIT_B && q.s < EXIT_B + EXIT_L, end = q.s > WEST_END && q.s < WEST_END + 60;   // westbound only: 7B, or the end of the run
+    if ((off7B || end) && Z.world.W.tavern) { Z.busy = true; Z.lastTrip = now; Z.world.W.tavern.arrive('belt'); setTimeout(() => { Z.busy = false; }, 4000); } }   // right lane through the EXIT 7 gore = off you go
 }
 function moveTo(x, y, z, h, speed) {
   const { ctx } = Z; const v = ctx.vehicles?.mounted, p = ctx.player;
@@ -183,7 +184,7 @@ function fade(text, fn) {
   setTimeout(() => { try { fn(); } catch (e) { console.warn('[belt]', e); } if (fl) { fl.style.fontSize = '44px'; fl.textContent = text; }
     setTimeout(() => { if (f) f.style.opacity = '0'; if (fl) fl.textContent = ''; setTimeout(() => { if (f) { f.style.transition = ''; fl && (fl.style.fontSize = ''); } Z.busy = false; }, 400); }, 900); }, 380);
 }
-function enter() { const sp = Math.max(18, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0)); fade('BELT PARKWAY', () => { const q = at(20), r = right(q), off = -ROAD / 2 + SH + LW * 2.5; moveTo(q.x + r.x * off, DECK, q.z + r.z * off + ZONE.oz, Math.atan2(-q.tx, -q.tz), sp); }); }
+function enter() { const sp = Math.max(18, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0)); fade('BELT PKWY WESTBOUND', () => { const q = at(WEST0), r = right(q), off = -ROAD / 2 + SH + LW * 2.5; moveTo(q.x + r.x * off, DECK, q.z + r.z * off + ZONE.oz, Math.atan2(-q.tx, -q.tz), sp); }); }
 function exit() { const sp = Math.max(10, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0) * 0.6); fade('EXIT 7 · CONEY ISLAND', () => moveTo(BACK.x, 0, BACK.z, BACK.h, Z.ctx.vehicles?.mounted ? sp : 0)); }
 
 // ---------------------------------------------------------------------------------------------------------------------------

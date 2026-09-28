@@ -29,9 +29,13 @@ const LINES_CFG = [
   { id: 'D', color: '#ff6319', fg: '#fff', stwX: -58.2, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 340, off: 41,
     dest: { out: 'Norwood-205 St', in: 'Coney Island|Stillwell Av' }, bound: { out: 'Norwood–205th Street–bound D', in: 'Coney Island–bound D' },
     strip: ['Stillwell Av', 'Bay 50 St', '25 Av', 'Bay Pkwy', '20 Av', '18 Av', '79 St', '71 St', '62 St', 'Ft Hamilton'] },
+  // the N: a Sea Beach express straight to 8 Av (Soccer Tavern) — every minute (a short dwell, it turns just past the throat)
+  { id: 'N', color: '#fccc0a', fg: '#111', stwX: -43.1, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 60, off: 7, turn: 150, dwell: 16,
+    dest: { out: '8 Av|Sunset Park', in: 'Coney Island|Stillwell Av' }, bound: { out: '8th Avenue–bound N express', in: 'Coney Island–bound N' },
+    strip: ['Stillwell Av', '8 Av'] },
 ];
 const NAMES = { STW: ['Coney Island–Stillwell Av', 'Coney Island–Stillwell Avenue'], W8: ['W 8 St–NY Aquarium', 'West 8th Street–New York Aquarium'], NEP: ['Neptune Av', 'Neptune Avenue'],
-  OCP: ['Ocean Pkwy', 'Ocean Parkway'], BRT: ['Brighton Beach', 'Brighton Beach'], B50: ['Bay 50 St', 'Bay 50th Street'], A25: ['25 Av', '25th Avenue'] };
+  OCP: ['Ocean Pkwy', 'Ocean Parkway'], N8: ['8 Av', '8th Avenue, Sunset Park'], BRT: ['Brighton Beach', 'Brighton Beach'], B50: ['Bay 50 St', 'Bay 50th Street'], A25: ['25 Av', '25th Avenue'] };
 const LINES = [], STN = {}, G = { hudT: 0 }; let MAPR = null, MAPS = null;   // G: the shared HUD / clocks / PA state
 let R = null, SKEW = 0;
 const W8U = new THREE.Vector2(W8.P1.x - W8.P0.x, W8.P1.y - W8.P0.y).normalize();   // R: the line being updated (every function below works on R)
@@ -92,12 +96,13 @@ function buildLine() {
   let stops, seq;
   if (cfg.id === 'F') { stops = [st('STW', sStw), st('W8', sW8), st('NEP', (sAt((p) => p.x > 440 && p.z < NEP_Z) ?? s - 20) + LEN / 2 - 10, { both: true })]; seq = [0, 1, 2, 1]; }
   else if (cfg.id === 'Q') { stops = [st('STW', sStw), st('W8', sW8), st('OCP', sAt((p) => p.x > 1005) ?? s - 200, { both: true }), st('BRT', s - 4, { hidden: true })]; seq = [0, 1, 2, 3, 2, 1]; }
+  else if (cfg.id === 'N') { stops = [st('STW', sStw), st('N8', Math.min(s - 4, sStw + cfg.turn), { hidden: true })]; seq = [0, 1]; }
   else { stops = [st('STW', sStw), st('B50', sAt((p) => p.z < -735) ?? s - 200, { both: true }), st('A25', s - 4, { hidden: true })]; seq = [0, 1, 2, 1]; }
   R.stops = stops;
   // timetable: dwell at each stop, jerk-limited runs between them (wall clock: every client sees the same trains)
   const runT = (d) => { d = Math.abs(d); const dA = VMAX * VMAX / ACC; return d >= dA ? d / VMAX + VMAX / ACC : 2 * Math.sqrt(d / ACC); };
   R.legs = []; let T = 0;
-  for (let i = 0; i < seq.length; i++) { const a = stops[seq[i]], b = stops[seq[(i + 1) % seq.length]]; const dw = a.hidden ? 20 : DWELL[a.id] || 25;
+  for (let i = 0; i < seq.length; i++) { const a = stops[seq[i]], b = stops[seq[(i + 1) % seq.length]]; const dw = a.hidden ? (cfg.dwell ? 2 : 20) : cfg.dwell || DWELL[a.id] || 25;
     R.legs.push({ kind: 'dwell', t0: T, t1: T + dw, stop: a, next: b, dir: b.s > a.s ? 1 : -1 }); T += dw;
     const rt = runT(b.s - a.s); R.legs.push({ kind: 'run', t0: T, t1: T + rt, a, b }); T += rt; }
   R.cycle = T;
@@ -224,7 +229,7 @@ function update(dt) {
   // boarding: the train is at a platform with its doors open and you're on that platform near a door
   R.boardable = null; R.open = open; R.side = dwellSide; R.leg = l;
   const playing = ctx.state === 'playing', p = ctx.player;
-  if (l.kind === 'dwell' && !l.next.hidden && open > 0.8 && !R.aboard && !p.dead && !p.mounted) {   // (not onto a train about to run out of the map)
+  if (l.kind === 'dwell' && (!l.next.hidden || R.id === 'N') && open > 0.8 && !R.aboard && !p.dead && !p.mounted) {   // (not onto a train about to run out of the map)
     const me = p.position; let best = null, bd = 4.5;
     R.cars.forEach((g, c) => { for (const dz of DOORZ) for (const sx of dwellSide === 2 ? [-1, 1] : [dwellSide]) { _a.set(sx * 2.2, FLOOR, dz).applyMatrix4(g.matrixWorld); const d = Math.hypot(_a.x - me.x, _a.z - me.z); if (d < bd && Math.abs(_a.y - me.y) < 2.5) { bd = d; best = { c, dz, sx }; R.doorPos.copy(_a); } } });
     if (best) R.boardable = { ...best, next: l.next };
@@ -240,8 +245,8 @@ function update(dt) {
   }
   // riding: you stand in the car and can walk its aisle (WASD / stick, relative to where you look); the car carries you and
   // turns you with it on the curves. At a stop: F, or walk out through an open door on the platform side, gets you off.
-  if (R.aboard && l.kind === 'dwell' && l.next.hidden && open > 0.8 && t > l.t1 - 5.5) { if (R.id === 'D' && R.W.tavern) { if (R.stayKey !== l.t0) { R.stayKey = l.t0; R.W.tavern.stayOn(); } } else { K.toast(`The ${R.id} runs on to ${l.next.name}, past the edge of the map. Everybody off at ${l.stop.name}.`, 4200); alight(); } }
-  if (R.aboard && R.id === 'D' && R.W.tavern && l.kind === 'run' && l.b.hidden && t - l.t0 > 4) { alight(true); R.W.tavern.arrive('D'); }
+  if (R.aboard && l.kind === 'dwell' && l.next.hidden && open > 0.8 && t > l.t1 - 5.5) { if ((R.id === 'D' || R.id === 'N') && R.W.tavern) { if (R.stayKey !== l.t0) { R.stayKey = l.t0; R.W.tavern.stayOn(); } } else { K.toast(`The ${R.id} runs on to ${l.next.name}, past the edge of the map. Everybody off at ${l.stop.name}.`, 4200); alight(); } }
+  if (R.aboard && (R.id === 'D' || R.id === 'N') && R.W.tavern && l.kind === 'run' && l.b.hidden && t - l.t0 > 4) { alight(true); R.W.tavern.arrive(R.id === 'N' ? 'Nx' : 'D'); }
   if (R.aboard) {
     const A = R.aboard, g = R.cars[A.c]; g.updateMatrixWorld(true);
     const head = Math.atan2(g.matrixWorld.elements[8], g.matrixWorld.elements[10]);   // the car's local +z in world

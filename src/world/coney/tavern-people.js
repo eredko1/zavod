@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { hangkit as K, sell, ITEMS, kitQA } from '../hangkit.js';
 import { buildPerson, peopleReady } from '../people.js';
-import { dressFigure, standTall } from '../outfits.js';
+import { dressFigure, standTall, buildChar } from '../outfits.js';
 import { nameTag } from '../deli.js';
 
 // bar items (registered here, not in hangkit.js: they only exist once the tavern is built)
@@ -38,6 +38,8 @@ export function buildTavernPeople(world) {
   const kPos = new THREE.Vector3(stoolX + 0.1, SW, oz + 17.5);
   const venK = K.vendor({ name: 'KENNY', pos: kPos, r: 2.0, fig: kenny, talk: (Kk, again) => kennyTalk(again) });
   P.kenny.v = venK;
+  // Kenny's F point slides along the counter to wherever you stand, so at the bar he's always the one you talk to (the regulars were nearer)
+  P.kPos = kPos; P.kz = [oz + 14.2, oz + 26.8];
   // ---- the regulars, on the stools ----
   const reg = [
     { id: 'lou', name: 'UNCLE LOU', z: 15.3, o: { avatar: 'm10', seed: 61, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: null },
@@ -47,6 +49,9 @@ export function buildTavernPeople(world) {
   for (const r of reg) { const f = person(r.o, r.dress, 1.7); f.group.position.set(stoolX - 0.08, SW + 0.36, oz + r.z); f.group.rotation.y = Math.PI / 2; tag(f, r.name, '#cfe3ff');
     r.v = K.vendor({ name: r.name, pos: new THREE.Vector3(stoolX - 0.5, SW, oz + r.z), r: 1.3, fig: f, noMap: true, talk: (Kk, again) => regularTalk(r.id, again) }); r.f = f; }
   P.reg = reg;
+  // THE ELF, from the crew: leaning on the end of the bar with his knife, buying rounds of baijiu for whoever's around
+  try { const e = buildChar('elf', ctx); if (e) { e.group.position.set(stoolX - 0.55, SW, oz + 24.4); e.group.rotation.y = Math.PI / 2; world.scene.add(e.group); P.figs.push(e); tag(e, 'THE ELF', '#b6ffb0');
+    P.elf = { f: e, v: K.vendor({ name: 'THE ELF', pos: new THREE.Vector3(stoolX - 1.1, SW, oz + 24.4), r: 1.2, fig: e, noMap: true, talk: (Kk, again) => elfTalk(again) }) }; } } catch (e) { console.warn('[tavern] elf', e); }
   // ---- the crew at the front high-top ----
   const crew = [
     { id: 'tony', name: 'BIG TONY', at: [1.25, 14.55], face: -2.3, o: { avatar: 'm10', seed: 70 }, dress: { top: 'track', jacket: 0x0c0c0c, stripe: 0xc9a040, bottom: 'track', pants: 0x0c0c0c }, h: 1.80 },
@@ -93,6 +98,12 @@ function menu(after) {
       return { text: `KENNY: «Bucket of five. ${n < 5 ? `Your hands only took ${n} — rest is back in your pocket.` : 'Share it. B passes it round when your friends are close.'} 乾杯!»`, choices: [{ label: '乾杯!', go: null }] }; } },
   ];
 }
+const ELF = ['THE ELF: «Kenny pours like it\'s 1929 and he\'s scared of the cops. I like Kenny.»', 'THE ELF: «Er Guo Tou is not a drink. It\'s a decision.»', 'THE ELF: «Ah Fai took forty from me at darts. I\'m taking it back tonight. Three boilermakers in. Perfect conditions.»', 'THE ELF: «Sunset Park has better dumplings than Brighton. Say that in Brighton and see what happens.»'];
+function elfTalk(again) {
+  return { text: again ? pick(ELF) : 'THE ELF: «Bratan! Sit. Kenny — a round of the two-dollar stuff. On me. Everybody drinks.»', choices: [
+    { label: 'Take the shot (on the Elf)', go: () => { const ok = K.give('erguotou'); return { text: ok ? 'THE ELF: «Za nas! 乾杯!» (He slides you an Er Guo Tou. B to drink.)' : 'THE ELF: «Your hands are full, bratan. Drink what you got first.»', choices: [{ label: 'Za nas', go: null }] }; } },
+    { label: 'Tell me something', go: () => ({ text: pick(ELF), choices: [{ label: 'Ha', go: null }] }) }, { label: 'Later', go: null }] };
+}
 function kennyTalk(again) {
   const node = () => ({ text: again ? pick(KENNY_Q) : 'KENNY: «Soccer Tavern. Cash only, cheapest pour on 8th Ave. 你好 — what are you having?»', choices: [...menu(node), { label: 'Who\'s who in here?', go: () => ({ text: 'KENNY: «Stools: Uncle Lou — Liverpool. Mr. Wong — leaving, supposedly. Ah Fai — darts captain, don\'t bet him. Front table: Big Tony, Sonny, Duck. Be polite. Tip Duck, he remembers.»', choices: [{ label: 'Got it', go: null }] }) }, { label: 'Put it on my tab?', go: () => ({ text: 'KENNY: «冇數賒. No tabs. Not since 1929. There\'s a sign. There are three signs.»', choices: [{ label: 'Fair', go: null }] }) }, { label: 'Later', go: null }] });
   return node();
@@ -138,10 +149,12 @@ function update(dt) {
   for (const f of P.figs) f.group.visible = vis;
   if (!vis) return; P.t += dt;
   const inBar = T.inBar(me), dlg = K.state()?.dialog?.name;
+  if (!dlg) P.kPos.z = Math.max(P.kz[0], Math.min(P.kz[1], me.z));
   // Kenny: drifts along the aisle (pouring, wiping), turns to whoever's at the bar; stops for you
   const k = P.kenny; if (k.v.hurt?.down) { k.f.update(dt, 0); } else if (dlg === 'KENNY' || (inBar && Math.hypot(me.x - k.v.pos.x, me.z - k.v.pos.z) < 2.2)) { k.f.update(dt, 0); face(k.f, me.x, me.z, dt); }
   else { if (walkTo(k.f, k.to, dt, 0.8)) { k.wait -= dt; if (k.wait < 0) { k.wait = 3 + Math.random() * 6; k.to.set(k.home.x, k.home.y, k.home.z - 3 + Math.random() * 7); } } }
   P.wb?.update(dt, 0);
+  P.elf?.f.update(dt, 0); if (P.elf && dlg === 'THE ELF') face(P.elf.f, me.x, me.z, dt);
   for (const r of P.reg) { r.f.update(dt, 0); if (dlg === r.name) face(r.f, me.x, me.z, dt); }
   // the crew: when a stranger walks in, BIG TONY comes over, says his piece, goes back to the table
   for (const c of P.crew) {

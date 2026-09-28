@@ -3,7 +3,7 @@
 // the N back to Coney. bar: buy a Tsingtao. darts: a leg vs AI to a finish (QA throws). mp: two browsers, one darts table.
 import pw from 'playwright-core';
 const { chromium } = pw;
-const out = process.argv[2] || '/tmp', parts = (process.argv[3] || 'travel,bar,back,darts,mp').split(',');
+const out = process.argv[2] || '/tmp', parts = (process.argv[3] || 'travel,bus,bar,back,darts,mp').split(',');
 const URL = `http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=night`;
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio'] });
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
@@ -34,6 +34,16 @@ if (parts.includes('travel')) {
     const p = await pos(pg); ok(arrived, 'the D past Bay 50 St → 62 St → N → 8 Av, Sunset Park', JSON.stringify(p));
     await pg.waitForTimeout(1500); await pg.screenshot({ path: `${out}/tavern-arrive-d.png` });
   }
+  // ---- the N express: every minute from Stillwell straight to 8 Av ----
+  await pg.evaluate(() => window.__game.tavern.leave('N')); await pg.waitForTimeout(3000);
+  const N = await pg.evaluate(async () => { const S = window.__game.subway.line('N'); if (!S) return { none: true }; const cyc = S.state().cycle; const u = S.until('STW'); S.skew(u + 1); await new Promise((r) => setTimeout(r, 2500));
+    const st = S.stops()[0]; const [x, y, z] = st.at; let door = null; for (const dx of [-2.9, 2.9]) { window.__game.teleport(x + dx, y + 1.2, z, 0, 0); await new Promise((r) => setTimeout(r, 700)); door = S.state().door; if (door) break; }
+    if (door) { window.__game.teleport(door[0], door[1] + 0.05, door[2], 0, 0); await new Promise((r) => setTimeout(r, 500)); S.board(); }
+    await new Promise((r) => setTimeout(r, 300)); return { cyc, door, st: st.at, open: S.state().open, aboard: S.state().aboard, p: window.__ctx.player.position.toArray().map((v) => +v.toFixed(1)) }; });
+  if (!N.aboard) await pg.screenshot({ path: `${out}/n-platform.png` });
+  ok(N.cyc && N.cyc <= 70, 'the N comes about every minute', JSON.stringify(N.cyc));
+  ok(N.aboard, 'boarded the N at Stillwell', JSON.stringify(N));
+  if (N.aboard) { let arrived = false; for (let i = 0; i < 40 && !arrived; i++) { await pg.waitForTimeout(1000); arrived = (await T(pg)).inZone; } ok(arrived, 'the N express → 8 Av, Sunset Park'); await pg.screenshot({ path: `${out}/tavern-arrive-n.png` }); }
   // ---- the Belt: a car on the loop, right lane through EXIT 7B → 8th Ave in the car ----
   await pg.evaluate(() => { const B = window.__game.belt; const a = B.at(B.exitB - 60, 3.8); window.__game.teleport(a[0], a[1], a[2], a[3], 0); }); await pg.waitForTimeout(600);
   await pg.evaluate(() => { const V = window.__ctx.vehicles; const p = window.__ctx.player.position; const B = window.__game.belt; const a = B.at(B.exitB - 30, 3.8); const c = V.spawnCar(a[0], a[2], a[3], 'sedan', 0x2b3f73, a[1]); V.mount(c); }); await pg.waitForTimeout(600);
@@ -60,6 +70,16 @@ if (parts.includes('travel')) {
   await pg.screenshot({ path: `${out}/tavern-home.png` });
   await pg.evaluate(() => window.__game.tavern.arrive('D')); await pg.waitForTimeout(5000);   // back for the next parts
 }
+if (parts.includes('bus')) {
+  // ---- a Coney bus: board at a stop, stay on three stops, it runs on to 8 Av ----
+  await pg.evaluate(() => window.__game.teleport(-47, 0, -226, 0, 0)); await pg.waitForTimeout(1500);
+  const bus = await pg.evaluate(async () => { const T = window.__game.traffic; for (let i = 0; i < 1500; i++) { const b = T.buses().find((q) => q.state === 'dwell' && q.door > 0.8); if (b) return b; await new Promise((r) => setTimeout(r, 100)); } return null; });
+  ok(!!bus, 'a bus at a stop, doors open', bus ? `${bus.route} @ ${bus.stop}` : 'none');
+  if (bus) { await pg.evaluate((id) => window.__game.traffic.toBusDoor(id), bus.id); await pg.waitForTimeout(400); await pg.keyboard.press('KeyF'); await pg.waitForTimeout(600);
+    ok(!!(await pg.evaluate(() => window.__game.traffic.ride())), 'on the bus');
+    let arrived = false; for (let i = 0; i < 300 && !arrived; i++) { await pg.waitForTimeout(1000); arrived = (await T(pg)).inZone; }
+    ok(arrived, 'three stops in, the bus runs on to 8 Av, Sunset Park', JSON.stringify(await pos(pg))); await pg.screenshot({ path: `${out}/tavern-arrive-bus.png` }); }
+}
 if (parts.includes('bar')) {
   // ---- KENNY: a Tsingtao ----
   await pg.evaluate(() => { const k = window.__game.tavernPeople.kenny(); window.__game.teleport(k[0] - 0.3, k[1], k[2], -Math.PI / 2, 0); window.__game.tavernPeople.kit.give(30); }); await pg.waitForTimeout(900);
@@ -70,6 +90,11 @@ if (parts.includes('bar')) {
   st = await pg.evaluate(() => window.__game.tavernPeople.kit.state()); ok(st.inv.includes('tsingtao'), 'bought a Tsingtao from Kenny', JSON.stringify({ inv: st.inv, cash: st.cash, text: st.dialog?.text }));
   await pg.evaluate(() => window.__game.tavernPeople.kit.close()); await pg.keyboard.press('KeyB'); await pg.waitForTimeout(800);
   st = await pg.evaluate(() => window.__game.tavernPeople.kit.state()); ok(st.drunk > 0 && !st.inv.includes('tsingtao'), 'B: drank it', JSON.stringify({ drunk: st.drunk }));
+  // Kenny from anywhere along the counter, even right beside a regular on his stool (friends: "keeps saying to talk to other people")
+  const who = []; for (const dz of [-2.2, 1.6, 4.45, 7]) { await pg.evaluate((dz) => { const k = window.__game.tavernPeople.kenny(); window.__game.tavernPeople.kit.close(); window.__game.teleport(k[0] - 0.25, k[1], window.__game.tavern.zone.oz + 17.5 + dz, -Math.PI / 2, 0); }, dz); await pg.waitForTimeout(500);
+    await pg.keyboard.press('KeyF'); await pg.waitForTimeout(400); who.push(await pg.evaluate(() => window.__game.tavernPeople.kit.state().dialog?.name || null)); }
+  await pg.evaluate(() => window.__game.tavernPeople.kit.close());
+  ok(who.every((n) => n === 'KENNY'), 'F anywhere at the counter talks to Kenny', JSON.stringify(who));
   // the crew walks up to a stranger
   await pg.evaluate(() => { const d = window.__game.tavern.door; window.__game.teleport(d[0] - 0.8, d[1], d[2] + 5.5, Math.PI - 0.6, 0.02); }); await pg.waitForTimeout(6000);
   const g = await pg.evaluate(() => ({ greeted: window.__game.tavernPeople.greeted(), crew: window.__game.tavernPeople.crew() })); ok(g.greeted, 'BIG TONY walks up and says his piece', JSON.stringify(g.crew[0]));
