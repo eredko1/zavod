@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { OSM } from './osm.js';
 import { W8 } from './w8th.js';
 import { hangkit as K } from '../hangkit.js';
+import { makeR160, drawLED, rideAudio, pa, STOPS_STRIP } from './r160.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const CAR = 18.4, NCAR = 6, LEN = CAR * NCAR, RAIL = 7.5, FLOOR = 1.1;   // car floor = platform height above top of rail
@@ -114,65 +115,30 @@ function headS() {
   const l = legNow(), t = now() % R.cycle;
   if (l.kind === 'dwell') return l.stop.s;
   const D = l.b.s - l.a.s, d = Math.abs(D), T = l.t1 - l.t0, u = t - l.t0; const dA = VMAX * VMAX / ACC;
-  let x; if (d >= dA) { const ta = VMAX / ACC; x = u < ta ? 0.5 * ACC * u * u : u > T - ta ? d - 0.5 * ACC * (T - u) ** 2 : 0.5 * ACC * ta * ta + VMAX * (u - ta); }
-  else { const h = T / 2; x = u < h ? 0.5 * ACC * u * u : d - 0.5 * ACC * (T - u) ** 2; }
+  // jerk-limited: velocity ramps along a smoothstep (∫ = k³ − k⁴/2), so the train eases into and out of its acceleration and
+  // braking like a real one (same run time and distance as the old trapezoid, so the timetable is unchanged)
+  const I = (k) => k * k * k - k * k * k * k / 2;
+  let x; if (d >= dA) { const ta = VMAX / ACC; x = u < ta ? VMAX * ta * I(u / ta) : u > T - ta ? d - VMAX * ta * I((T - u) / ta) : VMAX * ta / 2 + VMAX * (u - ta); }
+  else { const h = T / 2, vp = ACC * h; x = u < h ? vp * h * I(u / h) : d - vp * h * I((T - u) / h); }
   return l.a.s + Math.sign(D) * x;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// an R160-ish car: stainless shell with see-through window band, a door leaf per door (slides at stops), grey floor, orange/yellow
-// bucket seats down both sides, poles, light strips — the interior shows when you're riding
+// the R160 cars come from coney/r160.js; here every static piece is baked into one mesh per material and the door leaves into
+// sliding groups (side × direction × material)
 function buildTrain(scene) {
-  const S = (c, r = 0.5, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
-  const alu = S(0xc9cdd1, 0.32, 0.85), glass = new THREE.MeshStandardMaterial({ color: 0xbfd6e0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
-  const inside = S(0xe4e1d8, 0.6), floor = S(0x6f6d68, 0.9), seatA = S(0xe38a1c, 0.5), seatB = S(0xe0c021, 0.5), pole = S(0xd9dde0, 0.2, 0.9), lamp = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf4f7ff, emissiveIntensity: 1.4 });
-  const doorM = S(0x9aa0a6, 0.35, 0.8), bull = new THREE.MeshStandardMaterial({ map: bulletTex(), emissive: 0xffffff, emissiveMap: bulletTex(), emissiveIntensity: 0.6 });
-  const W = 3.0, H = 3.3, L = CAR - 0.4, DOORS = [-6.2, -2.1, 2.1, 6.2];
-  const cars = [];
-  for (let c = 0; c < NCAR; c++) {
-    const g = new THREE.Group(); g.name = 'fTrainCar'; scene.add(g);
-    const add = (geo, m, x, y, z, noShadow) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = !noShadow; me.receiveShadow = true; g.add(me); return me; };
-    add(new THREE.BoxGeometry(W, 0.12, L), floor, 0, FLOOR, 0);
-    add(new THREE.BoxGeometry(W, 0.1, L), alu, 0, FLOOR + H - 0.05, 0);                                   // roof
-    add(new THREE.BoxGeometry(W - 0.2, 0.02, L - 0.3), inside, 0, FLOOR + H - 0.14, 0, true);              // ceiling
-    for (const zz of [-L / 2, L / 2]) add(new THREE.BoxGeometry(W, H, 0.08), alu, 0, FLOOR + H / 2, zz);    // end walls
-    add(new THREE.BoxGeometry(W + 0.02, 1.1, L), alu, 0, FLOOR - 0.5, 0);                                  // underframe
-    for (const sx of [-1, 1]) {
-      // wall bands between the doors: lower panel, glass band, upper panel
-      const seg = [[-L / 2, DOORS[0] - 0.65], [DOORS[0] + 0.65, DOORS[1] - 0.65], [DOORS[1] + 0.65, DOORS[2] - 0.65], [DOORS[2] + 0.65, DOORS[3] - 0.65], [DOORS[3] + 0.65, L / 2]];
-      for (const [z0, z1] of seg) { const l = z1 - z0, zc = (z0 + z1) / 2;
-        add(new THREE.BoxGeometry(0.06, 1.0, l), alu, sx * W / 2, FLOOR + 0.5, zc); add(new THREE.BoxGeometry(0.02, 1.0, l), glass, sx * W / 2, FLOOR + 1.5, zc, true); add(new THREE.BoxGeometry(0.06, H - 2.0, l), alu, sx * W / 2, FLOOR + 2.0 + (H - 2.0) / 2, zc);
-        add(new THREE.BoxGeometry(0.45, 0.42, l - 0.3), zc % 2 > 0 ? seatA : seatB, sx * (W / 2 - 0.32), FLOOR + 0.42, zc, true); }   // bench of bucket seats
-      for (const dz of DOORS) { const leaf = add(new THREE.BoxGeometry(0.05, 2.0, 0.64), doorM, sx * W / 2, FLOOR + 1.0, dz - 0.32); const leaf2 = add(new THREE.BoxGeometry(0.05, 2.0, 0.64), doorM, sx * W / 2, FLOOR + 1.0, dz + 0.32);
-        leaf.userData.door = { sx, z: dz - 0.32, dir: -1 }; leaf2.userData.door = { sx, z: dz + 0.32, dir: 1 };
-        add(new THREE.BoxGeometry(0.06, H - 2.0, 1.3), alu, sx * W / 2, FLOOR + 2.0 + (H - 2.0) / 2, dz); }
-      add(new THREE.PlaneGeometry(0.7, 0.7), bull, sx * (W / 2 + 0.04), FLOOR + 2.55, L / 2 - 1.2, true).rotation.y = sx * Math.PI / 2;   // the orange F bullet
-    }
-    for (const dz of DOORS) add(new THREE.CylinderGeometry(0.03, 0.03, H - 0.2, 8), pole, 0, FLOOR + H / 2, dz, true);
-    add(new THREE.BoxGeometry(0.25, 0.04, L - 1), lamp, -0.7, FLOOR + H - 0.17, 0, true); add(new THREE.BoxGeometry(0.25, 0.04, L - 1), lamp, 0.7, FLOOR + H - 0.17, 0, true);
-    // trucks: frame + two wheelsets each, at the bogie centres (±(CAR/2 − 2.6)); they're what sits on the rails
-    const truckM = S(0x2a2b2d, 0.7, 0.5), wheelM = S(0x5b5d60, 0.4, 0.9);
-    for (const tz of [-(CAR / 2 - 2.6), CAR / 2 - 2.6]) { add(new THREE.BoxGeometry(2.3, 0.45, 2.9), truckM, 0, 0.55, tz);
-      for (const wz of [-1.05, 1.05]) for (const wx of [-0.75, 0.75]) { const w = add(new THREE.CylinderGeometry(0.43, 0.43, 0.16, 16), wheelM, wx, 0.43, tz + wz); w.rotation.z = Math.PI / 2; } }
-    // cab ends on the first and last car: windshield, headlights, marker lights, route sign
-    if (c === 0 || c === NCAR - 1) { const e = (c === 0 ? 1 : -1) * (L / 2 + 0.05);
-      add(new THREE.BoxGeometry(2.1, 0.9, 0.04), new THREE.MeshStandardMaterial({ color: 0x0c1014, roughness: 0.05, metalness: 0.6 }), 0, FLOOR + 1.75, e, true);
-      const hl = new THREE.MeshStandardMaterial({ color: 0xfffbe8, emissive: 0xfff4d0, emissiveIntensity: 0 }); g.userData.head = hl;
-      for (const sx of [-1, 1]) { add(new THREE.CircleGeometry(0.12, 12), hl, sx * 0.95, FLOOR + 0.55, e + Math.sign(e) * 0.03, true).rotation.y = e > 0 ? 0 : Math.PI;
-        add(new THREE.CircleGeometry(0.06, 10), new THREE.MeshStandardMaterial({ color: 0x44ff66, emissive: 0x33ff55, emissiveIntensity: 1.2 }), sx * 1.2, FLOOR + 2.95, e + Math.sign(e) * 0.03, true).rotation.y = e > 0 ? 0 : Math.PI; }
-      const sgn = add(new THREE.PlaneGeometry(1.5, 0.32), new THREE.MeshStandardMaterial({ map: destTex(), emissive: 0xffffff, emissiveMap: destTex(), emissiveIntensity: 0.9 }), 0.2, FLOOR + 2.5, e + Math.sign(e) * 0.03, true); sgn.rotation.y = e > 0 ? 0 : Math.PI; }
+  const kit = makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite: !!R.ctx.lite }); R.kit = kit;
+  for (const g of kit.cars) {
     g.userData.doors = [];
-    // draw calls: bake every static piece into one mesh per material, the door leaves into four sliding groups (side × direction)
     { const stat = new Map(), doors = new Map(); g.updateMatrix();
       for (const ch of [...g.children]) { if (!ch.isMesh) continue; ch.updateMatrix(); const geo = (ch.geometry.index ? ch.geometry.toNonIndexed() : ch.geometry.clone()).applyMatrix4(ch.matrix);
         if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
-        const key = ch.userData.door ? `${ch.userData.door.sx}|${ch.userData.door.dir}` : null; const map = key ? doors : stat, k = key || ch.material.uuid;
-        if (!map.has(k)) map.set(k, { m: ch.material, list: [], door: ch.userData.door, shadow: ch.castShadow }); map.get(k).list.push(geo); g.remove(ch); }
+        const key = ch.userData.door ? `${ch.userData.door.sx}|${ch.userData.door.dir}|${ch.material.uuid}` : null; const map = key ? doors : stat, k = key || ch.material.uuid;
+        if (!map.has(k)) map.set(k, { m: ch.material, list: [], door: ch.userData.door, shadow: false }); const e = map.get(k); e.list.push(geo); e.shadow ||= ch.castShadow; g.remove(ch); }
       for (const { m, list, shadow } of stat.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.receiveShadow = true; g.add(me); }
-      for (const { m, list, door } of doors.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; me.userData.door = { sx: door.sx, dir: door.dir, z: 0 }; g.add(me); g.userData.doors.push(me); } }
-    cars.push(g);
+      for (const { m, list, door, shadow } of doors.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.userData.door = { sx: door.sx, dir: door.dir, z: 0 }; g.add(me); g.userData.doors.push(me); } }
   }
-  return cars;
+  return kit.cars;
 }
 function destTex() {
   if (destTex.t) return destTex.t; const c = document.createElement('canvas'); c.width = 320; c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#050505'; g.fillRect(0, 0, 320, 64);
@@ -193,7 +159,7 @@ function update(dt) {
   const h = headS(), l = legNow(), t = now() % R.cycle;
   const ds = R.lastH == null ? 0 : h - R.lastH; R.lastH = h; const speed = Math.abs(ds) / Math.max(1e-3, dt), moving = l.kind === 'run' ? Math.sign(l.b.s - l.a.s) : 0;
   const curve = (() => { ptAt(h - 30, _a); ptAt(h - 10, _b); const a1 = Math.atan2(_b.x - _a.x, _b.z - _a.z); ptAt(h + 10, _a); const a2 = Math.atan2(_a.x - _b.x, _a.z - _b.z); let d = a2 - a1; d = Math.atan2(Math.sin(d), Math.cos(d)); return d; })();
-  trackSound(speed, Math.abs(curve));
+  trackSound(speed, Math.abs(curve)); R.acc = (R.acc || 0) + ((speed - (R.lastV ?? speed)) / Math.max(1e-3, dt) - (R.acc || 0)) * Math.min(1, dt * 3); R.lastV = speed;
   // doors: open 2 s into a dwell, close (chime) 4 s before it ends
   const open = l.kind === 'dwell' ? Math.max(0, Math.min(1, (t - l.t0 - 1.5) / 1.2, (l.t1 - 3 - t) / 1.2)) : 0;
   const dwellSide = l.kind === 'dwell' ? sideAt(l.stop) : 0; R.lastOpen = [+open.toFixed(2), dwellSide];
@@ -201,10 +167,15 @@ function update(dt) {
     const sm = h - (c + 0.5) * CAR; ptAt(sm + CAR / 2 - 2.6, _a); ptAt(sm - CAR / 2 + 2.6, _b);   // the two trucks sit on the rails; the body hangs between them
     g.position.copy(_a).add(_b).multiplyScalar(0.5); const dx = _a.x - _b.x, dz = _a.z - _b.z, dy = _a.y - _b.y;
     g.rotation.set(0, Math.atan2(dx, dz), 0); g.rotateX(-Math.atan2(dy, Math.hypot(dx, dz)));
-    const sway = Math.sin(now() * 2.1 + c * 1.7) * 0.004 * Math.min(1, speed / 6) + curve * 0.01; g.rotateZ(sway);   // a little roll: more at speed, leaning out on the curves
-    if (g.userData.head) g.userData.head.emissiveIntensity = (c === 0 ? moving > 0 : moving < 0) ? 2.2 : 0.15;
+    const sway = Math.sin(now() * 2.1 + c * 1.7) * 0.004 * Math.min(1, speed / 6) + Math.sin(now() * 0.9 + c) * 0.0015 * Math.min(1, speed / 6) + curve * 0.01; g.rotateZ(sway);   // a little roll: more at speed, leaning out on the curves
+    // rail joints every 11.9 m (39 ft rails): each truck dips as its wheels cross one (visual only; riders feel it through the camera)
+    if (speed > 0.5) { const jk = Math.min(1, speed / VMAX), dip = (s) => { const q = ((s % JOINT) + JOINT) % JOINT; return q < 0.45 ? Math.sin(q / 0.45 * Math.PI) : 0; };
+      const f = dip(sm + CAR / 2 - 2.6), r = dip(sm - CAR / 2 + 2.6); g.position.y -= (f + r) * 0.006 * jk; g.rotateX((f - r) * 0.0012 * jk); }
+    const lead = c === 0 ? moving > 0 || (l.kind === 'dwell' && l.next.s > l.stop.s) : moving < 0 || (l.kind === 'dwell' && l.next.s < l.stop.s);
+    if (g.userData.head) { g.userData.head.emissiveIntensity = lead ? 2.4 : 0.1; g.userData.mark.emissive.setHex(lead ? 0xffb030 : 0xff1a10); g.userData.mark.emissiveIntensity = 1.8; }
     for (const d of g.userData.doors) d.position.z = d.userData.z + (d.userData.sx === dwellSide || dwellSide === 2 ? d.userData.dir * 0.62 * open : 0);
   });
+  cabin(dt, l, t, open, speed, curve);
   // announcements
   const annKey = l.kind + (l.stop?.id || l.a?.id) + (l.b?.id || l.next?.id || '') + Math.floor(t / R.cycle);
   if (R.aboard && annKey !== R.lastAnn) { R.lastAnn = annKey; announce(l); }
@@ -254,14 +225,14 @@ function update(dt) {
     }
   }
   // doors closing: the chime + the conductor, for riders and for anyone standing at the open doors
-  if (l.kind === 'dwell' && t > l.t1 - 4.6 && t < l.t1 - 4.2 && R.closeKey !== l.t0 && (R.aboard || R.boardable)) { R.closeKey = l.t0; chime(); K.toast('Stand clear of the closing doors, please.', 2400); }
+  if (l.kind === 'dwell' && t > l.t1 - 4.6 && t < l.t1 - 4.2 && R.closeKey !== l.t0 && (R.aboard || R.boardable)) { R.closeKey = l.t0; chime(); K.toast('Stand clear of the closing doors, please.', 2400); if (R.aboard) pa(R.ctx, 'Stand clear of the closing doors, please.'); }
   // touch: the contextual action button (touch.js) says what F does here
   const lab = R.aboard && R.canAlight ? 'GET OFF' : null;   // boarding is a hangkit spot: its "F — BOARD THE F" prompt already gets a tap button on phones (netui.js)
   if (lab) { ctx.actionLabel = lab; R.ownLabel = true; } else if (R.ownLabel) { ctx.actionLabel = null; R.ownLabel = false; }
   if (R.aboard || lab || R.boardable) ctx.interactNear = true;   // weapons.js leaves F (the touch button) to us
   hud(t);
 }
-const DOORZ = [-6.2, -2.1, 2.1, 6.2], _inv = new THREE.Matrix4();
+const DOORZ = [-6.2, -2.1, 2.1, 6.2], JOINT = 11.9, _inv = new THREE.Matrix4();
 const mss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 /** the next F out of a stop, per direction: [{ to, arrive (s until the doors open), leave (s until they close), boarding }] */
 function departures(id, t) {
@@ -340,24 +311,60 @@ function announce(l) {
   if (l.kind === 'dwell') {
     const s = l.stop, nx = l.next; chime();
     const bound = nx.s > s.s ? 'Jamaica–179th Street–bound F local' : 'Coney Island–bound F';
-    K.toast(s.id === 'STW' ? `This is Coney Island–Stillwell Avenue. This is a ${bound} train. The next stop is ${n('W8')}.` : `This is ${s.name}. ${s.id === 'W8' ? 'Transfer is available to the Q train. ' : ''}This is a ${bound} train. The next stop is ${nx.name}.`, 5200);
-  } else { K.toast(`The next stop is ${l.b.name}.`, 3000); }
+    const txt = s.id === 'STW' ? `This is Coney Island–Stillwell Avenue. This is a ${bound} train. The next stop is ${n('W8')}.` : `This is ${s.id === 'W8' ? 'West 8th Street–New York Aquarium' : s.name}. ${s.id === 'W8' ? 'Transfer is available to the Q train. ' : ''}This is a ${bound} train. The next stop is ${nx.id === 'STW' ? 'Coney Island–Stillwell Avenue' : nx.name}.`;
+    K.toast(txt, 5200); pa(R.ctx, txt);
+  } else { const txt = `The next stop is ${l.b.id === 'W8' ? 'West 8th Street–New York Aquarium' : l.b.name}.`; K.toast(txt, 3000); pa(R.ctx, txt); }
+}
+/** the cars' live bits: door-open lights, the LED signs / strip map, ceiling-light flicker, sparks off the shoes at night,
+ *  wheel clack + motor whine for the car you ride */
+const _sp = new THREE.Vector3();
+function cabin(dt, l, t, open, speed, curve) {
+  const M = R.kit.M, idx = (st) => ({ STW: 0, W8: 1, NEP: 2 })[st.id];
+  M.ind.emissiveIntensity = open > 0.05 ? 2.4 : 0;
+  // LED: destination follows the direction of travel; the strip map lights the next stop (blinking while you ride)
+  const run = l.kind === 'run', a = run ? l.a : l.stop, b = run ? l.b : l.next, dest = b.s > a.s ? 'JAM' : 'STW';
+  const line = run ? `Next stop: ${STOPS_STRIP[idx(b)]}` : `This is ${STOPS_STRIP[idx(a)]}`, blink = R.aboard ? Math.floor(now() * 1.6) & 1 : 1;
+  const key = `${dest}|${idx(a)}|${idx(b)}|${line}|${blink}`; if (key !== R.ledKey) { R.ledKey = key; drawLED(R.kit.led, dest, idx(a), idx(b), line, blink); }
+  // lights: a rare flicker (a gap in the third rail, or a tired ballast)
+  R.flk = (R.flk ?? 6) - dt; if (R.flk < 0) { R.flk = 8 + Math.random() * 20; R.flkT = 0.35; }
+  // the cabin is lit by its own panels: at night the interior surfaces glow with them (no real lights = no extra cost)
+  const nk = Math.max(0, Math.min(1, ((R.W.horizon?.cycle?.s ?? 0) - 0.3) / 0.4)), lit = (R.flkT > 0 && Math.sin(R.flkT * 70) > 0.2 ? 0.2 : 1) * (0.08 + 0.55 * nk);
+  if (!M.int.emissiveMap) { for (const m of [M.int, M.floor]) { m.emissive.setHex(0xfff8ec); m.emissiveMap = m.map; m.needsUpdate = true; } }
+  M.int.emissiveIntensity = lit; M.floor.emissiveIntensity = lit * 0.6;
+  R.flkT = Math.max(0, (R.flkT || 0) - dt); M.lamp.emissiveIntensity = R.flkT > 0 && Math.sin(R.flkT * 70) > 0.2 ? 0.25 : 1.2;
+  // sparks: brief showers from the shoes / wheels on the curves and now and then at a joint, at night
+  if (!R.spk) { const n = 60, geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(-999), 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffc070, size: 0.09, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); pts.frustumCulled = false; R.world.scene.add(pts);
+    R.spk = { pts, n, v: new Float32Array(n * 3), life: new Float32Array(n), i: 0 }; }
+  const S = R.spk, night = (R.W.horizon?.cycle?.s ?? 0) > 0.55, near = R.aboard || R.ctx.player.position.distanceTo(R.cars[2].position) < 220;
+  if (night && near && speed > 3 && (Math.abs(curve) > 0.035 ? Math.random() < 0.5 : Math.random() < 0.04)) {
+    const g = R.cars[Math.random() * NCAR | 0], tz = (Math.random() < 0.5 ? -1 : 1) * (CAR / 2 - 2.6) + (Math.random() < 0.5 ? -1.05 : 1.05);
+    for (let k = 0; k < 6; k++) { const i = S.i = (S.i + 1) % S.n; _sp.set((Math.random() < 0.5 ? -1 : 1) * 1.5, 0.3, tz).applyMatrix4(g.matrixWorld); S.pts.geometry.attributes.position.setXYZ(i, _sp.x, _sp.y, _sp.z);
+      S.v[i * 3] = (Math.random() - 0.5) * 5; S.v[i * 3 + 1] = Math.random() * 2.5; S.v[i * 3 + 2] = (Math.random() - 0.5) * 5; S.life[i] = 0.25 + Math.random() * 0.35; } }
+  let live = false; const P = S.pts.geometry.attributes.position;
+  for (let i = 0; i < S.n; i++) { if (S.life[i] <= 0) continue; S.life[i] -= dt; live = true; if (S.life[i] <= 0) { P.setXYZ(i, 0, -999, 0); continue; }
+    S.v[i * 3 + 1] -= 9.8 * dt; P.setXYZ(i, P.getX(i) + S.v[i * 3] * dt, P.getY(i) + S.v[i * 3 + 1] * dt, P.getZ(i) + S.v[i * 3 + 2] * dt); }
+  if (live || S.was) P.needsUpdate = true; S.was = live; S.pts.visible = live;
+  // ride audio: motor whine on acceleration / braking; a click for every axle of your car crossing a rail joint
+  const au = R.au || (R.au = rideAudio(R.ctx)); au.update(!!R.aboard, speed, R.acc || 0);
+  if (R.aboard) { const sm = headS() - (R.aboard.c + 0.5) * CAR, ax = [CAR / 2 - 2.6 + 1.05, CAR / 2 - 2.6 - 1.05, -(CAR / 2 - 2.6) + 1.05, -(CAR / 2 - 2.6) - 1.05].map((o) => sm + o);
+    if (R.ax) ax.forEach((s, k) => { if (Math.floor(s / JOINT) !== Math.floor(R.ax[k] / JOINT) && speed > 0.8) au.click(speed, k * 0.004); }); R.ax = ax; } else R.ax = null;
 }
 /** aboard: steel-wheel rumble (filtered noise, louder with speed) + flange squeal when curving at speed */
 function trackSound(speed, curve) {
   if (!R.aboard) { if (R.snd) R.snd.g.gain.value = R.snd.q.gain.value = 0; return; }
   try {
-    if (!R.snd) { const ac = R.ac || (R.ac = new (window.AudioContext || window.webkitAudioContext)()); const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); let last = 0; for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+    if (!R.snd) { const ac = R.ac || (R.ac = R.ctx.audio?.context || new (window.AudioContext || window.webkitAudioContext)()); const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0); let last = 0; for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
       const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380; const g = ac.createGain(); g.gain.value = 0; src.connect(lp).connect(g).connect(ac.destination); src.start();
       const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 2900; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3100; bp.Q.value = 18; const q = ac.createGain(); q.gain.value = 0; o.connect(bp).connect(q).connect(ac.destination); o.start();
       R.snd = { g, q, o, lp }; }
-    const k = Math.min(1, speed / VMAX); R.snd.g.gain.value = 0.05 + k * 0.32; R.snd.lp.frequency.value = 220 + k * 520;
-    R.snd.q.gain.value = curve > 0.05 && speed > 5 ? Math.min(0.05, (curve - 0.05) * 0.4) * k : 0; R.snd.o.frequency.value = 2800 + Math.sin(now() * 13) * 120;
+    const k = Math.min(1, speed / VMAX), v = R.au?.vol?.() ?? 1; R.snd.g.gain.value = (0.05 + k * 0.32) * v; R.snd.lp.frequency.value = 220 + k * 520;
+    R.snd.q.gain.value = curve > 0.04 && speed > 4 ? Math.min(0.06, (curve - 0.03) * 0.5) * k * v : 0; R.snd.o.frequency.value = 2800 + Math.sin(now() * 13) * 120;
   } catch {}
 }
 function chime() {   // the R160 "ding-dong" (two falling sine tones)
-  try { const ac = R.ac || (R.ac = new (window.AudioContext || window.webkitAudioContext)()); const t = ac.currentTime;
-    for (const [f, d] of [[1046.5, 0], [830.6, 0.32]]) { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; o.type = 'sine'; g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.18, t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.7); o.connect(g).connect(ac.destination); o.start(t + d); o.stop(t + d + 0.75); } } catch {}
+  try { const ac = R.ac || (R.ac = R.ctx.audio?.context || new (window.AudioContext || window.webkitAudioContext)()); const t = ac.currentTime;
+    for (const [f, d] of [[1046.5, 0], [830.6, 0.32]]) { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; o.type = 'sine'; g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.18 * (R.au?.vol?.() ?? 1)), t + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.7); o.connect(g).connect(ac.destination); o.start(t + d); o.stop(t + d + 0.75); } } catch {}
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
