@@ -75,7 +75,7 @@ export function install(ctx, opts) {
     let name = ''; try { name = cleanName(localStorage.getItem('zavod.name')); } catch {}
     if (!name) { U.forceMap = 'coney'; openOnline(); if (U.f) { U.f.room.value = 'lunapark'; U.f.upd(); } return; }
     const info = netInfo(); if (info && info.room === 'lunapark' && curMap() === 'coney') { if (U.ctx.state === 'menu') U.ctx.setState('playing'); return; }
-    const u = new URL(location.href); u.search = ''; u.searchParams.set('map', 'coney'); u.searchParams.set('room', 'lunapark'); u.searchParams.set('name', name);
+    const u = new URL(location.href); u.search = ''; u.searchParams.set('map', 'coney'); u.searchParams.set('room', 'lunapark'); u.searchParams.set('name', name); u.searchParams.set('go', '1');
     if (info && curMap() !== 'coney') { announceGoto('coney'); setTimeout(() => { location.href = u.toString(); }, 400); return; }
     location.href = u.toString();
   });
@@ -235,6 +235,7 @@ function join() {
   const u = new URL(location.href); u.searchParams.set('map', map); u.searchParams.set('room', room); u.searchParams.delete('mp'); u.searchParams.delete('pose');
   if (name) u.searchParams.set('name', name); else u.searchParams.delete('name');
   if (U.chill && map === 'coney') u.searchParams.set('mode', 'chill'); else u.searchParams.delete('mode');
+  u.searchParams.set('go', '1');   // you already chose: load straight into the game, no second trip through the menu
   if (info && info.room === room && map !== curMap()) { announceGoto(map); setTimeout(() => { location.href = u.toString(); }, 400); return; }
   location.href = u.toString();
 }

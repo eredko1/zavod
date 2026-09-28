@@ -33,7 +33,7 @@ export function buildJetpacks(world) {
     if (m.on && w && !R) { const g = model(); g.scale.setScalar(0.72); g.position.set(0, 0.55, -0.24); w.add(g); const fl = flameCone(); fl.position.set(0, 0.28, -0.24); w.add(fl); R = { g, fl, w }; J.remote.set(m.f, R); }
     if (!m.on && R) { R.w.remove(R.g); R.w.remove(R.fl); J.remote.delete(m.f); return; }
     if (R) { R.th = +m.th || 0; R.fl.visible = R.th > 0.1; } });
-  if (window.__game) window.__game.jetpack = { state: () => ({ worn: !!J.worn, fuel: Math.round(J.fuel), y: +ctx.player.position.y.toFixed(2) }), wear: () => wear(J.packs[0]), off: takeOff };
+  if (window.__game) window.__game.jetpack = { state: () => ({ worn: !!J.worn, fuel: Math.round(J.fuel), y: +ctx.player.position.y.toFixed(2) }), wear: () => wear(J.packs[0]), off: takeOff, packs: () => J.packs.map((p) => p.pos.toArray()) };
 }
 
 function model() {

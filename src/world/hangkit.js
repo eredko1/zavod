@@ -638,10 +638,11 @@ function buildUI(o) {
   }
   const el = (cls, tag = 'div') => { const e = document.createElement(tag); e.className = cls + ' hkui'; document.body.appendChild(e); return e; };
   const cash = el('hgcash'), fade = el('hgfade'), floor = el('hgfloor'); fade.innerHTML = '<i class="tag">LPH 4 LIFE · DIMA ✶ 19</i>';
-  const dlg = el('hkdlg'); dlg.innerHTML = '<div class="nm"></div><div class="tx"></div><div class="chs"></div><div class="ft">1–4 choose · F leave</div>';
+  const dlg = el('hkdlg'); dlg.innerHTML = '<div class="nm"></div><div class="tx"></div><div class="chs"></div><div class="ft">1–9 choose · F leave</div>';
   const use = el('hguse', 'button'); use.textContent = 'USE (B)'; use.style.cssText = 'position:fixed;left:18px;bottom:130px;z-index:46;display:none;padding:12px 18px;font:700 16px Barlow Condensed,Arial;letter-spacing:.12em;color:#fff;background:rgba(40,120,60,.8);border:1px solid rgba(255,255,255,.4);border-radius:6px';
   if (V.ctx.isTouch) { cash.style.cssText = 'top:252px;bottom:auto;font-size:15px'; use.style.top = '280px'; use.style.bottom = 'auto'; use.style.padding = '8px 12px'; use.style.fontSize = '13px'; }   // phones: up under the bag button, out of the thumb cluster
-  use.addEventListener('touchstart', (e) => { e.preventDefault(); useItem(); }, { passive: false }); use.addEventListener('click', (e) => { e.stopPropagation(); useItem(); });
+  if (V.ctx.isTouch) use.textContent = 'BAG';   // phones: choose from the bag (inventory.js) instead of blindly using the newest thing
+  use.addEventListener('touchstart', (e) => { e.preventDefault(); V.ctx.bus.emit('inventory'); }, { passive: false }); use.addEventListener('click', (e) => { e.stopPropagation(); useItem(); });
   let help = null;
   if (o.help) {
     help = el('hghelp'); help.style.cssText = 'position:fixed;right:14px;top:60px;z-index:44;background:rgba(8,10,14,.78);border-left:2px solid #ffb24a;color:#e8edf2;font:500 13px Barlow,Arial;padding:10px 14px;line-height:1.55;pointer-events:none;max-width:280px';
@@ -662,6 +663,6 @@ function showUI(on) {   // cash / USE / help card are in-game HUD: hidden on the
 }
 function renderCash() {
   if (!V?.ui) return;
-  V.ui.cash.textContent = `$${V.cash}${V.inv.length ? '  ·  ' + V.inv.map((i) => (ITEMS[i]?.icon || '?') + (i === 'ice' && V.iceT != null ? Math.round(V.iceT / ITEMS.ice.melt * 100) + '%' : '') + (ITEMS[i]?.cig ? '×' + (V.left?.[i] > 0 ? V.left[i] : ITEMS[i].cig) : '')).join(' ') + ' (B · I bag)' : ''}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;
+  V.ui.cash.textContent = `$${V.cash}${V.status?.shades ? '  🕶' : ''}${V.status?.crabs ? '  🦀' : ''}`;   // what you carry lives in the bag (I / the bag button), not in a long icon string on screen
   if (V.ui.use) V.ui.use.style.display = V.inv.length ? 'block' : 'none';
 }
