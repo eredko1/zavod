@@ -83,11 +83,11 @@ try {
       const rp = rifle.position; c.player.teleport(rp.x + 0.5, c.world.groundHeight(rp.x, rp.z), rp.z + 0.5, 0, -0.5); await wait(400);
       const before = c.weapons.current.id, nearBike = !!c.vehicles.nearBike;
       c.input.pressed.add('KeyF'); await wait(300);
-      return { before, after: c.weapons.current.id, nearBike, nearPickup: !!c.ai.nearPickup, mounted: !!c.player.mounted };
+      return { before, after: c.weapons.current.id, bag: c.weapons.bag || [], nearBike, nearPickup: !!c.ai.nearPickup, mounted: !!c.player.mounted };
     });
     console.log('pickup', JSON.stringify(pk));
     check(pk.nearBike === false && pk.mounted === false, 'no bike near the rifle');
-    check(pk.after === 'ak74' && pk.before !== 'ak74', `F picked up the rifle (${pk.before} -> ${pk.after})`);
+    check(pk.before !== 'ak74' && (pk.after === 'ak74' || pk.bag.includes('ak74')), `picked up the rifle, drawn or in the bag (${pk.before} -> ${pk.after}; bag ${pk.bag.join(',')})`);   // the weapon bag: walking over a gun collects it
   }
   const perf = await page.evaluate(() => window.__game.stats());
   console.log('stats', JSON.stringify(perf));
