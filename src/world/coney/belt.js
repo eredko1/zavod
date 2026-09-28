@@ -12,7 +12,7 @@ export const ZONE = { x0: -2000, x1: 3400, z0: 11400, z1: 12700, oz: 12000 };   
 const CX = 900, LS = 300, R = 72, DECK = 9;                                      // loop centre (local x), straight length, bend radius, deck height
 const LANES = 3, LW = 3.6, SH = 1.2, ROAD = LANES * LW + SH * 2;                 // 13.2 m deck between barriers
 const PER = 2 * LS + 2 * Math.PI * R;                                            // ≈ 1052 m round
-const EXIT_S = LS + Math.PI * R + LS * 0.55, EXIT_L = 45;                       // the exit ramp: keep right on the north straight
+const EXIT_S = LS + Math.PI * R + LS * 0.55, EXIT_L = 45, EXIT_B = LS + Math.PI * R + LS * 0.12;   // EXIT_B: 7B Gowanus / Sunset Park (tavern.js)                       // the exit ramp: keep right on the north straight
 const RAMP = { x0: 394, x1: 420, z0: -560, z1: -541 };                           // coney: the on-ramp trigger (north end of W 8th St)
 const BACK = { x: 404, z: -522, h: Math.PI };                                     // coney: where the exit puts you (heading south)
 
@@ -68,12 +68,12 @@ export function buildBelt(world) {
   for (const o of [-ROAD / 2 - 0.3, ROAD / 2 + 0.3]) {
     for (const oo of [o - 0.28, o + 0.28]) { const g = wall(oo, DECK, DECK + 1.05); put(M.concrete, g); const g2 = g.clone(); g2.index.array.reverse(); g2.computeVertexNormals(); put(M.concrete, g2); }
     const top = ribbon(o - 0.28, o + 0.28, DECK + 1.05); put(M.concrete, top);
-    for (let s = 0; s < PER; s += 3) { if (o > 0 && s > EXIT_S - 2 && s < EXIT_S + EXIT_L) continue;   // the exit gore opens the outside barrier
+    for (let s = 0; s < PER; s += 3) { if (o > 0 && ((s > EXIT_S - 2 && s < EXIT_S + EXIT_L) || (s > EXIT_B - 2 && s < EXIT_B + EXIT_L))) continue;   // the exit gore opens the outside barrier
       const p = at(s), r = right(p), x = p.x + r.x * o, z = p.z + r.z * o; wbox(x - 0.45, DECK, z - 0.45, x + 0.45, DECK + 1.1, z + 0.45); }
   }
   // exit ramp: a short spur curving off the outside of the north straight, dropping away (the trigger sends you home)
-  { const p0 = at(EXIT_S), r = right(p0); const g = new THREE.BufferGeometry(); const pos = [], idx = [];
-    for (let i = 0; i <= 12; i++) { const k = i / 12, s = EXIT_S + k * EXIT_L, p = at(s), rr = right(p), off = ROAD / 2 + k * k * 14, y = DECK + 0.03 - k * k * 3;
+  for (const ES of [EXIT_S, EXIT_B]) { const p0 = at(ES), r = right(p0); const g = new THREE.BufferGeometry(); const pos = [], idx = [];
+    for (let i = 0; i <= 12; i++) { const k = i / 12, s = ES + k * EXIT_L, p = at(s), rr = right(p), off = ROAD / 2 + k * k * 14, y = DECK + 0.03 - k * k * 3;
       pos.push(p.x + rr.x * (off - 5), y, p.z + rr.z * (off - 5), p.x + rr.x * (off + 4), y, p.z + rr.z * (off + 4)); if (i) { const q = i * 2; idx.push(q - 2, q, q - 1, q - 1, q, q + 1); } }
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(pos.length / 3 * 2).fill(0), 2)); g.setIndex(idx); g.computeVertexNormals(); if (g.attributes.normal.getY(0) < 0) { g.index.array.reverse(); g.computeVertexNormals(); } put(M.asphalt, g); void r; }
   // piers every 24 m: a column + a hammerhead cap under the deck
@@ -95,6 +95,8 @@ export function buildBelt(world) {
   gantry(EXIT_S - 160, ['EXIT 7', 'OCEAN PKWY · CONEY ISLAND ↘']);
   gantry(EXIT_S - 12, ['EXIT 7 ↘', 'CONEY ISLAND · KEEP RIGHT']);
   gantry(LS + 30, ['BRIGHTON BEACH', 'EXIT 7A · BRIGHTON BEACH AV']);
+  gantry(EXIT_B - 12, ['EXIT 7B ↘', 'GOWANUS EXPWY · SUNSET PARK']);
+  gantry(EXIT_B - 110, ['EXIT 7B · 8 AV', 'SUNSET PARK · KEEP RIGHT ↘']);
 
   // ---- below: Brighton / Sheepshead Bay ------------------------------------------------------------------------------------
   const BAY_Z = R + 120;   // the bay starts south of the loop
@@ -144,7 +146,8 @@ export function buildBelt(world) {
     const pn = new THREE.Mesh(new THREE.PlaneGeometry(9, 3), new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.15 })); pn.position.set(x, 6.1, z + 0.25); scene.add(pn); }
 
   world.updaters.push((dt) => { if (Z?.world === world) update(dt); });
-  if (typeof window !== 'undefined' && window.__game) window.__game.belt = { enter: () => enter(), exit: () => exit(), state: () => ({ inZone: inZone(ctx.player.position), t: +Z.t.toFixed(1) }), ramp: RAMP, zone: ZONE, at: (s, off = 0) => { const p = at(s), r = right(p); return [p.x + r.x * off, DECK, p.z + r.z * off + ZONE.oz, Math.atan2(-p.tx, -p.tz)]; }, exitS: EXIT_S, per: PER, deck: DECK };
+  W.belt = { enter: () => enter(), exit: () => exit() };   // tavern.js: drive off 8th Ave onto the loop
+  if (typeof window !== 'undefined' && window.__game) window.__game.belt = { enter: () => enter(), exit: () => exit(), state: () => ({ inZone: inZone(ctx.player.position), t: +Z.t.toFixed(1) }), ramp: RAMP, zone: ZONE, at: (s, off = 0) => { const p = at(s), r = right(p); return [p.x + r.x * off, DECK, p.z + r.z * off + ZONE.oz, Math.atan2(-p.tx, -p.tz)]; }, exitS: EXIT_S, exitB: EXIT_B, per: PER, deck: DECK };
   console.log('[belt] elevated loop built', Math.round(PER), 'm');
 }
 
@@ -166,7 +169,7 @@ function update(dt) {
   if (inZone(here) && !Z.hintT) { Z.hintT = 1; ctx.hud?.toast?.('BELT PKWY LOOP — keep right at EXIT 7 (or T) for Coney', 3200); }
   if (!inZone(here)) Z.hintT = 0;
   if (v && !Z.busy && v.pos.x > RAMP.x0 && v.pos.x < RAMP.x1 && v.pos.z > RAMP.z0 && v.pos.z < RAMP.z1) enter();   // on-ramp
-  if (!Z.busy && inZone(here)) { const q = project(here.x, here.z - ZONE.oz); if (q.d > 2.2 && q.s > EXIT_S && q.s < EXIT_S + EXIT_L) exit(); }   // right lane through the EXIT 7 gore = off you go
+  if (!Z.busy && inZone(here)) { const q = project(here.x, here.z - ZONE.oz); if (q.d > 2.2 && q.s > EXIT_S && q.s < EXIT_S + EXIT_L) exit(); if (q.d > 2.2 && q.s > EXIT_B && q.s < EXIT_B + EXIT_L && v && Z.world.W.tavern) { Z.busy = true; Z.lastTrip = now; Z.world.W.tavern.arrive('belt'); setTimeout(() => { Z.busy = false; }, 4000); } }   // right lane through the EXIT 7 gore = off you go
 }
 function moveTo(x, y, z, h, speed) {
   const { ctx } = Z; const v = ctx.vehicles?.mounted, p = ctx.player;

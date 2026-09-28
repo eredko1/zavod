@@ -240,7 +240,8 @@ function update(dt) {
   }
   // riding: you stand in the car and can walk its aisle (WASD / stick, relative to where you look); the car carries you and
   // turns you with it on the curves. At a stop: F, or walk out through an open door on the platform side, gets you off.
-  if (R.aboard && l.kind === 'dwell' && l.next.hidden && open > 0.8 && t > l.t1 - 5.5) { K.toast(`The ${R.id} runs on to ${l.next.name}, past the edge of the map. Everybody off at ${l.stop.name}.`, 4200); alight(); }
+  if (R.aboard && l.kind === 'dwell' && l.next.hidden && open > 0.8 && t > l.t1 - 5.5) { if (R.id === 'D' && R.W.tavern) { if (R.stayKey !== l.t0) { R.stayKey = l.t0; R.W.tavern.stayOn(); } } else { K.toast(`The ${R.id} runs on to ${l.next.name}, past the edge of the map. Everybody off at ${l.stop.name}.`, 4200); alight(); } }
+  if (R.aboard && R.id === 'D' && R.W.tavern && l.kind === 'run' && l.b.hidden && t - l.t0 > 4) { alight(true); R.W.tavern.arrive('D'); }
   if (R.aboard) {
     const A = R.aboard, g = R.cars[A.c]; g.updateMatrixWorld(true);
     const head = Math.atan2(g.matrixWorld.elements[8], g.matrixWorld.elements[10]);   // the car's local +z in world
