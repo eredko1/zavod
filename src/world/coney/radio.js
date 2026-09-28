@@ -10,6 +10,7 @@ const TRACKS = [
   { src: './assets/audio/radio/burbon-bratva-gudzon.mp3', title: 'Бурбон, братва, Гудзон' },
   { src: './assets/audio/radio/olya-angliyskaya.mp3', title: 'Оля английская' },
   { src: './assets/audio/radio/burbon-bratva-gudzon-2.mp3', title: 'Бурбон, братва, Гудзон (версия 2)' },
+  { src: './assets/audio/radio/trinidad-daddy-remastered.mp3', title: 'Trinidad Daddy (Remastered)' },
 ];
 
 export function buildRadio(world) {
