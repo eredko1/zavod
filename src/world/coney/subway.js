@@ -231,6 +231,7 @@ function update(dt) {
   if (lab) { ctx.actionLabel = lab; R.ownLabel = true; } else if (R.ownLabel) { ctx.actionLabel = null; R.ownLabel = false; }
   if (R.aboard || lab || R.boardable) ctx.interactNear = true;   // weapons.js leaves F (the touch button) to us
   hud(t);
+  if ((R.hudT & 7) === 1) stationLife(t);
 }
 const DOORZ = [-6.2, -2.1, 2.1, 6.2], JOINT = 11.9, _inv = new THREE.Matrix4();
 const mss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -276,13 +277,49 @@ function hud(t) {
         let h = '';
         if (R.boardable) h = `${key} to board — or just walk in through the open doors`;
         else if (st.id === 'STW') h = st.plat ? (st.fIsland ? 'the F boards here — the west edge of this platform' : 'wrong platform: the F leaves from the 3rd island (3rd stairs from Stillwell Ave)') : 'through the turnstiles → 3rd stairs from Stillwell Ave → F platform';
-        else if (st.id === 'W8') h = st.plat ? 'upper level: the F stops here' : st.lower ? 'Q level — the F is one flight up (stairs off the platform, midway along)' : 'stairs at the W 8th St end → up two flights to the F';
+        else if (st.id === 'W8') h = w8Hint(p);
         else if (st.id === 'NEP') h = st.plat ? 'F back to Coney Island stops here' : 'stairs at the south end of the platforms';
         html = lines + `<span class="h">${h}</span>`;
       }
     }
   }
   if (html !== R.html) { R.html = html; R.el.innerHTML = html; R.el.classList.toggle('on', !!html); }
+}
+/** W 8 St wayfinding for the HUD: which way (an arrow relative to where you look) and how far to the stairs you want */
+function w8Pt(a, o, y) { const u = R.w8u; return new THREE.Vector3(W8.P0.x + u.x * a - u.y * o, y, W8.P0.y + u.y * a + u.x * o); }
+function w8Hint(p) {
+  const P = p.position, u = R.w8u, o = -(P.x - W8.P0.x) * u.y + (P.z - W8.P0.y) * u.x, sd = o < 0 ? -1 : 1, lvl = P.y > 13.5 ? 'up' : P.y > 7.5 ? 'lo' : 'st';
+  const dir = (q) => { const b = Math.atan2(q.x - P.x, q.z - P.z), f = Math.atan2(-Math.sin(p.yaw), -Math.cos(p.yaw)); let r = b - f; r = Math.atan2(Math.sin(r), Math.cos(r));
+    return `${['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][((Math.round(-r / (Math.PI / 4)) % 8) + 8) % 8]} ${Math.round(Math.hypot(q.x - P.x, q.z - P.z))} m`; };
+  if (lvl === 'up') return sd < 0 ? `upper level: the F stops here · exit / Q / Aquarium: stairs ${dir(w8Pt(120.8, -7, 0))}` : `no F on this side — stairs ${dir(w8Pt(120.8, 7, 0))} → Q level → street → north stairs up`;
+  if (lvl === 'lo') return sd < 0 ? `F: stairs up ${dir(w8Pt(107.5, -9.5, 0))} · exit to W 8 St ${dir(w8Pt(54.8, -9, 0))}` : `Aquarium footbridge ${dir(w8Pt(150, 9, 0))} · exit ${dir(w8Pt(54.8, 9, 0))} · the F boards from the north side`;
+  return `F: stairs up on the north side ${dir(w8Pt(38.2, -9.5, 0))} · two flights`;
+}
+/** station life: countdown clocks (in-world LED), and the station PA when a train comes in while you're on the platform */
+function stationLife(t) {
+  const { ctx, world } = R, p = ctx.player.position;
+  if (!R.clocks) { R.clocks = {};
+    for (const [id, spots] of [['W8', [[60, -5.45, W8.UP.plat + 2.6, 1], [150, -5.45, W8.UP.plat + 2.6, -1], [92, -5.45, W8.LO.plat + 2.5, 1], [92, 5.45, W8.LO.plat + 2.5, 1]]], ['STW', null]]) {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64; const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+      const m = new THREE.MeshStandardMaterial({ color: 0, map: tx, emissive: 0xffffff, emissiveMap: tx, emissiveIntensity: 1.1 }), geos = [];
+      const pl = (x, y, z, yaw) => { for (const k of [0, Math.PI]) { const g = new THREE.PlaneGeometry(1.6, 0.4); g.rotateY(yaw + k); g.translate(x + Math.sin(yaw + k) * 0.04, y, z + Math.cos(yaw + k) * 0.04); geos.push(g); } const bx = new THREE.BoxGeometry(1.7, 0.48, 0.07); bx.rotateY(yaw); bx.translate(x, y, z); geos.push(bx); };
+      if (spots) for (const [a, o, y] of spots) { const q = w8Pt(a, o, y); pl(q.x, q.y, q.z, Math.atan2(R.w8u.x, R.w8u.y)); }
+      else { pl(-49.5, 8.6 + 2.7, -345, 0); pl(-49.5, 8.6 + 2.7, -300, 0); }
+      const mesh = new THREE.Mesh(mergeGeometries(geos.map((g) => (g.index ? g.toNonIndexed() : g)), false), m); mesh.name = `clock${id}`; world.scene.add(mesh); R.clocks[id] = { c, tx, at: spots ? w8Pt(92, 0, 10) : new THREE.Vector3(-50, 9, -330), last: '' }; } }
+  for (const [id, C] of Object.entries(R.clocks)) { if (C.at.distanceTo(p) > 180) continue;
+    const deps = departures(id, t), txt = deps.map((d) => `${d.to === 'Stillwell Av' ? 'Coney Isl' : 'Jamaica'}|${d.boarding ? 'NOW' : Math.max(1, Math.ceil(d.arrive / 60)) + ' min'}`).join('/');
+    if (txt === C.last) continue; C.last = txt; const g = C.c.getContext('2d'); g.fillStyle = '#060606'; g.fillRect(0, 0, 256, 64);
+    deps.slice(0, 2).forEach((d, i) => { const y = 16 + i * 32; g.fillStyle = '#ff6319'; g.beginPath(); g.arc(14, y, 11, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 15px Helvetica, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('F', 14, y + 1);
+      g.fillStyle = '#ffae3a'; g.font = '700 17px "Courier New", monospace'; g.textAlign = 'left'; g.fillText(d.to === 'Stillwell Av' ? 'Coney Island' : 'Jamaica-179', 32, y + 1); g.textAlign = 'right'; g.fillText(d.boarding ? 'NOW' : `${Math.max(1, Math.ceil(d.arrive / 60))} min`, 250, y + 1); });
+    C.tx.needsUpdate = true; }
+  // the station PA: "now approaching" ~25 s out, "this is ..." as the doors open — only while you're on that station's platforms
+  if (R.aboard || ctx.state !== 'playing') return; const st = stationAt(p); if (!st || !(st.plat || st.lower)) return;
+  const l = legNow(), name = { STW: 'Coney Island–Stillwell Avenue', W8: 'West 8th Street–New York Aquarium', NEP: 'Neptune Avenue' }[st.id];
+  const d = departures(st.id, t)[0]; if (!d) return;
+  const k1 = `${st.id}|a|${Math.round(now() + d.arrive)}`;
+  if (!d.boarding && d.arrive < 25 && d.arrive > 18 && R.paKey !== k1) { R.paKey = k1; const txt = `Attention passengers: the next ${d.to === 'Stillwell Av' ? 'Coney Island–bound' : 'Jamaica–bound'} F train is now approaching. Please stand away from the platform edge.`; K.toast(txt, 4200); pa(ctx, txt); }
+  const k2 = `${st.id}|d|${Math.round(l.t0)}`;
+  if (l.kind === 'dwell' && l.stop.id === st.id && d.boarding && R.paKey !== k2 && t - l.t0 < 6) { R.paKey = k2; const txt = `This is ${name}.${st.id === 'W8' ? ' Transfer is available to the Q train.' : ''} This is a ${d.to === 'Stillwell Av' ? 'Coney Island–bound' : 'Jamaica–bound'} F train.`; K.toast(txt, 4200); pa(ctx, txt); }
 }
 /** which side the platform is on at a stop (+1 = the car's right / −1 left, 2 = both) — measured, not assumed */
 function sideAt(stop) {
