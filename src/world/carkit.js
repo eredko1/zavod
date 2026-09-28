@@ -16,6 +16,10 @@ const KINDS = {
   suv:   { len: 4.75, w: 1.9, clr: 0.28, belt: 1.12, roof: 1.74, hood: 1.04, ws: [1.05, 0.35], rs: [-1.9, -2.15], wheels: [1.45, -1.42], b: [0.2, -0.95], trunk: 1.12 },
   coupe: { len: 4.45, w: 1.94, clr: 0.14, belt: 0.78, roof: 1.22, hood: 0.72, ws: [0.55, -0.35], rs: [-0.95, -1.7], wheels: [1.33, -1.3], b: [-0.35], trunk: 0.84, sport: true },   // mid-engine supercar
   muscle: { len: 4.8, w: 1.9, clr: 0.16, belt: 0.86, roof: 1.33, hood: 0.84, ws: [0.75, -0.1], rs: [-0.75, -1.6], wheels: [1.45, -1.4], b: [-0.1], trunk: 0.88, sport: true },   // Camaro-ish
+  // Soviet classics: boxy three-box sedans, narrow track, chrome bumpers
+  lada: { len: 4.12, w: 1.62, clr: 0.17, belt: 0.92, roof: 1.44, hood: 0.86, ws: [0.62, 0.12], rs: [-0.74, -1.22], wheels: [1.21, -1.21], b: [-0.2], trunk: 0.9, boxy: true },
+  volga: { len: 4.73, w: 1.8, clr: 0.18, belt: 0.93, roof: 1.48, hood: 0.88, ws: [0.8, 0.24], rs: [-0.95, -1.45], wheels: [1.4, -1.4], b: [-0.2], trunk: 0.93, boxy: true },
+  moskvich: { len: 4.1, w: 1.55, clr: 0.18, belt: 0.93, roof: 1.45, hood: 0.87, ws: [0.6, 0.1], rs: [-0.7, -1.2], wheels: [1.2, -1.2], b: [-0.2], trunk: 0.92, boxy: true },
   van:   { len: 5.2, w: 1.98, clr: 0.24, belt: 1.12, roof: 2.08, hood: 1.02, ws: [1.72, 1.2], rs: [-2.5, -2.58], wheels: [1.68, -1.72], b: [0.7], trunk: 1.12, panel: true },
 };
 export const CAR_KINDS = Object.keys(KINDS);
@@ -43,7 +47,7 @@ export function carGeometries(kind = 'sedan') {
     return K.roof + 0.02 * Math.cos(((x - (wsTop + rsTop) / 2) / (wsTop - rsTop)) * Math.PI);
   };
   const bottomAt = (x) => { let y = K.clr + 0.02; for (const wx of K.wheels) { const d = Math.abs(x - wx); if (d < archR) y = Math.max(y, 0.33 + Math.sqrt(archR * archR - d * d) * 0.98); } return y; };
-  const halfW = (x) => { const u = x > 0 ? x / xf : x / xr; return HW * (1 - 0.1 * Math.pow(u, 6)); };
+  const halfW = (x) => { const u = x > 0 ? x / xf : x / xr; return K.boxy ? HW * (1 - 0.04 * Math.pow(u, 12)) : HW * (1 - 0.1 * Math.pow(u, 6)); };   // boxy: square corners
   // cross-section ring: [z/halfW, y-param] from bottom-right around the top to bottom-left.
   // y-param: 'b' bottom, 'r' rocker, 's' shoulder, 'e' belt edge, 'g' glass (lerp belt→roof), 'R' roof edge, 'C' roof centre
   const ring = [[0.86, 'b'], [0.985, 'r'], [1.0, 's'], [0.975, 'e'], [0.9, 'g1'], [0.8, 'g2'], [0.74, 'R'], [0.4, 'C'], [0.0, 'C0']];
@@ -134,7 +138,8 @@ export function carGeometries(kind = 'sedan') {
   box(parts.trim, 0.05, 0.16, K.w * 0.5, xf - 0.02, hlY - 0.02, 0);
   box(parts.trim, 0.06, 0.1, K.w * 0.78, xf - 0.04, K.clr + 0.16, 0);
   box(parts.trim, 0.06, 0.1, K.w * 0.8, xr + 0.04, K.clr + 0.16, 0);
-  box(parts.lampR, 0.02, 0.022, K.w * 0.55, xr + 0.012, tlY + 0.045, 0);   // light bar across the tail
+  if (K.boxy) { box(parts.rim, 0.07, 0.09, K.w * 0.98, xf + 0.02, K.clr + 0.3, 0); box(parts.rim, 0.07, 0.09, K.w * 0.98, xr - 0.02, K.clr + 0.34, 0); box(parts.rim, 0.03, 0.14, K.w * 0.52, xf - 0.01, hlY - 0.01, 0); }   // chrome bumpers + grille
+  else box(parts.lampR, 0.02, 0.022, K.w * 0.55, xr + 0.012, tlY + 0.045, 0);   // light bar across the tail
   if (K.sport) { box(parts.trim, 0.3, 0.03, K.w * 0.82, xr + 0.25, K.trunk + 0.09, 0); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, 0.55); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, -0.55); }   // spoiler
   box(parts.plate, 0.012, 0.11, 0.36, xf + 0.005, K.clr + 0.3, 0);
   box(parts.plate, 0.012, 0.11, 0.36, xr - 0.005, tlY - 0.2, 0);

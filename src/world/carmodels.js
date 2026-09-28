@@ -30,7 +30,7 @@ export function loadCarModels(ctx) {
         o.castShadow = n === 'body'; o.receiveShadow = true; });
       // AO / contact shadow card under the car (the example's baked shadow)
       const ao = await new THREE.TextureLoader().loadAsync(s.ao).catch(() => null);
-      if (ao) { const sh = new THREE.Mesh(new THREE.PlaneGeometry(0.655 * 4, 1.3 * 4), new THREE.MeshBasicMaterial({ map: ao, blending: THREE.MultiplyBlending, toneMapped: false, transparent: true, depthWrite: false })); sh.name = 'aoShadow'; sh.rotation.x = -Math.PI / 2; sh.renderOrder = 2; scene.add(sh); }
+      if (ao) { const sh = new THREE.Mesh(new THREE.PlaneGeometry(0.655 * 4, 1.3 * 4), new THREE.MeshBasicMaterial({ map: ao, blending: THREE.MultiplyBlending, premultipliedAlpha: true, toneMapped: false, transparent: true, depthWrite: false })); sh.name = 'aoShadow'; sh.rotation.x = -Math.PI / 2; sh.renderOrder = 2; scene.add(sh); }
       // normalise: front along +x (the front wheels are the ones named *_f*), length = the kind's length, wheels on y = 0
       scene.updateMatrixWorld(true);
       const fl = scene.getObjectByName('wheel_fl'), rr = scene.getObjectByName('wheel_rr'), a = new THREE.Vector3(), b = new THREE.Vector3();

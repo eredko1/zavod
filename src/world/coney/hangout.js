@@ -219,6 +219,8 @@ function buildRedCar(world) {
   const i = cars.indexOf(best); stealLocal(i, false);   // the kerb slot becomes the red car
   const car = ctx.vehicles.spawnCar(best.x, best.z, (best.ry || 0) - Math.PI / 2, 'coupe', 0xb3121c, 0);
   if (!car) return; car.isRed = true; H.red = { car, mine: false, hidden: false };
+  { const hd = (best.ry || 0) - Math.PI / 2, fx = -Math.sin(hd), fz = -Math.cos(hd);   // Soviet classics parked along the same kerb (drivable)
+    for (const [d, kind, col] of [[-6.2, 'lada', 0xe8dcb4], [6.4, 'volga', 0x141414], [12.6, 'moskvich', 0x8fb3c8]]) { try { ctx.vehicles.spawnCar(best.x + fx * d, best.z + fz * d, hd, kind, col, 0); } catch (e) { console.warn('[hangout] soviet car', kind, e); } } }
   // a red marker so friends can find it
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d'); g.font = '700 30px Barlow, Arial'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(20, 10, 216, 44); g.fillStyle = '#ff5a5a'; g.fillText('THE RED CAR', 128, 42);
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true })); tag.scale.set(1.8, 0.45, 1); tag.position.set(0, 2.4, 0); car.group.add(tag); H.red.tag = tag;
@@ -363,7 +365,7 @@ function redkoAtTablePark(world) {
   const fig = buildPerson({ avatar: 'm02', seed: 21 }); standTall(fig, 1.83); dressFigure(fig, ctx, { top: 'tee', shirt: 8, bottom: 'jeans' });
   const pos = new THREE.Vector3(1.4, 0, 2.9).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.yaw).add(P.pos).setY(0); fig.group.position.copy(pos); fig.group.rotation.y = P.yaw + 2.4; world.scene.add(fig.group);
   world.updaters.push((dt) => fig.update(dt, 0)); fig.mood = 'talk';
-  K.vendor({ name: 'REDKO', pos, r: 2.4, fig, talk: (Kk, again) => ({ text: again ? BS[(Math.random() * BS.length) | 0] : 'REDKO: «О, здорово. Сигаретку будешь? Мы тут по кругу.»',
+  world.W.crew = world.W.crew || {}; world.W.crew.redko = K.vendor({ name: 'REDKO', pos, r: 2.4, fig, talk: (Kk, again) => ({ text: again ? BS[(Math.random() * BS.length) | 0] : 'REDKO: «О, здорово. Сигаретку будешь? Мы тут по кругу.»',
     choices: [{ label: 'Давай сигарету 🚬', go: () => (K.full() ? { text: 'REDKO: «Руки заняты, брат.»', choices: [{ label: 'Ok', go: null }] } : (K.give('cigs'), { text: 'REDKO: «Держи пачку. B — закурить. Передавай по кругу.»', choices: [{ label: 'Спасибо', go: null }] })) },
       { label: 'Что обсуждаете?', go: () => ({ text: BS[(Math.random() * BS.length) | 0], choices: [{ label: 'Ха', go: null }] }) }, { label: 'Later', go: null }] }) });
   let puffT = 3, bsT = 6;
