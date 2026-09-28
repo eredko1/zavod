@@ -23,6 +23,7 @@ import { buildPerson, peopleReady } from '../people.js';
 import { BoxGrid, rectBlocked } from '../../vehicles/collide.js';
 import { hangkit as HK } from '../hangkit.js';
 import { adoptFolk, folkFlee } from './chill.js';
+import { buildBus, BUS } from '../../vehicles/bus.js';
 
 const RM = 8;                    // max corner radius (m)
 const CYC = 34;                  // signal cycle (s): A green 0-14, amber 14-17, all red 17-18, B green 18-30, amber 30-33, all red
@@ -61,7 +62,7 @@ function laneBlocked(grid, ax, az, bx, bz, w) {
 function buildGraph(world) {
   const { ctx, W } = world, b = W.bounds, M = 8, zMax = BW.z0 - 4;
   const parked = new Set((world.parkedCars || []).map((c) => c.box).filter(Boolean));
-  const grid = new BoxGrid(4); grid.build(ctx.colliders.filter((c) => !parked.has(c) && c.max.y > 0.35 && (c.max.x - c.min.x) < 400));
+  const grid = new BoxGrid(4); grid.build(ctx.colliders.filter((c) => !parked.has(c) && c.max.y > 0.35 && (c.max.x - c.min.x) < 400 && ((c.max.x - c.min.x) > 0.8 || (c.max.z - c.min.z) > 0.8)));   // el columns / poles / hydrants don't close a street
   const inB = (x, z) => x > b.min.x + M && x < b.max.x - M && z > b.min.z + M && z < zMax;
   const nodes = [], idx = new Map(); let dropped = 0;
   const nid = (x, z) => { const k = Math.round(x * 2) + ',' + Math.round(z * 2); let i = idx.get(k); if (i === undefined) { i = nodes.length; nodes.push({ x, z, adj: [], ctrl: null }); idx.set(k, i); } return i; };
@@ -71,7 +72,7 @@ function buildGraph(world) {
       const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1];
       if (!inB(ax, az) || !inB(bx, bz)) continue;
       const L = Math.hypot(bx - ax, bz - az); if (L < 0.5) continue;
-      if (laneBlocked(grid, ax, az, bx, bz, r.w)) { dropped++; continue; }
+      if (laneBlocked(grid, ax, az, bx, bz, r.w)) { dropped++; (T.droppedSegs ||= []).push([ax, az, bx, bz, r.w]); continue; }
       const a = nid(ax, az), c = nid(bx, bz); if (a === c || nodes[a].adj.some((e) => e.to === c)) continue;
       const dx = (bx - ax) / L, dz = (bz - az) / L;
       nodes[a].adj.push({ to: c, w: r.w, len: L, dx, dz }); nodes[c].adj.push({ to: a, w: r.w, len: L, dx: -dx, dz: -dz });
@@ -272,6 +273,7 @@ export function buildTraffic(world) {
   // F at a driver's door: carjack (hangkit decides between this and every other F prompt nearby)
   T.spotPos = new THREE.Vector3(0, -999, 0);
   try { HK.spot({ pos: T.spotPos, r: 1.9, dy: 1.6, when: () => !!T.jackable, prompt: () => (T.jackable?.driver && T.jackable.state !== 'dead' ? 'F — CARJACK' : 'F — DRIVE'), act: () => { if (T.jackable) jack(T.jackable); } }); } catch (e) { console.warn('[traffic] spot', e?.message || e); }
+  try { buildBuses(world); } catch (e) { console.warn('[traffic] buses', e); }
   world.updaters.push((dt) => { try { update(dt); } catch (e) { if ((T.errN = (T.errN || 0) + 1) < 4) console.error('[traffic]', e); } });
   if (typeof window !== 'undefined' && window.__game) window.__game.traffic = trafficQA;
   W.traffic = { cars: () => T.cars.filter((c) => c.active) };
@@ -327,7 +329,7 @@ function update(dt) {
   gatherObstacles();
   const now = Date.now();
   if (dt > 0 && !T.fz) for (const c of T.cars) {
-    if (!c.active) continue;
+    if (!c.active) { if (c.bus && Math.hypot(c.x - P.x, c.z - P.z) > 150 && !inView(c.x, c.y, c.z, 8)) placeBus(c, true); continue; }
     const d = Math.hypot(c.x - P.x, c.z - P.z);
     if (c.bus) { if (c.state !== 'drive' && c.state !== 'dwell' && c !== T.ride?.c && d > 150 && !inView(c.x, c.y, c.z, 8)) placeBus(c, true); }
     else if (d > T.ring + 30 || ((c.state === 'abandoned' || c.state === 'end') && d > 60 && !inView(c.x, c.y, c.z, 4))) { despawn(c); continue; }
@@ -343,6 +345,7 @@ function update(dt) {
     for (const c of T.cars) { if (n <= 0) break; if (c.active || c.bus) continue; if (spawn(c, boot)) n--; else if (++fails > 2) { T.spawnCool = 1; break; } } }
   collidePlayer(dt);
   render(dt);
+  busPeople();
   drivers(dt);
   interact();
   riding(dt);
@@ -505,6 +508,7 @@ function render(dt) {
   const blink = Math.floor(T.t * 3) % 2 === 0;
   for (const c of T.cars) {
     if (!c.active) continue;
+    if (c.bus) { renderBus(c, dt); continue; }
     if (c.far && (T.frame + c.id) % 4) continue;
     const R = c.R;
     // body: T · Ry(yaw) · Rz(pitch) · Rx(roll) in the kit frame (+x = forward)
@@ -560,7 +564,7 @@ function drivers(dt) {
   T.peopleT -= dt;
   if (T.peopleT <= 0) {
     T.peopleT = 0.25; const P = T.ctx.player.position;
-    const want = T.cars.filter((c) => c.active && c.driver && c.state !== 'abandoned' && !c.model && Math.hypot(c.x - P.x, c.z - P.z) < 55).sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z)).slice(0, T.people.length);
+    const want = T.cars.filter((c) => c.active && !c.bus && c.driver && c.state !== 'abandoned' && !c.model && Math.hypot(c.x - P.x, c.z - P.z) < 55).sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z)).slice(0, T.people.length);
     for (const pp of T.people) if (pp.car && !want.includes(pp.car)) { pp.car.real = null; pp.car = null; pp.f.group.visible = false; }
     for (const c of want) { if (c.real) continue; const pp = T.people.find((q) => !q.car); if (!pp) break; pp.car = c; c.real = pp; pp.f.group.visible = true; }
   }
@@ -581,9 +585,11 @@ function releaseDriver(c) { const pp = c.real; if (!pp) return; pp.car = null; p
 function doorPos(c, out) { const fx = -Math.sin(c.h), fz = -Math.cos(c.h), rx = -fz, rz = fx, e = c.R.eye; return out.set(c.x + fx * (e.x - 0.1) - rx * (c.hw + 0.55), c.y, c.z + fz * (e.x - 0.1) - rz * (c.hw + 0.55)); }
 function interact() {
   const ctx = T.ctx, p = ctx.player; T.jackable = null; T.spotPos.set(0, -999, 0);
+  T.board = null; T.hijack = null; T.boardPos.set(0, -999, 0); T.hijackPos.set(0, -999, 0);
   if (!p || p.dead || p.mounted || ctx.vehicles?.mounted) return;
   let best = null, bd = 2.4;
-  for (const c of T.cars) { if (!c.active || c.v > 6.5) continue; doorPos(c, _v); const d = Math.hypot(_v.x - p.position.x, _v.z - p.position.z); if (d < bd && Math.abs(p.position.y - c.y) < 1.6) { bd = d; best = c; } }
+  busInteract();
+  for (const c of T.cars) { if (!c.active || c.bus || c.v > 6.5) continue; doorPos(c, _v); const d = Math.hypot(_v.x - p.position.x, _v.z - p.position.z); if (d < bd && Math.abs(p.position.y - c.y) < 1.6) { bd = d; best = c; } }
   if (best) { T.jackable = best; doorPos(best, T.spotPos); if (best.state === 'drive' && best.v < 3) best.v *= 0.5; }
 }
 function jack(c) {
@@ -639,7 +645,13 @@ function honk(c, len = 0.45) {
 function roadDist(x, z) { let best = 1e9; for (const r of OSM.r) { if (r.w < 9) continue; for (let i = 0; i + 1 < r.p.length; i++) { const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1); best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t) - r.w / 2); } } return best; }
 const r2 = (v) => Math.round(v * 100) / 100;
 export const trafficQA = {
-  state: () => T && { cars: T.cars.filter((c) => c.active).length, budget: T.budget, ring: T.ring, moving: T.cars.filter((c) => c.active && c.v > 1).length, people: T.people.filter((p) => p.car).length, ...T.stats, jackable: T.jackable ? T.jackable.id : null },
+  _T: () => T,
+  buses: () => T ? T.cars.filter((c) => c.bus).map((c) => ({ id: c.id, route: c.route.id, x: r2(c.x), z: r2(c.z), h: r2(c.h), v: r2(c.v), state: c.state, stop: c.state === 'dwell' ? c.route.stops[c.stopI].name : null, next: c.route.stops[c.nextStop].name, door: r2(c.doorK || 0), road: r2(roadDist(c.x, c.z)), riding: T.ride?.c === c })) : [],
+  board: () => (T.board ? (boardBus(T.board), true) : false), toStop(id) { const c = T.cars[id]; if (!c?.bus) return null; const S = c.route.stops[c.nextStop]; T.ctx.player.teleport(S.px, 0, S.pz, 0, 0); return S.name; },
+  toBusDoor(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, (BUS.doorF[0] + BUS.doorF[1]) / 2, BUS.w / 2 + 1.0, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h + Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
+  toBusDriver(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, BUS.eye.x, -BUS.w / 2 - 0.8, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h - Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
+  ride: () => T.ride ? { route: T.ride.c.route.id, bus: T.ride.c.id, x: r2(T.ctx.player.position.x), z: r2(T.ctx.player.position.z) } : null,
+  state: () => T && { cars: T.cars.filter((c) => c.active && !c.bus).length, budget: T.budget, ring: T.ring, moving: T.cars.filter((c) => c.active && c.v > 1).length, people: T.people.filter((p) => p.car).length, ...T.stats, jackable: T.jackable ? T.jackable.id : null },
   cars: () => T ? T.cars.filter((c) => c.active).map((c) => ({ id: c.id, kind: c.kind, x: r2(c.x), z: r2(c.z), v: r2(c.v), h: r2(c.h), state: c.state, driver: c.driver, real: !!c.real, road: r2(roadDist(c.x, c.z)), lane: c.lane })) : [],
   roadDist,
   /** stand at the driver's door of car id (or the nearest active car) */
@@ -651,8 +663,203 @@ export const trafficQA = {
   graph: () => ({ nodes: T.G.nodes.filter((n) => n.adj.length).length, segs: T.G.segs.length, signals: T.G.nodes.filter((n) => n.sig).length }),
 };
 
-// ---- buses (next PR): route pacing, stops, riding ----
-function busPace() { return 1; }
-function busStop() { return null; }
-function placeBus() {}
-function riding() {}
+
+// =========================================================================================================================
+// MTA buses: fixed loops on the real Coney routes, paced by a wall-clock timetable (friends see the same bus at about the same
+// place), ~10 s at every stop with the doors open. F at an open door rides along (F at a stop to get off); F at the driver's
+// window while it's stopped hijacks it.
+const ROUTES = [
+  { id: 'B36', sign: 'B36|SHEEPSHEAD BAY', way: [[-86, -132], [20, -117], [54, -153], [100, -459], [40, -536], [-87, -536], [-87, -290]], n: 2 },
+  { id: 'B68', sign: 'B68|PROSPECT PARK', way: [[-86, -132], [-87, -290], [-87, -536], [40, -536], [100, -459], [54, -153], [20, -117]], n: 2 },
+  { id: 'B74', sign: 'B74|MERMAID AV', way: [[-86, -132], [-230, -142], [-365, -142], [-365, -291], [-230, -291], [-87, -290]], n: 1 },
+];
+export const BUS_STOPS = [
+  ['Surf Av / W 15 St', -10, -119], ['W 12 St / Luna Park', 68, -250], ['W 12 St / Neptune Av', 94, -430],
+  ['Neptune Av / W 15 St', 20, -536], ['Stillwell Av / Mermaid Av', -87, -330], ['Stillwell Av / Surf Av', -87, -185],
+  ['Surf Av / W 17 St', -175, -140], ['Surf Av / W 21 St', -310, -142], ['W 23 St / Mermaid Av', -365, -240], ['Mermaid Av / W 21 St', -300, -291], ['Mermaid Av / W 17 St', -170, -291],
+];
+const BUS_V = 6.2, DWELL = 10;
+function dijkstra(s, t) {
+  const N = T.G.nodes, n = N.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n); dist[s] = 0; const open = [s];
+  while (open.length) { let bi = 0; for (let i = 1; i < open.length; i++) if (dist[open[i]] < dist[open[bi]]) bi = i; const u = open[bi]; open[bi] = open[open.length - 1]; open.pop(); if (done[u]) continue; done[u] = 1; if (u === t) break;
+    for (const e of N[u].adj) { const nd = dist[u] + e.len * (e.w >= 14 ? 1 : 1.6); if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; open.push(e.to); } } }
+  if (!isFinite(dist[t])) return null; const out = []; for (let v = t; v !== -1; v = prev[v]) out.push(v); return out.reverse();
+}
+function nearestNode(x, z) { let bi = -1, bd = 1e9; T.G.nodes.forEach((n, i) => { if (!n.adj.length) return; const d = Math.hypot(n.x - x, n.z - z); if (d < bd) { bd = d; bi = i; } }); return bi; }
+function buildRoute(R) {
+  const w = R.way.map(([x, z]) => nearestNode(x, z)); let nodes = [];
+  for (let i = 0; i < w.length; i++) { const leg = dijkstra(w[i], w[(i + 1) % w.length]); if (!leg) return null; nodes.push(...leg.slice(0, -1)); }
+  // no U-turns where the legs join
+  for (let k = 0; k < 300; k++) { const n = nodes.length; const out = []; for (let i = 0; i < n; i++) { const a = nodes[(i - 1 + n) % n], c = nodes[(i + 1) % n]; if (a === c && out.length) { out.pop(); continue; } out.push(nodes[i]); } const done = out.length === nodes.length; nodes = out; if (done) break; }
+  const N = T.G.nodes, cum = [0]; for (let i = 0; i < nodes.length; i++) { const a = N[nodes[i]], b = N[nodes[(i + 1) % nodes.length]]; cum.push(cum[i] + Math.hypot(b.x - a.x, b.z - a.z)); }
+  const Lr = cum[nodes.length];
+  // stops: every listed stop within 12 m of this loop, on the kerb side of the direction of travel
+  const stops = [];
+  for (const [name, sx, sz] of BUS_STOPS) {
+    let best = null; for (let i = 0; i < nodes.length; i++) { const a = N[nodes[i]], b = N[nodes[(i + 1) % nodes.length]], dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1, t = clamp(((sx - a.x) * dx + (sz - a.z) * dz) / L2, 0.05, 0.95), px = a.x + dx * t, pz = a.z + dz * t, d = Math.hypot(sx - px, sz - pz);
+      if (d < 12 && (!best || d < best.d)) { const L = Math.sqrt(L2), e = edge(nodes[i], nodes[(i + 1) % nodes.length]); best = { d, name, rs: cum[i] + t * L, x: px, z: pz, dx: dx / L, dz: dz / L, w: e?.w || 10 }; } }
+    if (best) { const kerb = best.w / 2 - 1.6, sh = Math.max(0, kerb - laneOff(best.w, 1)); stops.push({ ...best, shift: sh, px: best.x - best.dz * (best.w / 2 + 1.2), pz: best.z + best.dx * (best.w / 2 + 1.2) }); }
+  }
+  stops.sort((a, b) => a.rs - b.rs);
+  // timetable: run at BUS_V between stops, DWELL at each → position on the loop at any wall-clock second
+  const legs = []; let t = 0; for (let i = 0; i < stops.length; i++) { const a = stops[i], b = stops[(i + 1) % stops.length]; legs.push({ t0: t, t1: t + DWELL, s0: a.rs, s1: a.rs, stop: i }); t += DWELL; const d = ((b.rs - a.rs) % Lr + Lr) % Lr || Lr; legs.push({ t0: t, t1: t + d / BUS_V, s0: a.rs, s1: a.rs + d }); t += d / BUS_V; }
+  return { id: R.id, sign: R.sign, nodes, cum, Lr, stops, legs, cycle: t, next: (c) => nodes[(c.rq1 + 4) % nodes.length] };
+}
+function schedAt(route, tt) { const t = ((tt % route.cycle) + route.cycle) % route.cycle; for (const g of route.legs) if (t < g.t1) { const k = g.t1 > g.t0 ? (t - g.t0) / (g.t1 - g.t0) : 0; return { s: (g.s0 + (g.s1 - g.s0) * k) % route.Lr, stop: g.stop }; } return { s: 0 }; }
+const routePos = (c) => (c.route.cum[c.rq1] + Math.min(c.s, c.L)) % c.route.Lr;
+const wrapD = (d, L) => { d = ((d % L) + L) % L; return d > L / 2 ? d - L : d; };
+function buildBuses(world) {
+  const { ctx } = world; T.routes = []; T.boardPos = new THREE.Vector3(0, -999, 0); T.hijackPos = new THREE.Vector3(0, -999, 0);
+  const hbm = new THREE.MeshBasicMaterial({ visible: false }), stopGeo = [];
+  for (const R of ROUTES) {
+    const r = buildRoute(R); if (!r || r.stops.length < 2) { console.warn('[traffic] no route for', R.id); continue; } T.routes.push(r);
+    const n = T.lite ? 1 : R.n;
+    for (let k = 0; k < n; k++) {
+      const B = buildBus({ sign: R.sign, lite: T.lite }); world.scene.add(B.group);
+      for (const m of B.meshes) if (m.parent === B.group) { m.userData.surface = 'metal'; m.userData.noLOS = true; }
+      const c = { id: T.cars.length, bus: true, kind: 'bus', route: r, off: k * r.cycle / n + (hash(R.id.charCodeAt(2), 5) % 60), B, R: { hl: BUS.len / 2, hw: BUS.w / 2, eye: BUS.eye, wr: BUS.wheelR, belt: 1.05, ims: [] },
+        active: true, q: new Int32Array(5), rng: mulberry(900 + T.cars.length), lane: 1, s: 0, v: 0, a: 0, x: 0, y: 0, z: 0, h: 0, yawRate: 0, spin: 0, shift: 0, shiftT: 0, ox: 0, oz: 0, oyaw: 0,
+        state: 'drive', stateT: 0, driver: true, hornT: 0, blockT: 0, waitT: 0, ghostT: 0, panic: 0, brake: 0, pitch: 0, roll: 0, hl: BUS.len / 2, hw: BUS.w / 2, seed: 4242 + k * 17, pers: 0.72, amax: 1.1, acc: 0, stopT: 0, far: false, cleared: -1, doorK: 0, doorT: 0, nextStop: 0 };
+      const drv = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.5), hbm); drv.userData = { traffic: c, onHit: (dmg, head, point) => shootDriver(c, dmg, point) }; world.scene.add(drv); ctx.raycastTargets.push(drv);
+      for (const m of B.meshes) if (m.parent === B.group) ctx.raycastTargets.push(m);
+      c.hbDrv = drv; c.hbBody = new THREE.Object3D();
+      // who's aboard: silhouettes (driver + a few riders) merged per bus; real people take over on the nearest bus
+      c.sil = busSilhouettes(B, c.seed); B.group.add(c.sil);
+      T.cars.push(c); placeBus(c, true);
+    }
+    for (const S of r.stops) if (!stopGeo.some((q) => Math.hypot(q.px - S.px, q.pz - S.pz) < 6)) stopGeo.push(S);
+  }
+  try { busStopProps(world, stopGeo); } catch (e) { console.warn('[traffic] stops', e); }
+  if (!T.lite && peopleReady()) { T.busPeople = []; for (let i = 0; i < 4; i++) { try { const f = buildPerson({ seed: 700 + i * 53, pose: 'sit', female: i === 2 }); f.update(0.016); f.group.updateMatrixWorld(true); const hp = f.head.getWorldPosition(new THREE.Vector3()); f.group.visible = false; f.group.matrixAutoUpdate = false; world.scene.add(f.group); T.busPeople.push({ f, hx: hp.x, hy: hp.y, hz: hp.z }); } catch { break; } } }
+  try { HK.spot({ pos: T.boardPos, r: 2.4, dy: 1.6, when: () => !!T.board, prompt: () => `F — BOARD THE ${T.board?.route.id} · ${T.board?.route.sign.split('|')[1]}`, act: () => { if (T.board) boardBus(T.board); } }); } catch {}
+  try { HK.spot({ pos: T.hijackPos, r: 1.8, dy: 1.6, when: () => !!T.hijack, prompt: () => 'F — HIJACK THE BUS', act: () => { if (T.hijack) jackBus(T.hijack); } }); } catch {}
+  console.log('[traffic] buses', T.cars.filter((c) => c.bus).length, '· routes', T.routes.map((r) => `${r.id} ${Math.round(r.Lr)}m ${r.stops.length} stops ${Math.round(r.cycle)}s`).join(' · '));
+}
+/** put a bus where the timetable says it is right now */
+function placeBus(c, reset) {
+  const r = c.route, now = Date.now() / 1000, sc = schedAt(r, now + c.off), N = r.nodes, n = N.length;
+  let i = 0; while (i < n - 1 && r.cum[i + 1] <= sc.s) i++;
+  c.rq1 = i; startOn(c, N[i], N[(i + 1) % n], sc.s - r.cum[i]);
+  c.active = true; c.state = 'drive'; c.stateT = 0; c.v = sc.stop != null ? 0 : BUS_V; c.driver = true; c.ox = c.oz = c.oyaw = 0; c.shift = c.shiftT = 0; c.panic = 0; c.hold = false;
+  const rs = routePos(c); let k = 0; while (k < r.stops.length && r.stops[k].rs < rs - 1) k++; c.nextStop = k % r.stops.length;
+  if (sc.stop != null) { c.nextStop = sc.stop; const S = r.stops[sc.stop]; c.shift = c.shiftT = S.shift; }
+  c.B.group.visible = true; pose(c, 0.016);
+}
+function busPace(c, now) { const r = c.route, sc = schedAt(r, now / 1000 + c.off), lag = wrapD(sc.s - routePos(c), r.Lr); return clamp(0.85 + lag / 70, 0.5, 1.3); }
+function busStop(c) {
+  const r = c.route, S = r.stops[c.nextStop]; let d = ((S.rs - routePos(c)) % r.Lr + r.Lr) % r.Lr;
+  if (d > r.Lr - 4) d = 0;
+  if (d < 50) c.shiftT = S.shift; else if (!c.avoid) c.shiftT = 0;
+  if (d < 0.9 && c.v < 0.8) { c.state = 'dwell'; c.stateT = 0; c.stopI = c.nextStop; c.dwellT = DWELL; c.nextStop = (c.nextStop + 1) % r.stops.length; c.v = 0; if (T.ride?.c === c) T.ctx.hud?.toast?.(`This is ${S.name}. ${T.ctx.isTouch ? 'GET OFF' : 'F'} to get off · next: ${r.stops[c.nextStop].name}`, 3600); return null; }
+  return d < 70 ? { d: d + S0 - 0.5 } : null;
+}
+function busSilhouettes(B, seed) {
+  const sg = silhouetteGeos(), rng = mulberry(seed), geos = [];
+  const put = (x, y, z, ry, col) => { for (const [g0, hex] of [[sg.body, col], [sg.head, SKINS[(rng() * 5) | 0].getHex()]]) { const g = g0.clone(); g.rotateY(ry); g.translate(x, y, z); const n = g.attributes.position.count, a = new Float32Array(n * 3), cc = new THREE.Color(hex); for (let i = 0; i < n; i++) a.set([cc.r, cc.g, cc.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); geos.push(g); } };
+  put(B.driver.x - 0.1, B.driver.y + 0.74, B.driver.z, 0, 0x2b3a55);
+  const picks = B.seats.filter(() => rng() < 0.35).slice(0, 7);
+  for (const s of picks) put(s.x - (s.face ? 0.12 : 0), s.y + 0.72, s.z + (s.face ? 0 : s.side * 0.1), s.face ? 0 : (s.side > 0 ? Math.PI / 2 : -Math.PI / 2), SHIRTS[(rng() * SHIRTS.length) | 0].getHex());
+  B.used = picks;
+  const m = new THREE.Mesh(mergeGeometries(geos, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })); m.name = 'bus:riders'; return m;
+}
+function renderBus(c, dt) {
+  const B = c.B, P = T.ctx.player.position, d = Math.hypot(c.x - P.x, c.z - P.z);
+  B.group.visible = d < 380;
+  if (!B.group.visible) return;
+  B.group.position.set(c.x, c.y, c.z); B.group.rotation.set(c.roll, c.h + Math.PI / 2, c.pitch, 'YZX');
+  c.doorK = damp(c.doorK || 0, c.state === 'dwell' ? c.doorT : 0, 5, dt); B.setDoors(c.doorK);
+  B.interior.visible = d < 90; c.sil.visible = d < 200 && T.busNear !== c;
+  B.group.updateMatrixWorld();
+  _v.set(B.driver.x - 0.05, B.driver.y + 0.45, B.driver.z).applyMatrix4(B.group.matrixWorld); c.hbDrv.position.copy(_v); c.hbDrv.updateMatrixWorld();
+  if (c.state === 'dead' && !c.deadDone) { c.deadDone = true; c.sil.visible = false; }
+}
+/** real seated people (driver + 3 riders) on the nearest bus within 60 m */
+function busPeople() {
+  const L = T.busPeople; if (!L?.length) return; const P = T.ctx.player.position;
+  let best = null, bd = 60; for (const c of T.cars) if (c.bus && c.B.group.visible && c.state !== 'jacked') { const d = Math.hypot(c.x - P.x, c.z - P.z); if (d < bd) { bd = d; best = c; } }
+  T.busNear = best; for (const pp of L) pp.f.group.visible = !!best;
+  if (!best) return; const B = best.B, M = B.group.matrixWorld;
+  const seats = [{ x: B.driver.x, y: B.driver.y, z: B.driver.z, face: 1, drv: true }, ...B.used.slice(0, L.length - 1)];
+  L.forEach((pp, i) => { const s = seats[i]; if (!s || (s.drv && !best.driver)) { pp.f.group.visible = false; return; }
+    const ry = s.face ? Math.PI / 2 : (s.side > 0 ? Math.PI : 0); _q.setFromAxisAngle(UP, ry); _v.set(pp.hx, pp.hy, pp.hz).applyQuaternion(_q);
+    const fx = s.face ? 1 : 0, fz = s.face ? 0 : -s.side; _p.set(s.x - fx * 0.14 - _v.x, s.y + 0.7 - _v.y, s.z - fz * 0.14 - _v.z);
+    _m.compose(_p, _q, ONE).premultiply(M); pp.f.group.matrix.copy(_m); pp.f.group.matrixWorldNeedsUpdate = true; pp.f.update(1 / 60); });
+}
+/** doors (kerb side) and the driver's window (street side) of a stopped bus, in world space */
+function busPoint(c, lx, lz, out) { return out.set(lx, 0, lz).applyMatrix4(c.B.group.matrixWorld).setY(c.y); }
+function busInteract() {
+  const p = T.ctx.player.position; let bd = 3;
+  for (const c of T.cars) {
+    if (!c.bus || c.state === 'jacked' || !c.B.group.visible) continue; if (Math.hypot(c.x - p.x, c.z - p.z) > 16) continue;
+    if (c.state === 'dwell' && c.doorK > 0.6) for (const [a, b] of [BUS.doorF, BUS.doorR]) { busPoint(c, (a + b) / 2, BUS.w / 2 + 0.9, _v); const d = Math.hypot(_v.x - p.x, _v.z - p.z); if (d < bd) { bd = d; T.board = c; T.boardPos.copy(_v); } }
+    if (c.v < 1 && c.driver && c.state !== 'dead') { busPoint(c, BUS.eye.x, -BUS.w / 2 - 0.8, _v); if (Math.hypot(_v.x - p.x, _v.z - p.z) < 2) { T.hijack = c; T.hijackPos.copy(_v); } }
+    else if (c.v < 1 && c.state === 'dead') { busPoint(c, BUS.eye.x, -BUS.w / 2 - 0.8, _v); if (Math.hypot(_v.x - p.x, _v.z - p.z) < 2) { T.hijack = c; T.hijackPos.copy(_v); } }
+  }
+}
+function boardBus(c) {
+  const p = T.ctx.player; if (T.ride || p.mounted || T.ctx.vehicles?.mounted) return;
+  const B = c.B, free = B.seats.filter((s) => s.face && !B.used.includes(s)); const seat = free[(free.length * 0.4) | 0] || B.seats[0];
+  T.ride = { c, seat, head: null }; p.mounted = { bus: true, route: c.route.id };
+  T.ctx.hud?.toast?.(`On the ${c.route.id} to ${c.route.sign.split('|')[1]}. Next stop: ${c.route.stops[c.nextStop].name}. ${T.ctx.isTouch ? 'GET OFF' : 'F'} at a stop to get off.`, 3600);
+  T.ctx.bus.emit('busBoard', { route: c.route.id });
+}
+function alightBus() {
+  const R = T.ride; if (!R) return; const c = R.c, p = T.ctx.player; T.ride = null; if (p.mounted?.bus) p.mounted = null;
+  busPoint(c, (BUS.doorR[0] + BUS.doorR[1]) / 2, BUS.w / 2 + 1.1, _v); p.teleport(_v.x, c.y, _v.z, c.h - Math.PI / 2, 0);
+  T.ctx.hud?.toast?.(`Got off at ${c.route.stops[c.stopI ?? 0].name}`, 1800); T.ctx.bus.emit('busAlight', { route: c.route.id });
+}
+function riding(dt) {
+  const R = T.ride; if (!R) return; const ctx = T.ctx, p = ctx.player, c = R.c;
+  if (p.dead || !p.mounted?.bus) { T.ride = null; if (p.mounted?.bus) p.mounted = null; return; }
+  const g = c.B.group; g.updateMatrixWorld();
+  const head = c.h; if (R.head != null) p.yaw += wrap(head - R.head); R.head = head;
+  const s = R.seat; _v.set(s.x, s.y, s.z).applyMatrix4(g.matrixWorld); p.position.set(_v.x, _v.y - 0.45, _v.z); p.velocity?.set?.(0, 0, 0);
+  _p.set(s.x - 0.05, s.y + 0.78, s.z).applyMatrix4(g.matrixWorld); const cam = ctx.camera; cam.position.copy(_p); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); p.cameraPosition?.copy?.(_p);
+  const open = c.state === 'dwell' && c.doorK > 0.5;
+  if (open) { ctx.actionLabel = 'GET OFF'; T.ownLabel = true; } else if (T.ownLabel) { ctx.actionLabel = null; T.ownLabel = false; }
+  ctx.interactNear = true;
+  if (ctx.state === 'playing' && ctx.input?.pressed?.has?.('KeyF')) { ctx.input.pressed.delete('KeyF'); if (open) { alightBus(); if (T.ownLabel) { ctx.actionLabel = null; T.ownLabel = false; } } else { ctx.hud?.toast?.(`*ding* Stop requested — next stop: ${c.route.stops[c.nextStop].name}`, 1800); } }
+  if (c.state === 'jacked' || c.state === 'dead') alightBus();
+}
+function jackBus(c) {
+  const ctx = T.ctx, veh = ctx.vehicles; if (!veh?.spawnCar || ctx.vehicles.mounted) return false;
+  if (c.driver && c.state !== 'dead') pullOut(c, c.rng() < 0.25); else if (c.state === 'dead') dumpBody(c);
+  c.state = 'jacked'; c.active = false; c.B.group.visible = false; if (T.busNear === c) T.busNear = null; c.hbDrv.position.set(0, -500, 0); c.hbDrv.updateMatrixWorld();
+  let car = null; try { car = veh.spawnCar(c.x, c.z, c.h, 'bus', 0xffffff, 0); } catch (e) { console.warn('[traffic] bus spawn', e); }
+  if (!car) return false; veh.mount(car); T.stats.jacked++;
+  ctx.bus.emit('carjack', { kind: 'bus', position: [c.x, 0, c.z], driver: true }); ctx.hud?.toast?.(`HIJACKED THE ${c.route.id}`, 1600);
+  return true;
+}
+/** MTA stop: blue-and-white sign on a pole (route bullets), glass shelter with a bench and a lit ad panel where the sidewalk allows */
+function busStopProps(world, stops) {
+  const signTex = (() => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256; const g = cv.getContext('2d'); g.fillStyle = '#f4f5f2'; g.fillRect(0, 0, 128, 256); g.fillStyle = '#0f3d91'; g.fillRect(0, 0, 128, 70);
+    g.fillStyle = '#fff'; g.font = 'bold 22px Arial'; g.textAlign = 'center'; g.fillText('MTA', 64, 30); g.font = 'bold 16px Arial'; g.fillText('BUS STOP', 64, 56);
+    g.fillStyle = '#0f3d91'; g.beginPath(); g.roundRect?.(30, 84, 68, 40, 6); g.fill(); g.fillStyle = '#fff'; g.fillRect(36, 92, 56, 16); g.fillStyle = '#0f3d91'; g.fillRect(40, 95, 10, 9); g.fillRect(54, 95, 10, 9); g.fillRect(68, 95, 10, 9);
+    ['B36', 'B68', 'B74'].forEach((r, i) => { g.fillStyle = '#0f3d91'; g.fillRect(14, 140 + i * 36, 100, 30); g.fillStyle = '#fff'; g.font = 'bold 22px Arial'; g.fillText(r, 64, 163 + i * 36); });
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const vc = [], glass = [], sign = [], grid = T.G.grid, col = new THREE.Color();
+  const tint = (g, hex) => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); col.setHex(hex); const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([col.r, col.g, col.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+  const bx = (x0, y0, z0, x1, y1, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g; };
+  for (const S of stops) {
+    const ry = Math.atan2(S.dx, S.dz) + Math.PI, place = (g) => { g.rotateY(ry); g.translate(S.px, 0, S.pz); return g; };
+    // local frame: +z = along the traffic, +x = away from the road (kerb side)
+    vc.push(tint(place(new THREE.CylinderGeometry(0.035, 0.035, 3.0, 8).translate(0, 1.5, 3.2)), 0x6a6f74));
+    for (const k of [0, Math.PI]) { const g = new THREE.PlaneGeometry(0.46, 0.92); g.rotateY(Math.PI / 2 + k); g.translate(k ? -0.01 : 0.01, 2.45, 3.2); sign.push(place(g)); }
+    world.box([S.px - 0.08, 0, S.pz - 0.08], [S.px + 0.08, 3, S.pz + 0.08]);
+    const sx = S.px - S.dz * 1.6, sz = S.pz + S.dx * 1.6;
+    if (rectBlocked(grid, sx - 2.4, sz - 2.4, sx + 2.4, sz + 2.4, 0.3, 2.5)) continue;
+    // shelter: 4.2 m long, back wall of glass away from the road, a roof, an ad panel at the downstream end, a bench
+    const P = (g) => { g.translate(1.6, 0, 0); return place(g); };
+    for (const z of [-2.05, 2.05]) for (const x of [-0.65, 0.65]) vc.push(tint(P(bx(x - 0.04, 0, z - 0.04, x + 0.04, 2.35, z + 0.04)), 0x3c4146));
+    vc.push(tint(P(bx(-0.85, 2.35, -2.2, 0.85, 2.45, 2.2)), 0x3c4146)); vc.push(tint(P(bx(-0.7, 2.45, -2.1, 0.75, 2.5, 2.1)), 0x9aa0a6));
+    for (const [z0, z1] of [[-2.0, -0.05], [0.05, 2.0]]) { const g = new THREE.PlaneGeometry(z1 - z0, 1.9); g.rotateY(Math.PI / 2); g.translate(0.65, 1.2, (z0 + z1) / 2); glass.push(P(g)); }
+    { const g = new THREE.PlaneGeometry(1.2, 1.9); g.translate(0, 1.2, -2.05); glass.push(P(g)); }
+    vc.push(tint(P(bx(-0.62, 0.3, 1.45, 0.62, 2.1, 2.0)), 0x2b2f33)); vc.push(tint(P(bx(-0.56, 0.4, 1.42, 0.56, 2.02, 1.44)), 0xf2e8c8)); vc.push(tint(P(bx(-0.56, 0.4, 2.01, 0.56, 2.02, 2.03)), 0xd8e4ee));
+    vc.push(tint(P(bx(0.2, 0.44, -1.6, 0.55, 0.5, 1.2)), 0x7c8288)); for (const z of [-1.4, 1.0]) vc.push(tint(P(bx(0.35, 0, z - 0.03, 0.4, 0.44, z + 0.03)), 0x3c4146));
+    const c0 = new THREE.Vector3(), c1 = new THREE.Vector3(); for (const [a, b] of [[[0.55, 0, -2.1], [0.75, 2.4, 2.1]]]) { const g = bx(...a, ...b); P(g); g.computeBoundingBox(); c0.copy(g.boundingBox.min); c1.copy(g.boundingBox.max); world.box(c0.toArray(), c1.toArray()); }
+  }
+  const add = (arr, mat, name) => { if (!arr.length) return; const m = new THREE.Mesh(mergeGeometries(arr, false), mat); m.name = name; m.receiveShadow = true; m.castShadow = !T.lite; world.scene.add(m); };
+  add(vc, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.3 }), 'busStops');
+  add(glass, new THREE.MeshStandardMaterial({ color: 0x9fb2bc, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }), 'busStops:glass');
+  add(sign, new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.5, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.12 }), 'busStops:sign');
+}

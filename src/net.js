@@ -51,6 +51,7 @@ import { carGeometries, carMaterials, carInterior, carEye, CAR_KINDS } from './w
 import { hasCarModel, carModel } from './world/carmodels.js';
 import { buildBike } from './vehicles/bike.js';
 import { buildJetski } from './vehicles/jetski.js';
+import { buildBus } from './vehicles/bus.js';
 import * as UI from './netui.js';
 
 const ALL_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
@@ -555,6 +556,7 @@ function remoteVehicle(ctx, v) {
   const grp = new THREE.Group();
   if (v.k === 'bike') { try { const b = buildBike(ctx); grp.add(b.group); } catch {} return grp; }
   if (v.k === 'jetski') { try { const b = buildJetski(ctx, v.c || null); grp.add(b.group); } catch {} return grp; }
+  if (v.k === 'bus') { try { const B = buildBus({ sign: 'NOT IN SERVICE', lite: !!ctx.lite }); B.group.rotation.y = Math.PI / 2; grp.add(B.group); } catch {} return grp; }
   if (hasCarModel(v.k)) { const m = carModel(v.k, v.c || 0xb01010); if (m) { m.rotation.y = Math.PI / 2; grp.add(m); return grp; } }
   const G = _carGeo.get(v.k) || (_carGeo.set(v.k, carGeometries(v.k).geos), _carGeo.get(v.k)); const CM = carMaterials();
   const paint = CM.paint.clone(); paint.color = new THREE.Color(v.c || 0x22305c);
