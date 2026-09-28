@@ -21,6 +21,13 @@ export function mountInventory(ctx, K) {
     else if (I.open && e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); toggle(false); }
   }, true);
   I.ctx.bus.on('state', ({ state }) => { if (state !== 'playing') toggle(false); btn.style.display = state === 'playing' ? '' : 'none'; });
+  // the weapon strip: every gun you carry, always on screen — click / tap to draw it (1–9 on a keyboard), BAG opens the rest
+  const strip = document.createElement('div'); strip.className = 'inv-strip' + (ctx.isTouch ? ' touch' : ''); document.body.appendChild(strip); I.strip = strip; let sig = '';
+  strip.addEventListener('click', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else I.ctx.weapons?.selectBag?.(+t.dataset.g); });
+  strip.addEventListener('touchstart', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.preventDefault(); e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else I.ctx.weapons?.selectBag?.(+t.dataset.g); }, { passive: false });
+  setInterval(() => { const W = I.ctx.weapons; let bag = []; try { bag = W?.bag || []; } catch {} const cur = W?.currentId, show = I.ctx.state === 'playing' && !I.open;
+    const n = bag.map((id, i) => `${i}:${id}:${id === cur ? 1 : 0}`).join(',') + show; if (n === sig) return; sig = n; strip.style.display = show ? 'flex' : 'none';
+    strip.innerHTML = bag.map((id, i) => `<button data-g="${i}" class="${id === cur ? 'on' : ''}"><b>${i + 1}</b>${esc(String(id).toUpperCase().replace('AK74', 'AK').replace('M24', 'SNIPER'))}</button>`).join('') + `<button data-g="bag" class="bag">🎒 BAG${I.ctx.isTouch ? '' : ' (I)'}</button>`; }, 350);
   window.__game && (window.__game.inventory = { open: () => toggle(true), close: () => toggle(false), state: () => ({ open: I.open, html: root.textContent }) });
 }
 
@@ -66,5 +73,7 @@ const CSS = `
 .inv-box .row.gun{cursor:pointer}.inv-box .row.gun.on{background:rgba(212,170,70,.25)}
 .inv-box button[data-a]:not(.row){padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(212,170,70,.9);color:#111;font:700 12px Barlow;cursor:pointer}
 .inv-box button.ghost{background:transparent;color:#f1eee6}.inv-box .empty{opacity:.65}.inv-box footer{margin-top:10px;font-size:12px;opacity:.55}
+.inv-strip{position:fixed;right:22px;bottom:150px;z-index:41;display:none;gap:4px;font:700 11px 'Barlow Condensed',Arial;letter-spacing:.08em}.inv-strip.touch{top:108px;bottom:auto;right:10px;flex-direction:column}
+.inv-strip button{display:flex;gap:4px;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.5);color:#e8e6df;font:inherit;cursor:pointer}.inv-strip button b{opacity:.6}.inv-strip button.on{background:rgba(212,170,70,.85);color:#111}.inv-strip button.bag{background:rgba(40,90,60,.75)}
 .inv-btn{position:fixed;left:calc(env(safe-area-inset-left,0px) + 14px);top:calc(env(safe-area-inset-top,0px) + 200px);z-index:40;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.45);font-size:20px}
 `;

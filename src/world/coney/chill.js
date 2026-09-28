@@ -118,7 +118,7 @@ export function buildChill(world, H) {
   K.vendor({ name: 'VITEK', pos: vp, r: 2.4, talk: vitekTalk, fig: vf });
   CH.vitek = vp; (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'VITEK (guns)', x: vp.x, z: vp.z, kind: 'danger' });
   // loadout: the knife; the handgun slot is locked until Vitek comes through
-  const arm = () => { const w = ctx.weapons; if (!w?.setLoadout) return false; w.setLoadout({ primary: 'knife', secondary: 'm9' }); w.lock?.(1, !CH.armed, 'No gun yet — VITEK (by the park gate) sells one'); return true; };
+  const arm = () => { const w = ctx.weapons; if (!w?.setLoadout) return false; w.setLoadout({ primary: 'knife', secondary: 'm9' }); w.lock?.(1, !CH.armed, 'No gun yet — VITEK (by the park gate) sells one'); try { w.collect?.('ak74', 90); w.collect?.('m24', 25); } catch {} return true; };   // everyone carries an AK + a sniper in the bag (3 / 4, or the weapon strip)
   ctx.bus.on('playerRespawn', () => { setTimeout(arm, 50); });
   K.onUpdate((dt, playing) => {
     if (!CH.armedOnce && arm()) { CH.armedOnce = true; K.toast('CHILL MODE — no mercs. Get wasted, don\'t get robbed — or do the robbing (F on a passer-by). Knife + $60. Muggings bring the cops.', 5200); }
