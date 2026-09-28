@@ -39,6 +39,8 @@ export function buildTavern(world) {
   { const gh = W.groundHeight; W.groundHeight = (x, z) => { if (z > TZ.z0 - 30 && z < TZ.z1 + 30 && x > TZ.x0 - 30 && x < TZ.x1 + 30) { const lz = z - TZ.oz; const road = Math.abs(lz) < ROAD || (x > ST60[0] && x < ST60[1]) || (x > ST61[0] && x < ST61[1]); return road && !inBar({ x, z }) ? 0 : SW; } return gh ? gh(x, z) : 0; }; }
   const root = new THREE.Group(); root.name = 'sunsetPark'; root.position.set(0, 0, TZ.oz); scene.add(root);
   Z = { world, ctx, W, root, lite, busy: false, lastTrip: -9, t: 0, tvT: 0, inside: false, radioPrev: null, hint: 0 };
+  // pause menu → Soc Tav: take the N straight there (on foot; a car is left behind)
+  ctx.bus.on('socTav', () => { if (ctx.world !== W) return; if (inZone(ctx.player.position)) { K.toast('You are already on 8th Ave. Soccer Tavern: green door, three flags.', 2600); return; } if (ctx.vehicles?.mounted) try { ctx.vehicles.dismount?.(); } catch {} arrive('N'); });
   // a friend fed the jukebox: everyone in the bar hears the same song from the same second
   ctx.bus.on('net:juke', (m) => { if (!Z.inside) return; if (m?.title == null) restoreRadio(); else if (typeof m.title === 'string' && Number.isFinite(m.t0)) { jukeOn(m.title, m.t0); K.toast(`🎵 ${m.title}`, 2200); } });
   const rnd = mulberry(6004);

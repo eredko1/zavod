@@ -405,6 +405,7 @@ function bindMenus(H) {
         try { ctx.net?.send?.('fresh', {}); } catch {} ctx.bus.emit('worldReset', { by: 'me' }); ctx.hud?.toast?.('Fresh start — the block is reset for everyone', 2400); ctx.setState('playing'); break; }
       case 'character': ctx.setState('playing'); ctx.bus.emit('charSelect'); break;
       case 'durak': ctx.setState('playing'); ctx.bus.emit('durakFriends'); break;   // world/coney/durak-mp.js: walk to the table and sit down   // world/charselect.js (hangout maps)
+      case 'soctav': ctx.setState('playing'); ctx.bus.emit('socTav'); break;   // world/coney/tavern.js: straight to the Soccer Tavern on 8th Ave
       case 'menu': ctx.setState('menu'); break;
       case 'retry': ctx.restart(); break;
     }
@@ -628,7 +629,7 @@ function buildDOM() {
       <div class="subtitle in" style="--i:2">Night ops · Container yard</div>
       <div class="loadsum in" style="--i:2"></div>
       <div class="brief in" style="--i:3"><b>SITREP</b> — An armed mercenary force has seized the site and is holding it against the city. You are the only operator inside before backup can arrive. Hold your ground, protect the civilians who fled to cover, and clear every wave until extraction.</div>
-      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('character', 4, 'Character')}${mi('durak', 5, 'Play durak')}${mi('menu', 6, 'Quit to menu')}</nav>
+      <nav class="menu">${mi('resume', 0, 'Resume', 'primary')}${mi('friends', 1, 'Play with friends')}${mi('settings', 2, 'Settings')}${mi('controls', 3, 'Controls')}${mi('character', 4, 'Character')}${mi('durak', 5, 'Play durak')}${mi('soctav', 6, 'Soc Tav')}${mi('menu', 7, 'Quit to menu')}</nav>
     </div>
     <div class="tag-br in up" style="--i:6"><span><kbd>W</kbd><kbd>S</kbd> Navigate</span><span><kbd>ENTER</kbd> Select</span><span><kbd>ESC</kbd> Resume</span></div>
   </div>
