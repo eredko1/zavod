@@ -14,7 +14,7 @@ const missing=structuredClone(good);missing.runs.forEach(r=>r.metadata.geometryC
 const drift=structuredClone(good);drift.runs[1].summaries.idle.poseHash='different';assert.throws(()=>validateRepeats(drift),/drift/);
 const p=createFrameProfiler({getContext:()=>({getExtension:()=>null,isContextLost:()=>false})});p.start();for(let i=0;i<20002;i++){p.beginFrame();p.endFrame({});}assert.equal((await p.stop()).frames.length,20002);
 const summary=await summarizeFrames({frames:[{phase:'walk-turn',rendered:true,cpu:{loop:2},gpuMs:null,gpuStatus:'unsupported',pose:{position:[0,0,0],quaternion:[0,0,0,1],yaw:0,pitch:0},resources:[],visible:true,intervalMs:null}]},'walk-turn');assert.equal(summary.gpu.samples,0);assert.equal(summary.gpu.p95,null);
-assert.throws(()=>validateArea({south:60,north:40,west:-1,east:0}),/bounds/);assert.throws(()=>validateArea({south:40,north:41,west:-1,east:0}),/5 km/);assert.equal(inNYC({south:51,north:51.001,west:0,east:.001}),false);assert.match(queryForArea({south:51,north:51.001,west:0,east:.001}),/nwr\(51,0,51.001,0.001\)/);
+assert.throws(()=>validateArea({south:60,north:40,west:-1,east:0}),/bounds/);assert.throws(()=>validateArea({south:40,north:41,west:-1,east:0}),/km/);assert.equal(inNYC({south:51,north:51.001,west:0,east:.001}),false);assert.match(queryForArea({south:51,north:51.001,west:0,east:.001}),/nwr\(51,0,51.001,0.001\)/);
 console.log('PASS complete baselines, repeat identity, visible geometry comparisons, maximum replay capacity, null GPU timings and arbitrary area validation');
 const frame=(loop,ground,collision,simulation)=>({phase:'walk-turn',cpu:{loop,controls:1,ground,collision,simulation,renderSubmit:2},rendered:true,gpuMs:null});
 const samples=Array.from({length:20},(_,i)=>frame(i+8,1,2,i+3)),charts={runs:[{raw:{frames:samples}}]};
@@ -34,6 +34,8 @@ for(const [key,value] of [['viewport',[500,400]],['devicePixelRatio',2]]){
   changed.runs[1].metadata={...changed.runs[1].metadata,[key]:null};assert.throws(()=>validateRepeats(changed),new RegExp(key));
 }
 console.log('PASS viewport and pixel-ratio environment changes invalidate comparisons');
+for(const key of ['mergePolicyVersion','renderPolicyVersion']){const changed=structuredClone(good);changed.runs.forEach(r=>r.metadata[key]=1);assert.throws(()=>validateComparison(good,changed),new RegExp(key));validateComparison(good,changed,true);changed.runs[1].metadata={...changed.runs[1].metadata,[key]:2};assert.throws(()=>validateRepeats(changed),new RegExp(key));}
+console.log('PASS source/render policy versions invalidate incompatible comparisons and drifted repeats');
 const gpuReport=statuses=>({runs:[{raw:{frames:statuses.map(gpuStatus=>({...frame(3,0,0,0),gpuStatus,gpuMs:gpuStatus==='valid'?5:null}))}}]});
 assert.equal(gpuSampleNote(activitySummary({runs:[]},'idle')),'No redraws');
 const unsupported=activitySummary(gpuReport(['unsupported','unsupported']),'walk-turn');

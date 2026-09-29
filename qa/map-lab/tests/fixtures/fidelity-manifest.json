@@ -1,0 +1,153 @@
+{
+  "file": "fidelity-input.json.gz",
+  "sha256": "1a92d09f92c3c6720d49044630c4a5fc7de767a5bb4feb8c1483d6135f5c1c39",
+  "acquiredAt": "2026-09-28T02:40:04.994Z",
+  "sources": [
+    {
+      "sourceId": "nyc-buildings",
+      "bounds": {
+        "south": 40.5752,
+        "west": -73.9798,
+        "north": 40.5799,
+        "east": -73.976
+      },
+      "urls": [
+        "https://data.cityofnewyork.us/resource/5zhs-2jue.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.9798+40.5752%2C+-73.976+40.5752%2C+-73.976+40.5799%2C+-73.9798+40.5799%2C+-73.9798+40.5752%29%29%27%29&%24order=doitt_id%2C%3Aid&%24limit=1000&%24offset=0"
+      ],
+      "fetchedAt": "2026-09-28T00:04:38.094Z"
+    },
+    {
+      "sourceId": "nyc-buildings-2014",
+      "bounds": {
+        "south": 40.5752,
+        "west": -73.9798,
+        "north": 40.5799,
+        "east": -73.976
+      },
+      "urls": [
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/root?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/877?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/2579?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/2896?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3556?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3757?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4179?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3557?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3562?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4180?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3558?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561/geometries/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561/attributes/f_0/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561/attributes/f_1/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561/attributes/f_2/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561/attributes/f_3/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3561/attributes/f_4/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3563?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3585?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4181?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4198?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211/geometries/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211/attributes/f_0/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211/attributes/f_1/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211/attributes/f_2/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211/attributes/f_3/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4211/attributes/f_4/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560/geometries/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560/attributes/f_0/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560/attributes/f_1/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560/attributes/f_2/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560/attributes/f_3/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/3560/attributes/f_4/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4182?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4193?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199/geometries/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199/attributes/f_0/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199/attributes/f_1/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199/attributes/f_2/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199/attributes/f_3/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4199/attributes/f_4/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205/geometries/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205/attributes/f_0/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205/attributes/f_1/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205/attributes/f_2/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205/attributes/f_3/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4205/attributes/f_4/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186?f=json",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186/geometries/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186/attributes/f_0/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186/attributes/f_1/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186/attributes/f_2/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186/attributes/f_3/0",
+        "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/3D_Buildings_Citywide/SceneServer/layers/0/nodes/4186/attributes/f_4/0"
+      ],
+      "fetchedAt": "2026-09-28T02:31:19.262Z"
+    },
+    {
+      "sourceId": "nyc-transport",
+      "bounds": {
+        "south": 40.596,
+        "west": -74.07,
+        "north": 40.617,
+        "east": -74.019
+      },
+      "urls": [
+        "https://data.cityofnewyork.us/resource/r9cu-9r7b.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=0"
+      ],
+      "fetchedAt": "2026-09-28T02:17:30.170Z"
+    },
+    {
+      "sourceId": "nyc-elevation",
+      "bounds": {
+        "south": 40.596,
+        "west": -74.07,
+        "north": 40.617,
+        "east": -74.019
+      },
+      "urls": [
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=0",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=1000",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=2000",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=3000",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=4000",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=5000",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=6000",
+        "https://data.cityofnewyork.us/resource/9uxf-ng6q.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.07+40.596%2C+-74.019+40.596%2C+-74.019+40.617%2C+-74.07+40.617%2C+-74.07+40.596%29%29%27%29&%24order=source_id%2C%3Aid&%24limit=1000&%24offset=7000"
+      ],
+      "fetchedAt": "2026-09-28T02:17:36.813Z"
+    },
+    {
+      "sourceId": "nyc-water-tanks",
+      "bounds": {
+        "south": 40.5752,
+        "west": -73.9798,
+        "north": 40.5799,
+        "east": -73.976
+      },
+      "urls": [
+        "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Water_Tank_2022/FeatureServer/27?f=json",
+        "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Water_Tank_2022/FeatureServer/27/query?where=1%3D1&geometry=%7B%22xmin%22%3A-73.9798%2C%22ymin%22%3A40.5752%2C%22xmax%22%3A-73.976%2C%22ymax%22%3A40.5799%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=false&returnZ=true&returnM=true&f=json&returnIdsOnly=true",
+        "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Water_Tank_2022/FeatureServer/27/query?where=1%3D1&geometry=%7B%22xmin%22%3A-73.9798%2C%22ymin%22%3A40.5752%2C%22xmax%22%3A-73.976%2C%22ymax%22%3A40.5799%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=true&returnZ=true&returnM=true&f=json&objectIds=5436%2C5437&returnTrueCurves=true",
+        "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Water_Tank_2022/FeatureServer/27/query?where=1%3D1&geometry=%7B%22xmin%22%3A-73.9798%2C%22ymin%22%3A40.5752%2C%22xmax%22%3A-73.976%2C%22ymax%22%3A40.5799%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=true&returnZ=true&returnM=true&f=geojson&objectIds=5436%2C5437"
+      ],
+      "fetchedAt": "2026-09-28T03:06:05.384Z"
+    }
+  ],
+  "attribution": {
+    "mesh": "NYC Department of City Planning, 2014 3D Buildings Citywide; NYC current building footprints; NYC 2022 Water Tank planimetrics",
+    "bridge": "NYC 2022 planimetrics and OpenStreetMap contributors (ODbL)",
+    "purpose": "Pinned public API regression data; browser UI fetches live selected areas"
+  },
+  "osm": {
+    "endpoint": "https://overpass.kumi.systems/api/interpreter",
+    "query": "[out:json][timeout:60];(way[bridge](40.596,-74.070,40.617,-74.019);nwr[\"bridge:support\"](40.596,-74.070,40.617,-74.019););out geom;",
+    "osmBase": "2026-05-06T03:25:00Z",
+    "fetchedAt": "2026-09-28T02:21:16.427Z",
+    "fetchedAtEvidence": "Original response file modification time"
+  }
+}

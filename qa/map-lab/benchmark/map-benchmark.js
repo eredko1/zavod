@@ -14,7 +14,7 @@ export function createMapBenchmark(world,{scenarios=DEFAULT_SCENARIOS}={}) {
     if(error)current.reject(error);else current.resolve();
   }
   const api={world,profiler,scenarios,
-    async loadResult(selection,settings,beforeStage){profiler.beginBuild({settings});try{return await world.loadResult(selection,settings,(name,ms)=>profiler.buildMark(name,ms),beforeStage);}finally{profiler.endBuild();}},
+    async loadResult(selection,settings,beforeStage,signal){profiler.beginBuild({settings});try{return await world.loadResult(selection,settings,(name,ms,thread)=>profiler.buildMark(name,ms,thread),beforeStage,signal);}finally{profiler.endBuild();}},
     runReplay(mode,{frames=REPLAY.frames,warmup=REPLAY.warmup}={}) {
       if(replay)return Promise.reject(Error('Replay already running'));
       if(!Number.isInteger(frames)||frames<2||!Number.isInteger(warmup)||warmup<0||frames+warmup>MAX_REPLAY_FRAMES)return Promise.reject(Error('Invalid replay length'));

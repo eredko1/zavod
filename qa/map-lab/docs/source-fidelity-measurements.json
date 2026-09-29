@@ -1,0 +1,1043 @@
+{
+  "generatedAt": "2026-09-28T00:41:01.255Z",
+  "comparisonFile": "comparison.json",
+  "areas": [
+    {
+      "area": "luna-park",
+      "box": [
+        -73.9798,
+        40.5752,
+        -73.976,
+        40.5799
+      ],
+      "counts": {
+        "nyc": 34,
+        "mesh": 36,
+        "overture2023": 35,
+        "overtureCurrent": 34,
+        "overtureCurrentParts": 0
+      },
+      "currentOSM": {
+        "snapshot": "2026-09-27T05:07:05.003Z",
+        "osmBase": "2026-09-27T05:06:23Z",
+        "buildingRecords": 34,
+        "parts": 0,
+        "explicitHeight": 27,
+        "estimatedHeight": 4,
+        "nonFlatRoof": 0,
+        "bridgeSupportRecordsWideScene": [],
+        "normalizedWholeBuildings": 34,
+        "normalizedParts": 0
+      },
+      "overtureCurrent": {
+        "sources": {
+          "OpenStreetMap": 34,
+          "Microsoft ML Buildings": 2,
+          "USGS Lidar": 1
+        },
+        "partSources": {},
+        "height": 30,
+        "floors": 22,
+        "nonFlatRoof": 0,
+        "partsHeight": 0,
+        "partsMinHeight": 0,
+        "partsNonFlatRoof": 0
+      },
+      "overture2023": {
+        "sources": {
+          "OpenStreetMap": 34,
+          "Microsoft ML Buildings": 1
+        },
+        "height": 32
+      },
+      "meshIDs": {
+        "validBIN": 35,
+        "nonzeroDOITT": 35
+      },
+      "temporalReview": [
+        {
+          "BIN": "3428535",
+          "DOITT_ID": "1289199",
+          "year": "2018",
+          "heightFt": "20"
+        },
+        {
+          "BIN": "3425667",
+          "DOITT_ID": "1292438",
+          "year": "2019",
+          "heightFt": "28"
+        },
+        {
+          "BIN": "3424676",
+          "DOITT_ID": "1298391",
+          "year": "2023",
+          "heightFt": "60"
+        }
+      ],
+      "matching": {
+        "confirmed": 25,
+        "meshUnresolved": 11,
+        "cityUnresolved": 9,
+        "reviewMeshes": 5,
+        "noReviewOverlapMeshes": 6,
+        "reviewMeshMultipleCandidates": 0,
+        "cityMultipleMeshCandidates": 1,
+        "sharedBIN": 24,
+        "sharedDOITT": 24,
+        "minIoU": 0.7762661214218307,
+        "medianIoU": 1,
+        "medianAreaRatio": 1,
+        "medianCentroidDistance": 0,
+        "medianPerimeterRatio": 1,
+        "multipleUpperHorizontalBands": 15,
+        "strictEdgePairingPass": 10,
+        "fullyInsideHeightComparisons": 11,
+        "medianAbsoluteRelativeSpanDifference": 0.6360806101074221,
+        "minRelativeSpanDifference": -0.6360806101074221,
+        "maxRelativeSpanDifference": 6.100442744262693,
+        "sameMatchesAtOneMetre": true
+      },
+      "overtureExtra": [
+        {
+          "file": "overture-2026-09-23.1-bathymetry--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 2,
+          "classCounts": {
+            "undefined/undefined": 2
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-infrastructure--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 456,
+          "classCounts": {
+            "communication/communication_line": 5,
+            "bridge/boardwalk": 1,
+            "barrier/gate": 36,
+            "transportation/crossing": 74,
+            "emergency/fire_hydrant": 4,
+            "transit/bus_stop": 15,
+            "transit/stop_position": 27,
+            "barrier/kerb": 84,
+            "transportation/traffic_signals": 14,
+            "transit/parking": 19,
+            "bridge/bridge": 63,
+            "transit/platform": 9,
+            "transit/subway_station": 3,
+            "transportation/street_lamp": 17,
+            "transit/bicycle_parking": 3,
+            "barrier/block": 9,
+            "pedestrian/bench": 8,
+            "waste_management/waste_basket": 2,
+            "barrier/fence": 23,
+            "barrier/chain": 7,
+            "pedestrian/information": 3,
+            "barrier/swing_gate": 1,
+            "barrier/lift_gate": 3,
+            "water/fountain": 1,
+            "pedestrian/toilets": 1,
+            "recreation/roller_coaster": 6,
+            "barrier/barrier": 1,
+            "pedestrian/artwork": 3,
+            "pedestrian/vending_machine": 1,
+            "transit/parking_entrance": 1,
+            "transportation/stop": 4,
+            "power/substation": 1,
+            "utility/storage_tank": 2,
+            "barrier/wall": 1,
+            "power/generator": 1,
+            "waste_management/waste_disposal": 1,
+            "utility/pipeline": 1,
+            "power/cable": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-land--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 228,
+          "classCounts": {
+            "tree/tree": 221,
+            "wetland/wetland": 2,
+            "rock/scree": 1,
+            "shrub/scrub": 1,
+            "physical/peninsula": 1,
+            "land/land": 1,
+            "land/island": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-land_cover--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 4,
+          "classCounts": {
+            "forest/undefined": 1,
+            "urban/undefined": 2,
+            "barren/undefined": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-land_use--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 41,
+          "classCounts": {
+            "pedestrian/pedestrian": 2,
+            "horticulture/garden": 7,
+            "entertainment/theme_park": 2,
+            "recreation/pitch": 10,
+            "developed/brownfield": 1,
+            "developed/commercial": 1,
+            "horticulture/flowerbed": 1,
+            "park/park": 2,
+            "recreation/beach_resort": 1,
+            "residential/residential": 2,
+            "managed/grass": 3,
+            "park/dog_park": 3,
+            "recreation/recreation_ground": 1,
+            "park/village_green": 1,
+            "recreation/playground": 3,
+            "education/school": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-segment--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 333,
+          "classCounts": {
+            "water/undefined": 2,
+            "road/footway": 115,
+            "road/path": 1,
+            "road/steps": 9,
+            "road/service": 116,
+            "road/pedestrian": 3,
+            "road/secondary": 21,
+            "road/unknown": 2,
+            "road/residential": 26,
+            "rail/subway": 37,
+            "road/unclassified": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-water--73.981,40.574,-73.974,40.581.geojson",
+          "exportViewportCount": 14,
+          "classCounts": {
+            "physical/bay": 2,
+            "ocean/ocean": 2,
+            "stream/stream": 1,
+            "water/fairway": 1,
+            "water/water": 8
+          }
+        }
+      ]
+    },
+    {
+      "area": "lower-manhattan",
+      "box": [
+        -74.01,
+        40.706,
+        -74.006,
+        40.71
+      ],
+      "counts": {
+        "nyc": 118,
+        "mesh": 126,
+        "overture2023": 130,
+        "overtureCurrent": 128,
+        "overtureCurrentParts": 388
+      },
+      "currentOSM": {
+        "snapshot": "2026-09-28T00:36:08.266Z",
+        "osmBase": "2026-09-28T00:34:55Z",
+        "buildingRecords": 112,
+        "parts": 390,
+        "explicitHeight": 465,
+        "estimatedHeight": 3,
+        "nonFlatRoof": 25,
+        "bridgeSupportRecordsWideScene": [],
+        "normalizedWholeBuildings": 113,
+        "normalizedParts": 388
+      },
+      "overtureCurrent": {
+        "sources": {
+          "OpenStreetMap": 128,
+          "Microsoft ML Buildings": 2,
+          "USGS Lidar": 23
+        },
+        "partSources": {
+          "OpenStreetMap": 388
+        },
+        "height": 118,
+        "floors": 64,
+        "nonFlatRoof": 2,
+        "partsHeight": 386,
+        "partsMinHeight": 117,
+        "partsNonFlatRoof": 23
+      },
+      "overture2023": {
+        "sources": {
+          "OpenStreetMap": 129,
+          "Microsoft ML Buildings": 1
+        },
+        "height": 122
+      },
+      "meshIDs": {
+        "validBIN": 125,
+        "nonzeroDOITT": 125
+      },
+      "temporalReview": [
+        {
+          "BIN": "1001281",
+          "DOITT_ID": "658508",
+          "year": "2016",
+          "heightFt": "177.71323793"
+        },
+        {
+          "BIN": "1090115",
+          "DOITT_ID": "1286114",
+          "year": "2018",
+          "heightFt": "727"
+        },
+        {
+          "BIN": "1090562",
+          "DOITT_ID": "1286710",
+          "year": "2019",
+          "heightFt": "750"
+        },
+        {
+          "BIN": "1088815",
+          "DOITT_ID": "1290752",
+          "year": "2019",
+          "heightFt": "422"
+        }
+      ],
+      "matching": {
+        "confirmed": 111,
+        "meshUnresolved": 15,
+        "cityUnresolved": 7,
+        "reviewMeshes": 6,
+        "noReviewOverlapMeshes": 9,
+        "reviewMeshMultipleCandidates": 0,
+        "cityMultipleMeshCandidates": 2,
+        "sharedBIN": 111,
+        "sharedDOITT": 111,
+        "minIoU": 0.715158924205379,
+        "medianIoU": 1,
+        "medianAreaRatio": 1,
+        "medianCentroidDistance": 0,
+        "medianPerimeterRatio": 1,
+        "multipleUpperHorizontalBands": 89,
+        "strictEdgePairingPass": 22,
+        "fullyInsideHeightComparisons": 74,
+        "medianAbsoluteRelativeSpanDifference": 1.0731918823242168,
+        "minRelativeSpanDifference": -26.234972741699224,
+        "maxRelativeSpanDifference": 17.59812600460922,
+        "sameMatchesAtOneMetre": true
+      },
+      "overtureExtra": [
+        {
+          "file": "overture-2026-09-23.1-bathymetry--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 1,
+          "classCounts": {
+            "undefined/undefined": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-infrastructure--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 2423,
+          "classCounts": {
+            "utility/pipeline": 1,
+            "transit/parking_entrance": 11,
+            "barrier/bollard": 57,
+            "transportation/crossing": 283,
+            "barrier/retaining_wall": 121,
+            "pedestrian/bench": 328,
+            "transportation/street_lamp": 411,
+            "barrier/kerb": 511,
+            "waste_management/recycling": 33,
+            "waste_management/waste_basket": 105,
+            "transit/platform": 13,
+            "barrier/fence": 52,
+            "transit/bus_stop": 25,
+            "barrier/jersey_barrier": 5,
+            "emergency/fire_hydrant": 62,
+            "transportation/traffic_signals": 34,
+            "transportation/stop": 52,
+            "pedestrian/artwork": 16,
+            "transit/stop_position": 23,
+            "transit/bicycle_parking": 62,
+            "transit/subway_station": 8,
+            "barrier/gate": 22,
+            "pedestrian/information": 23,
+            "barrier/barrier": 8,
+            "transit/parking": 10,
+            "barrier/block": 57,
+            "pedestrian/vending_machine": 3,
+            "transit/bicycle_rental": 13,
+            "barrier/wall": 31,
+            "pedestrian/post_box": 6,
+            "water/fountain": 7,
+            "water/drinking_water": 4,
+            "pedestrian/atm": 6,
+            "bridge/bridge": 5,
+            "power/cable": 2,
+            "pedestrian/toilets": 1,
+            "barrier/lift_gate": 3,
+            "transit/railway_station": 1,
+            "barrier/chain": 2,
+            "tower/bell_tower": 1,
+            "communication/communication_line": 5
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-land--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 689,
+          "classCounts": {
+            "land/land": 2,
+            "tree/tree": 637,
+            "rock/scree": 7,
+            "rock/bare_rock": 41,
+            "land/island": 2
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-land_cover--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 3,
+          "classCounts": {
+            "forest/undefined": 1,
+            "urban/undefined": 2
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-land_use--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 312,
+          "classCounts": {
+            "pedestrian/pedestrian": 58,
+            "cemetery/grave_yard": 1,
+            "horticulture/garden": 220,
+            "education/university": 3,
+            "park/park": 14,
+            "managed/grass": 4,
+            "construction/construction": 5,
+            "developed/brownfield": 1,
+            "developed/commercial": 1,
+            "developed/retail": 1,
+            "recreation/track": 1,
+            "residential/residential": 1,
+            "cemetery/cemetery": 1,
+            "park/dog_park": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-segment--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 985,
+          "classCounts": {
+            "water/undefined": 11,
+            "road/footway": 610,
+            "road/residential": 97,
+            "road/service": 28,
+            "road/steps": 133,
+            "road/secondary": 29,
+            "road/cycleway": 4,
+            "rail/subway": 19,
+            "road/unclassified": 15,
+            "road/living_street": 1,
+            "road/pedestrian": 16,
+            "road/tertiary": 4,
+            "road/primary": 11,
+            "road/motorway": 6,
+            "rail/unknown": 1
+          }
+        },
+        {
+          "file": "overture-2026-09-23.1-water--74.012,40.704,-74.004,40.712.geojson",
+          "exportViewportCount": 14,
+          "classCounts": {
+            "ocean/ocean": 1,
+            "river/river": 4,
+            "water/water": 7,
+            "human_made/swimming_pool": 1,
+            "water/tidal_channel": 1
+          }
+        }
+      ]
+    }
+  ],
+  "overtureHeightSemantics": [
+    {
+      "overtureId": "6f564653-1f70-3623-bd8d-b925fa5daf22",
+      "source": {
+        "property": "",
+        "dataset": "OpenStreetMap",
+        "license": "ODbL-1.0",
+        "record_id": "w370587019@3",
+        "update_time": "2015-09-17T19:01:04.000Z",
+        "provider": "osm",
+        "resource": "planet",
+        "version": "2026-09-06T00:00:00.000Z"
+      },
+      "OSM": {
+        "id": 370587019,
+        "version": 3,
+        "height": "75",
+        "min_height": "68"
+      },
+      "overture": {
+        "height": 75,
+        "min_height": 68
+      }
+    },
+    {
+      "overtureId": "ce661468-1816-3474-b1a0-5710cbd1509d",
+      "source": {
+        "property": "",
+        "dataset": "OpenStreetMap",
+        "license": "ODbL-1.0",
+        "record_id": "w370587020@3",
+        "update_time": "2015-09-17T19:01:05.000Z",
+        "provider": "osm",
+        "resource": "planet",
+        "version": "2026-09-06T00:00:00.000Z"
+      },
+      "OSM": {
+        "id": 370587020,
+        "version": 3,
+        "height": "65",
+        "min_height": "53"
+      },
+      "overture": {
+        "height": 65,
+        "min_height": 53
+      }
+    },
+    {
+      "overtureId": "987f0b76-5a13-3a4d-bf9a-66610fff0ab0",
+      "source": {
+        "property": "",
+        "dataset": "OpenStreetMap",
+        "license": "ODbL-1.0",
+        "record_id": "w370587012@3",
+        "update_time": "2015-09-17T19:01:04.000Z",
+        "provider": "osm",
+        "resource": "planet",
+        "version": "2026-09-06T00:00:00.000Z"
+      },
+      "OSM": {
+        "id": 370587012,
+        "version": 3,
+        "height": "78",
+        "min_height": "75"
+      },
+      "overture": {
+        "height": 78,
+        "min_height": 75
+      }
+    },
+    {
+      "overtureId": "2db73e01-7260-365c-b8bd-aa34c0b1a277",
+      "source": {
+        "property": "",
+        "dataset": "OpenStreetMap",
+        "license": "ODbL-1.0",
+        "record_id": "w370587017@3",
+        "update_time": "2015-09-17T19:01:04.000Z",
+        "provider": "osm",
+        "resource": "planet",
+        "version": "2026-09-06T00:00:00.000Z"
+      },
+      "OSM": {
+        "id": 370587017,
+        "version": 3,
+        "height": "68",
+        "min_height": "65"
+      },
+      "overture": {
+        "height": 68,
+        "min_height": 65
+      }
+    },
+    {
+      "overtureId": "d9469c0e-ceec-3451-ada4-47fd03bc3806",
+      "source": {
+        "property": "",
+        "dataset": "OpenStreetMap",
+        "license": "ODbL-1.0",
+        "record_id": "w375890394@1",
+        "update_time": "2015-10-19T06:58:18.000Z",
+        "provider": "osm",
+        "resource": "planet",
+        "version": "2026-09-06T00:00:00.000Z"
+      },
+      "OSM": {
+        "id": 375890394,
+        "version": 1,
+        "height": "64",
+        "min_height": "61.3"
+      },
+      "overture": {
+        "height": 64,
+        "min_height": 61.3
+      }
+    },
+    {
+      "overtureId": "1c4a8ff3-bb82-3f27-983d-df136198f551",
+      "source": {
+        "property": "",
+        "dataset": "OpenStreetMap",
+        "license": "ODbL-1.0",
+        "record_id": "w375890552@1",
+        "update_time": "2015-10-19T07:04:23.000Z",
+        "provider": "osm",
+        "resource": "planet",
+        "version": "2026-09-06T00:00:00.000Z"
+      },
+      "OSM": {
+        "id": 375890552,
+        "version": 1,
+        "height": "38",
+        "min_height": "34.6"
+      },
+      "overture": {
+        "height": 38,
+        "min_height": 34.6
+      }
+    }
+  ],
+  "originalNYCLayers": [
+    {
+      "name": "Transport_Structure_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Transport_Structure_2022/FeatureServer",
+      "layerId": 25,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 1,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 1,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Parking_Lot_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Parking_Lot_2022/FeatureServer",
+      "layerId": 13,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 20,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 1,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Sidewalk_Line_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Sidewalk_Line_2022/FeatureServer",
+      "layerId": 23,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 46,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Median_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Median_2022/FeatureServer",
+      "layerId": 9,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 12,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Elevation_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Elevation_2022/FeatureServer",
+      "layerId": 6,
+      "hasZ": true,
+      "geometryType": "esriGeometryPoint",
+      "areas": {
+        "luna-park": {
+          "count": 174,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 183,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Plaza_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Plaza_2022/FeatureServer",
+      "layerId": 16,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 0,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 7,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Park_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Park_2022/FeatureServer",
+      "layerId": 12,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 17,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Sidewalk_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Sidewalk_2022/FeatureServer",
+      "layerId": 22,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 14,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 34,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Roadbed_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Roadbed_2022/FeatureServer",
+      "layerId": 20,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 25,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 71,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Hydrography_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Hydrography_2022/FeatureServer",
+      "layerId": 8,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 1,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "BOARDWALK_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/BOARDWALK_2022/FeatureServer",
+      "layerId": 0,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 0,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Open_Space_No_Park_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Open_Space_No_Park_2022/FeatureServer",
+      "layerId": 11,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 10,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Swimming_Pool_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Swimming_Pool_2022/FeatureServer",
+      "layerId": 24,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 0,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Curb_Cut_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Curb_Cut_2022/FeatureServer",
+      "layerId": 5,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 95,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 127,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Shoreline_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Shoreline_2022/FeatureServer",
+      "layerId": 21,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 1,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Retaining_Wall_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Retaining_Wall_2022/FeatureServer",
+      "layerId": 19,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 0,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Miscellaneous_Structure_Polygon_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Miscellaneous_Structure_Polygon_2022/FeatureServer",
+      "layerId": 10,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 1,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Curb_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Curb_2022/FeatureServer",
+      "layerId": 4,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 57,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 194,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Railroad_Structure_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Railroad_Structure_2022/FeatureServer",
+      "layerId": 18,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 6,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 25,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Pavement_Edge_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Pavement_Edge_2022/FeatureServer",
+      "layerId": 14,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 39,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 109,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Under_Construction_Unknown_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Under_Construction_Unknown_2022/FeatureServer",
+      "layerId": 26,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 0,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 2,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Railroad_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Railroad_2022/FeatureServer",
+      "layerId": 17,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 19,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Water_Tank_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Water_Tank_2022/FeatureServer",
+      "layerId": 27,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 2,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 34,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Hydro_Structure_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Hydro_Structure_2022/FeatureServer",
+      "layerId": 7,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 1,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 0,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Cooling_Towers_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Cooling_Towers_2022/FeatureServer",
+      "layerId": 3,
+      "hasZ": false,
+      "geometryType": "esriGeometryPolygon",
+      "areas": {
+        "luna-park": {
+          "count": 17,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 106,
+          "complete": true
+        }
+      }
+    },
+    {
+      "name": "Pavement_Edge_Carto_2022",
+      "url": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Pavement_Edge_Carto_2022/FeatureServer",
+      "layerId": 15,
+      "hasZ": true,
+      "geometryType": "esriGeometryPolyline",
+      "areas": {
+        "luna-park": {
+          "count": 6,
+          "complete": true
+        },
+        "lower-manhattan": {
+          "count": 4,
+          "complete": true
+        }
+      }
+    }
+  ],
+  "scope": "Research snapshot; candidate matches do not authorize runtime replacement. Original responses, binaries, complete alternatives and request metadata are retained in the ignored local evidence bundle."
+}

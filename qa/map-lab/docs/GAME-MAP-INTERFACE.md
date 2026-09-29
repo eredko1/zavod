@@ -139,7 +139,7 @@ No new task runner is required for this work. Extend the existing named compiler
 | Output | Contents / checks |
 | --- | --- |
 | Map manifest | Map ID, source snapshot hashes/provenance, frame, settings and rule/compiler versions |
-| Resolved plan | Canonical features, retained source identity, chosen attributes, estimates and skips |
+| Resolved plan | Canonical features, retained source source identity/measured selections and separate render estimates/skips |
 | Physics data | Collider records, supporting surfaces, feature IDs and approximation policy |
 | Gameplay data | Validated spawns, optional cover/anchors and supported modes |
 | Stage diagnostics | Duration, input/output counts, exclusions, failures and source-linked reasons |

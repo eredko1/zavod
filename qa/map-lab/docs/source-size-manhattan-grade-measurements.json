@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "startedAt": "2026-09-29T21:03:21.199Z",
+  "bounds": {
+    "south": 40.702001691681964,
+    "west": -74.01985092819372,
+    "north": 40.71999830831803,
+    "east": -73.99614907180627
+  },
+  "dimensions": {
+    "height": 1999.9999999995703,
+    "width": 2000.0000000003236
+  },
+  "acquisitionLimits": {
+    "areaMetres": 10000,
+    "vectorRecords": 50000,
+    "mesh": {
+      "nodes": 8000,
+      "leaves": 1200,
+      "features": 40000,
+      "vertices": 12000000,
+      "bytes": 536870912
+    },
+    "lidar": {
+      "assets": 4096,
+      "hierarchyPages": 1024,
+      "points": 100000000,
+      "bytes": 1073741824,
+      "decodedBytes": 4294967296
+    }
+  },
+  "displayBackend": "verified-xvfb-x11-vulkan",
+  "method": "Sequential live production adapters; complete source JSON streamed to disk. Rejected evidence is separate and never selected. Encoded response sizes are CDP measurements, not retained JSON size or RAM. Decoded point bytes measure validated records, not retained RAM.",
+  "sources": [
+    {
+      "id": "nyc-building-grade",
+      "name": "NYC building grade and floor observations",
+      "status": "complete",
+      "records": 1971,
+      "inventoryRecords": 1971,
+      "features": 1971,
+      "assets": 0,
+      "points": 0,
+      "compressedPointBytes": 0,
+      "decodedPointBytes": 0,
+      "meshVertices": 0,
+      "meshBinaryBytes": 0,
+      "fetchedAt": "2026-09-29T21:03:45.543Z",
+      "metadata": {
+        "name": "Building Elevation and Subgrade (BES)",
+        "dataUpdatedAt": "2023-09-19T16:07:13.000Z",
+        "metadataUpdatedAt": "2023-10-25T14:59:28.000Z"
+      },
+      "urls": [
+        "https://data.cityofnewyork.us/resource/bsin-59hv.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.01985092819372+40.702001691681964%2C+-73.99614907180627+40.702001691681964%2C+-73.99614907180627+40.71999830831803%2C+-74.01985092819372+40.71999830831803%2C+-74.01985092819372+40.702001691681964%29%29%27%29&%24order=bin%2C%3Aid&%24limit=1000&%24offset=0",
+        "https://data.cityofnewyork.us/resource/bsin-59hv.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-74.01985092819372+40.702001691681964%2C+-73.99614907180627+40.702001691681964%2C+-73.99614907180627+40.71999830831803%2C+-74.01985092819372+40.71999830831803%2C+-74.01985092819372+40.702001691681964%29%29%27%29&%24order=bin%2C%3Aid&%24limit=1000&%24offset=1000"
+      ],
+      "queryMs": 23486.101340999998,
+      "export": {
+        "file": "nyc-building-grade.json",
+        "bytes": 3011253,
+        "sha256": "912107ae615a9da7d7fbd40a08e18c588e4576ba3c03e5b731549e3f2b8c0f12"
+      },
+      "network": {
+        "completedResponses": 2,
+        "encodedResponseBytes": 156133,
+        "unfinishedResponses": 0,
+        "failedResponses": 0
+      }
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "gpu": {
+    "renderer": "ANGLE (Intel, Vulkan 1.3.255 (Intel(R) UHD Graphics 620 (WHL GT2) (0x00003EA0)), Intel open-source Mesa driver-23.2.1)",
+    "features": {
+      "2d_canvas": "enabled",
+      "direct_rendering_display_compositor": "disabled_off_ok",
+      "gpu_compositing": "enabled",
+      "multiple_raster_threads": "enabled_on",
+      "opengl": "enabled_on",
+      "rasterization": "enabled",
+      "raw_draw": "disabled_off_ok",
+      "skia_graphite": "disabled_off",
+      "trees_in_viz": "disabled_off",
+      "video_decode": "enabled",
+      "video_encode": "disabled_software",
+      "vulkan": "enabled_on",
+      "webgl": "enabled",
+      "webgpu": "enabled",
+      "webgpu_on_vk_via_gl_interop": "disabled_off",
+      "webnn": "disabled_off"
+    },
+    "devices": [
+      {
+        "vendorId": 32902,
+        "deviceId": 16032,
+        "vendorString": "Google Inc. (Intel)",
+        "deviceString": "ANGLE (Intel, Vulkan 1.3.255 (Intel(R) UHD Graphics 620 (WHL GT2) (0x00003EA0)), Intel open-source Mesa driver-23.2.1)",
+        "driverVendor": "Mesa",
+        "driverVersion": "driver"
+      }
+    ]
+  },
+  "diagnosticFile": ".tmp/map-lab/diagnostics/source-size-capture-1790715801704-42412eb2-8410-4ac3-9018-5666c916d481.jsonl",
+  "selection": [
+    "nyc-building-grade"
+  ],
+  "status": "complete",
+  "totals": {
+    "complete": 1,
+    "rejected": 0,
+    "completeExportBytes": 3011253,
+    "rejectedEvidenceBytes": 0
+  },
+  "finishedAt": "2026-09-29T21:03:46.045Z"
+}

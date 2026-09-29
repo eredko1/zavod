@@ -19,7 +19,11 @@ export function surfaceIndex(meshes, fallback, cell = 10) {
       triangles++;
     }
   }
-  return { cells: cells.size, triangles, sample(x,z,ceiling=Infinity) {
+  return indexedSurfaces(cells,triangles,fallback,cell);
+}
+export function surfaceIndexFromData(data,objects,fallback){return indexedSurfaces(new Map(data.entries.map(([key,groups])=>[key,new Map(groups.map(([id,list])=>{if(!objects[id])throw Error('Missing surface object '+id);return[objects[id],list];}))])),data.triangles,fallback,data.cell);}
+function indexedSurfaces(cells,triangles,fallback,cell){
+  return { cells: cells.size, triangles, toData(id){return {cell,triangles,entries:[...cells].map(([key,groups])=>[key,[...groups].map(([mesh,list])=>[id(mesh),list])])};},sample(x,z,ceiling=Infinity) {
     const base=fallback(x,z);let height=base<=ceiling?base:-Infinity;
     const groups = cells.get(`${Math.floor(x/cell)},${Math.floor(z/cell)}`); if (!groups) return height;
     for (const [mesh, list] of groups) {
