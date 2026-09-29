@@ -3,8 +3,6 @@
 // for a moment, so walking about in chill mode nobody's waving anything around. Chill mode's default; 7 / numpad 7 anywhere.
 // Owned by: WEAPONS agent.
 import * as THREE from 'three';
-import { buildArm } from './arms.js';
-import { orient } from './rifle.js';
 
 export const FISTS_SPEC = {
   id: 'fists', name: 'FISTS', class: 'Melee', slot: 0, mode: 'MELEE', melee: true, fists: true,
@@ -21,22 +19,39 @@ export const FISTS_SPEC = {
   lower: { pos: [0, -0.4, -0.24], rot: [-0.9, 0, 0] },
 };
 
+// a bare fist, modelled directly (the gun hands are gloved): x across the knuckles, y up, +z back toward the wrist and the eye.
+// sgn = 1 right hand, -1 left: the thumb wraps across the front of the fingers toward the body's centre
+function bareFist(sgn, skin, nail) {
+  const g = new THREE.Group(), add = (geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.rotation.set(rx, ry, rz); g.add(me); return me; };
+  const cap = (r, l) => new THREE.CapsuleGeometry(r, l, 4, 10);
+  // the back of the hand / palm block, slightly rounded, and the knuckle row across the front top
+  { const m = add(new THREE.SphereGeometry(1, 18, 12), skin, 0, 0.004, 0.012); m.scale.set(0.043, 0.029, 0.045); }   // the back of the hand and palm, rounded
+  for (let k = 0; k < 4; k++) { const x = sgn * (-0.027 + k * 0.018), r = k === 3 ? 0.0098 : 0.0112;
+    add(new THREE.SphereGeometry(r, 10, 8), skin, x, 0.02, -0.028 - (k === 0 || k === 3 ? -0.003 : 0));   // knuckle
+    // the curled finger: first segment down the front, second folded back under
+    add(cap(r * 0.95, 0.018), skin, x, 0.002, -0.036, 0, 0, 0);
+    add(cap(r * 0.9, 0.016), skin, x, -0.02, -0.022, Math.PI / 2, 0, 0);
+    add(new THREE.BoxGeometry(r * 1.1, 0.002, r * 1.1), nail, x, -0.03, -0.012); }
+  // the thumb: a pad at the heel of the hand, then laid across the front of the index and middle fingers
+  add(new THREE.SphereGeometry(0.02, 10, 8), skin, -sgn * 0.034, -0.006, 0.02);
+  add(cap(0.011, 0.03), skin, -sgn * 0.016, -0.014, -0.036, 0, 0, Math.PI / 2 - sgn * 0.25);
+  // wrist and bare forearm, dropping back and out toward the elbow (off the bottom corner of the screen)
+  add(new THREE.CylinderGeometry(0.03, 0.028, 0.05, 12), skin, 0, -0.002, 0.07, Math.PI / 2, 0, 0);
+  const fore = add(new THREE.CylinderGeometry(0.03, 0.026, 0.3, 12), skin, sgn * 0.035, -0.08, 0.21, Math.PI / 2 - 0.55, 0, -sgn * 0.15);
+  void fore; return g;
+}
+
 export function buildFists(mats) {
   const group = new THREE.Group(); group.name = 'fists'; const parts = {};
+  if (!mats.fistSkin) { mats.fistSkin = new THREE.MeshStandardMaterial({ color: 0xc98f6a, roughness: 0.62, metalness: 0 }); mats.fistNail = new THREE.MeshStandardMaterial({ color: 0xe8c8b8, roughness: 0.35 }); }
   const body = new THREE.Group(); body.name = 'fistsBody'; group.add(body); parts.body = body;
   parts.sight = new THREE.Object3D(); parts.sight.position.set(0, 0.03, 0); group.add(parts.sight);
   parts.muzzle = new THREE.Object3D(); parts.muzzle.position.set(0, 0.0, -0.2); group.add(parts.muzzle);
   parts.eject = new THREE.Object3D(); group.add(parts.eject);
-  // a fist each side: fingers fully curled, knuckles forward, the thumb across; forearms dropping away out of shot
-  const fist = (side) => { const sx = side === 'right' ? 1 : -1;
-    return buildArm(side, { curl: [1.0, 1.0, 1.0, 1.0, 1.0], spread: 0.0, thumbUp: 0.15, forearmLen: 0.34, keepFore: false }, (hand, fore) => {
-      hand.position.set(sx * 0.105, -0.035, -0.02);
-      orient(hand, [0, 0, -1], [sx * -0.2, 1, 0]);
-      hand.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), -sx * 0.35);
-      fore.position.set(sx * 0.13, -0.09, 0.05);
-      fore.lookAt(sx * 0.2, -0.32, 0.42); fore.rotateX(Math.PI / 2);
-    }, mats); };
-  const R = fist('right'), L = fist('left'); group.add(R); group.add(L); parts.armR = R; parts.armL = L;
+  // the guard: right fist a touch lower and further back, both turned slightly in, knuckles toward the target
+  for (const [sgn, key, x, y, z, ry] of [[1, 'armR', 0.105, -0.04, -0.07, 0.22], [-1, 'armL', -0.105, -0.025, -0.11, -0.22]]) {
+    const f = bareFist(sgn, mats.fistSkin, mats.fistNail); f.position.set(x, y, z); f.rotation.set(0.12, ry, sgn * -0.12);
+    f.userData.home = { pos: f.position.clone(), rot: f.rotation.clone() }; group.add(f); parts[key] = f; }
   group.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = true; } });
   return { group, parts, spec: FISTS_SPEC };
 }

@@ -15,10 +15,10 @@ const SWINGS = [
   [[0, [0, 0, 0, 0, 0, 0]], [0.08, [0.12, 0.07, 0.02, 0.2, 0.55, -0.9]], [0.2, [-0.17, -0.05, -0.12, -0.25, -0.65, 0.7]], [0.26, [-0.19, -0.07, -0.08, -0.25, -0.7, 0.75]], [0.48, [0, 0, 0, 0, 0, 0]]],   // forehand: up-right → across → down-left
 ];
 // punches (fists): 2 jab (left, straight), 3 cross (right, straight, a turn of the shoulders), 4 hook (the third of a quick chain)
-SWINGS.push(
-  [[0, [0, 0, 0, 0, 0, 0]], [0.05, [-0.05, 0.03, -0.2, 0.05, 0.05, 0]], [0.1, [-0.05, 0.03, -0.22, 0.05, 0.05, 0]], [0.24, [0, 0, 0, 0, 0, 0]]],
-  [[0, [0, 0, 0, 0, 0, 0]], [0.06, [0.05, 0.03, -0.24, 0.05, -0.18, 0]], [0.12, [0.04, 0.03, -0.25, 0.05, -0.2, 0]], [0.3, [0, 0, 0, 0, 0, 0]]],
-  [[0, [0, 0, 0, 0, 0, 0]], [0.08, [0.12, 0.02, -0.08, 0, 0.3, -0.25]], [0.16, [-0.14, 0.05, -0.2, 0, -0.55, 0.35]], [0.22, [-0.16, 0.05, -0.18, 0, -0.6, 0.35]], [0.42, [0, 0, 0, 0, 0, 0]]],
+SWINGS.push(   // offsets on one fist (weapons.update moves that fist, not the whole view): 2 jab (left), 3 cross (right), 4 hook (left)
+  [[0, [0, 0, 0, 0, 0, 0]], [0.06, [0.03, 0.045, -0.3, -0.1, -0.05, 0]], [0.1, [0.03, 0.045, -0.31, -0.1, -0.05, 0]], [0.24, [0, 0, 0, 0, 0, 0]]],
+  [[0, [0, 0, 0, 0, 0, 0]], [0.07, [-0.07, 0.05, -0.33, -0.1, 0.18, 0.25]], [0.12, [-0.08, 0.05, -0.34, -0.1, 0.2, 0.3]], [0.3, [0, 0, 0, 0, 0, 0]]],
+  [[0, [0, 0, 0, 0, 0, 0]], [0.08, [-0.05, 0.06, 0.02, 0, 0.5, 0.2]], [0.16, [0.16, 0.07, -0.2, 0, -0.9, -0.5]], [0.22, [0.18, 0.07, -0.18, 0, -1.0, -0.55]], [0.42, [0, 0, 0, 0, 0, 0]]],
 );
 const FIST_BASE = 14, FIST_MUL = [1, 1.15, 2.1];   // jab, cross, hook (a chain inside 0.7 s between punches)
 const smooth = (x) => { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3 - 2 * x); };
@@ -613,8 +613,8 @@ export function update(dt, ctx) {
   // ---------- reload timeline ----------
   const reloadOff = { pos: _rlp.set(0, 0, 0), rot: _rlr.set(0, 0, 0) }; // extra weapon offset while reloading / cycling
   const armL = w.parts.armL, armR = w.parts.armR, mag = w.parts.mag;
-  if (armL) { armL.position.copy(armL.userData.home.pos); armL.rotation.set(0, 0, 0); }   // the knife is one-handed
-  if (armR) { armR.position.copy(armR.userData.home.pos); armR.rotation.set(0, 0, 0); }
+  if (armL) { armL.position.copy(armL.userData.home.pos); if (armL.userData.home.rot) armL.rotation.copy(armL.userData.home.rot); else armL.rotation.set(0, 0, 0); }   // the knife is one-handed
+  if (armR) { armR.position.copy(armR.userData.home.pos); if (armR.userData.home.rot) armR.rotation.copy(armR.userData.home.rot); else armR.rotation.set(0, 0, 0); }
   if (S.reload && S.reload.style === 'mag') {
     const r = S.reload; r.t += dt; const u = clamp(r.t / r.dur, 0, 1);
     const rk = sp.reloadKeys || (sp.slot === 0 ? RIFLE_SPEC.reloadKeys : PISTOL_SPEC.reloadKeys); const isLong = sp.slot === 0;
@@ -771,7 +771,8 @@ export function update(dt, ctx) {
     if (sw.t >= dur || !sp.melee) S.swing = null;
     else { let i = 0; while (i < keys.length - 2 && sw.t > keys[i + 1][0]) i++;
       const [t0, a] = keys[i], [t1, b] = keys[i + 1], k = smooth((sw.t - t0) / Math.max(1e-3, t1 - t0)), L = (j) => a[j] + (b[j] - a[j]) * k;
-      sn.position.x += L(0); sn.position.y += L(1); sn.position.z += L(2); sn.rotation.x += L(3); sn.rotation.y += L(4); sn.rotation.z += L(5); }
+      const tgt = sp.fists ? (sw.kind === 3 ? w.parts.armR : w.parts.armL) : sn;   // punches throw one fist; blades swing the whole hand
+      if (tgt) { tgt.position.x += L(0); tgt.position.y += L(1); tgt.position.z += L(2); tgt.rotation.x += L(3); tgt.rotation.y += L(4); tgt.rotation.z += L(5); } }
   }
 
   // ---------- scope (sniper): overlay replaces the viewmodel once the eye is on the eyepiece; aim sway moves the camera ----------
