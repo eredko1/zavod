@@ -436,7 +436,8 @@ function buildBack(world, root, put, wbox, M, lite, rnd) {
     floor(R.x0, R.z0, R.x1, R.z1, 0x77736a); box(R.x0 - 0.15, 0, R.z0, R.x0, top, R.z1 + 0.15, tile); box(R.x1, 0, R.z0, R.x1 + 0.15, top, R.z1 + 0.15, tile); box(R.x0 - 0.15, 0, R.z1, R.x1 + 0.15, top, R.z1 + 0.15, tile);
     box(R.x0 - 0.15, top, R.z0, R.x1 + 0.15, top + 0.12, R.z1 + 0.15, 0xcfcac0);
     wbox(R.x0 - 0.15, 0, R.z0, R.x0, top, R.z1 + 0.15); wbox(R.x1, 0, R.z0, R.x1 + 0.15, top, R.z1 + 0.15); wbox(R.x0 - 0.15, 0, R.z1, R.x1 + 0.15, top, R.z1 + 0.15);
-    box(R.x0, y0 + 1.1, R.z0, R.x1, y0 + 1.14, R.z1, 0x2f6a4a);   // a green tile stripe round the room
+    // a green tile stripe round the room (three thin strips on the walls: it was one slab across the whole room at hip height)
+    box(R.x0, y0 + 1.1, R.z0, R.x0 + 0.02, y0 + 1.22, R.z1, 0x2f6a4a); box(R.x1 - 0.02, y0 + 1.1, R.z0, R.x1, y0 + 1.22, R.z1, 0x2f6a4a); box(R.x0, y0 + 1.1, R.z1 - 0.02, R.x1, y0 + 1.22, R.z1, 0x2f6a4a);
     // the urinal (east wall), the stall (north-west corner) with the bowl, the sink and mirror (west wall), a bare bulb
     const uz = R.z0 + 1.5; box(R.x1 - 0.32, y0 + 0.45, uz - 0.2, R.x1, y0 + 1.05, uz + 0.2, 0xf4f4f0); box(R.x1 - 0.28, y0 + 0.45, uz - 0.16, R.x1 - 0.05, y0 + 0.5, uz + 0.16, 0xd8e4e6);
     { const p = new THREE.CylinderGeometry(0.015, 0.015, 0.5, 5); p.translate(R.x1 - 0.06, y0 + 1.3, uz); shade(p, 0xb8bcc0); put(M.pnt, p); }
