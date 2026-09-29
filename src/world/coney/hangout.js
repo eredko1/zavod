@@ -64,8 +64,10 @@ export function buildHangout(world, M) {
   try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
   try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }
-  try { buildTavern(world); } catch (e) { console.warn('[hangout] tavern', e); }
-  try { buildBrighton(world); } catch (e) { console.warn('[hangout] brighton', e); }
+  // ?skip=tavern,brighton,… leaves areas out (to find what tips a phone over on memory)
+  const skip = new Set(String(world.ctx.qs?.get?.('skip') || '').split(','));
+  if (!skip.has('tavern')) try { buildTavern(world); } catch (e) { console.warn('[hangout] tavern', e); }
+  if (!skip.has('brighton')) try { buildBrighton(world); } catch (e) { console.warn('[hangout] brighton', e); }
   try { buildJetpacks(world); } catch (e) { console.warn('[hangout] jetpacks', e); }   // three jet packs on a rack by the table
   try { redkoAtTablePark(world); } catch (e) { console.warn('[hangout] redko', e); }
   try { crewTalk(world); } catch (e) { console.warn('[hangout] crew talk', e); }
