@@ -14,6 +14,9 @@ const NEW_ITEMS = {
   tsingtao: { kind: 'booze', icon: '🍺', name: 'Tsingtao (青島啤酒)', drunk: 0.25, dur: 100, glass: 'can', liq: 0xe8c860 },
   coors: { kind: 'booze', icon: '🍺', name: 'Coors Light', drunk: 0.18, dur: 80, glass: 'can', liq: 0xf2e08a },
   erguotou: { kind: 'booze', icon: '🥃', name: 'Er Guo Tou 二鍋頭 (56%, a shot)', drunk: 0.7, dur: 150, glass: 'shot', liq: 0xeef2f2 },
+  chuanr_lamb: { kind: 'food', icon: '🍢', name: 'lamb skewers 羊肉串 (cumin, chili)', food: 35 },
+  chuanr_chicken: { kind: 'food', icon: '🍢', name: 'chicken skewers 雞肉串', food: 30 },
+  chuanr_tofu: { kind: 'food', icon: '🍢', name: 'grilled tofu skewers 烤豆腐', food: 25 },
   boilermaker: { kind: 'booze', icon: '🍺', name: 'Kenny\'s boilermaker (Tsingtao + a baijiu shot dropped in)', drunk: 0.95, dur: 180, glass: 'pint', liq: 0xe8c860 },
 };
 const SKIN = 0xd6a987;
@@ -62,6 +65,20 @@ export function buildTavernPeople(world) {
     c.home = f.group.position.clone(); c.face0 = c.face; c.f = f;
     c.v = K.vendor({ name: c.name, pos: f.group.position, r: 1.6, fig: f, noMap: true, talk: (Kk, again) => crewTalk(c.id, again) }); }
   P.crew = crew;
+  // ---- the skewer cart next door: AUNTIE LI's 羊肉串 grill on the sidewalk just east of the tavern's door ----
+  { const cx = 6.2, cz = oz + 8.3, g = new THREE.Group(); g.position.set(cx, SW, cz); world.scene.add(g);
+    const mat = (c, e = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0.3, emissive: e ? c : 0, emissiveIntensity: e });
+    const add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = true; g.add(me); return me; };
+    add(new THREE.BoxGeometry(1.9, 0.85, 0.9), mat(0xb8bcc0), 0, 0.55, 0);   // the steel cart
+    add(new THREE.BoxGeometry(1.7, 0.1, 0.55), mat(0x222222), 0, 1.02, -0.1); add(new THREE.BoxGeometry(1.6, 0.03, 0.45), mat(0xff5a1a, 1.4), 0, 1.08, -0.1);   // the grill, glowing coals
+    for (let k = 0; k < 9; k++) add(new THREE.BoxGeometry(0.02, 0.02, 0.62), mat(0x7a3b1a), -0.72 + k * 0.18, 1.13, -0.1);   // skewers on the grill
+    for (const [x, z] of [[-0.8, -0.35], [0.8, -0.35], [-0.8, 0.35], [0.8, 0.35]]) { const w = add(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12), mat(0x151515), x, 0.13, z); w.rotation.x = Math.PI / 2; }
+    add(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), mat(0x888888), 0.7, 1.6, 0.3); const um = add(new THREE.ConeGeometry(1.3, 0.45, 12), mat(0xc8201e), 0.7, 2.75, 0.3); um.castShadow = false;
+    const c = document.createElement('canvas'); c.width = 256; c.height = 96; const cg = c.getContext('2d'); cg.fillStyle = '#c8201e'; cg.fillRect(0, 0, 256, 96); cg.fillStyle = '#ffe07a'; cg.textAlign = 'center'; cg.font = '700 40px "PingFang TC","Heiti TC","Noto Sans CJK TC",sans-serif'; cg.fillText('羊肉串', 128, 44); cg.font = '700 20px Arial'; cg.fillStyle = '#fff'; cg.fillText('MEAT · CHICKEN · TOFU  $2-3', 128, 80);
+    const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.68), new THREE.MeshStandardMaterial({ map: tx, emissive: 0xffffff, emissiveMap: tx, emissiveIntensity: 0.35 })); sg.position.set(0, 0.55, -0.46); sg.rotation.y = Math.PI; g.add(sg);
+    world.box([cx - 1, 0, cz - 0.5], [cx + 1, 1.2, cz + 0.5]);
+    const li = person({ avatar: 'f17', seed: 88 }, { top: 'track', jacket: 0x7a1414, stripe: 0x7a1414, bottom: 'jeans' }, 1.58); li.group.position.set(cx - 0.2, SW, cz + 0.85); li.group.rotation.y = Math.PI; tag(li, 'AUNTIE LI', '#ffd27a');
+    P.li = { f: li, v: K.vendor({ name: 'AUNTIE LI', pos: new THREE.Vector3(cx, SW, cz - 1.2), r: 1.8, fig: li, talk: (Kk, again) => liTalk(again) }) }; }
   // the job drop: the N entrance on 8th Ave
   const drop = new THREE.Vector3(17.2, SW, oz - 7.6);
   { const wb = person({ avatar: 'm10', seed: 80 }, { top: 'track', jacket: 0x23446e, stripe: 0xe8e8e8, bottom: 'jeans' }, 1.68); wb.group.position.set(18.0, SW, oz - 8.0); wb.group.rotation.y = -0.9; P.wb = wb; }
@@ -103,6 +120,15 @@ function elfTalk(again) {
   return { text: again ? pick(ELF) : 'THE ELF: «Bratan! Sit. Kenny — a round of the two-dollar stuff. On me. Everybody drinks.»', choices: [
     { label: 'Take the shot (on the Elf)', go: () => { const ok = K.give('erguotou'); return { text: ok ? 'THE ELF: «Za nas! 乾杯!» (He slides you an Er Guo Tou. B to drink.)' : 'THE ELF: «Your hands are full, bratan. Drink what you got first.»', choices: [{ label: 'Za nas', go: null }] }; } },
     { label: 'Tell me something', go: () => ({ text: pick(ELF), choices: [{ label: 'Ha', go: null }] }) }, { label: 'Later', go: null }] };
+}
+const LI = ['AUNTIE LI: «Lamb is best. Cumin, chili, 孜然. Tofu is for Mr. Wong, he is on a diet since 2014.»', 'AUNTIE LI: «Twenty years on this corner. Norwegians, Irish, now us. Everybody eats skewers.»', 'AUNTIE LI: «Kenny sends drunk people to me. I send them back to Kenny. Good business.»', 'AUNTIE LI: «Chicken is for children and Duck. …Yes, Duck eats chicken. Don\'t tell him it\'s funny.»'];
+function liTalk(again) {
+  const buy = (item, price, ok) => () => ({ text: `AUNTIE LI: «${sell(item, price, 'AUNTIE LI', { ok, broke: `$${price}. 冇錢? No money, no skewer.`, full: 'Your hands are full. Eat something first (B).' })}»`, choices: [{ label: 'Another one', go: () => liTalk(true) }, { label: '多謝, thanks', go: null }] });
+  return { text: again ? pick(LI) : 'AUNTIE LI: «羊肉串! Hot off the grill. Meat, chicken, tofu. Cash.»', choices: [
+    { label: 'Lamb skewers 羊肉串 — $3', go: buy('chuanr_lamb', 3, 'Lamb, extra cumin, little chili. Careful, hot. (B to eat)') },
+    { label: 'Chicken skewers 雞肉串 — $2', go: buy('chuanr_chicken', 2, 'Chicken. Crispy skin. Good with Tsingtao from Kenny.') },
+    { label: 'Tofu skewers 烤豆腐 — $2', go: buy('chuanr_tofu', 2, 'Tofu, five-spice, chili oil. The healthy one. Healthy-ish.') },
+    { label: 'Later', go: null }] };
 }
 function kennyTalk(again) {
   const node = () => ({ text: again ? pick(KENNY_Q) : 'KENNY: «Soccer Tavern. Cash only, cheapest pour on 8th Ave. 你好 — what are you having?»', choices: [...menu(node), { label: 'Who\'s who in here?', go: () => ({ text: 'KENNY: «Stools: Uncle Lou — Liverpool. Mr. Wong — leaving, supposedly. Ah Fai — darts captain, don\'t bet him. Front table: Big Tony, Sonny, Duck. Be polite. Tip Duck, he remembers.»', choices: [{ label: 'Got it', go: null }] }) }, { label: 'Put it on my tab?', go: () => ({ text: 'KENNY: «冇數賒. No tabs. Not since 1929. There\'s a sign. There are three signs.»', choices: [{ label: 'Fair', go: null }] }) }, { label: 'Later', go: null }] });
@@ -153,7 +179,7 @@ function update(dt) {
   // Kenny: drifts along the aisle (pouring, wiping), turns to whoever's at the bar; stops for you
   const k = P.kenny; if (k.v.hurt?.down) { k.f.update(dt, 0); } else if (dlg === 'KENNY' || (inBar && Math.hypot(me.x - k.v.pos.x, me.z - k.v.pos.z) < 2.2)) { k.f.update(dt, 0); face(k.f, me.x, me.z, dt); }
   else { if (walkTo(k.f, k.to, dt, 0.8)) { k.wait -= dt; if (k.wait < 0) { k.wait = 3 + Math.random() * 6; k.to.set(k.home.x, k.home.y, k.home.z - 3 + Math.random() * 7); } } }
-  P.wb?.update(dt, 0);
+  P.wb?.update(dt, 0); if (P.li) { P.li.f.update(dt, 0); if (dlg === 'AUNTIE LI') face(P.li.f, me.x, me.z, dt); }
   P.elf?.f.update(dt, 0); if (P.elf && dlg === 'THE ELF') face(P.elf.f, me.x, me.z, dt);
   for (const r of P.reg) { r.f.update(dt, 0); if (dlg === r.name) face(r.f, me.x, me.z, dt); }
   // the crew: when a stranger walks in, BIG TONY comes over, says his piece, goes back to the table
