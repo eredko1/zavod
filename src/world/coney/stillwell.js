@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { Batch } from '../sbu/geo.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { makeR160 } from './r160.js';
 
 export const STILLWELL = { x0: -88, x1: -24, zS: -258, zC: -300, zP0: -266, zP1: -440, RAIL: 7.5, DECK_B: 6.8, DECK_T: 7.3, PLAT: 8.6 };
 const ISLANDS = [[-82, -74], [-68, -60], [-53, -46], [-38, -29]];
@@ -116,16 +117,14 @@ export function buildStillwell(world, M) {
 // ---------------------------------------------------------------------------------------------------------------------------
 function buildTrains(world, M) {
   const { scene, ctx } = world; const S = STILLWELL;
-  // one R160-ish car: brushed stainless body, lit window band, dark door bands, roof; instanced for every car on the map
-  const body = new THREE.BoxGeometry(3.0, 3.4, CAR - 0.3); body.translate(0, 1.7 + 0.35, 0);
-  const win = new THREE.BoxGeometry(3.04, 1.0, CAR - 1.6); win.translate(0, 2.35 + 0.35, 0);
-  const doors = []; for (const z of [-6.2, -2.1, 2.1, 6.2]) { const d = new THREE.BoxGeometry(3.06, 2.1, 1.3); d.translate(0, 1.4 + 0.35, z); doors.push(d); }
-  const stripe = new THREE.BoxGeometry(3.07, 0.14, CAR - 0.4); stripe.translate(0, 3.25 + 0.35, 0);
-  const mk = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; scene.add(m); return m; };
-  const alu = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.35, metalness: 0.85 }), glass = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff0c0, emissiveIntensity: 0.9, roughness: 0.2 }), dark = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.5, metalness: 0.6 });
-  const PARKED = [0, 4, 6], MOVING = [];   // track indices (the D on track 2 and the Q on track 5 are the rideable ones now: coney/subway.js)
-  const total = (PARKED.length + MOVING.length) * NCAR;
-  const I = { body: mk(body, alu, total), win: mk(win, glass, total), doors: mk(mergeBoxes(doors), dark, total), stripe: mk(stripe, new THREE.MeshStandardMaterial({ color: 0xff6319, roughness: 0.5 }), total) };
+  // the parked sets are the same R160 as the running trains (coney/r160.js): one car built, merged per material, instanced
+  const PARKED = [0, 6], MOVING = [];   // track indices (the D on track 2, the F on 3, the N on track 4 and the Q on 5 run: coney/subway.js)
+  const total = (PARKED.length + MOVING.length) * NCAR, tmp = new THREE.Group();
+  const kit = makeR160(tmp, { CAR, NCAR: 1, FLOOR: S.PLAT - S.RAIL, DOORZ: [-6.2, -2.1, 2.1, 6.2], lite: !!ctx.lite, route: { id: 'D', color: '#ff6319', fg: '#fff' } });
+  const byMat = new Map(); const car0 = kit.cars[0]; car0.updateMatrixWorld(true);
+  car0.traverse((o) => { if (!o.isMesh) return; const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld); for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); (byMat.get(o.material) || byMat.set(o.material, []).get(o.material)).push(g); });
+  const I = {}; let n = 0; for (const [m, list] of byMat) { const g = mergeGeometries(list, false); if (!g) continue; const im = new THREE.InstancedMesh(g, m, total); im.castShadow = !m.transparent; im.receiveShadow = true; im.frustumCulled = false; im.name = 'stwParked'; scene.add(im); I['m' + n++] = im; }
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
   const place = (k, x, zFront) => { for (let c = 0; c < NCAR; c++) { p.set(x, S.RAIL, zFront - CAR / 2 - c * CAR); m4.compose(p, q, one); for (const im of Object.values(I)) im.setMatrixAt(k * NCAR + c, m4); } };
   let k = 0;
