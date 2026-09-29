@@ -149,7 +149,8 @@ export function buildBrighton(world) {
     if (m === M.walls || m === M.el) ctx.raycastTargets?.push?.(mesh); }
 
   // ---- babushkas on the boardwalk benches, a few people out on the avenue ----
-  if (peopleReady()) { const n = lite ? 4 : 10; for (let i = 0; i < n; i++) { try {
+  if (peopleReady() && !lite) { const n = 10;   // phones: no extra figures out here (memory)
+ for (let i = 0; i < n; i++) { try {
       const onBench = i < n * 0.6, x = onBench ? 810 + 21 * Math.floor(2 + rnd() * 60) : 1010 + rnd() * (X1 - 1030), z = onBench ? BW.z0 + 1.55 : ZC + (rnd() < 0.5 ? -1 : 1) * (HALF + 2.5);
       const f = buildPerson({ avatar: onBench ? 'f09' : undefined, seed: 900 + i, pose: onBench ? 'sit' : undefined }); if (!f) continue;
       f.group.position.set(x, onBench ? 0.05 : SW, z); f.group.rotation.y = onBench ? 0 : rnd() * 6.28; scene.add(f.group); B.figs.push(f); } catch (e) { console.warn('[brighton] person', e); break; } } }

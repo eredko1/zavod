@@ -66,7 +66,7 @@ export function buildTavernPeople(world) {
     c.v = K.vendor({ name: c.name, pos: f.group.position, r: 1.6, fig: f, noMap: true, talk: (Kk, again) => crewTalk(c.id, again) }); }
   P.crew = crew;
   // ---- the skewer cart next door: AUNTIE LI's 羊肉串 grill on the sidewalk just east of the tavern's door ----
-  { const cx = 6.2, cz = oz + 8.3, g = new THREE.Group(); g.position.set(cx, SW, cz); world.scene.add(g);
+  { const cx = 6.2, cz = oz + 8.3, g = new THREE.Group(); g.position.set(cx, SW, cz); g.scale.setScalar(0.7); world.scene.add(g);   // a small cart
     const mat = (c, e = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0.3, emissive: e ? c : 0, emissiveIntensity: e });
     const add = (geo, m, x, y, z) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = true; g.add(me); return me; };
     add(new THREE.BoxGeometry(1.9, 0.85, 0.9), mat(0xb8bcc0), 0, 0.55, 0);   // the steel cart
@@ -76,9 +76,9 @@ export function buildTavernPeople(world) {
     add(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), mat(0x888888), 0.7, 1.6, 0.3); const um = add(new THREE.ConeGeometry(1.3, 0.45, 12), mat(0xc8201e), 0.7, 2.75, 0.3); um.castShadow = false;
     const c = document.createElement('canvas'); c.width = 256; c.height = 96; const cg = c.getContext('2d'); cg.fillStyle = '#c8201e'; cg.fillRect(0, 0, 256, 96); cg.fillStyle = '#ffe07a'; cg.textAlign = 'center'; cg.font = '700 40px "PingFang TC","Heiti TC","Noto Sans CJK TC",sans-serif'; cg.fillText('羊肉串', 128, 44); cg.font = '700 20px Arial'; cg.fillStyle = '#fff'; cg.fillText('MEAT · CHICKEN · TOFU  $2-3', 128, 80);
     const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.68), new THREE.MeshStandardMaterial({ map: tx, emissive: 0xffffff, emissiveMap: tx, emissiveIntensity: 0.35 })); sg.position.set(0, 0.55, -0.46); sg.rotation.y = Math.PI; g.add(sg);
-    world.box([cx - 1, 0, cz - 0.5], [cx + 1, 1.2, cz + 0.5]);
-    const li = person({ avatar: 'f17', seed: 88 }, { top: 'track', jacket: 0x7a1414, stripe: 0x7a1414, bottom: 'jeans' }, 1.58); li.group.position.set(cx - 0.2, SW, cz + 0.85); li.group.rotation.y = Math.PI; tag(li, 'AUNTIE LI', '#ffd27a');
-    P.li = { f: li, v: K.vendor({ name: 'AUNTIE LI', pos: new THREE.Vector3(cx, SW, cz - 1.2), r: 1.8, fig: li, talk: (Kk, again) => liTalk(again) }) }; }
+    world.box([cx - 0.7, 0, cz - 0.35], [cx + 0.7, 0.85, cz + 0.35]);
+    const li = person({ avatar: 'f17', seed: 88 }, { top: 'track', jacket: 0x7a1414, stripe: 0x7a1414, bottom: 'jeans' }, 1.58); li.group.position.set(cx - 0.15, SW, cz + 0.65); li.group.rotation.y = Math.PI; tag(li, 'AUNTIE LI', '#ffd27a');
+    P.li = { f: li, v: K.vendor({ name: 'AUNTIE LI', pos: new THREE.Vector3(cx, SW, cz - 0.9), r: 1.6, fig: li, talk: (Kk, again) => liTalk(again) }) }; }
   // the job drop: the N entrance on 8th Ave
   const drop = new THREE.Vector3(17.2, SW, oz - 7.6);
   { const wb = person({ avatar: 'm10', seed: 80 }, { top: 'track', jacket: 0x23446e, stripe: 0xe8e8e8, bottom: 'jeans' }, 1.68); wb.group.position.set(18.0, SW, oz - 8.0); wb.group.rotation.y = -0.9; P.wb = wb; }

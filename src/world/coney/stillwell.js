@@ -118,7 +118,7 @@ export function buildStillwell(world, M) {
 function buildTrains(world, M) {
   const { scene, ctx } = world; const S = STILLWELL;
   // the parked sets are the same R160 as the running trains (coney/r160.js): one car built, merged per material, instanced
-  const PARKED = [0, 6], MOVING = [];   // track indices (the D on track 2, the F on 3, the N on track 4 and the Q on 5 run: coney/subway.js)
+  const PARKED = ctx.lite ? [6] : [0, 6], MOVING = [];   // phones: one parked set   // track indices (the D on track 2, the F on 3, the N on track 4 and the Q on 5 run: coney/subway.js)
   const total = (PARKED.length + MOVING.length) * NCAR, tmp = new THREE.Group();
   const kit = makeR160(tmp, { CAR, NCAR: 1, FLOOR: S.PLAT - S.RAIL, DOORZ: [-6.2, -2.1, 2.1, 6.2], lite: !!ctx.lite, route: { id: 'D', color: '#ff6319', fg: '#fff' } });
   const byMat = new Map(); const car0 = kit.cars[0]; car0.updateMatrixWorld(true);
