@@ -109,7 +109,7 @@ function buildLine() {
   R.cars = buildTrain(world.scene);
   buildEl(world, P);
   if (cfg.id === 'F') buildElStation(world, stops[2].s, { id: 'NEP', name: 'Neptune Av', zone: 'NEPTUNE AV · SHELL RD', hint: 'the F back to Coney', cross: NEP_Z, street: true });
-  if (cfg.id === 'Q') buildElStation(world, stops[2].s, { id: 'OCP', name: 'Ocean Pkwy', zone: 'OCEAN PKWY · BRIGHTON BEACH AV', hint: 'the Q back to Coney', street: true });
+  if (cfg.id === 'Q') buildElStation(world, stops[2].s, { id: 'OCP', name: 'Ocean Pkwy', zone: 'OCEAN PKWY · BRIGHTON BEACH AV', hint: 'the Q back to Coney', street: !world.W.brighton });   // coney/brighton.js builds the streets round it when it's there
   if (cfg.id === 'D') buildElStation(world, stops[1].s, { id: 'B50', name: 'Bay 50 St', zone: 'BAY 50 ST', hint: 'the D back to Coney', street: false });
   // ---- boarding ----
   const me = R; R.doorPos = new THREE.Vector3(0, -999, 0);

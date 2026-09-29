@@ -17,6 +17,7 @@ import { openDurak, closeDurak, stats as durakStats } from './durak.js';
 import { initDurakMP, tableChoices as durakTableChoices, tableLine as durakTableLine } from './durak-mp.js';
 import { OSM } from './osm.js';
 import { buildTavern } from './tavern.js';
+import { buildBrighton } from './brighton.js';
 import { cen, pip } from '../osmkit.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -64,6 +65,7 @@ export function buildHangout(world, M) {
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
   try { buildDurakPark(); } catch (e) { console.warn('[hangout] durak park', e); }
   try { buildTavern(world); } catch (e) { console.warn('[hangout] tavern', e); }
+  try { buildBrighton(world); } catch (e) { console.warn('[hangout] brighton', e); }
   try { buildJetpacks(world); } catch (e) { console.warn('[hangout] jetpacks', e); }   // three jet packs on a rack by the table
   try { redkoAtTablePark(world); } catch (e) { console.warn('[hangout] redko', e); }
   try { crewTalk(world); } catch (e) { console.warn('[hangout] crew talk', e); }
