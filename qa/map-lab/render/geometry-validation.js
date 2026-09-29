@@ -5,8 +5,9 @@ import {inShape,length,projection} from '../pipeline/osm-model.js';
 import {surfaceOverlaps} from './surface-overlap.js';
 import {approachHeight,approachSeam} from '../pipeline/road-approaches.js';
 import {isGroundLevel,isBridgeLevel} from '../pipeline/physical-level.js';
+import {pathPosition} from '../pipeline/geometry-distance.js';
 
-export const VALIDATION_RULES=Object.freeze({boundsTolerance:.002,heightTolerance:.005,approachTolerance:.25,seamProbeDistance:.1,version:3});
+export const VALIDATION_RULES=Object.freeze({boundsTolerance:.002,heightTolerance:.005,approachTolerance:.25,seamProbeDistance:.1,seamWidthFraction:.4,version:4});
 // On-demand diagnostics, outside the frame loop and benchmark. No source or scene mutation.
 export function validateGeometry({plan,world,terrain,surfaces:groundSurfaces,selection}) {
   const start=performance.now(),findings=[],seen=new Set(),emitted=new Set(),meshesByHash=new Map(),surfaces=[],duplicates=new Set();let vertices=0,meshes=0,instances=0,profileVertices=0;
@@ -58,9 +59,20 @@ export function validateGeometry({plan,world,terrain,surfaces:groundSurfaces,sel
     // An unrelated overlapping surface must not conceal a missing selected join.
     if(!approachIndexes.has(chain))approachIndexes.set(chain,surfaceIndex(approachMeshes.filter(m=>m.userData.feature.roadElevation.chains.includes(chain)),()=>-Infinity));
     if(!deckIndexes.has(anchor.source))deckIndexes.set(anchor.source,surfaceIndex(deckMeshes.filter(m=>m.userData.feature.id===anchor.source),()=>-Infinity));
-    const node=anchor.station===0?chain.nodes[0]:chain.nodes.at(-1),deck=deckIndexes.get(anchor.source).sample(...inside),road=approachIndexes.get(chain).sample(...outside),gap=road-deck,valid=Number.isFinite(gap);
-    checkedJoins.add(`${node}/${anchor.source}`);approachChecks.push({chain:chain.id,node,deck:anchor.source,point:seam.point,deckHeight:Number.isFinite(deck)?deck:null,roadHeight:Number.isFinite(road)?road:null,gap:valid?gap:null});
-    if(!valid||Math.abs(gap)>VALIDATION_RULES.approachTolerance)add(anchor.source,`approach-discontinuity:${node}`,valid?`Rendered approach ${chain.wayIDs.join(', ')} differs by ${gap.toFixed(2)} m across the deck boundary.`:`No continuous rendered approach/deck surface at shared node ${node}; inspect ${chain.wayIDs.join(', ')}.`,'data','warning');
+    const node=anchor.station===0?chain.nodes[0]:chain.nodes.at(-1),owners=(plan.roadNetwork||[]).filter(r=>chain.wayIDs.includes(r.id)).map(r=>({id:r.id,width:r.width?.value,distance:pathPosition(r.points,seam.point).distance})).sort((a,b)=>a.distance-b.distance||a.id.localeCompare(b.id)),width=owners[0]?.width;
+    const offsets=Number.isFinite(width)&&width>0?[0,-width*VALIDATION_RULES.seamWidthFraction,width*VALIDATION_RULES.seamWidthFraction]:[0],probes=[];
+    for(const offset of offsets){
+      // Follow the actual deck boundary on each shifted path, including skewed abutments.
+      const shifted=offset?approachSeam({...chain,points:chain.points.map(([x,z])=>[x-dz*offset,z+dx*offset])},anchor):seam;
+      if(!shifted){probes.push({offset,point:null,deckHeight:null,roadHeight:null,gap:null,status:'missing-boundary'});continue;}
+      const [px,pz]=shifted.point,[vx,vz]=shifted.direction,inner=[px-vx*epsilon,pz-vz*epsilon],outer=[px+vx*epsilon,pz+vz*epsilon];
+      if([inner,outer].some(([x,z])=>x<b.x0||x>b.x1||z<b.z0||z>b.z1)){probes.push({offset,point:shifted.point,status:'outside-area'});continue;}
+      const deck=deckIndexes.get(anchor.source).sample(...inner),road=approachIndexes.get(chain).sample(...outer),gap=road-deck;
+      probes.push({offset,point:shifted.point,deckHeight:Number.isFinite(deck)?deck:null,roadHeight:Number.isFinite(road)?road:null,gap:Number.isFinite(gap)?gap:null,status:Number.isFinite(gap)?'sampled':'missing-surface'});
+    }
+    const centre=probes[0];checkedJoins.add(`${node}/${anchor.source}`);approachChecks.push({chain:chain.id,node,deck:anchor.source,point:seam.point,deckHeight:centre.deckHeight,roadHeight:centre.roadHeight,gap:centre.gap,probes});
+    const failed=probes.filter(p=>p.status!=='outside-area'&&(p.gap===null||Math.abs(p.gap)>VALIDATION_RULES.approachTolerance));
+    if(failed.length)add(anchor.source,`approach-discontinuity:${node}`,`Rendered approach/deck join at shared node ${node} fails at lateral offsets ${failed.map(p=>p.offset.toFixed(2)).join(', ')} m; inspect ${chain.wayIDs.join(', ')}. Missing samples and height gaps are recorded in approachChecks.probes.`,'data','warning');
   }
   const ways=(selection?.data?.elements||[]).filter(w=>w.type==='way'&&!hidden.has(`way/${w.id}`)&&w.tags?.highway&&w.geometry&&w.nodes),connections=new Map();
   for(const way of ways.filter(isGroundLevel))for(const at of [0,way.nodes.length-1]){const node=way.nodes[at];if(!connections.has(node))connections.set(node,[]);connections.get(node).push(way);}

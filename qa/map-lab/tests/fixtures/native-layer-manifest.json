@@ -1,0 +1,31 @@
+{
+  "file": "native-layer-samples.json.gz",
+  "sha256": "3a45c21eea175bc19966e7125bea404ec8b73009b196c7dc1378ac5782951ce2",
+  "scope": "Complete seven captured MTA station rows and metadata; two original NOAA LASzip payload samples (root and first-level node), full EPT metadata and original-source inventory. Test hierarchy is constructed, not a complete recorded hierarchy.",
+  "attribution": [
+    "Metropolitan Transportation Authority via New York State Open Data",
+    "NOAA Office for Coastal Management NYC 2017 topobathymetric LiDAR distribution"
+  ],
+  "capturedAt": "2026-09-29T00:08:32.396Z",
+  "urls": [
+    "https://data.ny.gov/api/views/39hk-dx4f.json",
+    "https://data.ny.gov/resource/39hk-dx4f.json?%24where=gtfs_latitude+between+40.575+and+40.59+AND+gtfs_longitude+between+-73.99+and+-73.96&%24order=station_id&%24limit=10001&%24select=station_id",
+    "https://data.ny.gov/resource/39hk-dx4f.json?%24where=station_id+in+%2855%2C56%2C57%2C58%2C70%2C252%2C253%29&%24order=station_id&%24limit=10001&%24select=*%2C+%3Aid",
+    "https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/entwine/geoid18/9306/ept.json",
+    "https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/entwine/geoid18/9306/ept-sources/list.json",
+    "https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/entwine/geoid18/9306/ept-data/0-0-0-0.laz",
+    "https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/entwine/geoid18/9306/ept-data/1-1-0-0.laz"
+  ],
+  "payloads": [
+    {
+      "id": "0-0-0-0",
+      "sha256": "19a49ddf87e38767957877e4dfd22d6a073a75845e1558ac3765789f32b9b228",
+      "bytes": 328117
+    },
+    {
+      "id": "1-1-0-0",
+      "sha256": "a8b717e79c7a108b72ccbd42da62725dbb5217641d04d70853c54839a413c810",
+      "bytes": 259288
+    }
+  ]
+}

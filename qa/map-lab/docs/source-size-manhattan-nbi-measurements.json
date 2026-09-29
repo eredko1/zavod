@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "startedAt": "2026-09-29T21:24:29.727Z",
+  "bounds": {
+    "south": 40.702001691681964,
+    "west": -74.01985092819372,
+    "north": 40.71999830831803,
+    "east": -73.99614907180627
+  },
+  "dimensions": {
+    "height": 1999.9999999995703,
+    "width": 2000.0000000003236
+  },
+  "acquisitionLimits": {
+    "areaMetres": 10000,
+    "vectorRecords": 50000,
+    "mesh": {
+      "nodes": 8000,
+      "leaves": 1200,
+      "features": 40000,
+      "vertices": 12000000,
+      "bytes": 536870912
+    },
+    "lidar": {
+      "assets": 4096,
+      "hierarchyPages": 1024,
+      "points": 150000000,
+      "bytes": 1073741824,
+      "decodedBytes": 5368709120
+    }
+  },
+  "displayBackend": "verified-xvfb-x11-vulkan",
+  "method": "Sequential live production adapters; complete source JSON streamed to disk. Rejected evidence is separate and never selected. Encoded response sizes are CDP measurements, not retained JSON size or RAM. Decoded point bytes measure validated records, not retained RAM.",
+  "sources": [
+    {
+      "id": "usdot-nbi-2023",
+      "name": "USDOT 2023 National Bridge Inventory",
+      "status": "complete",
+      "records": 11,
+      "inventoryRecords": 11,
+      "features": 11,
+      "assets": 0,
+      "points": 0,
+      "compressedPointBytes": 0,
+      "decodedPointBytes": 0,
+      "meshVertices": 0,
+      "meshBinaryBytes": 0,
+      "fetchedAt": "2026-09-29T21:24:31.378Z",
+      "metadata": {
+        "name": "National_Bridge_Inventory",
+        "dataUpdatedAt": null,
+        "metadataUpdatedAt": null,
+        "sourceURL": "https://geo.dot.gov/server/rest/services/Hosted/National_Bridge_Inventory/FeatureServer/0",
+        "hasZ": false,
+        "hasM": false,
+        "spatialReference": {
+          "falseM": -100000,
+          "xyTolerance": 0.001,
+          "mUnits": 10000,
+          "zUnits": 10000,
+          "latestWkid": 3857,
+          "zTolerance": 0.001,
+          "wkid": 102100,
+          "xyUnits": 10000,
+          "mTolerance": 0.001,
+          "falseX": -20037700,
+          "falseY": -30241100,
+          "falseZ": -100000
+        }
+      },
+      "urls": [
+        "https://geo.dot.gov/server/rest/services/Hosted/National_Bridge_Inventory/FeatureServer/0?f=json",
+        "https://geo.dot.gov/server/rest/services/Hosted/National_Bridge_Inventory/FeatureServer/0/query?where=1%3D1&geometry=%7B%22xmin%22%3A-74.01985092819372%2C%22ymin%22%3A40.702001691681964%2C%22xmax%22%3A-73.99614907180627%2C%22ymax%22%3A40.71999830831803%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=false&returnZ=true&returnM=true&f=json&returnIdsOnly=true",
+        "https://geo.dot.gov/server/rest/services/Hosted/National_Bridge_Inventory/FeatureServer/0/query?where=1%3D1&geometry=%7B%22xmin%22%3A-74.01985092819372%2C%22ymin%22%3A40.702001691681964%2C%22xmax%22%3A-73.99614907180627%2C%22ymax%22%3A40.71999830831803%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=true&returnZ=true&returnM=true&f=json&objectIds=359780%2C359781%2C359782%2C359783%2C359784%2C359797%2C359799%2C359800%2C359801%2C359802%2C359803&returnTrueCurves=true",
+        "https://geo.dot.gov/server/rest/services/Hosted/National_Bridge_Inventory/FeatureServer/0/query?where=1%3D1&geometry=%7B%22xmin%22%3A-74.01985092819372%2C%22ymin%22%3A40.702001691681964%2C%22xmax%22%3A-73.99614907180627%2C%22ymax%22%3A40.71999830831803%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&outSR=4326&returnGeometry=true&returnZ=true&returnM=true&f=geojson&objectIds=359780%2C359781%2C359782%2C359783%2C359784%2C359797%2C359799%2C359800%2C359801%2C359802%2C359803"
+      ],
+      "queryMs": 746.590488,
+      "export": {
+        "file": "usdot-nbi-2023.json",
+        "bytes": 166660,
+        "sha256": "be3775a2b7801054a843b520d0c555769d606d5d08bd2044521e206241dba5e6"
+      },
+      "network": {
+        "completedResponses": 2,
+        "encodedResponseBytes": 7640,
+        "unfinishedResponses": 0,
+        "failedResponses": 0
+      }
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "gpu": {
+    "renderer": "ANGLE (Intel, Vulkan 1.3.255 (Intel(R) UHD Graphics 620 (WHL GT2) (0x00003EA0)), Intel open-source Mesa driver-23.2.1)",
+    "features": {
+      "2d_canvas": "enabled",
+      "direct_rendering_display_compositor": "disabled_off_ok",
+      "gpu_compositing": "enabled",
+      "multiple_raster_threads": "enabled_on",
+      "opengl": "enabled_on",
+      "rasterization": "enabled",
+      "raw_draw": "disabled_off_ok",
+      "skia_graphite": "disabled_off",
+      "trees_in_viz": "disabled_off",
+      "video_decode": "enabled",
+      "video_encode": "disabled_software",
+      "vulkan": "enabled_on",
+      "webgl": "enabled",
+      "webgpu": "enabled",
+      "webgpu_on_vk_via_gl_interop": "disabled_off",
+      "webnn": "disabled_off"
+    },
+    "devices": [
+      {
+        "vendorId": 32902,
+        "deviceId": 16032,
+        "vendorString": "Google Inc. (Intel)",
+        "deviceString": "ANGLE (Intel, Vulkan 1.3.255 (Intel(R) UHD Graphics 620 (WHL GT2) (0x00003EA0)), Intel open-source Mesa driver-23.2.1)",
+        "driverVendor": "Mesa",
+        "driverVersion": "driver"
+      }
+    ]
+  },
+  "diagnosticFile": ".tmp/map-lab/diagnostics/source-size-capture-1790717070240-c898cd19-5464-4dfb-b0f6-de9ce3e543e2.jsonl",
+  "selection": [
+    "usdot-nbi-2023"
+  ],
+  "status": "complete",
+  "totals": {
+    "complete": 1,
+    "rejected": 0,
+    "completeExportBytes": 166660,
+    "rejectedEvidenceBytes": 0
+  },
+  "finishedAt": "2026-09-29T21:24:31.520Z"
+}

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {compileMapInWorker} from '../pipeline/worker-build.js';
+import {checkAbort} from '../data/request-abort.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GEOMETRY_DEFAULTS, FEATURE_GROUPS } from '../pipeline/map-pipeline.js';
 import { projection } from '../pipeline/osm-model.js';
@@ -7,10 +9,11 @@ import { advanceHeight } from './walk-height.js';
 import { dispose } from './osm-meshes.js';
 import { move, spawn, blocked } from './osm-walk.js';
 import { compileMapStages } from '../pipeline/map-build.js';
-import {runBuildStages,runBuildStagesAsync} from '../pipeline/build-stages.js';
+import {runBuildStages} from '../pipeline/build-stages.js';
 import { objectVisible } from './map-surface-index.js';
 import { sourceVisible, setFeatureVisibility } from './feature-visibility.js';
 import { placeSurfaceProps } from './prop-placement.js';
+import {queryLiDARPoints} from './lidar-points.js';
 
 export function createMapWorld({ canvas, viewport, onInspect = () => {}, onError = () => {}, onMode = () => {} }) {
 const events = new AbortController(), listen = (target,type,fn) => target.addEventListener(type,fn,{signal:events.signal});
@@ -21,7 +24,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x919b92, 2));
 const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(-100, 200, 80); scene.add(sun);
 const camera = new THREE.PerspectiveCamera(55, 1, 0.08, 20000), orbit = new OrbitControls(camera, canvas); orbit.enableDamping = true; orbit.maxPolarAngle = Math.PI * 0.495;
 camera.position.set(150, 220, 260); orbit.update();
-let plan = null, world = null, reference = null, mode = 'orbit', yaw = 0, pitch = 0, last = performance.now();
+let plan = null, world = null, reference = null, mode = 'orbit', yaw = 0, pitch = 0, last = performance.now(),buildController=null;
 let terrain = null, resolved = null, surfaces = null, supports = null, needsRender = true;
 const motion={velocity:0,grounded:true};
 let hiddenOSM = new Set(), suspended = false, running = false;
@@ -51,7 +54,7 @@ function focusFeature(id){
   if(!f){onError('This record has no active geometry; inspect its merge members or source download.');return;}
   const points=[...(f.point?[f.point]:[]),...(f.paths||[]).flat(),...(f.shapes||[]).flatMap(s=>s.outer)];if(!points.length)return;
   const box=new THREE.Box3();for(const [x,z]of points)box.expandByPoint(new THREE.Vector3(x,groundAt(x,z),z));
-  const center=box.getCenter(new THREE.Vector3());center.y+=f.height?.top?f.height.top/2:0;const span=Math.max(box.max.x-box.min.x,box.max.z-box.min.z,f.height?.top||0,15);
+  const center=box.getCenter(new THREE.Vector3()),bottom=f.height?.bottom??f.equipmentModel?.bottom??0,top=f.height?.top??f.equipmentModel?.top??f.supportModel?.height??0;center.y=(f.ground??center.y)+(bottom+top)/2;const span=Math.max(box.max.x-box.min.x,box.max.z-box.min.z,top-bottom,15);
   document.exitPointerLock?.();mode='orbit';orbit.enabled=true;keys.clear();orbit.target.copy(center);camera.position.copy(center).add(new THREE.Vector3(span*.6,span,span));orbit.update();message();onInspect(f);needsRender=true;
 }
 function applyVisibility() {
@@ -63,17 +66,27 @@ function applyVisibility() {
   plan.coverage = resolved.coverage.map(c => !active.has(c.id) && ['rendered','reference'].includes(c.status) && resolved.geometryIDs.has(c.id) ? { ...c, status: 'hidden', reason: 'Resolved geometry source is hidden; merge result is unchanged.' } : { ...c });
   needsRender = true;
 }
-function loadResult(result, options = {}, mark = () => {}, beforeStage=null) {
-  const steps=loadStages(result,options);return beforeStage?runBuildStagesAsync(steps,mark,beforeStage):runBuildStages(steps,mark);
+function loadResult(result, options = {}, mark = () => {}, beforeStage=null,signal=null) {
+  if(buildController)throw Error('A map build is already active.');
+  return beforeStage?loadWorkerResult(result,options,mark,beforeStage,signal):runBuildStages(loadStages(result,options),mark);
+}
+async function loadWorkerResult(result,options,mark,beforeStage,signal){
+  const controller=new AbortController(),abort=()=>controller.abort(signal.reason);buildController=controller;signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
+  const nextSelection={...result,nyc:result.nyc||[]},nextSettings={...GEOMETRY_DEFAULTS,...options,execution:'worker'};let built;
+  try{if(!result.data?.elements?.length&&!nextSelection.nyc.length)throw Error('No source data to generate.');built=await compileMapInWorker(nextSelection,nextSettings,mark,beforeStage,controller.signal);await beforeStage('sceneSwap');checkAbort(controller.signal);const start=performance.now();acceptBuild(built,nextSelection,nextSettings);built=null;mark('sceneSwap',performance.now()-start);}
+  finally{if(built){dispose(built.world.group);dispose(built.reference);}signal?.removeEventListener('abort',abort);buildController=null;}
 }
 function* loadStages(result,options){
-  const nextSelection={...result,nyc:result.nyc||[]},nextSettings={...GEOMETRY_DEFAULTS,...options};
+  const nextSelection={...result,nyc:result.nyc||[]},nextSettings={...GEOMETRY_DEFAULTS,...options,execution:'main'};
   if (!result.data?.elements?.length && !nextSelection.nyc.length) throw Error('No source data to generate.');
   const built = yield* compileMapStages(nextSelection,nextSettings);
   try{yield 'sceneSwap';}catch(error){dispose(built.world.group);dispose(built.reference);throw error;}
+  acceptBuild(built,nextSelection,nextSettings);
+}
+function acceptBuild(built,nextSelection,nextSettings){
   const {plan:next,world:mesh,reference:ref,terrain:nextTerrain,surfaces:nextSurfaces,supports:nextSupports}=built;
   if (world) { scene.remove(world.group); dispose(world.group); } if (reference) { scene.remove(reference); dispose(reference); }
-  selection=nextSelection;settings=nextSettings;hiddenOSM=new Set(result.hiddenOSM||[]);
+  selection=nextSelection;settings=nextSettings;hiddenOSM=new Set(nextSelection.hiddenOSM||[]);
   plan = next; world = mesh; reference = ref; terrain = nextTerrain; surfaces = nextSurfaces; supports=nextSupports; plan.groundSample = (x,z)=>api.groundAt(x,z); scene.add(world.group, reference); scene.updateMatrixWorld(true);
   resolved = { buildings: next.buildings, roads: next.roads, details: next.details, coverage: next.coverage.map(c => ({ ...c })), geometryIDs: new Set([...next.buildings,...next.roads,...next.details].map(f => f.id)) }; applyVisibility();
   fit();
@@ -112,6 +125,7 @@ function tick() {
 function start() { if(running)return;running=true;last=performance.now();renderer.setAnimationLoop(tick); }
 function stop() { running=false;renderer.setAnimationLoop(null); }
 const api = {
+  queryPoints(sourceId,options){const snapshot=selection.nyc.find(s=>s.sourceId===sourceId);if(!snapshot)throw Error('Point source is not loaded: '+sourceId);return queryLiDARPoints(snapshot,options);},
   loadResult, applyVisibility, scene, camera, renderer, fit, walk, pickWalk, walkAt, respawn, focusFeature, start, stop, frame, controls, simulate, draw,
   collision: (x,z,ground)=>blocked(x,z,plan,undefined,ground),
   look(angle,tilt) {yaw=angle;pitch=tilt;camera.rotation.set(pitch,yaw,0,'YXZ');},
@@ -123,7 +137,7 @@ const api = {
   setSourceVisible(id, value) { const s=selection.nyc.find(s=>s.sourceId===id); if(s&&s.visible!==value){s.visible=value;applyVisibility();placeSurfaceProps(world.group,terrain,surfaces,plan.issues);} },
   setPosition(x,z,angle=0) {motion.velocity=0;motion.grounded=true;camera.position.set(x,groundAt(x,z)+MOVEMENT.eye,z);yaw=angle;pitch=0;camera.rotation.set(0,yaw,0,'YXZ');},
   suspend(value) { suspended=value; keys.clear(); if(value && document.pointerLockElement===canvas)document.exitPointerLock(); if(!value){last=performance.now();needsRender=true;} },
-  dispose() { stop();events.abort(); observer.disconnect(); orbit.dispose(); if(world)dispose(world.group); if(reference)dispose(reference); renderer.dispose(); },
+  dispose() { buildController?.abort(Error('View disposed during build.'));stop();events.abort(); observer.disconnect(); orbit.dispose(); if(world)dispose(world.group); if(reference)dispose(reference); renderer.dispose(); },
 };
 start();return api;
 }

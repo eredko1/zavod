@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "startedAt": "2026-09-29T21:35:11.200Z",
+  "bounds": {
+    "south": 40.702001691681964,
+    "west": -74.01985092819372,
+    "north": 40.71999830831803,
+    "east": -73.99614907180627
+  },
+  "dimensions": {
+    "height": 1999.9999999995703,
+    "width": 2000.0000000003236
+  },
+  "acquisitionLimits": {
+    "areaMetres": 10000,
+    "vectorRecords": 50000,
+    "mesh": {
+      "nodes": 8000,
+      "leaves": 1200,
+      "features": 40000,
+      "vertices": 12000000,
+      "bytes": 536870912
+    },
+    "lidar": {
+      "assets": 4096,
+      "hierarchyPages": 1024,
+      "points": 150000000,
+      "bytes": 1073741824,
+      "decodedBytes": 5368709120
+    }
+  },
+  "displayBackend": "verified-xvfb-x11-vulkan",
+  "method": "Sequential live production adapters; complete source JSON streamed to disk. Rejected evidence is separate and never selected. Encoded response sizes are CDP measurements, not retained JSON size or RAM. Decoded point bytes measure validated records, not retained RAM.",
+  "sources": [
+    {
+      "id": "nysdot-bridge-roadway",
+      "name": "NYSDOT bridge-roadway relationships",
+      "status": "complete",
+      "records": 15,
+      "inventoryRecords": 15,
+      "features": 15,
+      "assets": 0,
+      "points": 0,
+      "compressedPointBytes": 0,
+      "decodedPointBytes": 0,
+      "meshVertices": 0,
+      "meshBinaryBytes": 0,
+      "fetchedAt": "2026-09-29T21:35:12.436Z",
+      "metadata": {
+        "name": "Bridge_With_Roadway_Inventory",
+        "sourceURL": "https://gis.dot.ny.gov/hostingny/rest/services/Roadways/SMS_Roadway_Inventory/FeatureServer/0",
+        "coordinateRole": "reported table latitude/longitude",
+        "dataUpdatedAt": null
+      },
+      "urls": [
+        "https://gis.dot.ny.gov/hostingny/rest/services/Roadways/SMS_Roadway_Inventory/FeatureServer/0?f=json",
+        "https://gis.dot.ny.gov/hostingny/rest/services/Roadways/SMS_Roadway_Inventory/FeatureServer/0/query?where=Lat+%3E%3D+40.702001691681964+AND+Lat+%3C%3D+40.71999830831803+AND+Long+%3E%3D+-74.01985092819372+AND+Long+%3C%3D+-73.99614907180627&outFields=*&returnGeometry=false&f=json&returnIdsOnly=true",
+        "https://gis.dot.ny.gov/hostingny/rest/services/Roadways/SMS_Roadway_Inventory/FeatureServer/0/query?where=Lat+%3E%3D+40.702001691681964+AND+Lat+%3C%3D+40.71999830831803+AND+Long+%3E%3D+-74.01985092819372+AND+Long+%3C%3D+-73.99614907180627&outFields=*&returnGeometry=false&f=json&objectIds=487%2C510%2C861%2C4040%2C4041%2C5829%2C6943%2C8469%2C9320%2C10249%2C11713%2C12434%2C15586%2C16149%2C16841"
+      ],
+      "queryMs": 334.5697,
+      "export": {
+        "file": "nysdot-bridge-roadway.json",
+        "bytes": 101859,
+        "sha256": "2695930fb26759e264f72054b2a101dfd2f3f9c85a83ae3e336069e7ae58fe6c"
+      },
+      "network": {
+        "completedResponses": 2,
+        "encodedResponseBytes": 4222,
+        "unfinishedResponses": 0,
+        "failedResponses": 0
+      }
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "gpu": {
+    "renderer": "ANGLE (Intel, Vulkan 1.3.255 (Intel(R) UHD Graphics 620 (WHL GT2) (0x00003EA0)), Intel open-source Mesa driver-23.2.1)",
+    "features": {
+      "2d_canvas": "enabled",
+      "direct_rendering_display_compositor": "disabled_off_ok",
+      "gpu_compositing": "enabled",
+      "multiple_raster_threads": "enabled_on",
+      "opengl": "enabled_on",
+      "rasterization": "enabled",
+      "raw_draw": "disabled_off_ok",
+      "skia_graphite": "disabled_off",
+      "trees_in_viz": "disabled_off",
+      "video_decode": "enabled",
+      "video_encode": "disabled_software",
+      "vulkan": "enabled_on",
+      "webgl": "enabled",
+      "webgpu": "enabled",
+      "webgpu_on_vk_via_gl_interop": "disabled_off",
+      "webnn": "disabled_off"
+    },
+    "devices": [
+      {
+        "vendorId": 32902,
+        "deviceId": 16032,
+        "vendorString": "Google Inc. (Intel)",
+        "deviceString": "ANGLE (Intel, Vulkan 1.3.255 (Intel(R) UHD Graphics 620 (WHL GT2) (0x00003EA0)), Intel open-source Mesa driver-23.2.1)",
+        "driverVendor": "Mesa",
+        "driverVersion": "driver"
+      }
+    ]
+  },
+  "diagnosticFile": ".tmp/map-lab/diagnostics/source-size-capture-1790717711728-c9cb8d1b-b7b4-4133-aca7-fd824b1d91d4.jsonl",
+  "selection": [
+    "nysdot-bridge-roadway"
+  ],
+  "status": "complete",
+  "totals": {
+    "complete": 1,
+    "rejected": 0,
+    "completeExportBytes": 101859,
+    "rejectedEvidenceBytes": 0
+  },
+  "finishedAt": "2026-09-29T21:35:12.587Z"
+}

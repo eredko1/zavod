@@ -1,0 +1,327 @@
+{
+  "scope": "Luna Park building outputs with fixed current/native snapshots and two distinct preserved OSM inputs; not citywide usage",
+  "bounds": {
+    "south": 40.5752,
+    "west": -73.9798,
+    "north": 40.5799,
+    "east": -73.976
+  },
+  "mergeVersion": 13,
+  "input": {
+    "native2014": "2026-09-28T02:31:19.262Z",
+    "currentNYC": "2026-09-28T00:04:38.094Z",
+    "osm": "2026-09-27T05:07:05.003Z",
+    "osmSelection": "Building records with a returned vertex inside these bounds from preserved Coney capture"
+  },
+  "meshDecisions": [
+    {
+      "id": "nyc-buildings-2014/354763@6b4776af",
+      "bin": 3394728,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/429518@a4be216d",
+      "bin": 3345783,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/430294@6dbafc82",
+      "bin": 3196574,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/430706@e4623d86",
+      "bin": 3320750,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/443944@f2ec237f",
+      "bin": 3346337,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/346345@f39468f8",
+      "bin": 3245153,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/442842@35b43289",
+      "bin": 3245152,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/430445@33ffe1f4",
+      "bin": 3319886,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/431576@99e8b33b",
+      "bin": 3412852,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/429105@11ec7f6d",
+      "bin": 3245158,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/442445@211e1701",
+      "bin": 3196571,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/430857@c7488f49",
+      "bin": 3196565,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/346558@19471828",
+      "bin": 3196572,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/429396@d3de280c",
+      "bin": 3196570,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/443647@c9c10f35",
+      "bin": 3245157,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/428847@e8113def",
+      "bin": 3320753,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/428797@b38bd102",
+      "bin": 3245137,
+      "selected": false,
+      "reason": "Mesh vertical span conflicts with the current recorded roof height."
+    },
+    {
+      "id": "nyc-buildings-2014/431452@a35b5b99",
+      "bin": 3256873,
+      "selected": false,
+      "reason": "Mesh vertical span conflicts with the current recorded roof height."
+    },
+    {
+      "id": "nyc-buildings-2014/443082@4bf4f7fd",
+      "bin": 3346336,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/347122@cd3e7815",
+      "bin": 3196569,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/430522@27f188a4",
+      "bin": 3196568,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/429398@270a7a50",
+      "bin": 3320752,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/430913@9f890cd8",
+      "bin": 3196590,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/429559@9f8a029a",
+      "bin": 3196591,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/429138@3f2d0f45",
+      "bin": 3245154,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/346984@5de17db7",
+      "bin": 3326932,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/429405@69cfbdd4",
+      "bin": 3196573,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/431103@83ce0864",
+      "bin": 3196557,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/431590@981dfac0",
+      "bin": 3196558,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/429544@cd064397",
+      "bin": 3336561,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/432016@9721de60",
+      "bin": 3000000,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/429528@e692e071",
+      "bin": 3320749,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/431112@c2846ab6",
+      "bin": 3320751,
+      "selected": true
+    },
+    {
+      "id": "nyc-buildings-2014/434223@d6a1bb40",
+      "bin": 3196273,
+      "selected": false
+    },
+    {
+      "id": "nyc-buildings-2014/353416@8d96e2ce",
+      "bin": 3385712,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    },
+    {
+      "id": "nyc-buildings-2014/353142@72336405",
+      "bin": 3196271,
+      "selected": false,
+      "reason": "Mesh adds no measured stepped or sloped upper surfaces over the current extrusion."
+    }
+  ],
+  "building3": {
+    "bin": 3320750,
+    "meshObject": 430706,
+    "nativeVertices": 414,
+    "tankGeometryPresent": false,
+    "tankGeometryEvidence": "Native surface and close-up inspection show roof blocks without distinct tanks; no tank triangles are removed by the renderer",
+    "researchTankObjects": [
+      5436,
+      5437
+    ],
+    "tankDataset": "Water_Tank_2022",
+    "tankLayerConnected": true,
+    "renderedTankObjects": [
+      5436,
+      5437
+    ]
+  },
+  "captures": [
+    {
+      "name": "historical-pinned-osm",
+      "buildings": {
+        "total": 36,
+        "bySource": {
+          "nyc-buildings-2014": 13,
+          "nyc-buildings": 20,
+          "osm-overpass": 3
+        }
+      },
+      "equipment": [
+        {
+          "id": "nyc-water-tanks/5436@569a9602",
+          "parent": "nyc-buildings-2014/430706@e4623d86",
+          "base": 61.60771554480001,
+          "top": 72.4131964992,
+          "height": 10.805480954399993,
+          "unit": "metres",
+          "footprints": [
+            {
+              "coverage": 0.8881118881118881,
+              "sampled": 429,
+              "covered": 381,
+              "step": 0.25,
+              "maxRoof": 58.582645416259766
+            }
+          ],
+          "estimatedEnvelope": true
+        },
+        {
+          "id": "nyc-water-tanks/5437@c8a0d670",
+          "parent": "nyc-buildings-2014/430706@e4623d86",
+          "base": 61.60771554480001,
+          "top": 72.4131964992,
+          "height": 10.805480954399993,
+          "unit": "metres",
+          "footprints": [
+            {
+              "coverage": 0.8997668997668997,
+              "sampled": 429,
+              "covered": 386,
+              "step": 0.25,
+              "maxRoof": 58.582645416259766
+            }
+          ],
+          "estimatedEnvelope": true
+        }
+      ]
+    },
+    {
+      "name": "preserved-wide-coney-osm",
+      "buildings": {
+        "total": 41,
+        "bySource": {
+          "nyc-buildings-2014": 13,
+          "nyc-buildings": 20,
+          "osm-overpass": 8
+        }
+      },
+      "equipment": [
+        {
+          "id": "nyc-water-tanks/5436@569a9602",
+          "parent": "nyc-buildings-2014/430706@e4623d86",
+          "base": 61.60771554480001,
+          "top": 72.4131964992,
+          "height": 10.805480954399993,
+          "unit": "metres",
+          "footprints": [
+            {
+              "coverage": 0.8881118881118881,
+              "sampled": 429,
+              "covered": 381,
+              "step": 0.25,
+              "maxRoof": 58.582645416259766
+            }
+          ],
+          "estimatedEnvelope": true
+        },
+        {
+          "id": "nyc-water-tanks/5437@c8a0d670",
+          "parent": "nyc-buildings-2014/430706@e4623d86",
+          "base": 61.60771554480001,
+          "top": 72.4131964992,
+          "height": 10.805480954399993,
+          "unit": "metres",
+          "footprints": [
+            {
+              "coverage": 0.8997668997668997,
+              "sampled": 429,
+              "covered": 386,
+              "step": 0.25,
+              "maxRoof": 58.582645416259766
+            }
+          ],
+          "estimatedEnvelope": true
+        }
+      ]
+    }
+  ]
+}

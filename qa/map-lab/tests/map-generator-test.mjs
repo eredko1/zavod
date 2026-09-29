@@ -1,7 +1,10 @@
 import {NYC_SOURCES} from '../data/map-sources.js';
 import {chromeOptions} from '../../browser-launch.mjs';
+import {recordPageDiagnostics} from './page-diagnostics.mjs';
 import assert from 'node:assert/strict';
 import {loadFixture} from './fixture.mjs';
+import {mockMeshSource} from './mesh-source-mock.mjs';
+import {mockEmptyBridgeRoadwayTable} from './bridge-roadway-mock.mjs';
 const {data:osm,nyc:snaps}=await loadFixture();
 import { readFile,writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright-core';
@@ -10,17 +13,24 @@ const browser=await chromium.launch(chromeOptions({channel:'chrome',headless:fal
 let other=false,fail=false,nycRequests=0,query='';
 const small={elements:[{type:'way',id:1,tags:{building:'yes',height:'12'},nodes:[1,2,3,4,1],geometry:[{lat:51.5001,lon:-.1201},{lat:51.5001,lon:-.1199},{lat:51.5003,lon:-.1199},{lat:51.5003,lon:-.1201},{lat:51.5001,lon:-.1201}]},{type:'way',id:2,tags:{highway:'residential'},geometry:[{lat:51.5,lon:-.1205},{lat:51.5,lon:-.1195}]}]};
 try {
+await mockMeshSource(page,{empty:true});
 if(process.env.QA_NO_ABORT_HELPERS==='1')await page.addInitScript(()=>{AbortSignal.any=AbortSignal.timeout=AbortSignal.prototype.throwIfAborted=undefined;});
 await page.route('**/api/interpreter',r=>{query=new URLSearchParams(r.request().postData()).get('data');return r.fulfill({status:fail?503:200,contentType:'application/json',body:JSON.stringify(fail?{remark:'test outage'}:other?small:osm)});});
 await page.route('**/resource/*.geojson?*',r=>{nycRequests++;return r.fulfill({contentType:'application/json',body:JSON.stringify(snaps.find(s=>r.request().url().includes(s.dataset))?.data||{type:'FeatureCollection',features:[]})});});
-await page.route('**/api/views/*.json',r=>r.fulfill({contentType:'application/json',body:'{}'}));await page.route('**/LION/FeatureServer/0?*',r=>r.fulfill({contentType:'application/json',body:'{"name":"LION"}'}));await page.route('**/LION/FeatureServer/0/query**',r=>{const s=snaps.find(s=>s.sourceId==='nyc-lion');return r.fulfill({contentType:'application/json',body:JSON.stringify(new URL(r.request().url()).searchParams.get('returnIdsOnly')==='true'?{objectIds:s.data.features.map(f=>f.properties.OBJECTID)}:s.data)});});
-await page.goto('http://localhost:8790/qa/map-lab/index.html?qa=1');await page.waitForFunction(()=>!!window.__generator);assert.equal(await page.locator('[data-feature]').count(),0);
+await page.route('https://data.cityofnewyork.us/api/views/*.json',r=>r.fulfill({contentType:'application/json',body:'{}'}));await page.route('**/LION/FeatureServer/0?*',r=>r.fulfill({contentType:'application/json',body:'{"name":"LION"}'}));await page.route('**/LION/FeatureServer/0/query**',r=>{const s=snaps.find(s=>s.sourceId==='nyc-lion');return r.fulfill({contentType:'application/json',body:JSON.stringify(new URL(r.request().url()).searchParams.get('returnIdsOnly')==='true'?{objectIds:s.data.features.map(f=>f.properties.OBJECTID)}:s.data)});});
+await mockEmptyBridgeRoadwayTable(page,NYC_SOURCES.find(s=>s.id==='nysdot-bridge-roadway'));
+recordPageDiagnostics(page,'map-generator');await page.goto('http://localhost:8790/qa/map-lab/index.html?qa=1');await page.waitForFunction(()=>!!window.__generator);assert.equal(await page.locator('[data-feature]').count(),0);
 await page.click('#auto-coney');await page.waitForFunction(()=>!document.getElementById('auto-coney').disabled);assert.equal(await page.evaluate(()=>window.__generator.result.nyc.length),NYC_SOURCES.length);assert.match(query,/40.5752/);console.log('PASS auto Coney and all sources');
 await page.evaluate(()=>{window.loadingLabels=new Set();const sample=()=>{const card=document.getElementById('build-loading');if(!card.hidden)window.loadingLabels.add(card.textContent);window.loadingFrame=requestAnimationFrame(sample);};sample();});
 await page.click('#generate');await page.waitForFunction(()=>!window.__generator.busy);assert.equal(await page.evaluate(()=>window.__generator.world?.stats().buildings),36,await page.textContent('#generation-summary'));await page.waitForFunction(()=>!document.getElementById('bench-run').disabled);assert.equal(new URL(page.url()).pathname,'/qa/map-lab/index.html');
 const painted=await page.evaluate(()=>{cancelAnimationFrame(window.loadingFrame);return [...window.loadingLabels];});for(const label of ['Reading map features','Merging sources','Preparing elevation data','Creating meshes','Fitting geometry to elevation','Creating ground','Preparing walking surfaces','Placing objects','Clipping area edges','Opening the world'])assert.ok(painted.some(s=>s.includes(label)),`${label} must reach an animation frame`);assert.ok(await page.locator('#build-loading').isHidden());
 assert.equal(await page.evaluate(()=>window.__generator.world.plan.issues.filter(i=>i.code==='building-match-review').length),6,'three conflicting BIN pairs remain explicit review records');
 await page.screenshot({path:'.tmp/map-lab/generator-3d.png'});
+for(const target of ['meshes','sceneHydration']){
+  const cancellation=await page.evaluate(async target=>{const g=window.__generator,w=g.world,load=w.loadResult,plan=w.plan;w.loadResult=function(result,options,mark,beforeStage,signal){return load.call(this,result,options,mark,async stage=>{if(stage===target)document.getElementById('build-cancel').click();await beforeStage(stage);},signal);};try{await g.generate();return {unchanged:w.plan===plan,message:document.getElementById('generation-summary').textContent,busy:g.busy};}finally{w.loadResult=load;}},target);
+  assert.equal(cancellation.unchanged,true,'cancelled replacement retains the previous scene');assert.equal(cancellation.busy,false);assert.match(cancellation.message,/Map build cancelled/);assert.ok(await page.locator('#build-cancel').isHidden());
+}
+await page.evaluate(()=>window.__generator.generate());assert.ok(await page.locator('#bench-run').isEnabled());assert.equal(await page.evaluate(()=>window.__generator.world.settings.execution),'worker');console.log('PASS worker and hydration cancellation retain the previous scene and release build ownership');
 const outlineCoverage=await page.evaluate(async()=>{const w=window.__generator.world,{sceneMetadata}=await import('/qa/map-lab/benchmark/scene-metadata.js'),before=sceneMetadata(w).geometryCoverage,outlines=[];w.getWorld().group.traverse(o=>{if(o.isLineSegments&&o.parent.userData.building){outlines.push(o);o.visible=false;}});const after=sceneMetadata(w).geometryCoverage;for(const o of outlines)o.visible=true;return {count:outlines.length,changed:JSON.stringify(before)!==JSON.stringify(after)};});assert.ok(outlineCoverage.count>0&&outlineCoverage.changed,'building outlines must contribute to benchmark coverage');
 // Actual button uses production three-repeat preset.
 if(process.env.QA_QUICK==='1')await page.evaluate(()=>window.__generator.benchmark({frames:30,warmup:15,repeats:3}));else await page.click('#bench-run');await page.waitForFunction(()=>!window.__generator.busy&&['complete','failed','cancelled'].includes(window.__generator.report?.status),null,{timeout:240000});const report=await page.evaluate(()=>window.__generator.report);assert.equal(report.status,'complete',report.failure);assert.equal(report.runs.length,3);await writeFile(process.env.QA_QUICK==='1'?'.tmp/map-lab/generator-benchmark-quick.json':'.tmp/map-lab/generator-benchmark.json',JSON.stringify(report,null,2));console.log('PASS in-page benchmark',report.runs.map(r=>({walkCPU:r.summaries['walk-turn'].cpu.loop.p95,walkGPU:r.summaries['walk-turn'].gpu.p95})));
