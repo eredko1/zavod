@@ -165,6 +165,23 @@ async function prewarm() {
   if (ctx.lite) { const rt = new Set(ctx.raycastTargets || []), seen = new Set();
     scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern):/.test(o.name || '')) return; seen.add(g);
       if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }); }
+  // phones: the big static buildings' own geometry (city, landmarks, boardwalk, the viaduct …) was kept in JS only so bullets,
+  // sight lines and footsteps could raycast it (~120 MB + its BVH). Those raycasts go to one invisible mesh of the collision
+  // boxes instead (the same shapes, a few MB); the originals stay on the GPU and drop their JS copies. Ground meshes stay.
+  if (ctx.lite && ctx.colliders?.length) {
+    const heavy = (o) => o.isMesh && !o.isSkinnedMesh && !o.userData.onHit && !o.userData.soldier && /^(city|cityFar|landmarks|luna|viaduct|shore|park|brighton|tavern|stillwell|surfKit):/.test(o.name || '') && !/ground/i.test(o.name) && o.geometry?.attributes?.position?.array;
+    const drop = ctx.raycastTargets.filter(heavy);
+    if (drop.length) {
+      const pos = [], idx = []; let v = 0;
+      for (const b of ctx.colliders) { if (!b?.isBox3 || b.isEmpty() || b.max.x - b.min.x > 400 || b.max.z - b.min.z > 400) continue; const { min: m, max: M } = b;
+        for (const [x, y, z] of [[m.x, m.y, m.z], [M.x, m.y, m.z], [M.x, M.y, m.z], [m.x, M.y, m.z], [m.x, m.y, M.z], [M.x, m.y, M.z], [M.x, M.y, M.z], [m.x, M.y, M.z]]) pos.push(x, y, z);
+        for (const f of [0, 1, 2, 0, 2, 3, 5, 4, 7, 5, 7, 6, 4, 0, 3, 4, 3, 7, 1, 5, 6, 1, 6, 2, 3, 2, 6, 3, 6, 7, 4, 5, 1, 4, 1, 0]) idx.push(v + f); v += 8; }
+      const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pg.setIndex(idx); pg.computeVertexNormals(); pg.computeBoundingSphere(); pg.computeBoundingBox();
+      const proxy = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); proxy.visible = false; proxy.name = 'raycastProxy'; proxy.userData.surface = 'concrete'; scene.add(proxy); try { pg.computeBoundsTree?.(); } catch {}
+      const gone = new Set(drop); ctx.raycastTargets.splice(0, ctx.raycastTargets.length, ...ctx.raycastTargets.filter((o) => !gone.has(o)), proxy);
+      for (const o of drop) { const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); try { g.disposeBoundsTree?.(); } catch {} g.boundsTree = null; for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }
+      console.log(`[boot] phones: ${drop.length} building meshes → a ${Math.round(pos.length / 24)}-box raycast proxy`);
+    } }
 }
 
 // ---------- loop ----------

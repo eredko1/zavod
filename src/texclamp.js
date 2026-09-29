@@ -10,6 +10,8 @@ export function textureBudget(ctx) {
   // every iPhone / iPad gets the low budget: iOS reports no deviceMemory, and a tab past ~1 GB is killed outright (and before
   // that, texture uploads start failing: alpha-tested leaves come out empty and the trees look bare)
   const low = (mem && mem <= 4) || (cores && cores <= 4) || /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) || ctx.qs?.get?.('lowmem') === '1';
+  const tm = +ctx.qs?.get?.('texmax') || 0;   // QA: try a tighter cap
+  if (tm) return { max: tm, people: Math.min(tm, 256), low: true };
   return low ? { max: 512, people: 256, low: true } : { max: 1024, people: 512, low: false };
 }
 
