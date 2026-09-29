@@ -120,10 +120,10 @@ export function buildChill(world, H) {
   K.vendor({ name: 'VITEK', pos: vp, r: 2.4, talk: vitekTalk, fig: vf });
   CH.vitek = vp; (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'VITEK (guns)', x: vp.x, z: vp.z, kind: 'danger' });
   // loadout: the knife; the handgun slot is locked until Vitek comes through
-  const arm = () => { const w = ctx.weapons; if (!w?.setLoadout) return false; w.setLoadout({ primary: 'knife', secondary: 'm9' }); w.lock?.(1, !CH.armed, 'No gun yet — VITEK (by the park gate) sells one'); try { w.collect?.('ak74', 90); w.collect?.('m24', 25); } catch {} return true; };   // everyone carries an AK + a sniper in the bag (3 / 4, or the weapon strip)
+  const arm = () => { const w = ctx.weapons; if (!w?.setLoadout) return false; w.setLoadout({ primary: 'fists', secondary: 'm9' }); w.lock?.(1, !CH.armed, 'No gun yet — VITEK (by the park gate) sells one'); try { w.collect?.('knife', 0); w.collect?.('ak74', 90); w.collect?.('m24', 25); } catch {} return true; };   // everyone carries an AK + a sniper in the bag (3 / 4, or the weapon strip)
   ctx.bus.on('playerRespawn', () => { setTimeout(arm, 50); });
   K.onUpdate((dt, playing) => {
-    if (!CH.armedOnce && arm()) { CH.armedOnce = true; K.toast('CHILL MODE — no mercs. Get wasted, don\'t get robbed — or do the robbing (F on a passer-by). Knife + $60. Muggings bring the cops.', 5200); }
+    if (!CH.armedOnce && arm()) { CH.armedOnce = true; K.toast('CHILL MODE — no mercs, nothing drawn: your fists are 7 (click to punch, three quick ones is a hook). Knife, AK and sniper are in the bag (1–4). Get wasted, don\'t get robbed. Muggings bring the cops.', 6000); }
     const st = K.state(); if (playing) CH.wasted += ((st?.high || 0) + (st?.drunk || 0)) * dt;
     el.textContent = `WASTED ${Math.floor(CH.wasted)}  ·  ROBBED ${C.robbed}×`;
   });
@@ -371,7 +371,7 @@ function vitekTalk(Kk, again) {
     if (!K.has('skewer')) return { text: 'VITEK: "Where\'s my shashlik? Hot, from the mangal at Table Park. NET GOST sells the meat. Then we talk."', choices: [{ label: 'On it', go: null }] };
     if (!K.pay(60)) return { text: 'VITEK: "Sixty, bratan. I don\'t do layaway."', choices: [{ label: 'Later', go: null }] };
     K.take('skewer'); CH.armed = true;
-    const w = ctx.weapons; w?.lock?.(1, false); w?.setLoadout?.({ primary: 'knife', secondary: 'm9' }); w?.swap?.(1);
+    const w = ctx.weapons; w?.lock?.(1, false); w?.setLoadout?.({ primary: w.loadout?.primary || 'fists', secondary: 'm9' }); w?.swap?.(1);
     K.toast('Got a Makarov (slot 2). The locals will think twice.', 3000);
     return { text: 'VITEK: "Mmm. Still hot. OK — here. Makarov. Clean, mostly. Fifteen in the mag. You never met me."', choices: [{ label: 'Pleasure doing business', go: null }] };
   };

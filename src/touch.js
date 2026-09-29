@@ -116,7 +116,7 @@ export function update(dt, ctx) {
   const m = ctx.player?.mounted, stowed = !!(m && (m.elevator || (m.spec?.car && (ctx.weapons?.current?.spec?.slot ?? 0) !== 1)));   // passengers + pistol drivers shoot
   if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { S.clearFire(); S.setAds?.(false); } }
   // fire buttons say what they do (the left one is a second trigger for the left thumb)
-  const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? 'SLASH' : 'FIRE';
+  const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? (ctx.weapons?.current?.id === 'fists' ? 'PUNCH' : 'SLASH') : 'FIRE';
   { const pistol = (ctx.weapons?.current?.spec?.slot ?? 0) === 1 || /m9|deagle|makarov|glock/i.test(ctx.weapons?.currentId || ''), portrait = innerHeight > innerWidth;   // declutter: ZOOM only with a long gun, one trigger in portrait
     S.root.classList.toggle('melee', melee); S.root.classList.toggle('portrait', portrait); S.root.classList.toggle('nozoom', melee || pistol); }
   if (ft !== S.fireTxt) { S.fireTxt = ft; S.root.querySelector('.fire').textContent = ft; S.root.querySelector('.fireL').textContent = ft; }
