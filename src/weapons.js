@@ -762,6 +762,8 @@ export function update(dt, ctx) {
   const scoped = !!sp.scope && S.ads > 0.85 && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && !S.showcase && !(w.needsAction && w.actionT >= 0);
   if (scoped !== S.scoped) { S.scoped = scoped; S.scope.rig.visible = scoped; if (scoped) ctx.bus.emit('scope', { on: true }); else ctx.bus.emit('scope', { on: false }); }
   if (!S.swap) w.group.visible = !scoped && !(stowed && S.lower > 0.9);
+  // only the gun in your hands is ever drawn: bag swaps / pickups / loadout changes could leave an earlier gun's model showing
+  { const held = S.weapons[S.cur]; for (const id in S.cache) { const c = S.cache[id]; if (c !== held && c.group.visible) c.group.visible = false; } }
   if (scoped) {
     const sc = S.scope; const half = 0.5 * Math.tan(cam.fov * DEG / 2); sc.rig.scale.set(half, half, 1);
     // scope shadow: eye offset from the recoil spring + bob, so the exit pupil crescent moves like a real eyepiece
