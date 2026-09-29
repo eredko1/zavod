@@ -81,7 +81,13 @@ function buildLine() {
     const w8u = new THREE.Vector2(W8.P1.x - W8.P0.x, W8.P1.y - W8.P0.y).normalize();
     const w8a = (p) => (p.x - W8.P0.x) * w8u.x + (p.z - W8.P0.y) * w8u.y, w8o = (p) => -(p.x - W8.P0.x) * w8u.y + (p.z - W8.P0.y) * w8u.x;
     const inW8 = (p) => { const a = w8a(p); return a > -10 && a < W8.L + 10 && Math.abs(w8o(p)) < 12; };
-    for (const p of P) if (inW8(p)) { const a = w8a(p); p.x = W8.P0.x + w8u.x * a + (-w8u.y) * oT; p.z = W8.P0.y + w8u.y * a + w8u.x * oT; }
+    // onto this line's W 8 St track, blended in and out over 120 m of track past each end (a hard snap left a sideways step at the edge
+    // of the station: the cars folded ~50° across it and swept through the pillars)
+    { const ins = P.map((p, i) => (inW8(p) ? i : -1)).filter((i) => i >= 0);
+      if (ins.length) { const i0 = ins[0], i1 = ins[ins.length - 1], snap = (p, k) => { const a = w8a(p), tx = W8.P0.x + w8u.x * a + (-w8u.y) * oT, tz = W8.P0.y + w8u.y * a + w8u.x * oT; p.x += (tx - p.x) * k; p.z += (tz - p.z) * k; };
+        const orig = P.map((p) => [p.x, p.z]), sm = (t) => t * t * (3 - 2 * t);
+        for (let i = i0; i <= i1; i++) snap(P[i], 1);
+        for (const [from, step] of [[i0, -1], [i1, 1]]) { let dd = 0; for (let i = from + step; i >= 0 && i < P.length; i += step) { dd += Math.hypot(orig[i][0] - orig[i - step][0], orig[i][1] - orig[i - step][1]); if (dd > 120) break; snap(P[i], sm(1 - dd / 120)); } } } }
     P.forEach((p, i) => { if (i) s += Math.hypot(p.x - P[i - 1].x, p.z - P[i - 1].z); p.s = s; });
     const w8idx = P.map((p, i) => (inW8(p) ? i : -1)).filter((i) => i >= 0);
     if (w8idx.length) { R.w8s0 = P[w8idx[0]].s; R.w8s1 = P[w8idx[w8idx.length - 1]].s;
@@ -142,7 +148,14 @@ function routePath(cfg) {
     let h = Math.atan2(d.z, d.x); const q = b.clone();
     for (let run = 0; run < cfg.ext; run += 10) { if (q.x > cfg.bend.x) h += Math.max(-0.0175, Math.min(0.0175, cfg.bend.h - h)); q.x += Math.cos(h) * 10; q.z += Math.sin(h) * 10; out.push(q.clone()); }
   } else out.push(b.clone().addScaledVector(d, cfg.ext));
-  return [...pre, ...out];
+  // the graph joins nearby rail ends, so a route can hop to the next track over and back: a zigzag the train folds across
+  // (the D doubled back on itself north of Stillwell). Drop any vertex where the line turns more than 45°, until none do.
+  const R = [...pre, ...out];
+  for (let pass = 0; pass < 20; pass++) { let cut = false;
+    for (let i = 1; i + 1 < R.length; i++) { const a = R[i - 1], b = R[i], c = R[i + 1]; const ux = b.x - a.x, uz = b.z - a.z, vx = c.x - b.x, vz = c.z - b.z, lu = Math.hypot(ux, uz), lv = Math.hypot(vx, vz);
+      if (lu < 1e-3 || lv < 1e-3 || (ux * vx + uz * vz) / (lu * lv) < Math.cos(Math.PI / 4)) { R.splice(i, 1); cut = true; i--; } }
+    if (!cut) break; }
+  return R;
 }
 function resample(pts, step) {   // even spacing ON the rail polyline (no smoothing — the train stays locked to the track)
   const out = [pts[0].clone()];
