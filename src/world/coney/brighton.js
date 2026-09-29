@@ -1,0 +1,197 @@
+// CONEY — Brighton Beach, east of the Aquarium: walk, drive, jetpack or jet ski straight on past the map's east edge. Brighton
+// Beach Ave runs east under the B/Q el (it picks up where the Q's el ends, with the Brighton Beach station at Brighton 6th),
+// lined with walk-ups and Russian shops (bilingual signs); Brighton 1st to 14th run down to the boardwalk, which carries on from
+// Coney with its benches, lamps and babushkas, then the beach and the same ocean. A W.zones rect widens the bounds for players,
+// cars and jet skis; W.groundHeight knows the kerbs, the boardwalk and the sand. Horizon keeps its sprawl out of the strip
+// (horizon.js CORR). Built once with the hangout. CONEY agent (brighton).
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { placeCars } from '../carkit.js';
+import { buildPerson, peopleReady } from '../people.js';
+import { BW, sandHeight, SAND_TOP } from './shore.js';
+
+export const BR = { x0: 436, x1: 2370, z0: -92, z1: 900 };   // the zone (players / vehicles / jet skis)
+const X0 = 1015, X1 = 2360, ZC = -40, HALF = 10, SWK = 5.5, SW = 0.15;   // Brighton Beach Ave: x span, centreline z, half width, sidewalk
+const EL0 = 1270, EL_Y = 7.4;                                   // the el over the avenue: from the Q's end, deck height
+const STN_X = 1622;                                             // Brighton Beach station (Brighton 6th St)
+const CROSS = []; for (let x = 1090, n = 1; x < X1 - 30; x += 112, n++) CROSS.push({ x, n });   // Brighton 1st .. 12th
+const CW = 6;                                                   // cross street half width
+const CONN = [[934, 50], [1030, ZC + 4]];                       // Surf Ave's end → the avenue (the plaza at Ocean Pkwy, past the Q's stairs)
+const NROW0 = 1200;                                             // the north row starts where the Q's el (it crosses diagonally to the avenue) clears it
+
+const SHOPS = [
+  ['ГАСТРОНОМ', 'GROCERY · DELI', '#b3121e', '#fff'], ['АПТЕКА', 'PHARMACY', '#0f6b3a', '#fff'], ['КНИГИ · ВИДЕО', 'BOOKS · DVD', '#1b3f9a', '#ffe07a'],
+  ['ОБМЕН ВАЛЮТЫ', 'CURRENCY EXCHANGE', '#111', '#ffd24a'], ['ПЕЛЬМЕННАЯ', 'DUMPLINGS', '#7a1414', '#fff'], ['BRIGHTON BAZAAR', 'ПРОДУКТЫ · 24 HRS', '#1a1a1a', '#e8c33a'],
+  ['ТАТЬЯНА', 'RESTAURANT · CABARET', '#3a0b3d', '#f2c14e'], ['КАФЕ ВОЛНА', 'CAFE · ON THE BOARDWALK', '#0b4a6e', '#fff'], ['ЧАЙ · КОФЕ', 'TEA & COFFEE', '#4a2e1c', '#f1e2c6'],
+  ['ЮВЕЛИР', 'JEWELRY · GOLD · WATCHES', '#111', '#e0b64a'], ['МЕХА', 'FURS · SHEARLING', '#2c2c2c', '#fff'], ['ТУРАГЕНТСТВО', 'TRAVEL · MOSCOW · KYIV · TASHKENT', '#c8102e', '#fff'],
+  ['ПАРИКМАХЕРСКАЯ', 'BEAUTY SALON', '#e75480', '#fff'], ['СВЕЖАЯ РЫБА', 'FRESH FISH · SMOKED', '#1d5c7a', '#fff'], ['ХЛЕБ', 'BAKERY · RYE · BLINI', '#8a5a1a', '#fff'],
+  ['ДОКТОР', 'MEDICAL OFFICE · 2ND FL', '#fff', '#1b3f9a'], ['КОНФЕТЫ', 'CANDY · HALVA', '#d9a400', '#3a1a00'], ['ЭЛЕКТРОНИКА', 'CELL PHONES · REPAIR', '#222', '#6fd3ff'],
+  ['ЧЕБУРЕКИ', 'CHEBUREKI · SHASHLIK', '#a4161a', '#ffe8a3'], ['МАТРЁШКА', 'GIFTS · SOUVENIRS', '#b3121e', '#ffd24a'], ['ОПТИКА', 'EYEGLASSES', '#0e2a47', '#fff'],
+  ['ЛОМБАРД', 'PAWN · WE BUY GOLD', '#111', '#ff5a1f'], ['КОСМЕТИКА', 'PERFUME · COSMETICS', '#5b2a86', '#fff'], ['ПИВО · КВАС', 'BEER · KVASS', '#1f4a2e', '#f7e27a'],
+];
+
+let B = null;
+
+export function buildBrighton(world) {
+  const { ctx, W, scene } = world; const lite = !!ctx.lite, rnd = mulberry(1622);
+  (W.zones || (W.zones = [])).push({ ...BR, name: 'BRIGHTON BEACH', hint: 'West for Coney' });
+  B = { world, ctx, W, figs: [], t: 0 };
+  W.brighton = { zone: BR };   // subway.js: Ocean Pkwy station skips its own street block
+  // ---- ground: the avenue and cross streets at 0, kerbs / blocks at SW, the boardwalk deck at 0, then the sand ----
+  const onRoad = (x, z) => {
+    if (x < X0 && z > ZC - HALF) return true;   // the plaza where Surf Ave meets the avenue
+    if (Math.abs(z - ZC) < HALF && x < X1) return true;
+    if (z > ZC && z < BW.z0 - 4) for (const c of CROSS) if (Math.abs(x - c.x) < CW) return true;
+    return false;
+  };
+  { const gh = W.groundHeight; W.groundHeight = (x, z) => {
+      if (x > 790 && x < BR.x1 + 10 && z > BW.z0 && z < BW.z1) return 0;
+      if (x > 900 && x < BR.x1 + 30 && z > BR.z0 - 30 && z < BR.z1) return z >= BW.z1 ? sandHeight(x, z) : onRoad(x, z) ? 0 : SW;
+      return gh ? gh(x, z) : 0; }; }
+  const wbox = (x0, y0, z0, x1, y1, z1) => world.box([Math.min(x0, x1), y0, Math.min(z0, z1)], [Math.max(x0, x1), y1, Math.max(z0, z1)]);
+  const M = mats(lite); const G = new Map(); const put = (m, g) => { g = g.index ? g.toNonIndexed() : g; (G.get(m) || G.set(m, []).get(m)).push(g); return g; };
+  const box = (m, x0, y0, z0, x1, y1, z1, col) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); if (col != null) tint(g, col); return put(m, g); };
+  const plane = (m, x0, z0, x1, z1, y, uvs = 0) => { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, y, (z0 + z1) / 2); if (uvs) scaleUV(g, (x1 - x0) / uvs, (z1 - z0) / uvs); return put(m, g); };
+
+  // asphalt: the avenue, the plaza, the cross streets, the connector from Surf Ave
+  plane(M.road, 900, ZC - HALF, X1, ZC + HALF, 0.012, 12);
+  plane(M.road, 900, ZC + HALF, X0, BW.z0 - 4, 0.012, 12);
+  for (const c of CROSS) plane(M.road, c.x - CW, ZC + HALF, c.x + CW, BW.z0 - 4, 0.012, 12);
+  { const [[ax, az], [bx, bz]] = CONN, L = Math.hypot(bx - ax, bz - az), g = new THREE.PlaneGeometry(22, L + 20); g.rotateX(-Math.PI / 2); g.rotateY(Math.atan2(bx - ax, bz - az)); g.translate((ax + bx) / 2, 0.014, (az + bz) / 2); scaleUV(g, 2, L / 12); put(M.road, g); }
+  // the blocks: kerb-high slabs (sidewalks round them); north side one long strip
+  box(M.walk, 900, 0, BR.z0 - 2, X1 + 10, SW, ZC - HALF, 0xb9b5ac);
+  const blocks = []; { let a = X0; for (const c of [...CROSS, { x: X1 + CW + 4 }]) { blocks.push([a, c.x - CW]); a = c.x + CW; } }
+  for (const [a, b] of blocks) box(M.walk, a, 0, ZC + HALF, b, SW, BW.z0 - 4, 0xb9b5ac);
+  box(M.walk, 900, 0, BW.z0 - 4, X1 + 10, SW, BW.z0, 0xb0aca3);
+  // double yellow, lane lines
+  for (let x = 905; x < X1; x += 6) { box(M.paint, x, 0.016, ZC - 0.18, x + 3.5, 0.02, ZC - 0.06, 0xe8c33a); box(M.paint, x, 0.016, ZC + 0.06, x + 3.5, 0.02, ZC + 0.18, 0xe8c33a); }
+
+  // ---- the atlas: every storefront sign on one canvas ----
+  const cells = [], CAN = document.createElement('canvas'); CAN.width = lite ? 1024 : 2048; CAN.height = lite ? 512 : 1024; const cg = CAN.getContext('2d'), cw = CAN.width / 4, ch = CAN.height / 16;
+  SHOPS.forEach((s, i) => { const x = (i % 4) * cw, y = Math.floor(i / 4) * ch; drawSign(cg, x, y, cw, ch, s); cells.push({ u0: x / CAN.width, u1: (x + cw) / CAN.width, v0: 1 - (y + ch) / CAN.height, v1: 1 - y / CAN.height }); });
+  { const i = SHOPS.length, x = (i % 4) * cw, y = Math.floor(i / 4) * ch; drawStation(cg, x, y, cw, ch); cells.push({ u0: x / CAN.width, u1: (x + cw) / CAN.width, v0: 1 - (y + ch) / CAN.height, v1: 1 - y / CAN.height }); }
+  const atlas = new THREE.CanvasTexture(CAN); atlas.colorSpace = THREE.SRGBColorSpace; atlas.anisotropy = 4; M.sign.map = atlas; M.sign.emissiveMap = atlas; M.sign.needsUpdate = true;
+  const signQuad = (cell, w, h, x, y, z, ry) => { const g = new THREE.PlaneGeometry(w, h), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, cell.u0 + uv.getX(i) * (cell.u1 - cell.u0), cell.v0 + uv.getY(i) * (cell.v1 - cell.v0)); g.rotateY(ry); g.translate(x, y, z); return put(M.sign, g); };
+
+  // ---- buildings: walk-ups with a shop on the ground floor facing the avenue; apartment blocks behind the south row ----
+  const brick = [0x9a5a44, 0x8a4a3a, 0xb07a5a, 0xa8876a, 0x7e4a3a, 0xc2a07a, 0x6f5a4a];
+  let si = 0;
+  const walkup = (x0, x1, zFace, sd, depth, floors) => {   // sd: which way the building runs back from its face (-1: the north row, +1: the south row); the street is at -sd
+    const h = 4.2 + (floors - 1) * 3.1, zb = zFace + sd * depth, col = brick[Math.floor(rnd() * brick.length)];
+    const g = new THREE.BoxGeometry(x1 - x0, h, depth); g.translate((x0 + x1) / 2, SW + h / 2, (zFace + zb) / 2); boxUV(g, x1 - x0, h, depth); tint(g, col); put(M.walls, g);
+    wbox(x0, 0, zFace, x1, SW + h, zb);
+    // cornice, the shop: dark glass, a door, the sign band (atlas), an awning on some
+    box(M.trim, x0, SW + h - 0.1, zFace - sd * 0.35, x1, SW + h + 0.25, zFace, 0x8d877c);
+    const fz = zFace - sd * 0.04, ry = sd > 0 ? Math.PI : 0;
+    box(M.glass, x0 + 0.4, SW + 0.3, fz, x1 - 0.4, SW + 2.9, fz - sd * 0.02);
+    box(M.trim, (x0 + x1) / 2 - 0.55, SW, fz - sd * 0.03, (x0 + x1) / 2 + 0.55, SW + 2.4, fz - sd * 0.06, 0x2a2622);
+    signQuad(cells[si++ % SHOPS.length], Math.min(x1 - x0 - 0.6, 9), 1.1, (x0 + x1) / 2, SW + 3.55, fz - sd * 0.05, ry);
+    if (rnd() < 0.45) { const aw = new THREE.BoxGeometry(x1 - x0 - 0.6, 0.06, 1.4); aw.rotateX(-sd * 0.3); aw.translate((x0 + x1) / 2, SW + 3.0, zFace - sd * 0.7); tint(aw, [0xb3121e, 0x1f4a2e, 0x1b3f9a, 0xd9a400][Math.floor(rnd() * 4)]); put(M.trim, aw); }
+  };
+  // north side of the avenue: one continuous row
+  for (let x = NROW0; x < X1; ) { let w = 7 + Math.floor(rnd() * 3) * 2.5; if (x + w > X1) w = X1 - x; walkup(x, x + w, ZC - HALF - SWK, -1, 18, 3 + Math.floor(rnd() * 3)); x += w; }
+  // south side: shops along the avenue, a six-storey block behind, a courtyard strip toward the boardwalk
+  for (const [a, b] of blocks) {
+    for (let x = a + 1; x < b - 1; ) { let w = 7 + Math.floor(rnd() * 3) * 2.5; if (x + w > b - 1) w = b - 1 - x; if (w < 4) break; walkup(x, x + w, ZC + HALF + SWK, 1, 16, 2 + Math.floor(rnd() * 2)); x += w; }
+    const z0 = ZC + HALF + SWK + 22, z1 = BW.z0 - 22, fl = 6 + Math.floor(rnd() * 3), h = fl * 3.0 + 1;
+    for (const [p, q] of [[a + 3, (a + b) / 2 - 4], [(a + b) / 2 + 4, b - 3]]) { if (q - p < 12) continue; const g = new THREE.BoxGeometry(q - p, h, z1 - z0); g.translate((p + q) / 2, SW + h / 2, (z0 + z1) / 2); boxUV(g, q - p, h, z1 - z0); tint(g, brick[Math.floor(rnd() * brick.length)]); put(M.walls, g); wbox(p, 0, z0, q, SW + h, z1);
+      box(M.trim, p - 0.2, SW + h, z0 - 0.2, q + 0.2, SW + h + 0.5, z1 + 0.2, 0x8d877c); }
+  }
+
+  // ---- the el over the avenue: steel bents every 15 m, girders, the deck and the rails; the Brighton Beach station ----
+  { const zs = [ZC - HALF + 1.2, ZC + HALF - 1.2];
+    for (let x = EL0; x <= X1; x += 15) { for (const z of zs) { box(M.el, x - 0.3, 0, z - 0.3, x + 0.3, EL_Y, z + 0.3, 0x3f5a47); wbox(x - 0.35, 0, z - 0.35, x + 0.35, EL_Y, z + 0.35); }
+      box(M.el, x - 0.35, EL_Y - 0.8, zs[0], x + 0.35, EL_Y, zs[1], 0x3f5a47); }
+    for (const z of zs) box(M.el, EL0, EL_Y - 0.9, z - 0.4, X1, EL_Y + 0.2, z + 0.4, 0x3f5a47);
+    box(M.el, EL0, EL_Y, zs[0], X1, EL_Y + 0.35, zs[1], 0x4a4a46);
+    for (const dz of [-2.4, -0.9, 0.9, 2.4]) box(M.steel, EL0, EL_Y + 0.35, ZC + dz - 0.05, X1, EL_Y + 0.5, ZC + dz + 0.05, 0x6d6f70);
+    // the station: side platforms with a canopy, stairs down to the sidewalk, name boards
+    const L = 150, s0 = STN_X - L / 2, s1 = STN_X + L / 2;
+    for (const sd of [-1, 1]) { const zp0 = ZC + sd * (HALF - 1.2), zp1 = ZC + sd * (HALF + 2.6);
+      box(M.walk, s0, EL_Y + 0.35, Math.min(zp0, zp1), s1, EL_Y + 1.25, Math.max(zp0, zp1), 0x9c988e); box(M.paint, s0, EL_Y + 1.25, zp0 - sd * 0.15, s1, EL_Y + 1.27, zp0 + sd * 0.45, 0xe8c33a);
+      for (let x = s0 + 5; x < s1; x += 12) box(M.el, x - 0.12, EL_Y + 1.25, zp1 - sd * 0.5 - 0.12, x + 0.12, EL_Y + 4.3, zp1 - sd * 0.5 + 0.12, 0x3f5a47);
+      box(M.roof, s0, EL_Y + 4.3, Math.min(zp0, zp1) - 0.3, s1, EL_Y + 4.45, Math.max(zp0, zp1) + 0.3, 0x5a6a62);
+      for (const x of [s0 + 30, STN_X, s1 - 30]) signQuad(cells[SHOPS.length], 5, 0.9, x, EL_Y + 3.2, zp1 - sd * 0.6, sd > 0 ? Math.PI : 0);
+      // stairs down to the sidewalk at the east end
+      const zs0 = ZC + sd * (HALF + SWK - 1.2); for (let k = 0; k < 18; k++) { const y = EL_Y + 1.25 - (k + 1) * (EL_Y + 1.1) / 18; box(M.walk, s1 - 2 - (k + 1) * 0.55, Math.max(SW, y), zs0 - 1.1, s1 - 2 - k * 0.55, y + 0.12, zs0 + 1.1, 0x8f8b82); }
+      box(M.el, s1 - 12, SW, zs0 - 1.2, s1 - 2, EL_Y + 1.25, zs0 - 1.15, 0x3f5a47); }
+    // green globes at the stair foot
+    for (const sd of [-1, 1]) { const g = new THREE.SphereGeometry(0.22, 12, 8); g.translate(STN_X + L / 2 - 12, SW + 2.6, ZC + sd * (HALF + SWK - 0.2)); put(M.globe, g); }
+  }
+
+  // ---- lamps, trees, hydrants on the avenue; parked cars along both kerbs ----
+  for (let x = 910; x < X1; x += 32) for (const sd of [-1, 1]) { const z = ZC + sd * (HALF + 0.6); box(M.steel, x - 0.07, 0, z - 0.07, x + 0.07, 8.2, z + 0.07, 0x2a2c2e); box(M.lamp, x - 0.2, 8.0, z - sd * 1.8 - 0.35, x + 0.2, 8.14, z - sd * 1.8 + 0.35); box(M.steel, x - 0.05, 8.1, z - sd * 1.8, x + 0.05, 8.2, z, 0x2a2c2e); wbox(x - 0.15, 0, z - 0.15, x + 0.15, 4, z + 0.15); }
+  { const leaf = new THREE.IcosahedronGeometry(2.1, lite ? 0 : 1); const trees = []; for (const c of CROSS) for (let z = ZC + HALF + 30; z < BW.z0 - 10; z += 18) for (const sd of [-1, 1]) if (rnd() < 0.7) trees.push([c.x + sd * (CW + 1.3), z]);
+    for (const [x, z] of trees) { box(M.bark, x - 0.14, 0, z - 0.14, x + 0.14, 3.4, z + 0.14, 0x6a5a44); wbox(x - 0.2, 0, z - 0.2, x + 0.2, 3, z + 0.2); }
+    const im = new THREE.InstancedMesh(leaf, M.leaf, trees.length), o = new THREE.Object3D(), c = new THREE.Color(); trees.forEach(([x, z], i) => { o.position.set(x, 4.6, z); o.scale.set(1.2, 1, 1.2); o.rotation.y = rnd() * 6; o.updateMatrix(); im.setMatrixAt(i, o.matrix); c.setHSL(0.26 + rnd() * 0.05, 0.4, 0.2 + rnd() * 0.06); im.setColorAt(i, c); });
+    im.castShadow = !lite; im.receiveShadow = true; scene.add(im); }
+  { const list = []; for (let x = 1010; x < X1 - 10; x += 6.4 + rnd() * 1.6) for (const sd of [-1, 1]) { if (CROSS.some((c) => Math.abs(c.x - x) < CW + 3) || Math.abs(x - STN_X - 63) < 6 || rnd() < (lite ? 0.55 : 0.3)) continue; list.push({ x, z: ZC + sd * (HALF - 1.2), ry: sd > 0 ? 0 : Math.PI, kind: rnd() < 0.18 ? 'suv' : rnd() < 0.08 ? 'cab' : 'sedan' }); }
+    try { placeCars(world, list, { raycast: true }); for (const c of list) wbox(c.x - 2.2, 0, c.z - 0.9, c.x + 2.2, 1.4, c.z + 0.9); } catch (e) { console.warn('[brighton] cars', e); } }
+
+  // ---- the boardwalk carries on from Coney: deck, bulkhead, rails with gaps for the beach steps, lamps, benches ----
+  { const x0 = 790, x1 = X1 + 10; plane(M.deck, x0, BW.z0, x1, BW.z1, 0.02, 2.4);
+    box(M.bark, x0, SAND_TOP - 0.6, BW.z1 - 0.02, x1, -0.12, BW.z1 + 0.05, 0x4a3a2a);
+    for (let x = x0; x < x1; x += 3) box(M.bark, x - 0.12, SAND_TOP - 1, BW.z1 - 0.2, x + 0.12, -0.1, BW.z1 - 0.05, 0x3a2e22);
+    for (let x = x0 + 4; x < x1 - 4; x += 3.9) { if (((x - x0) % 110) < 8) continue; box(M.rail, x - 0.05, 0, BW.z1 - 0.1, x + 0.05, 1.0, BW.z1, 0x2d4a3a); }
+    for (let x = x0; x < x1; x += 110) { box(M.rail, x + 8, 0.95, BW.z1 - 0.12, Math.min(x1, x + 110), 1.05, BW.z1, 0x2d4a3a); wbox(x + 8, 0, BW.z1 - 0.2, Math.min(x1, x + 110), 1.05, BW.z1 + 0.1); }
+    for (let x = x0 + 12; x < x1; x += 30) { box(M.steel, x - 0.08, 0, BW.z0 + 0.8 - 0.08, x + 0.08, 4.6, BW.z0 + 0.8 + 0.08, 0x2d4a3a); const gl = new THREE.SphereGeometry(0.28, 10, 8); gl.translate(x, 4.8, BW.z0 + 0.8); put(M.globe, gl); }
+    for (let x = x0 + 20; x < x1; x += 21) for (const z of [BW.z0 + 1.6, BW.z1 - 1.6]) { box(M.bench, x - 1.1, 0.42, z - 0.25, x + 1.1, 0.5, z + 0.25, 0x6b4f35); box(M.bench, x - 1.1, 0.5, z + (z < BW.z0 + 5 ? -0.28 : 0.2), x + 1.1, 0.95, z + (z < BW.z0 + 5 ? -0.2 : 0.28), 0x6b4f35); } }
+  // the sand past the bulkhead, down into the water (the same profile as Coney's)
+  { const x0 = 900, x1 = BR.x1, sx = lite ? 12 : 6, zs = []; for (let z = BW.z1; z < 430; z += z < 330 ? 4 : 10) zs.push(z); const nx = Math.ceil((x1 - x0) / sx), pos = [], uv = [], idx = [];
+    for (let j = 0; j < zs.length; j++) for (let i = 0; i <= nx; i++) { const x = x0 + i * sx; pos.push(x, sandHeight(x, zs[j]), zs[j]); uv.push(x / 6, zs[j] / 6); }
+    for (let j = 0; j + 1 < zs.length; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, M.sand); m.name = 'brighton:sand'; m.receiveShadow = true; scene.add(m); }
+
+  // ---- merge per material ----
+  for (const [m, list] of G) { const merged = mergeGeometries(list.map(norm), false); if (!merged) { console.warn('[brighton] merge failed', m.name); continue; }
+    const mesh = new THREE.Mesh(merged, m); mesh.name = 'brighton:' + m.name; mesh.receiveShadow = true; mesh.castShadow = !lite && m !== M.road && m !== M.walk && m !== M.deck && m !== M.paint && m !== M.sign; scene.add(mesh);
+    if (m === M.walls || m === M.el) ctx.raycastTargets?.push?.(mesh); }
+
+  // ---- babushkas on the boardwalk benches, a few people out on the avenue ----
+  if (peopleReady()) { const n = lite ? 4 : 10; for (let i = 0; i < n; i++) { try {
+      const onBench = i < n * 0.6, x = onBench ? 810 + 21 * Math.floor(2 + rnd() * 60) : 1010 + rnd() * (X1 - 1030), z = onBench ? BW.z0 + 1.55 : ZC + (rnd() < 0.5 ? -1 : 1) * (HALF + 2.5);
+      const f = buildPerson({ avatar: onBench ? 'f09' : undefined, seed: 900 + i, pose: onBench ? 'sit' : undefined }); if (!f) continue;
+      f.group.position.set(x, onBench ? 0.05 : SW, z); f.group.rotation.y = onBench ? 0 : rnd() * 6.28; scene.add(f.group); B.figs.push(f); } catch (e) { console.warn('[brighton] person', e); break; } } }
+  world.updaters.push((dt) => { const p = ctx.player?.position; if (!p) return; const near = p.x > 700; for (const f of B.figs) { f.group.visible = near; if (near && Math.abs(f.group.position.x - p.x) < 60) f.update(dt, 0); }
+    if (p.x > 900 && !B.hint) { B.hint = 1; ctx.hud?.toast?.('BRIGHTON BEACH — Little Odessa. Brighton Beach Ave under the el, the boardwalk to the south. West for Coney.', 4200); } if (p.x < 700) B.hint = 0; });
+  if (typeof window !== 'undefined' && window.__game) window.__game.brighton = { zone: BR, ave: { x0: X0, x1: X1, z: ZC }, station: STN_X, cross: CROSS.map((c) => c.x), gh: (x, z) => W.groundHeight(x, z) };
+  console.log('[brighton] built ·', CROSS.length, 'cross streets ·', G.size, 'materials ·', B.figs.length, 'people');
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+function drawSign(g, x, y, w, h, [ru, en, bg, fg]) {
+  g.fillStyle = bg; g.fillRect(x, y, w, h); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let fs = h * 0.5; do { g.font = `700 ${fs}px "Arial Black", Arial, sans-serif`; fs -= 1; } while (g.measureText(ru).width > w * 0.9 && fs > 6); g.fillText(ru, x + w / 2, y + h * 0.36);
+  fs = h * 0.24; do { g.font = `600 ${fs}px Arial, sans-serif`; fs -= 1; } while (g.measureText(en).width > w * 0.9 && fs > 5); g.fillText(en, x + w / 2, y + h * 0.78);
+}
+function drawStation(g, x, y, w, h) { g.fillStyle = '#111'; g.fillRect(x, y, w, h); g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = `700 ${h * 0.44}px Helvetica, Arial`; g.fillText('Brighton Beach', x + h * 0.25, y + h * 0.5);
+  [['B', '#ff6319', '#fff'], ['Q', '#fccc0a', '#111']].forEach(([t, c, f], i) => { const cx = x + w - h * (1.1 + i * 0.95); g.fillStyle = c; g.beginPath(); g.arc(cx, y + h / 2, h * 0.36, 0, 7); g.fill(); g.fillStyle = f; g.textAlign = 'center'; g.font = `700 ${h * 0.44}px Helvetica, Arial`; g.fillText(t, cx, y + h * 0.54); g.textAlign = 'left'; }); }
+function canvasTex(w, h, draw, rep) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep) t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; }
+function mats(lite) {
+  const S = (o) => new THREE.MeshStandardMaterial({ roughness: 0.85, ...o });
+  const q = lite ? 0.5 : 1;
+  const road = canvasTex(256 * q, 256 * q, (g, w, h) => { g.fillStyle = '#3b3c3e'; g.fillRect(0, 0, w, h); for (let i = 0; i < 3000 * q; i++) { const v = 45 + Math.random() * 35; g.fillStyle = `rgba(${v},${v},${v + 2},.5)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }, true);
+  const win = canvasTex(128, 256, (g, w, h) => { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); for (let i = 0; i < 600; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.12})`; g.fillRect(Math.random() * w, Math.random() * h, 4, 2); }
+    for (let y = 30; y < 250; y += 40) for (let x = 14; x < 120; x += 32) { g.fillStyle = '#1d2530'; g.fillRect(x, y, 16, 24); g.fillStyle = '#e6e0d2'; g.fillRect(x - 2, y + 24, 20, 3); } }, true);
+  const planks = canvasTex(256 * q, 256 * q, (g, w, h) => { for (let i = 0; i < 16; i++) { const v = 120 + Math.random() * 40; g.fillStyle = `rgb(${v},${v * 0.78},${v * 0.55})`; g.fillRect(0, i * h / 16, w, h / 16 - 2); } g.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 16; i++) g.fillRect(0, i * h / 16 + h / 16 - 2, w, 2); }, true);
+  const sand = canvasTex(256 * q, 256 * q, (g, w, h) => { g.fillStyle = '#d8c7a0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 6000 * q; i++) { const v = Math.random(); g.fillStyle = `rgba(${150 + v * 80},${130 + v * 70},${90 + v * 60},.35)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }, true);
+  const m = {
+    road: S({ map: road, roughness: 0.92 }), walk: S({ vertexColors: true, roughness: 0.9 }), paint: S({ vertexColors: true, roughness: 0.6 }),
+    walls: S({ map: win, vertexColors: true, roughness: 0.9 }), trim: S({ vertexColors: true, roughness: 0.7 }), roof: S({ vertexColors: true, roughness: 0.7, metalness: 0.2 }),
+    glass: S({ color: 0x1a2430, roughness: 0.15, metalness: 0.4 }), sign: new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: 0xffffff, emissiveIntensity: 0.25 }),
+    el: S({ vertexColors: true, roughness: 0.7, metalness: 0.3 }), steel: S({ vertexColors: true, roughness: 0.5, metalness: 0.6 }),
+    lamp: new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffd9a0, emissiveIntensity: 0.6 }), globe: new THREE.MeshStandardMaterial({ color: 0x5fd07a, emissive: 0x2fbf5a, emissiveIntensity: 0.9 }),
+    bark: S({ vertexColors: true, roughness: 0.95 }), leaf: new THREE.MeshLambertMaterial({ color: 0xffffff }), deck: S({ map: planks, roughness: 0.9 }), rail: S({ vertexColors: true, roughness: 0.6, metalness: 0.3 }),
+    bench: S({ vertexColors: true, roughness: 0.85 }), sand: S({ map: sand, roughness: 0.97 }),
+  };
+  for (const k in m) m[k].name = k; return m;
+}
+function tint(g, hex) { const c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; }
+function scaleUV(g, su, sv) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); }
+/** box UVs in metres of façade: one window bay per 1.75 m across, one floor per 3.1 m up (the window texture's repeat) */
+function boxUV(g, w, h, d) { const uv = g.attributes.uv, n = g.attributes.normal; for (let i = 0; i < uv.count; i++) { const along = Math.abs(n.getX(i)) > 0.5 ? d : w; uv.setXY(i, uv.getX(i) * along / 3.5, uv.getY(i) * h / 6.2); } }
+/** every geometry merged per material needs the same attributes: colour (white where missing) and uv */
+function norm(g) { const n = g.attributes.position.count; if (!g.attributes.color) tint(g, 0xffffff); if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2)); if (!g.attributes.normal) g.computeVertexNormals(); return g; }
+function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }

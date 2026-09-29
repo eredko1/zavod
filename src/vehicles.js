@@ -352,7 +352,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
   v.hitT = Math.max(0, v.hitT - dt);
 }
 // ---------- jet ski on the ocean ----------
-const WATER_BOX = { x0: -985, x1: 885, z0: 163, z1: 900 };
+const WATER_BOX = { x0: -985, x1: 2360, z0: 163, z1: 900 };   // east to Brighton 14th (coney/brighton.js)
 /** One water sub-step: jet thrust (only while the intake is wet), hull drag, jet steering, boat-like slide, buoyancy on the
  *  swell (spring, but it can't pull the hull down faster than gravity → it leaves the crest at speed), beaching on sand. */
 function stepWater(v, dt, thr, brk, steer) {

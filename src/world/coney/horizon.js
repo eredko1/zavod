@@ -37,7 +37,10 @@ const ZCUT = (() => { const n = Math.ceil((EXCL.x1 - EXCL.x0) / 20), a = new Flo
   for (const b of OSM.b) for (const [x, z] of b.p) mark(x, z);
   for (const k of ['l', 'pk', 'pt']) for (const q of OSM[k] || []) for (const [x, z] of (q.p || q)) mark(x, z);
   return (x) => { const i = Math.floor((x - EXCL.x0) / 20); return i >= 0 && i < n ? Math.min(-a[i] - 30, -150) : -1e9; }; })();
-const inExcl = (x, z, m = 0) => inRect(x, z, m) && !(z < ZCUT(x) - m);
+// the Brighton Beach strip (coney/brighton.js builds it, walkable): no sprawl, towers or land tiles in it
+const CORR = { x0: 880, x1: 2420, z0: -100, z1: 470 };
+const inCorr = (x, z, m = 0) => x > CORR.x0 - m && x < CORR.x1 + m && z > CORR.z0 - m && z < CORR.z1 + m;
+const inExcl = (x, z, m = 0) => (inRect(x, z, m) && !(z < ZCUT(x) - m)) || inCorr(x, z, m);
 // OSM streets inside the rect (the scene draws them): sprawl boxes keep off them
 const ROADS = []; for (const r of OSM.r) for (let i = 0; i + 1 < r.p.length; i++) { const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1]; ROADS.push({ ax, az, bx, bz, w: r.w / 2 + 3, x0: Math.min(ax, bx) - r.w, x1: Math.max(ax, bx) + r.w, z0: Math.min(az, bz) - r.w, z1: Math.max(az, bz) + r.w }); }
 function onRoad(x0, z0, x1, z1) {
@@ -254,7 +257,7 @@ function buildLand(world) {
   const rec = (x, z, s) => {
     const cx = x + s / 2, cz = z + s / 2, d = Math.hypot(cx - P0[0], cz - P0[1]);
     if (s > 200 && (Math.max(Math.abs(cx - NEAR_C[0]) - s / 2, 0) ** 2 + Math.max(Math.abs(cz - NEAR_C[1]) - s / 2, 0) ** 2 < NEAR_R * NEAR_R) && s > 100) { const h = s / 2; rec(x, z, h); rec(x + h, z, h); rec(x, z + h, h); rec(x + h, z + h, h); return; }
-    const ex = [inRect(x, z), inRect(x + s, z), inRect(x, z + s), inRect(x + s, z + s)]; if (ex.every(Boolean)) return;
+    const ex = [inRect(x, z) || inCorr(x, z), inRect(x + s, z) || inCorr(x + s, z), inRect(x, z + s) || inCorr(x, z + s), inRect(x + s, z + s) || inCorr(x + s, z + s)]; if (ex.every(Boolean)) return;
     if (ex.some(Boolean) && s > 50) { const h = s / 2; rec(x, z, h); rec(x + h, z, h); rec(x, z + h, h); rec(x + h, z + h, h); return; }
     const pts = [[x, z], [x + s, z], [x, z + s], [x + s, z + s], [cx, cz]]; const ls = pts.map(([a, b]) => isLand(a, b));
     const all = ls.every((v) => v === ls[4] && v), none = ls.every((v) => !v);
