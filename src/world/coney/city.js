@@ -52,6 +52,10 @@ export function buildCity(world, M) {
     try { building(T, world, M, b); } catch (e) { console.warn('[coney] building', e); }
   }
   S.flush({ shadow: true }); F.flush({ shadow: true });
+  // phones: the far skyline is only ever drawn, so it is not shot at and its vertex arrays are dropped from JS memory once they
+  // are on the GPU (~50 MB of a heap that iOS kills the tab over)
+  if (world.ctx.lite) { const far = new Set(F.meshes); world.ctx.raycastTargets.splice(0, Infinity, ...world.ctx.raycastTargets.filter((m) => !far.has(m)));
+    for (const m of F.meshes) { const g = m.geometry; g.computeBoundingSphere(); g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].onUpload(function () { this.array = null; }); if (g.index) g.index.onUpload(function () { this.array = null; }); } }
 
   // ---- elevated subway: steel viaduct (columns + girders + ties + rails) along every elevated OSM rail line ----------------
   viaducts(world, M);
