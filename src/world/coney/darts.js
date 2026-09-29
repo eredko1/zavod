@@ -107,7 +107,7 @@ function banner(b, who, kind) {
   el.style.cssText = 'position:fixed;left:50%;top:210px;transform:translateX(-50%);z-index:59;background:rgba(18,32,26,.95);border:1px solid #e0b64a;border-radius:10px;padding:10px 14px;display:flex;gap:12px;align-items:center;font:600 14px Barlow,Arial;color:#f4efe2;max-width:92vw';
   el.innerHTML = `<span>🎯 ${who.replace(/[<>&]/g, '')} ${kind === 'live' ? 'started a darts game' : 'is up for darts'} at Soc Tav</span><button style="padding:8px 14px;border-radius:6px;border:0;background:#e0b64a;color:#111;font:700 13px Barlow;cursor:pointer">JOIN</button><button style="padding:8px 10px;border-radius:6px;border:1px solid #888;background:transparent;color:#ddd;cursor:pointer">✕</button>`;
   const [go, x] = el.querySelectorAll('button'); const kill = () => el.remove();
-  const doJoin = () => { kill(); try { if (ctx.vehicles?.mounted) ctx.vehicles.dismount?.(); } catch {} const o = D.T.boards[b].oche; try { ctx.player.teleport(o.x + 0.4, o.y, o.z, -Math.PI / 2, 0); } catch {} setTimeout(() => openBoard(b), 400); };
+  const doJoin = () => { kill(); try { if (ctx.vehicles?.mounted) ctx.vehicles.dismount?.(); } catch {} const o = D.T.boards[b].oche; try { ctx.player.teleport(o.x, o.y, o.z, D.T.boards[b].yaw ?? -Math.PI / 2, 0); } catch {} setTimeout(() => openBoard(b), 400); };
   for (const [btn, fn] of [[go, doJoin], [x, kill]]) { btn.addEventListener('click', fn); btn.addEventListener('touchstart', (e) => { e.preventDefault(); fn(); }, { passive: false }); }
   document.body.appendChild(el); setTimeout(kill, 20000);
 }

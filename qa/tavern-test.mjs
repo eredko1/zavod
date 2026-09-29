@@ -91,7 +91,7 @@ if (parts.includes('bar')) {
   await pg.evaluate(() => window.__game.tavernPeople.kit.close()); await pg.keyboard.press('KeyB'); await pg.waitForTimeout(800);
   st = await pg.evaluate(() => window.__game.tavernPeople.kit.state()); ok(st.drunk > 0 && !st.inv.includes('tsingtao'), 'B: drank it', JSON.stringify({ drunk: st.drunk }));
   // Kenny from anywhere along the counter, even right beside a regular on his stool (friends: "keeps saying to talk to other people")
-  const who = []; for (const dz of [-2.2, 1.6, 4.45, 7]) { await pg.evaluate((dz) => { const k = window.__game.tavernPeople.kenny(); window.__game.tavernPeople.kit.close(); window.__game.teleport(k[0] - 0.25, k[1], window.__game.tavern.zone.oz + 17.5 + dz, -Math.PI / 2, 0); }, dz); await pg.waitForTimeout(500);
+  const who = []; for (const dz of [-3.2, -1, 1.5, 3.6]) { await pg.evaluate((dz) => { const k = window.__game.tavernPeople.kenny(); window.__game.tavernPeople.kit.close(); window.__game.teleport(k[0] - 0.25, k[1], window.__game.tavern.zone.oz + 18.5 + dz, -Math.PI / 2, 0); }, dz); await pg.waitForTimeout(500);
     await pg.keyboard.press('KeyF'); await pg.waitForTimeout(400); who.push(await pg.evaluate(() => window.__game.tavernPeople.kit.state().dialog?.name || null)); }
   await pg.evaluate(() => window.__game.tavernPeople.kit.close());
   ok(who.every((n) => n === 'KENNY'), 'F anywhere at the counter talks to Kenny', JSON.stringify(who));
@@ -127,7 +127,7 @@ const finish = (pg, b = 0) => pg.evaluate((b) => { const G = window.__game.darts
 async function playOut(pg, name, b = 0) { for (let i = 0; i < 120; i++) { const T = await pg.evaluate((b) => window.__game.darts.table(b), b); if (!T || T.phase === 'over') return T; if (T.seats[T.turn]?.id === await pg.evaluate(() => window.__ctx.net?.id || 'me')) await finish(pg, b); await pg.waitForTimeout(450); } return null; }
 if (parts.includes('darts')) {
   // ---- F at the line opens the board; a leg against Ah Fai to a finish ----
-  const bd = await pg.evaluate(() => { const o = window.__game.tavern.boards[0].oche; window.__game.teleport(o.x + 0.3, o.y, o.z, -Math.PI / 2, 0); return o; }); await pg.waitForTimeout(800);
+  const bd = await pg.evaluate(() => { const o = window.__game.tavern.boards[0].oche; window.__game.teleport(o.x, o.y, o.z, Math.PI, 0); return o; }); await pg.waitForTimeout(800);
   await pg.keyboard.press('KeyF'); await pg.waitForTimeout(700);
   ok(await pg.evaluate(() => !!document.querySelector('.darts') && !!window.__game.darts.ui()), 'F at the oche opens the board');
   await pg.screenshot({ path: `${out}/darts-lobby.png` });
@@ -151,16 +151,16 @@ if (parts.includes('mp')) {
   // ---- two players: A opens a board, B (on the boardwalk in Coney) gets the banner, JOIN walks B to the line, they play ----
   const A = await open('DA'), B = await open('DB');
   await B.evaluate(() => window.__game.teleport(-47, 0, -226, 0, 0)); await A.waitForTimeout(6000);
-  await A.evaluate(() => { const o = window.__game.tavern.boards[1].oche; window.__game.teleport(o.x + 0.3, o.y, o.z, -Math.PI / 2, 0); window.__game.darts.open(1); });
+  await A.evaluate(() => { const o = window.__game.tavern.boards[0].oche; window.__game.teleport(o.x, o.y, o.z, Math.PI, 0); window.__game.darts.open(0); });
   let ban = false; for (let i = 0; i < 20 && !ban; i++) { await B.waitForTimeout(500); ban = await B.evaluate(() => !!document.querySelector('.dt-banner')); }
   ok(ban, 'B in Coney gets the darts banner');
   await B.screenshot({ path: `${out}/darts-banner.png` });
   if (ban) await B.click('.dt-banner button');
-  let seats = 0; for (let i = 0; i < 20 && seats < 2; i++) { await A.waitForTimeout(500); seats = await A.evaluate(() => window.__game.darts.table(1)?.seats.length || 0); }
+  let seats = 0; for (let i = 0; i < 20 && seats < 2; i++) { await A.waitForTimeout(500); seats = await A.evaluate(() => window.__game.darts.table(0)?.seats.length || 0); }
   ok(seats === 2, 'JOIN: B is at the line with A', seats);
   ok(await B.evaluate(() => window.__game.tavern.state().inBar), 'B walked to the tavern');
   await A.evaluate(() => window.__game.darts.start()); await A.waitForTimeout(800);
-  const both = await Promise.all([playOut(A, 'A', 1), playOut(B, 'B', 1)]);
+  const both = await Promise.all([playOut(A, 'A', 0), playOut(B, 'B', 0)]);
   ok(both[0]?.phase === 'over' && both[1]?.phase === 'over' && both[0].win === both[1].win, 'A and B play a leg to a finish, same result', JSON.stringify(both.map((t) => t && { n: t.note, s: t.score })));
   await B.screenshot({ path: `${out}/darts-mp.png` });
 }
