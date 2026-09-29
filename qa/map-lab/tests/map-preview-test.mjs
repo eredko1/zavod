@@ -7,9 +7,30 @@ try {
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://localhost:8790/qa/map-lab/index.html?qa=1');await page.waitForFunction(()=>window.__generator);
   await page.evaluate(scene=>window.__generator.load(scene),await loadFixture());
-  const excluded=await page.evaluate(()=>window.__generator.previewPlan.merge.decisions.find(r=>r.status==='excluded')?.members[0].id);
+  const reuse=await page.evaluate(()=>{
+    const g=window.__generator,input=g.result,osm=[...document.querySelectorAll('#map [data-feature]')],regional=[...document.querySelectorAll('#map [data-nyc-feature]')],oldMerge=JSON.stringify(g.previewPlan.merge),originalRecord=g.previewPlan.observations.records.find(r=>r.sourceId===input.nyc[0].sourceId);
+    const changed={...input.nyc[0],raw:{...input.nyc[0].raw,previewProvenance:'replacement archive with unchanged geographic records'}};
+    g.load({...input,nyc:[changed,...input.nyc.slice(1)]});
+    const retained=g.previewPlan.observations.records.find(r=>r.sourceId===changed.sourceId);
+    return {osm:osm.every(node=>node.isConnected),regional:regional.every(node=>node.isConnected),mergeSame:JSON.stringify(g.previewPlan.merge)===oldMerge,newArchive:retained.snapshot.raw===changed.raw,oldArchivePreserved:originalRecord.snapshot.raw!==changed.raw};
+  });
+  assert.deepEqual(reuse,{osm:true,regional:true,mergeSame:true,newArchive:true,oldArchivePreserved:true},'unchanged geometry reuses SVG nodes while the latest full provenance is attached to a fresh source merge');
+  const replacement=await page.evaluate(()=>{
+    const g=window.__generator,input=g.result,source=input.nyc[0],group=document.querySelector(`[data-nyc-source="${source.sourceId}"]`),other=[...document.querySelectorAll('[data-nyc-source]')].filter(node=>node!==group),changed={...source,data:structuredClone(source.data)};
+    g.load({...input,nyc:[changed,...input.nyc.slice(1)]});const changedOnly=!group.isConnected&&other.every(node=>node.isConnected);
+    g.load({...input,nyc:input.nyc.slice(1)});const removed=!document.querySelector(`[data-nyc-source="${source.sourceId}"]`);
+    g.load({...input,nyc:[...input.nyc].reverse()});const order=[...document.querySelectorAll('[data-nyc-source]')].map(node=>node.dataset.nycSource),expected=input.nyc.map(source=>source.sourceId);
+    const osm=document.querySelector('[data-feature]');g.load({...input,bounds:{...input.bounds,north:input.bounds.north+.00001}});const areaRebuilt=!osm.isConnected;
+    g.load(input);return {changedOnly,removed,order,expected,areaRebuilt};
+  });
+  assert.equal(replacement.changedOnly,true);assert.equal(replacement.removed,true);assert.deepEqual(replacement.order,replacement.expected,'inserting an earlier source preserves registry paint order');assert.equal(replacement.areaRebuilt,true,'area/projection changes invalidate reused geometry');
+  const sourceOnly=await page.evaluate(()=>{const g=window.__generator,plan=g.previewPlan,input=g.result;document.getElementById('storey').value=0;document.getElementById('storey').dispatchEvent(new Event('change',{bubbles:true}));g.load(input);const same=JSON.stringify(plan.merge)===JSON.stringify(g.previewPlan.merge);document.getElementById('storey').value=3;document.getElementById('storey').dispatchEvent(new Event('change',{bubbles:true}));return {render:!!g.previewPlan.render,same,estimates:[...g.previewPlan.buildings,...g.previewPlan.roads,...g.previewPlan.details].flatMap(f=>f.estimates||[])};});
+  assert.deepEqual(sourceOnly,{render:false,same:true,estimates:[]},'source preview neither prepares models nor depends on render dimensions');
+  await page.evaluate(()=>window.__generator.generate());
+  const excluded=await page.evaluate(()=>window.__generator.world.plan.render.decisions.find(r=>r.status==='excluded')?.members[0].id);
+  await page.click('#tab-2d');
   await page.locator('details:has(> #live-log) > summary').click();
-  assert.ok(excluded,'fixture exercises tree-placement exclusions');await page.locator('#merge-log-search').fill(excluded);assert.ok(await page.locator('#merge-results button').count());assert.equal(await page.locator(`#map [data-feature="${excluded}"],#map [data-nyc-feature="${excluded}"]`).isVisible(),false,'excluded tree is hidden in 2D with its log available');await page.locator('#merge-log-search').fill('');
+  assert.ok(excluded,'fixture exercises tree-placement exclusions');await page.locator('#merge-log-search').fill(excluded);assert.ok(await page.locator('#merge-results button').count());assert.equal(await page.locator(`#map [data-feature="${excluded}"],#map [data-nyc-feature="${excluded}"]`).isVisible(),true,'render exclusion leaves the measured source visible in 2D with its log available');await page.locator('#merge-log-search').fill('');
   await page.evaluate(()=>{window.previewNodes={paths:[...document.querySelectorAll('#map [data-nyc-feature]')],defs:document.querySelector('#map [data-merge-defs]'),plan:window.__generator.previewPlan};});
   for(const source of ['nyc-buildings','nyc-sidewalk','nyc-trees']){
     const control=page.locator(`[data-source-visible="${source}"]`),group=page.locator(`#map [data-nyc-source="${source}"]`);

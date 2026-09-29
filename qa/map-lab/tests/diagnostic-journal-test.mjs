@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {createDiagnosticJournal,DIAGNOSTIC_LIMITS} from '../ui/diagnostic-journal.js';
+const memoryStorage=()=>{const values=new Map();return {get length(){return values.size;},key:i=>[...values.keys()][i]??null,getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};};
+const storage=memoryStorage(),tabStorage=memoryStorage();let clock=0;const now=()=>new Date(clock++).toISOString();
+const first=createDiagnosticJournal({storage,tabStorage,now,id:()=> 'first'});first.begin('generate',{bounds:{west:-74},sources:[{sourceId:'mesh',records:123}]});
+for(let i=0;i<DIAGNOSTIC_LIMITS.events+10;i++)first.record('stage',{index:i});
+assert.equal(first.snapshot().current.events.length,DIAGNOSTIC_LIMITS.events);assert.equal(first.snapshot().current.droppedEvents,11);
+const second=createDiagnosticJournal({storage,tabStorage,now,id:()=> 'second'});assert.equal(second.snapshot().previous.operation.status,'active');assert.equal(second.snapshot().previous.events.at(-1).detail.index,DIAGNOSTIC_LIMITS.events+9);assert.equal(second.snapshot().previous.context.sources[0].records,123,'rolling events must not lose operation context');
+second.begin('fetch',{});second.end('cancelled');const third=createDiagnosticJournal({storage,tabStorage,now,id:()=> 'third'});assert.equal(third.snapshot().previous.operation.status,'cancelled','cancellation must not be labeled as an interrupted operation');third.record('open');
+const fourth=createDiagnosticJournal({storage,tabStorage,now,id:()=> 'fourth'});fourth.record('open');assert.equal(storage.length,DIAGNOSTIC_LIMITS.sessions,'retention prunes oldest checkpoints');assert.equal(storage.getItem('map-lab-diagnostic-v1:first'),null);
+fourth.record('large',{text:'x'.repeat(DIAGNOSTIC_LIMITS.detailChars+1)});assert.equal(fourth.snapshot().current.events.at(-1).detail.omitted,true,'oversized summaries are explicitly omitted');
+const simultaneous=memoryStorage();for(let i=0;i<DIAGNOSTIC_LIMITS.sessions+1;i++){const key='simultaneous-'+i,journal=createDiagnosticJournal({storage:simultaneous,tabStorage:memoryStorage(),now:()=> '2026-09-29T00:00:00.000Z',id:()=>key});journal.record('open');assert.ok(simultaneous.getItem('map-lab-diagnostic-v1:'+key),'retention must keep the just-written session when timestamps tie');}
+const denied=createDiagnosticJournal({storage:{getItem(){throw Error('Storage denied');},setItem(){throw Error('Storage denied');}},tabStorage,now,id:()=> 'denied'});denied.begin('generate',{});denied.error('failure',new Error('test'));assert.match(denied.snapshot().persistenceError,/Storage denied/);assert.equal(denied.snapshot().current.events.at(-1).kind,'failure','downloadable in-memory evidence remains available when storage is denied');
+console.log('PASS bounded checkpoints, interrupted/cancelled distinction, retention, context preservation and visible persistence failure');

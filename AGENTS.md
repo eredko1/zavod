@@ -1,8 +1,7 @@
 # AGENTS.md — working on ZAVOD (for Codex / Claude / any coding agent)
 
 Browser FPS in plain Three.js r186 (vendored in `vendor/`, ES modules + importmap, **no build step**).
-`main` auto-deploys to https://zavod-chi.vercel.app — **work on a branch and open a PR** (Vercel posts a preview URL on
-every PR); don't push straight to `main` while people are playing.
+`main` auto-deploys to https://zavod-chi.vercel.app.
 
 ## Run
 ```

@@ -10,6 +10,12 @@ Open [the map lab](../index.html) and choose **Help & pipeline**. Its **Game int
 - [Benchmark architecture](./BENCHMARK-ARCHITECTURE.md): components, ownership, measurement flow, outputs and extension points.
 - [Dependency inventory](./DEPENDENCIES.md): libraries, external APIs, game-only integrations and deployment boundaries.
 - [Map pipeline](./OSM-PIPELINE.md): source acquisition, merging, geometry rules, module contracts and validation.
+- [Current fidelity integration](./FIDELITY-INTEGRATION.md): live 2014 meshes and water tanks, selection/attachment rules, global bridge grades, mapped supports, raw retention and remaining limits.
+- [Transport inventories](TRANSPORT-INVENTORIES.md): live NYSDOT ramp/roadway alignments and bridge structural attributes, complete source retention, reference roles and missing support locations/grades.
+- [Source acquisition](SOURCE-ACQUISITION.md): actual MTA records and original LiDAR point payloads, metadata-only distinctions, complete hierarchy selection, preserved compressed/decoded measurements and deferred interpretation/modeling.
+- [Support sources](SUPPORT-SOURCES.md): mapped supports, structural inventory constraints, public pier/cap/footing drawings, LiDAR/transit candidates and measured-versus-estimated boundaries.
+- [Source-gap catalog](SOURCE-GAP-CATALOG.md): all connected source groups, missing measurements, scoped OSM support counts and official plan/source leads.
+- [Source fidelity audit and merge plan](./SOURCE-FIDELITY-AUDIT.md): existing/unused/new datasets, archived building comparisons, supports, preserved research data and remaining source-selection work.
 - [Game integration plan](./GAME-MAP-INTERFACE.md): coordinate conversion, the existing game interface, collision generation, navigation and implementation gates.
 - [Running and reading benchmarks](./MAP-PROFILING.md): repeat configuration, CLI usage, interpretation and comparison checks.
 - [Performance review](./MAP-PERFORMANCE-REVIEW.md): historical measurements, implemented improvements and unresolved GPU questions.
@@ -23,7 +29,7 @@ qa/map-lab/
   README.md                      Start here: layout and running the lab
   data/                          API clients, retries and geographic bounds
   pipeline/                      Normalization, merge rules and build orchestration
-  render/                        Meshes, terrain, walking and Three.js world
+  render/                        Derived models/logs, meshes, terrain, walking and world
   ui/                            Page controller, area picker, 2D preview, Help and styles
   benchmark/                     Replay, instrumentation, reports and charts
   docs/                          All map-lab documentation
@@ -46,4 +52,10 @@ The lab does not replace the authored game map. `src/world/` remains the game's 
 
 [Infrastructure pass review](REVIEW-2026-09-27.md): fixes verified in this pass and outstanding rendering/data issues.
 
+[Fidelity and source/render review](REVIEW-FIDELITY-2026-09-28.md): every corrected finding, remaining limits, data-readiness finding, monitored reliability issues and scoped verification evidence.
+
 [Rendering gap inventory](RENDERING-GAPS.md): every current feature family, unused physical fields, source examples and the next geometry pass.
+
+- [Source/render contract](SOURCE-RENDER-BOUNDARY.md): immutable source selection, all observations and separate render models/logs.
+- [Measured source sizes](SOURCE-SIZES.md): actual live per-source payloads for a defined 2 km square, rejection evidence and verification limits.
+- [Crash diagnostics](CRASH-DIAGNOSTICS.md): persistent local checkpoints, external QA journals, retention and deliberate crash checks.

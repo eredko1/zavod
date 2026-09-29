@@ -96,7 +96,7 @@ Review loops cover pure rules, browser lifecycle/failure tests, headed end-to-en
 | Missing bounds | Empty coordinate fields became zero and missing object keys escaped validation; use numeric input validity and require all four finite bounds. |
 | Tile lifecycle | Picker imagery must not load during replay or while hidden; request viewport tiles only while the dialog is open and cancel its scheduler on close. |
 | Dragged tiles | Tiles leaving the viewport could retain stale positions during a drag; reposition existing images before loading the settled viewport. |
-| Merged visibility | Hiding a canonical source does not restore its suppressed counterpart; documented as a deferred minor limitation with merge-log provenance and an unmerged inspection option. |
+| Merged visibility | Source/category filters re-resolve selected providers and restore enabled alternatives; cached world visibility alone changes presentation. |
 
 No address/ZIP service or additional JavaScript library was introduced. OSM tiles are a presentation-only external service, recorded in the dependency inventory.
 

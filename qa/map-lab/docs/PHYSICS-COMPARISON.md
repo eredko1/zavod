@@ -9,8 +9,8 @@ Map Lab is a geometry inspection controller, not the game's character controller
 | Horizontal movement | Direct normalized walking/running input | Accelerated movement, directional speed modifiers and air control |
 | Vertical movement | Constant-gravity fall, swept landing and small surface steps | Gravity integration with collision substeps, jump/buffer/coyote logic, step up/down |
 | Ground support | Ground triangle index plus separate roof/deck index, queried below current feet | Terrain height callback plus capsule support on AABB colliders |
-| Building walls | Circle/footprint edge exclusion with vertical overlap | Vertical capsule against registered AABBs, spatial broad phase and resolution |
-| Roofs/bridges | Click their visible top to start; walk off to fall; no snap from ground onto an overhead deck | Walkable collider tops, roof/elevated-floor gameplay and navigation registrations |
+| Building walls | Circle/footprint edge exclusion; extrusion vertical overlap uses actual drawn Float32 bounds; native surfaces use a separate estimated footprint proxy | Vertical capsule against registered AABBs, spatial broad phase and resolution |
+| Roofs/bridges | Eligible extrusion roofs/decks support starting and falling; native mesh roof walking remains unsupported; no snap from ground onto an overhead deck | Walkable collider tops, roof/elevated-floor gameplay and navigation registrations |
 | Headroom | No general ceiling resolution; placement is an inspection tool | Ceiling collision, crouch headroom checks and capsule overlap checks |
 | Props | Visual geometry; no general prop collision | Only objects registered with colliders are solid |
 | Gameplay movement | No jumping, crouching, mantling, climbing, slide, fall damage or vehicles | Includes these systems and other game-state interactions |
@@ -28,7 +28,7 @@ The two controllers deliberately have different tuning today. Lab walking is int
 
 ## Walk here
 
-Click **Walk here**, then a roof, road or ground surface. Only visible physical surfaces can be selected; reference outlines are not walkable geometry. The picked surface sets foot height and the camera adds eye height. Stepping off starts a fall; landing checks the highest visible support below the previous foot position. Hiding a supporting source removes its support on the next simulated step. Escape releases mouse capture; Orbit returns to inspection.
+Click **Walk here**, then an eligible extrusion roof, deck, road or ground surface. Reference outlines and native building-mesh surfaces are not walkable geometry. The picked surface sets foot height and the camera adds eye height. Stepping off starts a fall; landing checks the highest visible support below the previous foot position. Hiding a supporting source removes its support on the next simulated step. Escape releases mouse capture; Orbit returns to inspection.
 
 The ground index remains separate for prop placement, default spawn and underpasses. Querying the globally highest roof as “ground” would teleport people to rooftops. Building undersides do not count as floors. Thin bridge decks support landing from above but do not provide a full solid underside/edge collision model.
 

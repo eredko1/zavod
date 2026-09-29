@@ -17,7 +17,7 @@ const unresolved=[{layer:'-1'},{layer:'1'},{layer:'junk'},{layer:''},{layer:' '}
 for(const tags of [{},{layer:'0'},{level:'0'},{bridge:'no',tunnel:'no'},{tunnel:'building_passage'},{location:'surface'}])assert.ok(isGroundLevel({tags}),JSON.stringify(tags));
 for(const layer of ['-2','-1','0','1','2']){
   const tags={bridge:'yes',layer};assert.ok(isBridgeLevel({tags}));
-  const plan=resolveMap({bounds,nyc,data:{elements:[road(tags)]}});assert.ok(plan.roads[0].elevationProfile,'negative bridge layers may use a measured deck');assert.equal(plan.roads[0].merge.attributes.physicalLevel.kind,'bridge');
+  const plan=resolveMap({bounds,nyc,data:{elements:[road(tags)]}});assert.ok(plan.roads[0].elevationProfile,'negative bridge layers may use a measured deck');assert.equal(plan.roads[0].render.attributes.physicalLevel.kind,'bridge');
 }
 for(const mergeEnabled of [true,false])for(const tags of unresolved){
   assert.ok(!isGroundLevel({tags}),JSON.stringify(tags));
