@@ -30,7 +30,7 @@ const LINES_CFG = [
     dest: { out: 'Norwood-205 St', in: 'Coney Island|Stillwell Av' }, bound: { out: 'Norwood–205th Street–bound D', in: 'Coney Island–bound D' },
     strip: ['Stillwell Av', 'Bay 50 St', '25 Av', 'Bay Pkwy', '20 Av', '18 Av', '79 St', '71 St', '62 St', 'Ft Hamilton'] },
   // the N: a Sea Beach express straight to 8 Av (Soccer Tavern) — every minute (a short dwell, it turns just past the throat)
-  { id: 'N', color: '#fccc0a', fg: '#111', stwX: -43.1, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 60, off: 7, turn: 150, dwell: 16,
+  { id: 'N', color: '#fccc0a', fg: '#111', stwX: -43.1, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 60, off: 7, turn: 58, dwell: 22,
     dest: { out: '8 Av|Sunset Park', in: 'Coney Island|Stillwell Av' }, bound: { out: '8th Avenue–bound N express', in: 'Coney Island–bound N' },
     strip: ['Stillwell Av', '8 Av'] },
 ];
