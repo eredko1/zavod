@@ -1,0 +1,1391 @@
+{
+  "meta": {
+    "name": "soccer_tavern_interior",
+    "address": "6004 8th Ave, Brooklyn NY",
+    "source": "Verbal walkthrough by a regular, revised three times. Not surveyed. Values marked assumed=true are guesses.",
+    "units": "feet",
+    "ft_to_m": 0.3048,
+    "axes": "Plan coords (x, y) with z up. Origin = front-left interior corner at street level, seen from a person entering. +x = toward the entrant's RIGHT wall. +y = toward the BACK of the building (street is y=0, back door wall is y=61). +z = up.",
+    "engine_mapping": {
+      "threejs_or_babylon_rhs": "world = (x*0.3048, z*0.3048, -y*0.3048). A camera with yaw 0 looks down -Z, i.e. toward the back of the bar.",
+      "unity": "world = (x*0.3048, z*0.3048, y*0.3048). Forward (+Z) is toward the back of the bar.",
+      "godot": "world = (x*0.3048, z*0.3048, -y*0.3048)"
+    },
+    "outline": "The building is a rectangle x=-0.5..20 (right side flush with the neighbor, one straight outer wall at x=20), y=-0.5..61.5. The interior is 16 ft wide up front because a solid block (basement stairs and walls) fills the right strip x=16..20 from y=-0.5 to y=31.4. From y=31.4 to the back the interior is 19.5 ft wide.",
+    "depth_ft": 61,
+    "depth_assumed": true,
+    "depth_note": "The original estimate was about 75 ft. A bar with 11 long-side stools and 3 short-side stools is much shorter than that, and the darts, kitchen and bathrooms sit right behind it, so the room came out about 61 ft deep. If 75 is right, add the extra 14 ft somewhere (most likely between the bar and the back) and shift everything with y > 31 by that amount.",
+    "ceiling_height": 10,
+    "ceiling_assumed": true,
+    "default_wall_height": 10,
+    "player": {
+      "spawn": {
+        "x": 8,
+        "y": 5,
+        "yaw_faces": "+y"
+      },
+      "eye_height": 5.5,
+      "recommended_capsule_radius": 0.9,
+      "recommended_capsule_height": 5.9
+    }
+  },
+  "floors": [
+    {
+      "id": "main_floor",
+      "material": "worn_wood_planks",
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          31.4
+        ],
+        [
+          19.5,
+          31.4
+        ],
+        [
+          19.5,
+          61
+        ],
+        [
+          0,
+          61
+        ]
+      ]
+    },
+    {
+      "id": "kitchen_floor",
+      "material": "tile",
+      "rect": {
+        "x": 0,
+        "y": 43.5,
+        "w": 9.5,
+        "h": 17.5
+      },
+      "assumed": true
+    },
+    {
+      "id": "womens_bath_floor",
+      "material": "tile",
+      "rect": {
+        "x": 14.5,
+        "y": 45,
+        "w": 5,
+        "h": 7.5
+      }
+    },
+    {
+      "id": "mens_bath_floor",
+      "material": "tile",
+      "rect": {
+        "x": 14.5,
+        "y": 53,
+        "w": 5,
+        "h": 8
+      }
+    },
+    {
+      "id": "backyard_floor",
+      "material": "patio_concrete",
+      "rect": {
+        "x": -4,
+        "y": 61,
+        "w": 23.5,
+        "h": 8
+      },
+      "open_sky": true
+    }
+  ],
+  "walls": {
+    "note": "Axis-aligned boxes. x,y = min corner in plan, w = size along x, d = size along y. Height defaults to meta.default_wall_height. Doorways are already gaps in this list. Windows are listed separately and need a cutout.",
+    "items": [
+      {
+        "id": "left_wall",
+        "x": -0.5,
+        "y": -0.5,
+        "w": 0.5,
+        "d": 62
+      },
+      {
+        "id": "front_left",
+        "x": -0.5,
+        "y": -0.5,
+        "w": 6.75,
+        "d": 0.5
+      },
+      {
+        "id": "recess_wall_left",
+        "x": 5.75,
+        "y": -0.5,
+        "w": 0.5,
+        "d": 3.75
+      },
+      {
+        "id": "recess_wall_right",
+        "x": 9.75,
+        "y": -0.5,
+        "w": 0.5,
+        "d": 3.75
+      },
+      {
+        "id": "front_right",
+        "x": 9.75,
+        "y": -0.5,
+        "w": 10.25,
+        "d": 0.5,
+        "note": "Runs flush to the outer right edge x=20."
+      },
+      {
+        "id": "stairs_and_walls_block",
+        "x": 16,
+        "y": -0.5,
+        "w": 4,
+        "d": 31.9,
+        "note": "Solid. Holds the basement stairs (not built) and the building's right-side mass. Its +y face at y=31.4 carries the basement door. Do not model any interior."
+      },
+      {
+        "id": "right_wall_back",
+        "x": 19.5,
+        "y": 31.4,
+        "w": 0.5,
+        "d": 30.1,
+        "note": "Straight continuation of the outer right wall (x=20)."
+      },
+      {
+        "id": "dart_wall",
+        "x": 14,
+        "y": 44.5,
+        "w": 5.5,
+        "d": 0.5,
+        "note": "Front face at y=44.5 carries the dartboard. It is also the women's bathroom front wall. Attached to the right wall, 5.5 ft long."
+      },
+      {
+        "id": "back_wall_left",
+        "x": -4.5,
+        "y": 61,
+        "w": 15,
+        "d": 0.5
+      },
+      {
+        "id": "back_wall_right",
+        "x": 13.5,
+        "y": 61,
+        "w": 6.5,
+        "d": 0.5,
+        "note": "Carries the men's bathroom window (see windows)."
+      },
+      {
+        "id": "kitchen_east_wall",
+        "x": 9.5,
+        "y": 43.25,
+        "w": 0.5,
+        "d": 17.75,
+        "note": "Kitchen's right wall and the corridor's left wall. Stacked supplies stand against its east face."
+      },
+      {
+        "id": "kitchen_front_stub_l",
+        "x": 0,
+        "y": 43.25,
+        "w": 0.6,
+        "d": 0.5
+      },
+      {
+        "id": "kitchen_front_stub_r",
+        "x": 8.8,
+        "y": 43.25,
+        "w": 1.2,
+        "d": 0.5,
+        "note": "Corner post where the kitchen doorway meets the right kitchen wall. The big TV hangs here."
+      },
+      {
+        "id": "bath_west_a",
+        "x": 14,
+        "y": 45,
+        "w": 0.5,
+        "d": 2
+      },
+      {
+        "id": "bath_west_b",
+        "x": 14,
+        "y": 50,
+        "w": 0.5,
+        "d": 5.5
+      },
+      {
+        "id": "bath_west_c",
+        "x": 14,
+        "y": 58.5,
+        "w": 0.5,
+        "d": 2.5
+      },
+      {
+        "id": "bath_divider",
+        "x": 14.5,
+        "y": 52.5,
+        "w": 5,
+        "d": 0.5
+      },
+      {
+        "id": "yard_fence_right",
+        "x": 19.5,
+        "y": 61,
+        "w": 0.5,
+        "d": 8.5,
+        "height": 6
+      },
+      {
+        "id": "yard_barrier_left",
+        "x": -4.5,
+        "y": 61,
+        "w": 0.5,
+        "d": 8.5,
+        "height": 6,
+        "note": "Ends the yard 4 ft left of the building's left wall. Beyond it is a cluttered alley for other businesses, not accessible. Can be a fence with clutter visible behind."
+      },
+      {
+        "id": "yard_back_wall",
+        "x": -4.5,
+        "y": 69,
+        "w": 25,
+        "d": 0.5,
+        "height": 10,
+        "note": "Inner face at y=69 carries the mural."
+      }
+    ]
+  },
+  "windows": [
+    {
+      "id": "left_nook_window",
+      "on_wall": "front_left",
+      "x_from": 0.6,
+      "x_to": 5.2,
+      "y": -0.25,
+      "sill": 3,
+      "head": 7,
+      "secured": true,
+      "note": "Security bars or grate. Street beyond."
+    },
+    {
+      "id": "right_nook_window",
+      "on_wall": "front_right",
+      "x_from": 10.8,
+      "x_to": 15.4,
+      "y": -0.25,
+      "sill": 3,
+      "head": 7,
+      "secured": true,
+      "note": "The nook ledge (furniture.right_nook.ledge) runs under this window."
+    },
+    {
+      "id": "mens_bath_window",
+      "on_wall": "back_wall_right",
+      "x_from": 16,
+      "x_to": 18.5,
+      "y": 61.25,
+      "faces": "+y",
+      "sill": 4.5,
+      "head": 6.5,
+      "frosted": true,
+      "note": "Looks onto the backyard. Small and frosted.",
+      "size_assumed": true
+    }
+  ],
+  "doors": [
+    {
+      "id": "front_door",
+      "center": [
+        8,
+        3
+      ],
+      "width": 3.5,
+      "height": 6.75,
+      "runs_along": "x",
+      "type": "swing_in",
+      "note": "Recessed 3 ft from the street line, between the two recess walls."
+    },
+    {
+      "id": "back_door",
+      "center": [
+        12,
+        61.25
+      ],
+      "width": 3,
+      "height": 6.75,
+      "runs_along": "x",
+      "type": "swing_out",
+      "leads_to": "backyard",
+      "note": "At the end of the corridor. The mural is directly ahead when you step out."
+    },
+    {
+      "id": "womens_door",
+      "center": [
+        14.25,
+        48.5
+      ],
+      "width": 3,
+      "height": 6.75,
+      "runs_along": "y",
+      "type": "swing_in",
+      "opens_from": "corridor"
+    },
+    {
+      "id": "mens_door",
+      "center": [
+        14.25,
+        57
+      ],
+      "width": 3,
+      "height": 6.75,
+      "runs_along": "y",
+      "type": "swing_in",
+      "opens_from": "corridor"
+    },
+    {
+      "id": "basement_door",
+      "center": [
+        18.15,
+        31.4
+      ],
+      "width": 2.5,
+      "height": 6.75,
+      "runs_along": "x",
+      "faces": "+y",
+      "type": "swing_in",
+      "state": "closed_and_locked",
+      "note": "Set into the +y face of stairs_and_walls_block, in its right corner (nearest the right wall). The stairs go down behind it and are out of scope. Keep it closed with a prompt like 'Basement (not open yet)'."
+    },
+    {
+      "id": "kitchen_doorway",
+      "center": [
+        4.7,
+        43.5
+      ],
+      "width": 8.2,
+      "height": 6.5,
+      "runs_along": "x",
+      "type": "open_under_shelf",
+      "note": "Open below a wooden shelf (see decor.kitchen_shelf) that closes off the top of the doorway. No door. The kitchen is still visible from the front of the bar."
+    },
+    {
+      "id": "bar_back_opening",
+      "rect": {
+        "x": 0,
+        "y": 38.5,
+        "w": 5.3,
+        "d": 5
+      },
+      "type": "open_gap",
+      "note": "Not a wall or door. The counter ends at y=38.5 and the bartender path runs from the staff aisle to the kitchen doorway at y=43.5."
+    }
+  ],
+  "bar": {
+    "counter": {
+      "height": 3.5,
+      "top_material": "dark_varnished_wood",
+      "boxes": [
+        {
+          "id": "counter_front_leg",
+          "x": 0,
+          "y": 11,
+          "w": 5.3,
+          "d": 2,
+          "note": "Short leg of the L, meets left wall. Three stools sit on its street side, by the jukebox nook."
+        },
+        {
+          "id": "counter_long_leg",
+          "x": 3.5,
+          "y": 13,
+          "w": 1.8,
+          "d": 25.5,
+          "note": "Customer side face at x=5.3. Ends at y=38.5 with an open end that lines up with the kitchen doorway. 11 stools along it."
+        }
+      ],
+      "length_assumed": true
+    },
+    "back_bar": {
+      "id": "back_bar",
+      "x": 0,
+      "y": 13,
+      "w": 1.2,
+      "d": 25.5,
+      "height": 7,
+      "shelves": 4,
+      "note": "Cabinet along the left wall with liquor shelves. Fill upper shelves with bottles (decor)."
+    },
+    "tap_tower": {
+      "id": "taps",
+      "center": [
+        4.4,
+        25.75
+      ],
+      "size": [
+        0.5,
+        3.2,
+        1.4
+      ],
+      "on_counter": true,
+      "taps": 6,
+      "assumed": true,
+      "note": "Center of the bar. The center TV hangs directly behind it."
+    },
+    "staff_aisle": {
+      "x_from": 1.2,
+      "x_to": 3.5,
+      "y_from": 13,
+      "y_to": 38.5,
+      "clear_width": 2.3,
+      "note": "Also the bartender route. Continue out the open end to the kitchen doorway (y=43.5)."
+    },
+    "stools": {
+      "kind": "bar_stool_backed_rect",
+      "description": "Rectangular backed barstool with horizontal bars across the back. Same model for the bar and for the two hi-tops along the right wall.",
+      "seat_height": 2.5,
+      "back_height": 3.5,
+      "radius": 0.6,
+      "long_side": {
+        "backrest_side": "+x",
+        "positions": [
+          [
+            6.3,
+            12.25
+          ],
+          [
+            6.3,
+            14.75
+          ],
+          [
+            6.3,
+            17.25
+          ],
+          [
+            6.3,
+            19.75
+          ],
+          [
+            6.3,
+            22.25
+          ],
+          [
+            6.3,
+            24.75
+          ],
+          [
+            6.3,
+            27.25
+          ],
+          [
+            6.3,
+            29.75
+          ],
+          [
+            6.3,
+            32.25
+          ],
+          [
+            6.3,
+            34.75
+          ],
+          [
+            6.3,
+            37.25
+          ]
+        ]
+      },
+      "short_side": {
+        "note": "By the jukebox nook. Customers face +y toward the counter, backs toward the street.",
+        "backrest_side": "-y",
+        "positions": [
+          [
+            0.9,
+            10.1
+          ],
+          [
+            2.65,
+            10.1
+          ],
+          [
+            4.4,
+            10.1
+          ]
+        ]
+      },
+      "count_assumed": true
+    }
+  },
+  "tvs": {
+    "note": "Four TVs. All mounted high. Model as thin black boxes with a screen quad. z is the vertical center.",
+    "primary": {
+      "id": "tv_primary",
+      "center": [
+        9.4,
+        42.7,
+        8.0
+      ],
+      "size": [
+        5.5,
+        0.3,
+        3.1
+      ],
+      "diagonal_in_approx": 75,
+      "facing_normal": [
+        0.12,
+        -0.99,
+        0
+      ],
+      "mount": "bracket hanging at the corner where the kitchen's open doorway meets the right kitchen wall",
+      "note": "Huge and high. Points almost due south (toward the front of the bar) with a very slight lean to the southeast. It reads head-on from the floor between the end of the bar and the darts area, and at a good oblique angle from the basement door. It does NOT point southwest.",
+      "size_assumed": true
+    },
+    "secondary": [
+      {
+        "id": "tv_bar_front",
+        "center": [
+          0.35,
+          18.5,
+          8.4
+        ],
+        "size": [
+          0.35,
+          3.1,
+          1.75
+        ],
+        "facing_normal": [
+          1,
+          0,
+          0
+        ],
+        "on_wall": "left_wall",
+        "diagonal_in_approx": 43
+      },
+      {
+        "id": "tv_bar_center",
+        "center": [
+          0.35,
+          25.75,
+          8.4
+        ],
+        "size": [
+          0.35,
+          3.1,
+          1.75
+        ],
+        "facing_normal": [
+          1,
+          0,
+          0
+        ],
+        "on_wall": "left_wall",
+        "diagonal_in_approx": 43,
+        "note": "Directly behind the taps."
+      },
+      {
+        "id": "tv_bar_back",
+        "center": [
+          0.35,
+          33,
+          8.4
+        ],
+        "size": [
+          0.35,
+          3.1,
+          1.75
+        ],
+        "facing_normal": [
+          1,
+          0,
+          0
+        ],
+        "on_wall": "left_wall",
+        "diagonal_in_approx": 43
+      }
+    ],
+    "secondary_note": "Roughly evenly spaced along the back bar, all above the liquor bottles (bottom edge at about z=7.5, back bar top at z=7)."
+  },
+  "furniture": {
+    "jukebox": {
+      "id": "jukebox",
+      "center": [
+        2.8,
+        1.25
+      ],
+      "size": [
+        3,
+        1.7,
+        5.5
+      ],
+      "faces": "+y",
+      "interactable": "play_music",
+      "style": "classic_lit_cabinet",
+      "note": "Against the front wall in the left nook, facing into the bar."
+    },
+    "right_nook": {
+      "hi_top": {
+        "id": "hitop_nook",
+        "center": [
+          13,
+          4.3
+        ],
+        "size": [
+          2.5,
+          2.5,
+          3.5
+        ],
+        "note": "The third hi-top. Square, same as the others."
+      },
+      "stools": {
+        "kind": "round_barstool_no_back",
+        "seat_height": 2.5,
+        "radius": 0.5,
+        "positions": [
+          [
+            11.2,
+            4.3
+          ],
+          [
+            14.8,
+            4.3
+          ],
+          [
+            13,
+            2.5
+          ],
+          [
+            13,
+            6.1
+          ]
+        ],
+        "note": "Standard round backless barstools. Only this hi-top uses them."
+      },
+      "ledge": {
+        "id": "nook_ledge",
+        "x": 10.6,
+        "y": 0,
+        "w": 4.9,
+        "d": 0.9,
+        "height": 3.5,
+        "note": "Drink ledge under the street window, against the front wall."
+      }
+    },
+    "hi_tops": {
+      "note": "Two hi-tops along the right wall (the nook hi-top is the third). The one closest to the basement door is further back, just before the stairs block.",
+      "table_size": [
+        2.5,
+        2.5,
+        3.5
+      ],
+      "tables": [
+        {
+          "id": "hitop_2",
+          "center": [
+            14.75,
+            15.5
+          ]
+        },
+        {
+          "id": "hitop_1",
+          "center": [
+            14.75,
+            26.0
+          ],
+          "note": "Closest to the basement door."
+        }
+      ],
+      "stool_seat_height": 2.5,
+      "stool_radius": 0.5,
+      "stool_kind": "bar_stool_backed_rect",
+      "stools": [
+        [
+          12.5,
+          14.9
+        ],
+        [
+          12.5,
+          16.1
+        ],
+        [
+          14.75,
+          13.45
+        ],
+        [
+          14.75,
+          17.55
+        ],
+        [
+          12.5,
+          25.4
+        ],
+        [
+          12.5,
+          26.6
+        ],
+        [
+          14.75,
+          23.95
+        ],
+        [
+          14.75,
+          28.05
+        ]
+      ]
+    },
+    "low_table_darts": {
+      "table": {
+        "id": "low_table",
+        "center": [
+          17.15,
+          33.7
+        ],
+        "size": [
+          4.5,
+          2.0,
+          2.5
+        ],
+        "long_axis": "x",
+        "seats": 4,
+        "note": "Long axis runs along x (across the room), two chairs on each long side. Right end is 0.1 ft from the right wall."
+      },
+      "chairs": {
+        "seat_height": 1.5,
+        "radius": 0.5,
+        "items": [
+          {
+            "id": "chair_door_side_1",
+            "pos": [
+              16.05,
+              32.15
+            ],
+            "soft_collider": true,
+            "note": "Sits about 0.25 ft from the basement door wall. Anyone opening the door needs this sitter to scrunch in."
+          },
+          {
+            "id": "chair_door_side_2",
+            "pos": [
+              18.25,
+              32.15
+            ],
+            "soft_collider": true,
+            "note": "Directly in front of the basement door."
+          },
+          {
+            "id": "chair_oche_side_1",
+            "pos": [
+              16.05,
+              35.25
+            ],
+            "soft_collider": true
+          },
+          {
+            "id": "chair_oche_side_2",
+            "pos": [
+              18.25,
+              35.25
+            ],
+            "soft_collider": true
+          }
+        ]
+      },
+      "note": "Positions are tight on purpose. Soft collider means the player slows down and is nudged through instead of being hard blocked."
+    },
+    "corridor_supplies": {
+      "id": "supply_stack",
+      "x": 10,
+      "y": 47,
+      "w": 1.5,
+      "d": 7,
+      "height": 4,
+      "note": "Stacked boxes and kegs against the kitchen's east wall. Leaves about 2.5 ft of clear corridor."
+    },
+    "backyard": {
+      "hi_top_4": {
+        "id": "yard_hitop_4",
+        "center": [
+          4.5,
+          64.8
+        ],
+        "size": [
+          2.5,
+          2.5,
+          3.5
+        ],
+        "stools": [
+          [
+            2.4,
+            64.8
+          ],
+          [
+            6.6,
+            64.8
+          ],
+          [
+            4.5,
+            62.75
+          ],
+          [
+            4.5,
+            66.85
+          ]
+        ],
+        "note": "On the left when you step out the back door."
+      },
+      "hi_top_2": {
+        "id": "yard_hitop_2",
+        "shape": "round",
+        "center": [
+          17.4,
+          64.6
+        ],
+        "radius": 0.8,
+        "height": 3.5,
+        "stools": [
+          [
+            16.1,
+            64.6
+          ],
+          [
+            18.7,
+            64.6
+          ]
+        ],
+        "note": "On the right, one or two people."
+      },
+      "bench": {
+        "id": "yard_bench",
+        "x": 8,
+        "y": 67.3,
+        "w": 8,
+        "d": 1.45,
+        "seat_height": 1.5,
+        "style": "plain_horizontal_bench",
+        "backless": true,
+        "length_assumed": true,
+        "note": "Under the mural, against the back wall."
+      },
+      "grill": {
+        "id": "grill",
+        "center": [
+          -2.7,
+          68
+        ],
+        "size": [
+          2,
+          2,
+          3
+        ],
+        "note": "Far left of the yard but close to the left edge, not out in the alley. Back edge touches the back wall (y=69)."
+      },
+      "mural": {
+        "id": "mural",
+        "plane": "y=69",
+        "x_from": 7,
+        "x_to": 17,
+        "z_from": 0.5,
+        "z_to": 7.5,
+        "faces": "-y",
+        "assumed_size": true,
+        "content": "Chinese dragon mixed with Norwegian imagery and soccer imagery. Painted on the yard's back wall, directly ahead when you step out the back door (door center x=12, mural center x=12). Create a swappable placeholder texture."
+      },
+      "left_extension": {
+        "x_from": -4,
+        "x_to": 0,
+        "note": "Yard is a bit wider on the left than the right, ending 4 ft left of the building's left wall. Beyond x=-4 is a cluttered alley for other businesses. Not accessible. Use yard_barrier_left."
+      }
+    },
+    "kitchen_fixtures": {
+      "note": "Feet, plan coords. Kitchen interior is x0..9.5, y43.75..61. Everything sits against the left (x=0) or right (x=9.5) wall and leaves a central walking path about 5 ft wide (x2.5..7.3, 5.1 ft beside counters). Placeholder boxes, sizes assumed.",
+      "assumed": true,
+      "left_wall": [
+        {
+          "id": "fridge",
+          "type": "fridge",
+          "x": 0,
+          "y": 44.4,
+          "w": 2.5,
+          "d": 3.0,
+          "height": 6.0,
+          "note": "Closest to the doorway. Door faces +x."
+        },
+        {
+          "id": "oven",
+          "type": "range_oven",
+          "x": 0,
+          "y": 47.4,
+          "w": 2.5,
+          "d": 3.0,
+          "height": 3.0,
+          "burners": 4,
+          "note": "Stove top with 4 burners. Next to the fridge."
+        },
+        {
+          "id": "left_counter",
+          "type": "counter",
+          "x": 0,
+          "y": 50.4,
+          "w": 2.2,
+          "d": 10.6,
+          "height": 3.0,
+          "note": "Counter space fills the rest of the left wall to the back wall."
+        }
+      ],
+      "right_wall": [
+        {
+          "id": "right_counter_front",
+          "type": "counter",
+          "x": 7.3,
+          "y": 44.5,
+          "w": 2.2,
+          "d": 6.4,
+          "height": 3.0
+        },
+        {
+          "id": "sink",
+          "type": "sink_counter",
+          "x": 7.3,
+          "y": 50.9,
+          "w": 2.2,
+          "d": 3.0,
+          "height": 3.0,
+          "basin": {
+            "x": 7.8,
+            "y": 51.4,
+            "w": 1.4,
+            "d": 2.0
+          },
+          "note": "Dead center of the right wall (kitchen center y=52.4)."
+        },
+        {
+          "id": "right_counter_back",
+          "type": "counter",
+          "x": 7.3,
+          "y": 53.9,
+          "w": 2.2,
+          "d": 7.1,
+          "height": 3.0
+        },
+        {
+          "id": "upper_cabinets",
+          "type": "wall_cabinets",
+          "x": 8.5,
+          "y": 46.4,
+          "w": 1.0,
+          "d": 12.0,
+          "z_from": 4.8,
+          "z_to": 7.0,
+          "note": "Over the sink, centered on it. Counter space is left open to either side below and beyond them."
+        }
+      ]
+    }
+  },
+  "darts": {
+    "board": {
+      "id": "dartboard",
+      "center": [
+        17.5,
+        44.5,
+        5.75
+      ],
+      "bull_height": 5.75,
+      "radius": 0.75,
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "mounted_on": "dart_wall",
+      "note": "Faces the front of the bar. Hangs on the women's bathroom front wall, center about 2 ft from the right wall face (x=19.5)."
+    },
+    "oche": {
+      "id": "oche",
+      "line": {
+        "from": [
+          16.65,
+          36.73
+        ],
+        "to": [
+          18.35,
+          36.73
+        ]
+      },
+      "throw_distance_ft": 7.77,
+      "throw_direction": "+y",
+      "thrower_stands_at": [
+        17.5,
+        36.1
+      ],
+      "note": "Toe line. The thrower stands on the front side of it (lower y). 7 ft 9.25 in to the board face."
+    },
+    "context": [
+      "The oche-side chairs are about 1 ft behind the toe line. There is roughly a 0.4 ft gap between the chair edges and a thrower standing at the line, so it is a tight squeeze.",
+      "The basement door (y=31.4) is about 4.7 ft behind the thrower.",
+      "The whole dart zone is inside the widened right part of the room (x 14.9 to 19.5)."
+    ]
+  },
+  "walkable": {
+    "note": "Regions a player and NPCs may enter. Everything else is solid or out of bounds. Subtract furniture colliders from these. Soft colliders may be entered slowly.",
+    "regions": [
+      {
+        "id": "front_recess_and_door",
+        "rect": {
+          "x": 6.25,
+          "y": 0,
+          "w": 3.5,
+          "h": 3
+        },
+        "outside": true
+      },
+      {
+        "id": "front_room",
+        "rect": {
+          "x": 0,
+          "y": 3,
+          "w": 16,
+          "h": 28.4
+        }
+      },
+      {
+        "id": "wide_room",
+        "rect": {
+          "x": 0,
+          "y": 31.4,
+          "w": 19.5,
+          "h": 13.1
+        },
+        "note": "From the block's front face to the dart wall. Chairs and low table sit in its right end."
+      },
+      {
+        "id": "bartender_zone",
+        "rect": {
+          "x": 1.2,
+          "y": 13,
+          "w": 2.3,
+          "h": 25.5
+        },
+        "staff_only": true
+      },
+      {
+        "id": "bartender_path_to_kitchen",
+        "rect": {
+          "x": 0,
+          "y": 38.5,
+          "w": 5.3,
+          "h": 5
+        },
+        "staff_only": true
+      },
+      {
+        "id": "kitchen",
+        "rect": {
+          "x": 0,
+          "y": 43.5,
+          "w": 9.5,
+          "h": 17.5
+        },
+        "staff_only": true
+      },
+      {
+        "id": "corridor",
+        "rect": {
+          "x": 10,
+          "y": 44.5,
+          "w": 4,
+          "h": 16.5
+        }
+      },
+      {
+        "id": "bathrooms",
+        "rects": [
+          {
+            "x": 14.5,
+            "y": 45,
+            "w": 5,
+            "h": 7.5
+          },
+          {
+            "x": 14.5,
+            "y": 53,
+            "w": 5,
+            "h": 8
+          }
+        ]
+      },
+      {
+        "id": "backyard",
+        "rect": {
+          "x": -4,
+          "y": 61.5,
+          "w": 23.5,
+          "h": 7.5
+        }
+      }
+    ],
+    "main_route": {
+      "polyline": [
+        [
+          8,
+          3
+        ],
+        [
+          8,
+          37
+        ],
+        [
+          12,
+          44.5
+        ],
+        [
+          12,
+          62.4
+        ]
+      ],
+      "note": "Front door to backyard. Aisle, then a jog right past the kitchen doorway and the darts area into the corridor, straight to the back door. Must be collision free for a 0.9 ft radius capsule."
+    }
+  },
+  "decor": {
+    "note": "Wall and shelf props. All are decor only, no interaction needed. Textures are swappable placeholders.",
+    "kitchen_shelf": {
+      "id": "kitchen_shelf",
+      "x": 0.6,
+      "y": 43.0,
+      "w": 8.2,
+      "d": 1.0,
+      "z_bottom": 6.5,
+      "thickness": 0.25,
+      "material": "wood",
+      "note": "A wooden shelf spanning the full kitchen doorway at the top, closing it off and forming a little display area. The doorway stays open underneath (6.5 ft clear). Faces the bar, so it is seen from the aisle.",
+      "items": [
+        {
+          "id": "volleyball",
+          "center": [
+            4.7,
+            43.5,
+            7.1
+          ],
+          "diameter": 0.7,
+          "look": "Off-white size-5 volleyball with a red-brown handprint on the side that faces the bar (-y), like the Cast Away prop. A small Wilson-style logo is optional.",
+          "note": "Sits on the shelf, roughly centered on the doorway. Rest a little wooden stand or nothing under it."
+        }
+      ],
+      "other_items_optional": "Leave room on the shelf for other small knickknacks (scarves, bottles). None specified."
+    },
+    "trophy_shelf": {
+      "id": "trophy_shelf",
+      "x": 19.0,
+      "y": 35.2,
+      "w": 0.5,
+      "d": 8.0,
+      "z_top": 7.0,
+      "thickness": 0.2,
+      "on_wall": "right_wall_back",
+      "face_normal": [
+        -1,
+        0,
+        0
+      ],
+      "note": "Darts trophies and similar (cups, plaques, small figurines) along the right wall, high up. It sits directly to the right of a thrower standing at the oche facing the board (a player facing +y has +x on their right). Shelf length and height are guesses.",
+      "items_hint": "8 to 12 mixed cups and plaques, 0.5 to 1.2 ft tall, standing on the shelf. Optional darts-themed plaques on the wall above.",
+      "size_assumed": true
+    },
+    "world_map": {
+      "id": "world_map",
+      "center": [
+        15.95,
+        20.75,
+        7.9
+      ],
+      "size_along_y": 5.0,
+      "size_z": 4.0,
+      "thickness": 0.1,
+      "on_wall": "stairs_and_walls_block",
+      "face_normal": [
+        -1,
+        0,
+        0
+      ],
+      "z_bottom": 5.9,
+      "z_top": 9.9,
+      "between": [
+        "hitop_2",
+        "hitop_1"
+      ],
+      "look": "Huge old political world map from about 1991. Show the Soviet Union and Yugoslavia as single countries and Germany as one country. Framed or laminated, slightly yellowed.",
+      "note": "Hangs on the wall between the middle hi-top (hitop_2, y 14.25 to 16.75) and the top hi-top (hitop_1, y 24.75 to 27.25). Hung high so nobody spills drinks on it: bottom edge at 5.9 ft. This needs a ceiling of about 10 ft. If the ceiling is lower, shrink the map or lower it.",
+      "size_assumed": true
+    }
+  },
+  "interactables": [
+    {
+      "id": "jukebox",
+      "type": "use",
+      "action": "play_music"
+    },
+    {
+      "id": "dartboard",
+      "type": "minigame",
+      "action": "throw_darts",
+      "from_zone": "oche"
+    },
+    {
+      "id": "front_door",
+      "type": "door",
+      "action": "open"
+    },
+    {
+      "id": "back_door",
+      "type": "door",
+      "action": "open"
+    },
+    {
+      "id": "womens_door",
+      "type": "door",
+      "action": "open"
+    },
+    {
+      "id": "mens_door",
+      "type": "door",
+      "action": "open"
+    },
+    {
+      "id": "basement_door",
+      "type": "door",
+      "action": "locked_message",
+      "message": "Basement (not open yet)"
+    }
+  ],
+  "spawn_points_for_npcs": {
+    "note": "Optional. Positions where people plausibly stand or sit.",
+    "bartender_stand": [
+      2.6,
+      25.75
+    ],
+    "cook_stand": [
+      4,
+      52
+    ],
+    "darts_players": [
+      [
+        17.5,
+        36.1
+      ]
+    ],
+    "bar_seats": "bar.stools.long_side.positions and bar.stools.short_side.positions",
+    "hitop_seats": "furniture.hi_tops.stools and furniture.right_nook.stools.positions",
+    "darts_table_seats": "furniture.low_table_darts.chairs.items"
+  },
+  "bathrooms_fixtures": {
+    "note": "Feet, plan coords. Interior: mens x14.5..19.5, y53..61; womens x14.5..19.5, y45..52.5. Doors are on the x=14.25 wall (mens y=57, womens y=48.5). Decor and light interactions only.",
+    "mens": [
+      {
+        "id": "urinal",
+        "type": "wall_urinal",
+        "on_wall": "y=61 (back wall)",
+        "rect": {
+          "x": 15.0,
+          "y": 60.3,
+          "w": 0.9,
+          "d": 0.7
+        },
+        "note": "Top-left corner. Sits beside the frosted window (x16..18.5) so the user can sort of look out while standing there."
+      },
+      {
+        "id": "toilet",
+        "type": "toilet",
+        "tank_rect": {
+          "x": 17.9,
+          "y": 53.0,
+          "w": 1.3,
+          "d": 0.6
+        },
+        "bowl_center": [
+          18.55,
+          54.4
+        ],
+        "bowl_radius": [
+          0.65,
+          0.8
+        ],
+        "faces": "+y",
+        "note": "Bottom-right corner. Back and tank against the wall shared with the womens (y=53). Sitter's knees point toward the middle of the room."
+      },
+      {
+        "id": "mirror",
+        "type": "wall_mirror",
+        "on_wall": "y=53",
+        "rect": {
+          "x": 15.0,
+          "y": 53.0,
+          "w": 1.8,
+          "d": 0.12
+        },
+        "z_from": 4.5,
+        "z_to": 6.8,
+        "note": "Bottom-left."
+      },
+      {
+        "id": "sink",
+        "type": "sink",
+        "rect": {
+          "x": 15.1,
+          "y": 53.12,
+          "w": 1.6,
+          "d": 0.8
+        },
+        "top_height": 2.8,
+        "note": "Under the mirror."
+      }
+    ],
+    "womens": [
+      {
+        "id": "toilet",
+        "type": "toilet",
+        "tank_rect": {
+          "x": 18.9,
+          "y": 47.9,
+          "w": 0.6,
+          "d": 1.2
+        },
+        "bowl_center": [
+          17.95,
+          48.5
+        ],
+        "bowl_radius": [
+          0.8,
+          0.62
+        ],
+        "faces": "-x",
+        "note": "Dead ahead of the door (door y=48.5). Back of the toilet against the right wall (x=19.5)."
+      },
+      {
+        "id": "mirror",
+        "type": "wall_mirror",
+        "on_wall": "y=52.5 (top wall)",
+        "rect": {
+          "x": 15.2,
+          "y": 52.38,
+          "w": 1.8,
+          "d": 0.12
+        },
+        "z_from": 4.5,
+        "z_to": 6.8,
+        "note": "On the top wall, to the left after you walk in."
+      },
+      {
+        "id": "sink",
+        "type": "sink",
+        "rect": {
+          "x": 15.3,
+          "y": 51.55,
+          "w": 1.6,
+          "d": 0.8
+        },
+        "top_height": 2.8,
+        "note": "Under the mirror."
+      }
+    ]
+  }
+}

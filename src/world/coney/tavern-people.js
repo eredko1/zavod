@@ -8,6 +8,7 @@ import { hangkit as K, sell, ITEMS, kitQA } from '../hangkit.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { dressFigure, standTall, buildChar } from '../outfits.js';
 import { nameTag } from '../deli.js';
+import { tavernPlan } from './tavern.js';
 
 // bar items (registered here, not in hangkit.js: they only exist once the tavern is built)
 const NEW_ITEMS = {
@@ -28,40 +29,41 @@ export function buildTavernPeople(world) {
   const { ctx, W } = world; const T = W.tavern; if (!T || !peopleReady()) return;
   for (const [k, v] of Object.entries(NEW_ITEMS)) if (!ITEMS[k]) ITEMS[k] = v;
   const { bar: B, zone: Z } = T, oz = Z.oz, SW = 0.15;
-  const MX = (x) => B.x0 + B.x1 - x;   // tavern.js mirrors the room: the bar runs along the +x wall
-  const stoolX = MX(B.x0 + 1.4 + 0.62 + 0.5);
+  // positions in the owner's plan (feet): tavern.js's layout frame
+  const { lx, lz, LAYOUT } = tavernPlan(), P2 = (x, y, dy = 0) => new THREE.Vector3(lx(x), SW + dy, lz(y) + oz), stools = LAYOUT.bar.stools.long_side.positions;
+  void B;
   P = { world, ctx, T, figs: [], t: 0, greeted: false, job: null };
   const person = (o, outfit, h = 1.72) => { const f = buildPerson(o); try { standTall(f, h); if (outfit) dressFigure(f, ctx, { skin: SKIN, ...outfit }); } catch (e) { console.warn('[tavern] dress', e); } world.scene.add(f.group); P.figs.push(f); return f; };
   const tag = (f, name, col) => { const s = nameTag(name, col); s.position.set(0, 1.95 / (f.heightScale || 1), 0); s.scale.multiplyScalar(1 / (f.heightScale || 1)); f.group.add(s); };
 
   // ---- KENNY, behind the bar ----
   const kenny = person({ avatar: 'm10', seed: 60 }, { top: 'track', jacket: 0x141414, stripe: 0x141414, bottom: 'jeans', denim: 0x22262e }, 1.70);
-  const kHome = new THREE.Vector3(MX(B.x0 + 0.95), SW, oz + 17.5); kenny.group.position.copy(kHome); kenny.group.rotation.y = -Math.PI / 2; tag(kenny, 'KENNY', '#ffd27a');
+  const kHome = P2(...LAYOUT.spawn_points_for_npcs.bartender_stand); kenny.group.position.copy(kHome); kenny.group.rotation.y = -Math.PI / 2; tag(kenny, 'KENNY', '#ffd27a');
   P.kenny = { f: kenny, home: kHome, to: kHome.clone(), wait: 3 };
-  const kPos = new THREE.Vector3(stoolX + 0.1, SW, oz + 17.5);
+  const kPos = P2(5.8, LAYOUT.spawn_points_for_npcs.bartender_stand[1]);
   const venK = K.vendor({ name: 'KENNY', pos: kPos, r: 2.0, fig: kenny, talk: (Kk, again) => kennyTalk(again) });
   P.kenny.v = venK;
   // Kenny's F point slides along the counter to wherever you stand, so at the bar he's always the one you talk to (the regulars were nearer)
-  P.kPos = kPos; P.kz = [oz + 14.2, oz + 26.8];
+  P.kPos = kPos; P.kz = [lz(13.3) + oz, lz(38.2) + oz];
   // ---- the regulars, on the stools ----
   const reg = [
-    { id: 'lou', name: 'UNCLE LOU', z: 15.3, o: { avatar: 'm10', seed: 61, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: null },
-    { id: 'wong', name: 'MR. WONG', z: 19.1, o: { avatar: 'm02', seed: 62, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: { top: 'track', jacket: 0x4a4a52, stripe: 0x4a4a52, bottom: 'jeans', denim: 0x2e2e34 } },
-    { id: 'fai', name: 'AH FAI', z: 21.95, o: { avatar: 'm10', seed: 63, pose: 'sit' }, dress: { top: 'track', jacket: 0x1f4a8a, stripe: 0xf2f2ee, bottom: 'jeans' } },
+    { id: 'lou', name: 'UNCLE LOU', seat: 3, o: { avatar: 'm10', seed: 61, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: null },
+    { id: 'wong', name: 'MR. WONG', seat: 6, o: { avatar: 'm02', seed: 62, pose: 'sit', glasses: 'clear', glassesY: 0.035 }, dress: { top: 'track', jacket: 0x4a4a52, stripe: 0x4a4a52, bottom: 'jeans', denim: 0x2e2e34 } },
+    { id: 'fai', name: 'AH FAI', seat: 9, o: { avatar: 'm10', seed: 63, pose: 'sit' }, dress: { top: 'track', jacket: 0x1f4a8a, stripe: 0xf2f2ee, bottom: 'jeans' } },
   ];
-  for (const r of reg) { const f = person(r.o, r.dress, 1.7); f.group.position.set(stoolX - 0.08, SW + 0.36, oz + r.z); f.group.rotation.y = Math.PI / 2; tag(f, r.name, '#cfe3ff');
-    r.v = K.vendor({ name: r.name, pos: new THREE.Vector3(stoolX - 0.5, SW, oz + r.z), r: 1.3, fig: f, noMap: true, talk: (Kk, again) => regularTalk(r.id, again) }); r.f = f; }
+  for (const r of reg) { const f = person(r.o, r.dress, 1.7); const [sx, sy] = stools[r.seat]; f.group.position.copy(P2(sx - 0.25, sy, 0.36)); f.group.rotation.y = Math.PI / 2; tag(f, r.name, '#cfe3ff');
+    r.v = K.vendor({ name: r.name, pos: P2(sx + 1.5, sy), r: 1.3, fig: f, noMap: true, talk: (Kk, again) => regularTalk(r.id, again) }); r.f = f; }
   P.reg = reg;
   // THE ELF, from the crew: leaning on the end of the bar with his knife, buying rounds of baijiu for whoever's around
-  try { const e = buildChar('elf', ctx); if (e) { e.group.position.set(stoolX - 0.55, SW, oz + 24.4); e.group.rotation.y = Math.PI / 2; world.scene.add(e.group); P.figs.push(e); tag(e, 'THE ELF', '#b6ffb0');
-    P.elf = { f: e, v: K.vendor({ name: 'THE ELF', pos: new THREE.Vector3(stoolX - 1.1, SW, oz + 24.4), r: 1.2, fig: e, noMap: true, talk: (Kk, again) => elfTalk(again) }) }; } } catch (e) { console.warn('[tavern] elf', e); }
+  try { const e = buildChar('elf', ctx); if (e) { e.group.position.copy(P2(7.6, 40.8)); e.group.rotation.y = Math.PI / 2; world.scene.add(e.group); P.figs.push(e); tag(e, 'THE ELF', '#b6ffb0');
+    P.elf = { f: e, v: K.vendor({ name: 'THE ELF', pos: P2(9.2, 40.8), r: 1.1, fig: e, noMap: true, talk: (Kk, again) => elfTalk(again) }) }; } } catch (e) { console.warn('[tavern] elf', e); }
   // ---- the crew at the front high-top ----
   const crew = [
-    { id: 'tony', name: 'BIG TONY', at: [1.25, 14.55], face: -2.3, o: { avatar: 'm10', seed: 70 }, dress: { top: 'track', jacket: 0x0c0c0c, stripe: 0xc9a040, bottom: 'track', pants: 0x0c0c0c }, h: 1.80 },
-    { id: 'sonny', name: 'SONNY', at: [0.55, 15.4], face: 1.2, o: { avatar: 'm02', seed: 71, glasses: true }, dress: { top: 'track', jacket: 0x2a2a2e, stripe: 0x2a2a2e, bottom: 'jeans', denim: 0x15161a }, h: 1.74 },
-    { id: 'duck', name: 'DUCK', at: [1.4, 16.2], face: -3.4, o: { avatar: 'm10', seed: 72 }, dress: null, h: 1.66 },
+    { id: 'tony', name: 'BIG TONY', at: [12.9, 15.5], face: -Math.PI / 2, o: { avatar: 'm10', seed: 70 }, dress: { top: 'track', jacket: 0x0c0c0c, stripe: 0xc9a040, bottom: 'track', pants: 0x0c0c0c }, h: 1.80 },
+    { id: 'sonny', name: 'SONNY', at: [14.75, 13.1], face: 0, o: { avatar: 'm02', seed: 71, glasses: true }, dress: { top: 'track', jacket: 0x2a2a2e, stripe: 0x2a2a2e, bottom: 'jeans', denim: 0x15161a }, h: 1.74 },
+    { id: 'duck', name: 'DUCK', at: [14.75, 17.9], face: Math.PI, o: { avatar: 'm10', seed: 72 }, dress: null, h: 1.66 },
   ];
-  for (const c of crew) { const f = person(c.o, c.dress, c.h); c.face = -c.face; f.group.position.set(MX(c.at[0]), SW, oz + c.at[1]); f.group.rotation.y = c.face; f.mood = 'talk'; tag(f, c.name, '#ff9f8a');
+  for (const c of crew) { const f = person(c.o, c.dress, c.h); f.group.position.copy(P2(c.at[0], c.at[1])); f.group.rotation.y = c.face; f.mood = 'talk'; tag(f, c.name, '#ff9f8a');
     c.home = f.group.position.clone(); c.face0 = c.face; c.f = f;
     c.v = K.vendor({ name: c.name, pos: f.group.position, r: 1.6, fig: f, noMap: true, talk: (Kk, again) => crewTalk(c.id, again) }); }
   P.crew = crew;
