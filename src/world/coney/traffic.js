@@ -396,8 +396,8 @@ function drive(c, dt, now) {
       const minor = c.w < jn.maxW || jn.adj.every((e) => e.w === jn.maxW);
       if (!minor) c.cleared = q[2];
       else {
-        if (d < 1.6 && c.v < 0.4) c.stopT += dt;
-        if (c.stopT > 0.9 && junctionClear(c, q[2])) c.cleared = q[2];
+        if (d < (c.bus ? 4 : 1.6) && c.v < 0.4) c.stopT += dt;   // a bus stops further back from the line
+        if (c.stopT > 0.9 && (junctionClear(c, q[2]) || c.stopT > 6)) c.cleared = q[2];   // six seconds at a stop sign: take your turn
         else { const ai = idm(c.v, v0, Math.max(0.05, d), c.v, AM); if (ai < a) { a = ai; lim = 'stop'; } }
       }
     }
@@ -410,8 +410,10 @@ function drive(c, dt, now) {
     const ohx = -Math.sin(o.h), ohz = -Math.cos(o.h), al = ohx * hx + ohz * hz;
     if (al < -0.3 && f > 7) continue;   // oncoming, not a threat
     if (Math.abs(l) > c.hw + (al > 0.7 ? o.hw : o.hl) + 0.25) continue;
+    if (o.leader === c && c.id < o.id && o.v < 1) continue;   // two stopped at a corner each waiting on the other: the lower id goes
     const gap = f - c.hl - (al > 0.7 ? o.hl : o.hw); if (gap < bg) { bg = gap; best = o; bdv = c.v - o.v * Math.max(0, al); }
   }
+  c.leader = best;
   let obst = null;
   for (const o of T.obs) {
     const dx = o.x - c.x, dz = o.z - c.z; if (dx * dx + dz * dz > 3600) continue; const f = dx * hx + dz * hz; if (f <= 0) continue;
@@ -427,6 +429,7 @@ function drive(c, dt, now) {
   if (c.avoid) { c.avoidT -= dt; if (c.avoidT <= 0 || (!obst && c.v > 3 && c.blockT === 0 && c.avoidT < 4)) { c.avoid = null; c.shiftT = 0; } }
   // stuck behind a car that is itself stuck (a gridlocked junction): after a while, nudge through
   if (lim === 'car' && c.v < 0.1) { c.waitT += dt; if (c.waitT > 9) { c.ghostT = 2.5; c.waitT = 0; } } else if (c.v > 1) c.waitT = 0;
+  c.lim = lim;
   // integrate
   a = clamp(a, -9, AM); c.a = damp(c.a, a, 6, dt); c.v = Math.max(0, c.v + a * dt);
   c.brake = a < -0.6 || (c.v < 0.3 && lim) ? 1 : 0;
@@ -660,7 +663,7 @@ function roadDist(x, z) { let best = 1e9; for (const r of OSM.r) { if (r.w < 9) 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const trafficQA = {
   _T: () => T,
-  buses: () => T ? T.cars.filter((c) => c.bus).map((c) => ({ id: c.id, route: c.route.id, x: r2(c.x), z: r2(c.z), h: r2(c.h), v: r2(c.v), state: c.state, stop: c.state === 'dwell' ? c.route.stops[c.stopI].name : null, next: c.route.stops[c.nextStop].name, door: r2(c.doorK || 0), road: r2(roadDist(c.x, c.z)), riding: T.ride?.c === c })) : [],
+  buses: () => T ? T.cars.filter((c) => c.bus).map((c) => ({ id: c.id, lim: c.lim || null, lead: c.leader?.id ?? null, route: c.route.id, x: r2(c.x), z: r2(c.z), h: r2(c.h), v: r2(c.v), state: c.state, stop: c.state === 'dwell' ? c.route.stops[c.stopI].name : null, next: c.route.stops[c.nextStop].name, door: r2(c.doorK || 0), road: r2(roadDist(c.x, c.z)), riding: T.ride?.c === c })) : [],
   board: () => (T.board ? (boardBus(T.board), true) : false), toStop(id) { const c = T.cars[id]; if (!c?.bus) return null; const S = c.route.stops[c.nextStop]; T.ctx.player.teleport(S.px, 0, S.pz, 0, 0); return S.name; },
   toBusDoor(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, (BUS.doorF[0] + BUS.doorF[1]) / 2, BUS.w / 2 + 1.0, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h + Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
   toBusDriver(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, BUS.eye.x, -BUS.w / 2 - 0.8, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h - Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
