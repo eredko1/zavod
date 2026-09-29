@@ -343,7 +343,7 @@ function update(dt) {
   T.spawnCool -= dt;
   if (T.spawnCool <= 0 && !T.fz) { const boot = T.t < 1.5; let n = boot ? T.budget : 1, fails = 0;
     for (const c of T.cars) { if (n <= 0) break; if (c.active || c.bus) continue; if (spawn(c, boot)) n--; else if (++fails > 2) { T.spawnCool = 1; break; } } }
-  collidePlayer(dt);
+  collidePlayer(dt); busSeparate();
   render(dt);
   busPeople();
   drivers(dt);
@@ -474,6 +474,10 @@ function collidePlayer(dt) {
       const d = dx0 * ax + dz0 * az, o = ra + rb - Math.abs(d); if (o <= 0) { best = -1; break; } if (o < best) { best = o; nx = ax * Math.sign(d || 1); nz = az * Math.sign(d || 1); }
     }
     if (best <= 0) continue;
+    // driving a hijacked bus: it keeps going and the car gets shoved out of the way (n points from the car to the bus)
+    if (mv.spec?.kind === 'bus' && !c.bus) { c.ox -= nx * best; c.oz -= nz * best; c.x -= nx * best; c.z -= nz * best; c.v = Math.min(c.v, 1.5); mv.vel.multiplyScalar(0.995);
+      const cl = -((mv.vel.x - fx * c.v) * nx + (mv.vel.z - fz * c.v) * nz); if (T.t - (c.crashT || -9) > 0.8 && cl > 2) { c.crashT = T.t; T.stats.crashes++; c.oyaw += (c.rng() - 0.5) * 0.6; if (c.state === 'drive' || c.state === 'crashed') { c.state = 'crashed'; c.stateT = 0; c.angryDone = false; c.sev = Math.max(c.sev || 0, 0.6); } try { T.ctx.audio?.play?.('impact', { position: new THREE.Vector3(c.x, c.y + 0.8, c.z), volume: 1.3 }); } catch {} }
+      continue; }
     // n points from the traffic car to you: push your vehicle out, kill the closing speed, a little bounce
     mv.pos.x += nx * best; mv.pos.z += nz * best;
     const cvx = fx * c.v, cvz = fz * c.v, rvn = (mv.vel.x - cvx) * nx + (mv.vel.z - cvz) * nz;
@@ -481,6 +485,16 @@ function collidePlayer(dt) {
     const sev = clamp(-rvn / 12, 0, 1);
     if (sev > 0.18 && T.t - (c.crashT || -9) > 0.8) crash(c, sev, nx, nz);
   }
+}
+// buses are solid to traffic: a car overlapping a bus (it pulled in to the kerb on top of it, or a car cut in) is pushed out sideways
+// and slowed, instead of driving through it
+function busSeparate() {
+  for (const b of T.cars) { if (!b.active || !b.bus) continue; const bfx = -Math.sin(b.h), bfz = -Math.cos(b.h), brx = -bfz, brz = bfx;
+    for (const c of T.cars) { if (!c.active || c.bus) continue; const dx = c.x - b.x, dz = c.z - b.z; if (dx * dx + dz * dz > 144) continue;
+      const fx = -Math.sin(c.h), fz = -Math.cos(c.h), rx = -fz, rz = fx; let best = Infinity, nx = 0, nz = 0;
+      for (const [ax, az] of [[bfx, bfz], [brx, brz], [fx, fz], [rx, rz]]) { const ra = b.hl * Math.abs(bfx * ax + bfz * az) + b.hw * Math.abs(brx * ax + brz * az), rb = c.hl * Math.abs(fx * ax + fz * az) + c.hw * Math.abs(rx * ax + rz * az);
+        const d = dx * ax + dz * az, o = ra + rb - Math.abs(d); if (o <= 0) { best = -1; break; } if (o < best) { best = o; nx = ax * Math.sign(d || 1); nz = az * Math.sign(d || 1); } }
+      if (best <= 0) continue; const k = best + 0.05; c.ox += nx * k; c.oz += nz * k; c.x += nx * k; c.z += nz * k; c.v = Math.min(c.v, 2); } }
 }
 function crash(c, sev, nx, nz) {
   c.crashT = T.t; T.stats.crashes++;
