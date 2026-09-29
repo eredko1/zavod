@@ -171,6 +171,7 @@ function headS() {
 // ---------------------------------------------------------------------------------------------------------------------------
 // the R160 cars come from coney/r160.js; here every static piece is baked into one mesh per material and the door leaves into
 // sliding groups (side × direction × material)
+// (each leaf's userData carries sx / dir / z for update(); without them the leaves sat at NaN and never drew)
 function buildTrain(scene) {
   const kit = makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite: !!R.ctx.lite, route: R.cfg }); R.kit = kit;
   for (const g of kit.cars) {
@@ -181,7 +182,7 @@ function buildTrain(scene) {
         const key = ch.userData.door ? `${ch.userData.door.sx}|${ch.userData.door.dir}|${ch.material.uuid}` : null; const map = key ? doors : stat, k = key || ch.material.uuid;
         if (!map.has(k)) map.set(k, { m: ch.material, list: [], door: ch.userData.door, shadow: false }); const e = map.get(k); e.list.push(geo); e.shadow ||= ch.castShadow; g.remove(ch); }
       for (const { m, list, shadow } of stat.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.receiveShadow = true; g.add(me); }
-      for (const { m, list, door, shadow } of doors.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.userData.door = { sx: door.sx, dir: door.dir, z: 0 }; g.add(me); g.userData.doors.push(me); } }
+      for (const { m, list, door, shadow } of doors.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.userData.door = { sx: door.sx, dir: door.dir, z: 0 }; Object.assign(me.userData, me.userData.door); g.add(me); g.userData.doors.push(me); } }
   }
   return kit.cars;
 }
