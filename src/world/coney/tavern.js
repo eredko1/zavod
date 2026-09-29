@@ -28,7 +28,7 @@ const DOOR = [-0.9, 0.3];                                                       
 const OCHE_X = BAR.x1 - 2.37;                                                    // the throw line: 2.37 m from the board face
 // the room is laid out as in the photo, then mirrored (the bar on the left as you walk in, darts on the right): MX maps x across
 const MX = (x) => BAR.x0 + BAR.x1 - x;
-const GAP_EXIT = [MX(BAR.x0 + 2.1), MX(BAR.x0 + 1.1)], GAP_WC = [MX(BAR.x1 - 0.1), MX(BAR.x1 - 0.9)];   // back-wall doorways (game x)
+const GAP_EXIT = [MX(BAR.x0 + 3.8), MX(BAR.x0 + 2.8)];   // the back door to the yard (game x): the corridor between the kitchen and the restrooms
 const BOARDS = [{ z: 22.2 }, { z: 25.6 }];                                       // two dartboards on the left (+x) wall, centre 1.73 m up
 const NSTAT = { x: 13, z: -8.6 };                                                // the N train entrance (across the avenue)
 const CJK = '"PingFang TC","Hiragino Sans TC","Hiragino Sans GB","Heiti TC","Microsoft JhengHei","Noto Sans CJK TC","Noto Sans TC",sans-serif';
@@ -102,8 +102,8 @@ export function buildTavern(world) {
       for (const [x0, x1] of [[B.x0, BAR.x0 - 0.02], [BAR.x1 + 0.02, B.x1]]) { const s = new THREE.BoxGeometry(x1 - x0, h, depth); s.translate((x0 + x1) / 2, h / 2, (fz + back) / 2); put(M.side, s); }
       wbox(B.x0, 0, fz, BAR.x0 - 0.02, h, back); wbox(BAR.x1 + 0.02, 0, fz, B.x1, h, back);
       // the back wall between the room and the yard: solid except the two doorways (yard, restroom)
-      for (const [a, b2] of [[BAR.x0, GAP_WC[0]], [GAP_WC[1], GAP_EXIT[0]], [GAP_EXIT[1], BAR.x1]]) { wbox(a, 0, BAR.z1, b2, h, back); const r = new THREE.BoxGeometry(b2 - a, h, back - BAR.z1); r.translate((a + b2) / 2, h / 2, (BAR.z1 + back) / 2); put(M.side, r); }
-      for (const [a, b2] of [GAP_WC, GAP_EXIT]) { const l = new THREE.BoxGeometry(b2 - a, h - SW - 2.2, back - BAR.z1); l.translate((a + b2) / 2, (h + SW + 2.2) / 2, (BAR.z1 + back) / 2); put(M.side, l); } }
+      for (const [a, b2] of [[BAR.x0, GAP_EXIT[0]], [GAP_EXIT[1], BAR.x1]]) { wbox(a, 0, BAR.z1, b2, h, back); const r = new THREE.BoxGeometry(b2 - a, h, back - BAR.z1); r.translate((a + b2) / 2, h / 2, (BAR.z1 + back) / 2); put(M.side, r); }
+      for (const [a, b2] of [GAP_EXIT]) { const l = new THREE.BoxGeometry(b2 - a, h - SW - 2.2, back - BAR.z1); l.translate((a + b2) / 2, (h + SW + 2.2) / 2, (BAR.z1 + back) / 2); put(M.side, l); } }
     const colour = brickTint[Math.floor(rnd() * brickTint.length)];
     if (B.hero === 'tavern') { B.job = job(w, h, 64 * D, (g, W2, H2) => drawTavernFacade(g, W2, H2, w, h)); continue; }
     // upper floors: the shared brick-and-windows material (lit by the sun: it's day or night out here)
@@ -232,11 +232,12 @@ export function buildTavern(world) {
   W.tavern = { arrive: (how) => arrive(how), stayOn: () => stayOn(), leave: (how) => leave(how), inZone: (p) => inZone(p), inBar: (p) => inBar(p), zone: TZ, boards: boardsWorld(), oche: MX(OCHE_X), bar: BAR, root };
   K.spot({ pos: Z.nPos, r: 2.6, dy: 2, prompt: 'F — 8 AV · N TRAIN → CONEY ISLAND (STILLWELL AV)', act: () => leave('N') });
   K.spot({ pos: Z.urinal, r: 1.0, dy: 2, prompt: 'F — TAKE A PISS', act: () => pee() });
+  K.spot({ pos: Z.basement, r: 1.1, dy: 2, low: true, prompt: 'F — BASEMENT DOOR', act: () => K.toast(pick(['KENNY, from the bar: «Basement is closed. Kegs, mops and 1929. Nobody goes down there.»', 'Locked. Somebody wrote «NORGE 1929» on the door in pencil.', 'You hear a keg compressor… and maybe Big Tony counting something.']), 3200) });
   K.spot({ pos: Z.yardSpot, r: 2.2, dy: 2, low: true, prompt: 'F — HAVE A SMOKE OUT BACK', act: () => yardSmoke() });
   world.updaters.push((dt) => { if (Z?.world === world) update(dt); });
   try { buildTavernPeople(world); } catch (e) { console.warn('[tavern] people', e); }
   try { buildDarts(world); } catch (e) { console.warn('[tavern] darts', e); }
-  if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards, juke: (t) => { const t0 = jukeOn(t); ctx.net?.send?.('juke', { title: t, t0 }); return t0; }, radio: () => ({ now: W.radio?.now, qa: W.radio?.qa?.() }), back: () => ({ urinal: Z.urinal.toArray(), yard: Z.yardSpot.toArray(), exitX: (GAP_EXIT[0] + GAP_EXIT[1]) / 2, wcX: (GAP_WC[0] + GAP_WC[1]) / 2, z1: BAR.z1 + TZ.oz }), pee: () => pee(), peeT: () => Z.pee || 0 };
+  if (typeof window !== 'undefined' && window.__game) window.__game.tavern = { arrive: (h) => arrive(h), leave: (h) => leave(h), state: () => ({ inZone: inZone(ctx.player.position), inBar: inBar(ctx.player.position), busy: Z.busy, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) }), zone: TZ, bar: BAR, door: [(DOOR[0] + DOOR[1]) / 2, SW, TZ.oz + WALK], nPos: Z.nPos.toArray(), boards: W.tavern.boards, juke: (t) => { const t0 = jukeOn(t); ctx.net?.send?.('juke', { title: t, t0 }); return t0; }, radio: () => ({ now: W.radio?.now, qa: W.radio?.qa?.() }), back: () => ({ urinal: Z.urinal.toArray(), yard: Z.yardSpot.toArray(), exitX: (GAP_EXIT[0] + GAP_EXIT[1]) / 2, z1: BAR.z1 + TZ.oz }), pee: () => pee(), peeT: () => Z.pee || 0 };
   console.log('[tavern] 8th Ave + Soccer Tavern built ·', bld.length, 'buildings ·', G.size, 'materials');
 }
 
@@ -271,16 +272,14 @@ function buildRoom(world, root, put, wbox, M, lite, rnd) {
   { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(Math.PI / 2); g.translate(cx, ceil, (z0 + z1) / 2); scaleUV(g, (x1 - x0) / 0.6, (z1 - z0) / 0.6); put(M.ceil, g); }
   const wallQ = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az); const g = new THREE.PlaneGeometry(L, H); scaleUV(g, L / 1.2, 1); g.rotateY(Math.atan2(-(bz - az), bx - ax)); g.translate((ax + bx) / 2, y0 + H / 2, (az + bz) / 2); put(M.wall, g); };
   wallQ(x1, z0, x1, z1); wallQ(x0, z1, x0, z0);   // +x (left as you walk in, in the photo), −x (right) — normals inward
-  // back wall: two doorways (restroom on the +x side, the yard door on the −x side, as in the photo), lintels over them
-  { const eg = [x0 + 1.1, x0 + 2.1], wg = [x1 - 0.9, x1 - 0.1]; wallQ(x1, z1, wg[1], z1); wallQ(wg[0], z1, eg[1], z1); wallQ(eg[0], z1, x0, z1);
-    for (const [a, b] of [eg, wg]) { const g = new THREE.PlaneGeometry(b - a, ceil - (y0 + 2.2)); g.rotateY(Math.PI); g.translate((a + b) / 2, (ceil + y0 + 2.2) / 2, z1); put(M.wall, g); }
-    wbox(x0, 0, z1, eg[0], ceil, z1 + 0.3); wbox(eg[1], 0, z1, wg[0], ceil, z1 + 0.3); wbox(wg[1], 0, z1, x1, ceil, z1 + 0.3); }
+  // back wall: the yard door at the end of the corridor between the kitchen and the restrooms (owner's plan), a lintel over it
+  { const eg = [x0 + 2.8, x0 + 3.8]; wallQ(x1, z1, eg[1], z1); wallQ(eg[0], z1, x0, z1);
+    { const g = new THREE.PlaneGeometry(eg[1] - eg[0], ceil - (y0 + 2.2)); g.rotateY(Math.PI); g.translate((eg[0] + eg[1]) / 2, (ceil + y0 + 2.2) / 2, z1); put(M.wall, g); }
+    wbox(x0, 0, z1, eg[0], ceil, z1 + 0.3); wbox(eg[1], 0, z1, x1, ceil, z1 + 0.3); }
   NOMIR = true; try {   // the front wall stays put: the street door doesn't move
     wallQ(x0, z0 + 0.1, DOOR[0], z0 + 0.1); wallQ(DOOR[1], z0 + 0.1, x1, z0 + 0.1); { const g = new THREE.PlaneGeometry(DOOR[1] - DOOR[0], ceil - (y0 + 2.35)); g.translate((DOOR[0] + DOOR[1]) / 2, (ceil + y0 + 2.35) / 2, z0 + 0.1); put(M.wall, g); }
   } finally { NOMIR = false; }
   wbox(x1, 0, z0, x1 + 0.3, ceil, z1); wbox(x0 - 0.3, 0, z0, x0, ceil, z1);
-  // the white half-partition with green trim by the front tables (photo, left foreground)
-  { const g = new THREE.BoxGeometry(0.12, 1.05, 1.4); g.translate(x1 - 1.9, y0 + 0.52, z0 + 2.2); shade(g, 0xe9e6dc, 0.8); put(M.pnt, g); const t = new THREE.BoxGeometry(0.16, 0.06, 1.44); t.translate(x1 - 1.9, y0 + 1.06, z0 + 2.2); shade(t, 0x2f7a3e, 0.8); put(M.pnt, t); wbox(x1 - 1.97, 0, z0 + 1.5, x1 - 1.83, 1.1, z0 + 2.9); }
   // ---- the bar: counter along the right wall, returning to the wall at the front in a curve (the L) ----
   const cX0 = x0 + 1.4, cX1 = cX0 + 0.62, cZ0 = z0 + 3.2, cZ1 = z1 - 3.4, top = y0 + 1.07;
   const woodBox = (w, h, d, x, y, z, ry = 0, col = 0xa05a34, sh = 1) => { const g = new THREE.BoxGeometry(w, h, d); if (ry) g.rotateY(ry); g.translate(x, y, z); boxUV(g, 0.8); shade(g, col, sh); put(M.barWood, g); return g; };
@@ -313,7 +312,7 @@ function buildRoom(world, root, put, wbox, M, lite, rnd) {
     const seat = new THREE.CylinderGeometry(0.21, 0.2, 0.08, 14); seat.translate(x, y0 + 0.8, z); shade(seat, 0x1b1a1a, 0.9); put(M.pnt, seat); };
   for (let z = cZ0 + 0.3; z < cZ1 - 0.2; z += 0.95) stool(cX1 + 0.5, z, Math.PI);
   // high-tops along the left wall + their stools
-  const tables = [z0 + 1.1, z0 + 4.2, z0 + 7.0];
+  const tables = [z0 + 4.2, z0 + 7.0];   // the front nook has the round low table (buildBack)
   for (const tz of tables) { const tx = x1 - 0.55; const top2 = new THREE.BoxGeometry(0.75, 0.05, 0.75); top2.translate(tx, y0 + 1.05, tz); shade(top2, 0x6a4a2e, 0.9); put(M.pnt, top2);
     const ped = new THREE.CylinderGeometry(0.04, 0.04, 1.02, 6); ped.translate(tx, y0 + 0.52, tz); shade(ped, 0x151515); put(M.pnt, ped); const ft = new THREE.CylinderGeometry(0.26, 0.28, 0.03, 10); ft.translate(tx, y0 + 0.02, tz); shade(ft, 0x151515); put(M.pnt, ft);
     stool(tx - 0.6, tz, 0); stool(tx, tz - 0.62, -Math.PI / 2); wbox(tx - 0.3, 0, tz - 0.3, tx + 0.3, 1.05, tz + 0.3); }
@@ -355,20 +354,20 @@ function buildRoom(world, root, put, wbox, M, lite, rnd) {
   iq(coorsJob, 1.3, 0.62, x1 - 0.02, y0 + 2.5, z0 + 1.6, RX);
   photos.forEach((j, i) => iq(j, 0.42, 0.34, x1 - 0.015, y0 + 1.55 + (i % 2) * 0.45, z0 + 0.7 + Math.floor(i / 2) * 0.55 + (i > 3 ? 4.2 : 0), RX));
   iq(clipJob, 0.9, 0.6, x1 - 0.015, y0 + 1.7, z0 + 9.0, RX);
-  iq(bannerJob, 1.7, 0.8, cx + 0.6, y0 + 2.35, z1 - 0.02, Math.PI);
-  iq(clockJob, 0.36, 0.36, cx - 0.9, y0 + 2.5, z1 - 0.02, Math.PI);
-  iq(exitJob, 0.6, 0.2, x0 + 1.6, y0 + 2.42, z1 - 0.02, Math.PI);
-  iq(wcJob, 0.3, 0.3, x1 - 0.5, y0 + 1.6, z1 - 0.025, Math.PI);
+  iq(bannerJob, 1.5, 0.7, cx + 1.4, y0 + 2.5, 26.76, Math.PI);   // on the restroom block's front (buildBack)
+  iq(clockJob, 0.34, 0.34, x1 - 0.6, y0 + 2.55, 26.76, Math.PI);
+  iq(exitJob, 0.6, 0.2, x0 + 3.3, y0 + 2.1, z1 - 0.02, Math.PI);
+  void wcJob;
   iq(cashJob, 0.5, 0.3, x0 + 0.02, y0 + 2.15, cZ0 + 5.5, LX);
   scarfJobs.forEach((j, i) => { const g = iq(j, 1.3, 0.2, 0, 0, 0, 0); g.rotateY(LX); g.rotateX(0); g.translate(x0 + 0.03, y0 + 2.95, cZ0 + 0.8 + i * 1.5); });
   // back doors: the EXIT door (with a wreath) and the restroom door, as panels
-  // both propped open into the room (the yard door with its wreath, the restroom door)
+  // the yard door, propped open into the room, with its wreath
   { const open = (w, h, hx, col, ry) => { const d = new THREE.BoxGeometry(w, h, 0.05); d.translate(w / 2, h / 2, 0); d.rotateY(ry); d.translate(hx, y0, z1 - 0.05); shade(d, col); put(M.pnt, d); return d; };
-    open(0.95, 2.1, x0 + 1.12, 0x3a2418, 1.35); const wr = new THREE.TorusGeometry(0.16, 0.05, 6, 16); wr.rotateY(Math.PI / 2 + 1.35 - Math.PI / 2); wr.translate(x0 + 1.12 + Math.cos(1.35) * 0.47, y0 + 1.6, z1 - 0.05 - Math.sin(1.35) * 0.47); shade(wr, 0x1f5a2a); put(M.pnt, wr);
-    open(0.78, 2.05, x1 - 0.12, 0xb0703a, Math.PI - 1.35); }
-  // jukebox against the left wall (between the front tables and the darts)
-  { const jz = z0 + 9.0 - 1.2; Z.juke = new THREE.Vector3(x1 - 0.4, SW, jz + TZ.oz); const b = new THREE.BoxGeometry(0.55, 1.5, 0.8); b.translate(x1 - 0.3, y0 + 0.75, jz); shade(b, 0x2a1a14); put(M.pnt, b);
-    iq(jukeJob, 0.72, 1.4, x1 - 0.585, y0 + 0.8, jz, RX); wbox(x1 - 0.6, 0, jz - 0.42, x1, 1.5, jz + 0.42); }
+    open(0.95, 2.1, x0 + 2.82, 0x3a2418, 1.35); const wr = new THREE.TorusGeometry(0.16, 0.05, 6, 16); wr.rotateY(Math.PI / 2 + 1.35 - Math.PI / 2); wr.translate(x0 + 2.82 + Math.cos(1.35) * 0.47, y0 + 1.6, z1 - 0.05 - Math.sin(1.35) * 0.47); shade(wr, 0x1f5a2a); put(M.pnt, wr);
+  }
+  // jukebox in the front corner by the street window, facing back into the room (owner's plan)
+  { const jx = x0 + 0.5, jz = z0 + 0.78; Z.juke = new THREE.Vector3(jx, SW, jz + 0.9 + TZ.oz); const b = new THREE.BoxGeometry(0.8, 1.5, 0.55); b.translate(jx, y0 + 0.75, jz); shade(b, 0x2a1a14); put(M.pnt, b);
+    iq(jukeJob, 0.72, 1.4, jx, y0 + 0.8, jz + 0.28, 0); wbox(jx - 0.42, 0, jz - 0.3, jx + 0.42, 1.5, jz + 0.3); }
   // ---- TVs: four screens up high sharing one animated canvas (a match) ----
   Z.tv = makeCanvasTex(lite ? 192 : 320, lite ? 108 : 180, (g, w, h) => drawMatch(g, w, h, 0));
   { const tvm = new THREE.MeshBasicMaterial({ map: Z.tv.tex, toneMapped: false }); const spots = [[x0 + 0.5, cZ0 + 1.2, LX], [x0 + 0.5, cZ1 - 1.4, LX], [cx - 0.2, z1 - 0.12, Math.PI], [x1 - 0.2, z0 + 3.0, RX]];
@@ -429,25 +428,43 @@ function jukeOn(title, t0) { const { ctx, W } = Z; if (Z.radioPrev == null) Z.ra
 function buildBack(world, root, put, wbox, M, lite, rnd) {
   const y0 = SW, back = WALK + 21, oz = TZ.oz, box = (x0, y, z0, x1, y1, z1, col, mat = M.pnt) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y, z1 - z0); g.translate((x0 + x1) / 2, (y + y1) / 2, (z0 + z1) / 2); shade(g, col); put(mat, g); return g; };
   const floor = (x0, z0, x1, z1, col, mat = M.pnt) => { const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, y0 + 0.004, (z0 + z1) / 2); shade(g, col); put(mat, g); };
-  // the two doorways through the back wall (floors), then the restroom
+  // inside, after the owner's plan: the restrooms (men's, women's) in the back right, the kitchen in the back left behind the bar,
+  // the corridor between them to the yard door; up front the round low table in the nook and the street windows; on the right wall
+  // the trophy case and the basement door. Game coordinates (not mirrored), baked like the room.
   BAKE = true; try {
-    for (const [a, b] of [GAP_WC, GAP_EXIT]) floor(a, BAR.z1, b, back, 0x5a4a3a);
-    const R = { x0: -4.0, x1: -1.8, z0: back, z1: back + 2.7 }, top = y0 + 2.6, tile = 0xe6e2d4;
-    floor(R.x0, R.z0, R.x1, R.z1, 0x77736a); box(R.x0 - 0.15, 0, R.z0, R.x0, top, R.z1 + 0.15, tile); box(R.x1, 0, R.z0, R.x1 + 0.15, top, R.z1 + 0.15, tile); box(R.x0 - 0.15, 0, R.z1, R.x1 + 0.15, top, R.z1 + 0.15, tile);
-    box(R.x0 - 0.15, top, R.z0, R.x1 + 0.15, top + 0.12, R.z1 + 0.15, 0xcfcac0);
-    wbox(R.x0 - 0.15, 0, R.z0, R.x0, top, R.z1 + 0.15); wbox(R.x1, 0, R.z0, R.x1 + 0.15, top, R.z1 + 0.15); wbox(R.x0 - 0.15, 0, R.z1, R.x1 + 0.15, top, R.z1 + 0.15);
-    // a green tile stripe round the room (three thin strips on the walls: it was one slab across the whole room at hip height)
-    box(R.x0, y0 + 1.1, R.z0, R.x0 + 0.02, y0 + 1.22, R.z1, 0x2f6a4a); box(R.x1 - 0.02, y0 + 1.1, R.z0, R.x1, y0 + 1.22, R.z1, 0x2f6a4a); box(R.x0, y0 + 1.1, R.z1 - 0.02, R.x1, y0 + 1.22, R.z1, 0x2f6a4a);
-    // the urinal (east wall), the stall (north-west corner) with the bowl, the sink and mirror (west wall), a bare bulb
-    const uz = R.z0 + 1.5; box(R.x1 - 0.32, y0 + 0.45, uz - 0.2, R.x1, y0 + 1.05, uz + 0.2, 0xf4f4f0); box(R.x1 - 0.28, y0 + 0.45, uz - 0.16, R.x1 - 0.05, y0 + 0.5, uz + 0.16, 0xd8e4e6);
-    { const p = new THREE.CylinderGeometry(0.015, 0.015, 0.5, 5); p.translate(R.x1 - 0.06, y0 + 1.3, uz); shade(p, 0xb8bcc0); put(M.pnt, p); }
-    box(R.x0 + 0.9, 0, R.z1 - 1.1, R.x0 + 0.94, y0 + 1.9, R.z1, 0x6a7a6e); box(R.x0 + 0.94, y0 + 0.15, R.z1 - 1.12, R.x0 + 1.5, y0 + 1.9, R.z1 - 1.08, 0x6a7a6e);
-    { const b = new THREE.CylinderGeometry(0.2, 0.16, 0.42, 12); b.translate(R.x0 + 0.45, y0 + 0.21, R.z1 - 0.45); shade(b, 0xf4f4f0); put(M.pnt, b); } box(R.x0 + 0.25, y0 + 0.42, R.z1 - 0.2, R.x0 + 0.65, y0 + 0.82, R.z1, 0xf4f4f0);
-    const sz = R.z0 + 0.7; box(R.x0, y0 + 0.78, sz - 0.25, R.x0 + 0.4, y0 + 0.92, sz + 0.25, 0xf4f4f0); box(R.x0, y0 + 1.25, sz - 0.3, R.x0 + 0.02, y0 + 1.9, sz + 0.3, 0x5c6a72);
-    { const b = new THREE.SphereGeometry(0.06, 8, 6); b.translate((R.x0 + R.x1) / 2, top - 0.15, (R.z0 + R.z1) / 2); shade(b, 0xfff2c0, 1.6); put(M.pnt, b); }
-    // scrawl on the tiles (coloured marker strokes)
-    for (let i = 0; i < (lite ? 6 : 16); i++) { const z = R.z0 + 0.3 + rnd() * (R.z1 - R.z0 - 0.6), y = y0 + 1.25 + rnd() * 0.9; box(R.x1 - 0.004, y, z, R.x1, y + 0.006 + rnd() * 0.01, z + 0.05 + rnd() * 0.16, [0x111111, 0x1a3aa8, 0xb3121e][i % 3]); }
-    Z.urinal = new THREE.Vector3(R.x1 - 0.55, y0, uz + oz);
+    floor(GAP_EXIT[0], BAR.z1, GAP_EXIT[1], back, 0x5a4a3a);
+    const T = 3.1, tile = 0xe6e2d4, rz0 = 26.8, bz = BAR.z1, wall = (x0, z0, x1, z1, y1 = T, y = 0, col = tile) => { box(x0, y, z0, x1, y1, z1, col); wbox(x0, y, z0, x1, y1, z1); };
+    // ---- restrooms: a tiled block, two doors in its front, a partition between; men's has the urinal, women's the stall ----
+    const WD = [-3.75, -3.05], MD = [-2.55, -1.85], RX1 = -1.52;
+    wall(BAR.x0, rz0, WD[0], rz0 + 0.1); wall(WD[1], rz0, MD[0], rz0 + 0.1); wall(MD[1], rz0, RX1, rz0 + 0.1);
+    for (const [a, b] of [WD, MD]) box(a, 2.2, rz0, b, T, rz0 + 0.1, tile);
+    wall(-2.84, rz0 + 0.1, -2.76, bz); wall(RX1 - 0.08, rz0, RX1, bz);
+    floor(BAR.x0, rz0 + 0.1, RX1 - 0.08, bz, 0x9a9890);
+    for (const [a, b] of [WD, MD]) { const d = new THREE.BoxGeometry(b - a, 2.1, 0.04); d.translate((b - a) / 2, 1.05 + y0, 0); d.rotateY(1.25); d.translate(a, 0, rz0 + 0.1); shade(d, 0x7a5a3a); put(M.pnt, d); }
+    for (const [x0, x1] of [[BAR.x0, -2.84], [-2.76, RX1 - 0.08]]) { box(x0, y0 + 1.1, bz - 0.02, x1, y0 + 1.22, bz, 0x2f6a4a); }
+    const ux = -2.2, uz = bz - 0.3; box(ux - 0.2, y0 + 0.45, bz - 0.32, ux + 0.2, y0 + 1.05, bz, 0xf4f4f0); box(ux - 0.16, y0 + 0.45, bz - 0.28, ux + 0.16, y0 + 0.5, bz - 0.05, 0xd8e4e6);
+    box(RX1 - 0.48, y0 + 0.78, 28.1, RX1 - 0.08, y0 + 0.92, 28.6, 0xf4f4f0); box(RX1 - 0.1, y0 + 1.25, 28.05, RX1 - 0.08, y0 + 1.9, 28.65, 0x5c6a72);
+    { const b = new THREE.CylinderGeometry(0.2, 0.16, 0.42, 12); b.translate(-3.4, y0 + 0.21, bz - 0.45); shade(b, 0xf4f4f0); put(M.pnt, b); } box(-3.6, y0 + 0.42, bz - 0.2, -3.2, y0 + 0.82, bz, 0xf4f4f0);
+    box(BAR.x0, y0 + 0.78, 28.1, BAR.x0 + 0.4, y0 + 0.92, 28.6, 0xf4f4f0); box(BAR.x0, y0 + 1.25, 28.05, BAR.x0 + 0.02, y0 + 1.9, 28.65, 0x5c6a72);
+    for (const x of [-3.4, -2.2]) { const b = new THREE.SphereGeometry(0.06, 8, 6); b.translate(x, T - 0.15, 28.6); shade(b, 0xfff2c0, 1.6); put(M.pnt, b); }
+    Z.urinal = new THREE.Vector3(ux, y0, uz - 0.35 + oz);
+    // ---- the kitchen behind the bar: a wall with the bar pass (a hatch at counter height) and the kitchen door; a flat-top, a fryer, a hood ----
+    const KX0 = 0.1, KZ = 27.6;
+    wall(KX0, KZ, 0.3, KZ + 0.1); wall(0.3, KZ, 1.0, KZ + 0.1, y0 + 1.05); box(0.3, y0 + 2.0, KZ, 1.0, T, KZ + 0.1, 0x6a3a22); box(0.3, y0 + 1.05, KZ - 0.15, 1.0, y0 + 1.1, KZ + 0.25, 0xb8bcc0);
+    wall(1.0, KZ, 1.25, KZ + 0.1); box(1.25, y0 + 2.15, KZ, 2.15, T, KZ + 0.1, 0x6a3a22); wall(2.15, KZ, BAR.x1, KZ + 0.1); wall(KX0, KZ, KX0 + 0.08, bz);
+    floor(KX0 + 0.08, KZ + 0.1, BAR.x1, bz, 0x6d6a62);
+    box(1.4, 0, bz - 0.7, 2.35, y0 + 0.9, bz - 0.02, 0xb8bcc0); box(1.45, y0 + 0.9, bz - 0.65, 2.3, y0 + 0.93, bz - 0.07, 0x2a2a2a); box(0.25, 0, bz - 0.7, 1.2, y0 + 0.9, bz - 0.02, 0x9aa0a4);
+    box(1.35, y0 + 1.9, bz - 0.9, 2.4, y0 + 2.35, bz - 0.02, 0x8d9296); box(2.0, 0, KZ + 0.2, 2.38, y0 + 1.9, KZ + 0.9, 0xd8dcdf); wbox(0.25, 0, bz - 0.7, 2.4, 0.95, bz);
+    // ---- up front: the round low table in the nook (four low chairs), the street windows either side of the door ----
+    { const tx = -3.0, tz = 12.3; const top = new THREE.CylinderGeometry(0.5, 0.5, 0.05, 18); top.translate(tx, y0 + 0.66, tz); shade(top, 0x6a4a2e); put(M.pnt, top);
+      const ped = new THREE.CylinderGeometry(0.05, 0.05, 0.64, 8); ped.translate(tx, y0 + 0.33, tz); shade(ped, 0x151515); put(M.pnt, ped); wbox(tx - 0.45, 0, tz - 0.45, tx + 0.45, 0.7, tz + 0.45);
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4, cx = tx + Math.cos(a) * 0.82, cz = tz + Math.sin(a) * 0.82; box(cx - 0.2, y0 + 0.42, cz - 0.2, cx + 0.2, y0 + 0.47, cz + 0.2, 0x2a1a14); const bk = new THREE.BoxGeometry(0.4, 0.4, 0.04); bk.translate(0, 0.2, 0.2); bk.rotateY(-a + Math.PI / 2); bk.translate(cx, y0 + 0.47, cz); shade(bk, 0x2a1a14); put(M.pnt, bk); for (const [dx, dz] of [[-0.15, -0.15], [0.15, -0.15], [-0.15, 0.15], [0.15, 0.15]]) box(cx + dx - 0.015, 0, cz + dz - 0.015, cx + dx + 0.015, y0 + 0.42, cz + dz + 0.015, 0x151515); } }
+    for (const [a, b] of [[-3.7, -1.3], [0.6, 2.1]]) { box(a, y0 + 0.9, BAR.z0 + 0.1, b, y0 + 2.4, BAR.z0 + 0.13, 0x223038); box(a - 0.05, y0 + 0.85, BAR.z0 + 0.1, b + 0.05, y0 + 0.9, BAR.z0 + 0.25, 0x5a3a22); box((a + b) / 2 - 0.02, y0 + 0.9, BAR.z0 + 0.12, (a + b) / 2 + 0.02, y0 + 2.4, BAR.z0 + 0.15, 0x1a1a1a); }
+    // ---- the right wall: the trophy case (glass front, cups on three shelves), the basement door ----
+    { const zc = 20.7; box(BAR.x0, 0, zc - 0.5, BAR.x0 + 0.4, y0 + 1.9, zc + 0.5, 0x3a2216); box(BAR.x0 + 0.4, y0 + 0.2, zc - 0.45, BAR.x0 + 0.42, y0 + 1.85, zc + 0.45, 0x8fa4a6); wbox(BAR.x0, 0, zc - 0.5, BAR.x0 + 0.42, 1.9, zc + 0.5);
+      for (const y of [0.6, 1.05, 1.5]) for (let k = 0; k < 4; k++) { const c = new THREE.CylinderGeometry(0.05, 0.025, 0.18, 8); c.translate(BAR.x0 + 0.2, y0 + y + 0.09, zc - 0.33 + k * 0.22); shade(c, 0xd4b04a, 1); put(M.pnt, c); } }
+    box(BAR.x0, 0, 18.9, BAR.x0 + 0.05, y0 + 2.05, 19.75, 0x3a2418); box(BAR.x0 + 0.05, y0 + 0.95, 19.55, BAR.x0 + 0.09, y0 + 1.05, 19.62, 0xb08a3a);
+    Z.basement = new THREE.Vector3(BAR.x0 + 0.6, y0, 19.3 + oz);
   } finally { BAKE = false; }
   // the yard: concrete, a board fence all round, a picnic table under string lights, the butt bucket, a keg, milk crates
   const Y = { x0: -6.0, x1: 2.7, z0: back, z1: back + 9 }, fence = 0x6b4f35, fh = y0 + 2.3;
@@ -460,7 +477,13 @@ function buildBack(world, root, put, wbox, M, lite, rnd) {
   box(tx - 0.9, y0 + 0.72, tz - 0.4, tx + 0.9, y0 + 0.77, tz + 0.4, 0x7a5a3a, M.prop); for (const s of [-1, 1]) { box(tx - 0.9, y0 + 0.42, tz + s * 0.62 - 0.14, tx + 0.9, y0 + 0.46, tz + s * 0.62 + 0.14, 0x7a5a3a, M.prop); for (const e of [-0.75, 0.75]) box(tx + e - 0.04, 0, tz + s * 0.35 - 0.04, tx + e + 0.04, y0 + 0.72, tz + s * 0.35 + 0.04, 0x5a4028, M.prop); }
   wbox(tx - 0.9, 0, tz - 0.4, tx + 0.9, y0 + 0.77, tz + 0.4);
   { const c = new THREE.CylinderGeometry(0.05, 0.05, 0.12, 10); c.translate(tx + 0.3, y0 + 0.83, tz); setColor(c, 0x8a8c8e); put(M.prop, c); }   // the coffee-can ashtray
-  { const b = new THREE.CylinderGeometry(0.2, 0.17, 0.38, 12); b.translate(-0.9, y0 + 0.19, Y.z0 + 1.0); setColor(b, 0xb3221e); put(M.prop, b); wbox(-1.1, 0, Y.z0 + 0.8, -0.7, 0.4, Y.z0 + 1.2); }   // the sand bucket by the door
+  { const b = new THREE.CylinderGeometry(0.2, 0.17, 0.38, 12); b.translate(-2.4, y0 + 0.19, Y.z0 + 1.0); setColor(b, 0xb3221e); put(M.prop, b); wbox(-2.6, 0, Y.z0 + 0.8, -2.2, 0.4, Y.z0 + 1.2); }
+  // the mural on the back fence (the owner's plan): a Chinese dragon, a Norwegian longship, a soccer ball — and the grill and a four-top
+  { const t = makeCanvasTex(lite ? 512 : 1024, lite ? 192 : 384, (g, w, h) => drawMural(g, w, h)); const m = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 2.0), new THREE.MeshStandardMaterial({ map: t.tex, roughness: 0.9 })); m.position.set(-1.65, y0 + 1.1, Y.z1 - 0.08); m.rotation.y = Math.PI; root.add(m); }
+  { const gx = -4.6, gz = Y.z0 + 2.2; const k = new THREE.SphereGeometry(0.34, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2); k.rotateX(Math.PI); k.translate(gx, y0 + 0.85, gz); setColor(k, 0x151515); put(M.prop, k); const l = new THREE.SphereGeometry(0.34, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2); l.translate(gx, y0 + 0.87, gz); setColor(l, 0x1c1c1c); put(M.prop, l);
+    for (const [dx, dz] of [[-0.22, -0.18], [0.22, -0.18], [0, 0.26]]) { const lg = new THREE.CylinderGeometry(0.02, 0.02, 0.62, 5); lg.translate(gx + dx, y0 + 0.31, gz + dz); setColor(lg, 0x151515); put(M.prop, lg); } wbox(gx - 0.36, 0, gz - 0.36, gx + 0.36, 1.2, gz + 0.36); }
+  { const hx = 1.7, hz = Y.z0 + 1.9; const tp = new THREE.BoxGeometry(0.8, 0.05, 0.8); tp.translate(hx, y0 + 1.05, hz); setColor(tp, 0x6a4a2e); put(M.prop, tp); const pd = new THREE.CylinderGeometry(0.04, 0.04, 1.02, 6); pd.translate(hx, y0 + 0.52, hz); setColor(pd, 0x151515); put(M.prop, pd); wbox(hx - 0.4, 0, hz - 0.4, hx + 0.4, 1.05, hz + 0.4);
+    for (const [dx, dz] of [[-0.62, 0], [0.62, 0], [0, -0.62], [0, 0.62]]) { const st = new THREE.CylinderGeometry(0.18, 0.18, 0.05, 10); st.translate(hx + dx, y0 + 0.78, hz + dz); setColor(st, 0x1b1a1a); put(M.prop, st); const lg = new THREE.CylinderGeometry(0.02, 0.02, 0.76, 5); lg.translate(hx + dx, y0 + 0.38, hz + dz); setColor(lg, 0x151515); put(M.prop, lg); } }   // the sand bucket by the door
   { const k = new THREE.CylinderGeometry(0.22, 0.22, 0.6, 14); k.translate(2.2, y0 + 0.3, Y.z1 - 0.6); setColor(k, 0xa8adb2); put(M.prop, k); wbox(1.95, 0, Y.z1 - 0.85, 2.45, 0.6, Y.z1 - 0.35); }
   for (const [x, z, h2] of [[-5.4, Y.z1 - 0.5, 0], [-5.4, Y.z1 - 0.5, 0.33], [-4.9, Y.z1 - 0.5, 0]]) { box(x - 0.2, y0 + h2, z - 0.2, x + 0.2, y0 + h2 + 0.32, z + 0.2, 0x1e4a9a, M.prop); } wbox(-5.65, 0, Y.z1 - 0.75, -4.65, 0.66, Y.z1 - 0.25);
   for (const [x, z, ry] of [[tx - 1.6, tz - 0.2, 0.4], [tx + 1.7, tz + 0.5, -0.3]]) { const parts = [[0.44, 0.04, 0.42, 0, 0.45, 0], [0.44, 0.42, 0.04, 0, 0.66, -0.2]]; for (const [w, h, d, ox, oy, oz2] of parts) { const g = new THREE.BoxGeometry(w, h, d); g.translate(ox, oy, oz2); g.rotateY(ry); g.translate(x, y0, z); setColor(g, 0xeeeeea); put(M.prop, g); } }
@@ -477,6 +500,21 @@ function yardSmoke() {
   const st = K.state(); if (st?.smoking) { K.toast('One at a time.', 1400); return; }
   if (!st?.inv?.includes('cigs')) { K.give('cigs'); K.toast('DUCK, out back: «No smokes? Here — 555s from Chinatown. Don\'t tell Kenny I carry a pack for strangers.»', 3600); }
   K.useItem('cigs'); if (Math.random() < 0.5) setTimeout(() => K.toast(pick(['Out back, under the string lights. Somebody\'s radio is playing Cantopop from a window upstairs.', 'A cat walks the fence. It looks at you like it knows about the envelope.', 'The kitchen fan of the roast-duck place next door blows five-spice at you. Worth it.']), 3400), 1800);
+}
+function drawMural(g, w, h) {
+  const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#2b5b8a'); sky.addColorStop(1, '#8fc0d8'); g.fillStyle = sky; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#1d4a6a'; for (let x = 0; x < w; x += 8) g.fillRect(x, h * 0.78 + Math.sin(x * 0.05) * 6, 8, h);   // the sea
+  // the longship (left): hull, a striped sail with the Norwegian cross
+  const sx = w * 0.16, sy = h * 0.72; g.fillStyle = '#6b3f1f'; g.beginPath(); g.moveTo(sx - w * 0.13, sy - h * 0.05); g.quadraticCurveTo(sx, sy + h * 0.12, sx + w * 0.13, sy - h * 0.05); g.lineTo(sx + w * 0.1, sy); g.lineTo(sx - w * 0.1, sy); g.fill();
+  g.fillStyle = '#ba0c2f'; g.fillRect(sx - w * 0.06, sy - h * 0.5, w * 0.12, h * 0.42); g.fillStyle = '#fff'; g.fillRect(sx - w * 0.06, sy - h * 0.33, w * 0.12, h * 0.07); g.fillRect(sx - w * 0.025, sy - h * 0.5, w * 0.03, h * 0.42); g.fillStyle = '#00205b'; g.fillRect(sx - w * 0.06, sy - h * 0.315, w * 0.12, h * 0.035); g.fillRect(sx - w * 0.017, sy - h * 0.5, w * 0.014, h * 0.42);
+  // the dragon (middle): a red serpent in waves, a green mane, gold scales
+  g.lineCap = 'round'; g.strokeStyle = '#c8201e'; g.lineWidth = h * 0.11; g.beginPath(); for (let i = 0; i <= 60; i++) { const x = w * 0.32 + i / 60 * w * 0.42, y = h * 0.45 + Math.sin(i / 60 * Math.PI * 3) * h * 0.18; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+  g.strokeStyle = '#e8b400'; g.lineWidth = h * 0.02; g.stroke(); g.fillStyle = '#1f8a3e'; for (let i = 0; i < 20; i++) { const x = w * 0.33 + i / 20 * w * 0.4, y = h * 0.45 + Math.sin(i / 20 * Math.PI * 3) * h * 0.18 - h * 0.08; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w * 0.01, y - h * 0.08); g.lineTo(x + w * 0.02, y); g.fill(); }
+  const hx = w * 0.75, hy = h * 0.45; g.fillStyle = '#c8201e'; g.beginPath(); g.ellipse(hx, hy, w * 0.045, h * 0.12, 0, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(hx + w * 0.015, hy - h * 0.04, h * 0.025, 0, 7); g.fill(); g.fillStyle = '#e8b400'; g.fillRect(hx + w * 0.02, hy + h * 0.02, w * 0.04, h * 0.02);
+  // the soccer ball (right)
+  const bx = w * 0.88, by = h * 0.55, r = h * 0.18; g.fillStyle = '#fff'; g.beginPath(); g.arc(bx, by, r, 0, 7); g.fill(); g.fillStyle = '#111'; g.beginPath(); for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; g.lineTo(bx + Math.cos(a) * r * 0.38, by + Math.sin(a) * r * 0.38); } g.fill();
+  for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 5; g.beginPath(); g.arc(bx + Math.cos(a) * r * 0.85, by + Math.sin(a) * r * 0.85, r * 0.2, 0, 7); g.fill(); }
+  g.fillStyle = '#fff'; g.font = `700 ${h * 0.09}px Arial`; g.textAlign = 'center'; g.fillText('SOCCER TAVERN · SINCE 1929', w / 2, h * 0.95);
 }
 function restoreRadio() { try { Z.W.radio?.juke?.(null); } catch {} if (Z.radioPrev != null) { Z.ctx.settings.radio = Z.radioPrev; Z.radioPrev = null; } }
 
