@@ -157,6 +157,7 @@ function deactivate(E, keep = true) {
 function planLeg(E) {
   const s = E.s; let yaw = s.ry || 0;
   if (s.zone === 'water' || s.zone === 'bw') yaw = Math.sin(yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
+  if (s.zone === 'subway') yaw = 0;   // pace along the platform (they face the tracks: walking that way took them off the edge)
   const fx = Math.sin(yaw), fz = Math.cos(yaw), cols = F.ctx.colliders, L = 7 + hash(s.x, s.z, 40) * 7;
   const free = (x, z) => !cols.some((b) => x > b.min.x - 0.4 && x < b.max.x + 0.4 && z > b.min.z - 0.4 && z < b.max.z + 0.4 && b.max.y > (s.y || 0) + 0.3 && b.min.y < (s.y || 0) + 1.8);
   let a = 0, b = 0; while (a < L && free(s.x - fx * (a + 1), s.z - fz * (a + 1))) a += 1; while (b < L && free(s.x + fx * (b + 1), s.z + fz * (b + 1))) b += 1;
