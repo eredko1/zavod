@@ -117,6 +117,9 @@ if (parts.includes('back')) {
   await pg.screenshot({ path: `${out}/tavern-wc.png` });
   // the bar is on the left now (mirrored): a look from the door
   await toDoor(pg, -1.5); await pg.waitForTimeout(1200); await pg.screenshot({ path: `${out}/tavern-room.png` });
+  // the back of the room: the kitchen, the restrooms, the corridor to the yard door
+  await pg.evaluate((bk) => window.__game.teleport(-0.8, 0.15, bk.z1 - 7, Math.PI, 0.02), bk); await pg.waitForTimeout(1200); await pg.screenshot({ path: `${out}/tavern-back.png` });
+  await pg.evaluate((bk) => window.__game.teleport(-1.6, 0.15, bk.z1 + 6.5, 0, 0.05), bk); await pg.waitForTimeout(1200); await pg.screenshot({ path: `${out}/tavern-mural.png` });
 }
 // my dart for what's left: T20 when far, then the number that finishes
 const finish = (pg, b = 0) => pg.evaluate((b) => { const G = window.__game.darts, T = G.table(b), me = T.seats[T.turn], t = T.mode === '2v2' ? T.turn % 2 : T.turn, left = T.score[t];
