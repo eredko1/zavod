@@ -25,7 +25,8 @@ const f = await pg.evaluate(() => { const t = window.__game.crews.state().thugs.
 s1 = await st(); ok(s1.cr.thugs.some((t) => t.st === 'fight'), 'crew fights back', f);
 await pg.screenshot({ path: `${out}/fight-guard.png` });
 await pg.waitForTimeout(3000); const s2 = await st(); ok(s2.hp < 100, 'punches land', `hp ${s2.hp}`);
-// knife them: face the nearest fighter and slash
+// knife them: draw the knife from the bag (chill starts on fists), face the nearest fighter and slash
+await pg.evaluate(() => { const W = window.__ctx.weapons; const i = W.bag.indexOf('knife'); if (i > -1) W.selectBag(i); }); await pg.waitForTimeout(700);
 for (let i = 0; i < 14; i++) {
   await pg.evaluate(() => { const p = window.__ctx.player; const t = window.__game.crews.state().thugs.filter((x) => x.st === 'fight').sort((a, b) => Math.hypot(a.pos[0] - p.position.x, a.pos[2] - p.position.z) - Math.hypot(b.pos[0] - p.position.x, b.pos[2] - p.position.z))[0]; if (!t) return; const yaw = Math.atan2(-(t.pos[0] - p.position.x), -(t.pos[2] - p.position.z)); p.yaw = yaw; p.pitch = -0.12; window.__game.fire(1); });
   await pg.waitForTimeout(650);

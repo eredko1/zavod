@@ -14,6 +14,13 @@ const SWINGS = [
   [[0, [0, 0, 0, 0, 0, 0]], [0.08, [-0.1, 0.02, 0.02, 0.15, -0.35, 0.7]], [0.19, [0.15, 0.06, -0.1, -0.2, 0.55, -0.6]], [0.25, [0.17, 0.07, -0.07, -0.2, 0.6, -0.65]], [0.46, [0, 0, 0, 0, 0, 0]]],   // backhand: low-left → up-right
   [[0, [0, 0, 0, 0, 0, 0]], [0.08, [0.12, 0.07, 0.02, 0.2, 0.55, -0.9]], [0.2, [-0.17, -0.05, -0.12, -0.25, -0.65, 0.7]], [0.26, [-0.19, -0.07, -0.08, -0.25, -0.7, 0.75]], [0.48, [0, 0, 0, 0, 0, 0]]],   // forehand: up-right → across → down-left
 ];
+// punches (fists): 2 jab (left, straight), 3 cross (right, straight, a turn of the shoulders), 4 hook (the third of a quick chain)
+SWINGS.push(
+  [[0, [0, 0, 0, 0, 0, 0]], [0.05, [-0.05, 0.03, -0.2, 0.05, 0.05, 0]], [0.1, [-0.05, 0.03, -0.22, 0.05, 0.05, 0]], [0.24, [0, 0, 0, 0, 0, 0]]],
+  [[0, [0, 0, 0, 0, 0, 0]], [0.06, [0.05, 0.03, -0.24, 0.05, -0.18, 0]], [0.12, [0.04, 0.03, -0.25, 0.05, -0.2, 0]], [0.3, [0, 0, 0, 0, 0, 0]]],
+  [[0, [0, 0, 0, 0, 0, 0]], [0.08, [0.12, 0.02, -0.08, 0, 0.3, -0.25]], [0.16, [-0.14, 0.05, -0.2, 0, -0.55, 0.35]], [0.22, [-0.16, 0.05, -0.18, 0, -0.6, 0.35]], [0.42, [0, 0, 0, 0, 0, 0]]],
+);
+const FIST_BASE = 14, FIST_MUL = [1, 1.15, 2.1];   // jab, cross, hook (a chain inside 0.7 s between punches)
 const smooth = (x) => { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3 - 2 * x); };
 
 const DEG = Math.PI / 180;
@@ -34,6 +41,7 @@ const OPTIONAL = [
   ['./weapons/ak.js', 'AK_SPEC', 'buildAk'],
   ['./weapons/deagle.js', 'DEAGLE_SPEC', 'buildDeagle'],
   ['./weapons/knife.js', 'KNIFE_SPEC', 'buildKnife'],
+  ['./weapons/fists.js', 'FISTS_SPEC', 'buildFists'],
 ];
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _rlp = new THREE.Vector3(), _rlr = new THREE.Vector3(), _ins = new THREE.Vector3(), _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _up = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _ray = new THREE.Ray();
@@ -139,7 +147,7 @@ export async function init(ctx) {
     get loadout() { return { ...S.loadout }; },
     get stats() { return arsenalEntry(S.weapons[S.cur].spec).stats; },
     setLoadout: (lo) => setLoadout(lo),
-    collect: (id, reserve) => collectGun(id, reserve), selectBag: (i) => selectBag(i), get bag() { bagSync(); return S.bag.slice(); },
+    collect: (id, reserve) => collectGun(id, reserve), selectBag: (i) => selectBag(i), fists: () => selectFists(), combo: () => S.combo || 0, get bag() { bagSync(); return S.bag.slice(); },
     /** Pick up a dropped weapon: same id as the current primary → +reserve ammo; otherwise it replaces the primary (with a full mag + the given reserve). */
     pickup: (id = 'ak74', reserve = 60) => {
       const cur = S.weapons[0]; if (!REGISTRY[id] || REGISTRY[id].spec.slot !== 0) return false;
@@ -251,7 +259,13 @@ function resetWeapon(w) {
 // ------------------------------------------------------------------ the bag: every gun you've collected (max 9, keys 1–9 /
 // numpad); the two equipped ones are live weapons, the rest wait in S.bank with the ammo they had
 const BAG_MAX = 9;
-function bagSync() { S.bag = S.bag || []; S.bank = S.bank || {}; for (const id of [S.loadout?.primary, S.loadout?.secondary]) if (id && REGISTRY[id] && !S.bag.includes(id)) S.bag.push(id); }
+function bagSync() { S.bag = S.bag || []; S.bank = S.bank || {}; for (const id of [S.loadout?.primary, S.loadout?.secondary]) if (id && id !== 'fists' && REGISTRY[id] && !S.bag.includes(id)) S.bag.push(id); }   // fists aren't in the bag: they're 7
+/** 7 / numpad 7: put the gun away, fists up */
+function selectFists() {
+  if (!REGISTRY.fists) return; bagSync(); if (S.weapons[0]?.id === 'fists' && S.cur === 0) return;
+  S.weapons.forEach(bankW); setLoadout({ primary: 'fists', secondary: S.loadout.secondary }, { silent: true, keepBag: true }); S.weapons.forEach(unbankW);
+  S.ctx.hud?.toast?.(`7 · FISTS   —   ${bagLine()}`, 1600);
+}
 function bankW(w) { if (w?.id) S.bank[w.id] = { ammo: w.ammo, reserve: w.reserve }; }
 function unbankW(w) { const b = w && S.bank[w.id]; if (b) { w.ammo = Math.min(b.ammo, w.spec.mag); w.reserve = b.reserve; w.cur.ammo = w.ammo; w.cur.reserve = w.reserve; } }
 const gunName = (id) => REGISTRY[id]?.spec?.name || String(id).toUpperCase();
@@ -437,8 +451,10 @@ function fireShot(w, opts = {}) {
   const dist = firstHit ? firstDist : sp.range;
 
   // muzzle world position (visual) — used by light, brass, tracer, smoke
+  // fists: the chain (jab → cross → hook) and its damage, before the hit is worked out
+  if (sp.fists) { S.combo = now - (S.comboT ?? -9) < 0.7 ? ((S.combo || 0) + 1) % 3 : 0; S.comboT = now; sp.damage = Math.round(FIST_BASE * FIST_MUL[S.combo]); }
   const muzzle = w.parts.muzzle.getWorldPosition(new THREE.Vector3());
-  if (sp.melee) { S.swing = { t: 0, kind: (S.swingN = (S.swingN || 0) + 1) % 2 };
+  if (sp.melee) { S.swing = { t: 0, kind: sp.fists ? 2 + S.combo : (S.swingN = (S.swingN || 0) + 1) % 2 }; if (sp.fists && S.combo === 2) S.ctx.hud?.toast?.('HOOK!', 500);
     const hu = firstHit?.object?.userData; if (hu && (hu.onHit || hu.soldier || hu.remote)) { ctx.ai?.blood?.(firstHit.point.x, firstHit.point.z, 0.35 + rng() * 0.25, firstHit.point.y - 1); S.rpv.z += 6; ctx.bus.emit('meleeHit', { point: firstHit.point.clone() }); }   // it went in: blood on the ground + the hand stops dead
     ctx.bus.emit('shot', { origin, dir, weapon: sp.name, id: sp.id, who: 'player', melee: true, muzzle, hit: firstHit ? firstHit.point.clone() : null }); return; }
   S.fx.muzzleLightAt(muzzle, sp.flashStrength ?? (sp.slot === 0 ? 1 : 0.7), opts.hold ? opts.hold : 0.045);
@@ -483,10 +499,10 @@ export function update(dt, ctx) {
 
   // ---------- input ----------
   if (playing && dt > 0 && !S.dead && stowed) {
-    for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { selectBag(n - 1); break; }   // 1–9 / numpad: your collected guns
+    for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { if (n === 7) selectFists(); else selectBag(n - 1); break; }   // 1–9 / numpad: your collected guns
     S.triggerHeld = false; S.triggerPressed = false; S.adsTarget = 0; if (S.qaAds != null) S.adsTarget = 0;
   } else if (playing && dt > 0 && !S.dead) {
-    for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { selectBag(n - 1); break; }   // 1–9 / numpad: your collected guns
+    for (let n = 1; n <= 9; n++) if (input.consume('Digit' + n) || input.consume('Numpad' + n)) { if (n === 7) selectFists(); else selectBag(n - 1); break; }   // 7: fists   // 1–9 / numpad: your collected guns
     if (input.mouse.wheel) {
       if (ctx.input?.keys?.has?.('KeyZ')) { S.zMag = clamp((S.zMag || 4) * (input.mouse.wheel < 0 ? 1.25 : 0.8), 2, 8); ctx.hud?.toast?.(`${S.zMag.toFixed(1)}×`, 600); }
       else if (S.weapons[S.cur]?.spec?.scope && S.adsTarget) {   // sniper aimed: the wheel steps the scope zoom (x0.5 … x3 of its base magnification)
@@ -761,7 +777,7 @@ export function update(dt, ctx) {
   // ---------- scope (sniper): overlay replaces the viewmodel once the eye is on the eyepiece; aim sway moves the camera ----------
   const scoped = !!sp.scope && S.ads > 0.85 && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && !S.showcase && !(w.needsAction && w.actionT >= 0);
   if (scoped !== S.scoped) { S.scoped = scoped; S.scope.rig.visible = scoped; if (scoped) ctx.bus.emit('scope', { on: true }); else ctx.bus.emit('scope', { on: false }); }
-  if (!S.swap) w.group.visible = !scoped && !(stowed && S.lower > 0.9);
+  if (!S.swap) w.group.visible = !scoped && !(stowed && S.lower > 0.9) && !(sp.fists && S.time - w.lastShot > 2.2 && !S.swing);   // fists: hands down when you're not fighting
   // only the gun in your hands is ever drawn: bag swaps / pickups / loadout changes could leave an earlier gun's model showing
   { const held = S.weapons[S.cur]; for (const id in S.cache) { const c = S.cache[id]; if (c !== held && c.group.visible) c.group.visible = false; } }
   if (scoped) {
