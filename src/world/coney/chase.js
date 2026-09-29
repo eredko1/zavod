@@ -51,6 +51,9 @@ export function buildChase(world) {
   bus.on('npcHurt', (d) => crime(d?.dead ? 'kill' : 'shot', d?.position));
   bus.on('enemyKilled', (d) => { if (!K || !d?.position || !K.units.some((u) => u.s === d.soldier)) return; try { HK.dropCash(d.position.clone().setY(0.05), 20 + 10 * Math.floor(Math.random() * 5)); } catch {} });   // drop a cop / a pursuer: his wallet hits the pavement (his gun drops via ai.js)   // stabbing / shooting the locals (hangkit hurtable NPCs)
   bus.on('vehicle', (e) => { if (e?.stage === 'mount' && e.bike?.spec?.car) crime('steal', e.bike.pos || ctx.player?.position); });
+  // a cop car the cops have jumped out of: F at it and it's yours (a real drivable car in NYPD colours, lightbar and all)
+  K.copSpot = new THREE.Vector3(0, -999, 0);
+  HK.spot({ pos: K.copSpot, r: 5, dy: 2.5, when: () => !!K.copTarget && !ctx.vehicles?.mounted, prompt: 'F — STEAL THE COP CAR', act: () => stealCop() });
   bus.on('enemyKilled', (d) => { if (!d || d.qa || (d.wave && ctx.netwaves)) return; crime(d.chase === 'cop' ? 'copKill' : d.chase === 'crew' ? 'crewKill' : 'kill', d.position || ctx.player?.position); });
   bus.on('playerDied', () => wasted());
   bus.on('restart', () => { for (const u of K.units) disposeBike(u); K.units.length = 0; for (const c of K.cars) disposeCar(c); K.cars.length = 0; K.stars = 0; K.crew.heat = 0; renderUI(); });
@@ -358,6 +361,10 @@ function disposeCar(c) { K.ctx.scene.remove(c.group); c.gone = true; }
 
 function updateCars(dt) {
   const ctx = K.ctx, p = ctx.player, t = K.t, veh = ctx.vehicles?.mounted;
+  // an empty cop car within reach (the crew bailed out): the steal prompt sits on it; a stolen one keeps its lights going
+  K.copTarget = null; if (!veh && p && !p.dead) { let bd = 4.8; for (const c of K.cars) { if (c.gone || c.leaving || c.manned || c.state !== 'stopped') continue; const d = hyp(c.pos.x, c.pos.z, p.position.x, p.position.z); if (d < bd) { bd = d; K.copTarget = c; } } }
+  if (K.copTarget) K.copSpot.copy(K.copTarget.pos); else K.copSpot.set(0, -999, 0);
+  if (K.stolen?.v && !K.stolen.v.gone) { const k = veh === K.stolen.v ? Math.floor(t * 6) % 2 : -1; K.stolen.lamps[0].material = k === 0 ? carMats().red : carMats().off; K.stolen.lamps[1].material = k === 1 ? carMats().blue : carMats().off; }
   for (const c of K.cars) {
     lampFlash(c, c.manned || K.units.some((u) => u.car === c && !u.s.dead), t);
     if (c.state === 'stopped' && !c.leaving && veh && Math.abs(veh.speed || 0) > 6 && c.pos.distanceTo(p.position) > 30) {
@@ -426,6 +433,16 @@ function carFire(c, dp) {
     ctx.bus.emit('shot', { origin: o.clone(), dir, weapon: 'pistol', who: 'enemy', hit });
     if (hit && ctx.state === 'playing') try { p.damage?.(5 + Math.floor(rng() * 5), c.pos.clone()); } catch {}
   }, k * 140);
+}
+function stealCop() {
+  const c = K.copTarget, ctx = K.ctx, V = ctx.vehicles; if (!c || !V?.spawnCar) return;
+  const v = V.spawnCar(c.pos.x, c.pos.z, c.heading, 'sedan', 0xf2f2ee, c.pos.y); if (!v) return;
+  // the livery: stripes, lightbar and its lamps (the boxes on the chase car's body) onto the drivable car's body, same frame
+  const lamps = []; for (const m of c.body.children) { if (m.isGroup || m.geometry?.type !== 'BoxGeometry') continue; const q = m.clone(); v.body.add(q); if (c.lamps.includes(m)) lamps[c.lamps.indexOf(m)] = q; }
+  K.stolen = { v, lamps };
+  disposeCar(c); K.cars.splice(K.cars.indexOf(c), 1); K.copTarget = null;
+  V.mount(v); K.stars = Math.max(K.stars, 3); K.seenT = K.t;
+  HK.toast('You stole a cop car. Every cop in Brooklyn just heard about it. ★★★', 3200);
 }
 function bail(c) {
   c.state = 'stopped'; c.manned = false; c.speed = 0;
@@ -558,6 +575,9 @@ export const chaseQA = {
   crew: () => { const nt = nearestTower(K.ctx.player.position); K.crew.heat = 1; K.crew.seenT = K.t; K.crew.tower = nt?.t || null; K.crew.spawned = 0; K.crewT = 0; renderUI(); return !!nt; },
   clear: () => wasted(),
   spawnCar: () => !!spawnCar(),
+  copBail: (dx = 5) => { const c = spawnCar(); if (!c) return false; const p = K.ctx.player.position; c.pos.set(p.x + dx, K.W.groundHeight?.(p.x + dx, p.z) ?? 0, p.z); place(c); bail(c); c.state = 'stopped'; c.manned = false; return true; },
+  stolen: () => !!K.stolen && K.ctx.vehicles?.mounted === K.stolen.v,
+  copTarget: () => K.copTarget ? { st: K.copTarget.state, manned: K.copTarget.manned, leaving: K.copTarget.leaving, d: +K.copTarget.pos.distanceTo(K.ctx.player.position).toFixed(1) } : (K.cars.map((c) => ({ st: c.state, manned: c.manned, leaving: c.leaving, gone: !!c.gone, d: +c.pos.distanceTo(K.ctx.player.position).toFixed(1) }))),
   spawn: (kind = 'cop', dmin = 12, dmax = 20) => { const at = spawnPoint(K.ctx.player.position, dmin, dmax, null); return at ? !!spawnUnit(kind, at) : false; },
   zones: () => K.zones.map((z) => ({ c: [+z.c.x.toFixed(1), +z.c.z.toFixed(1)], ha: +z.ha.toFixed(1), hc: +z.hc.toFixed(1), doors: z.doors.map((d) => [+d.x.toFixed(1), +d.z.toFixed(1)]) })),
   noGo: (x, z, y = 0) => noGo(x, z, y),
