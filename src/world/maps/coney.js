@@ -44,11 +44,12 @@ export function build(world) {
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
   try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
-  try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
-  try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
-  try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
+  const skip = new Set(String(ctx.qs?.get?.('skip') || '').split(','));   // ?skip=horizon,belt,subway,greens,crowds,traffic (and tavern, brighton in hangout.js)
+  if (!skip.has('horizon')) try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
+  if (!skip.has('belt')) try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
+  if (!skip.has('subway')) try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
   Object.defineProperty(W, 'filmGrade', { get: () => (/night|dusk/i.test(W.tod?.get?.() || '') ? null : 'lunafilm'), configurable: true });   // the aerial-photo grade by day (Settings → Film look)
-  try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
+  if (!skip.has('greens')) try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
   try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
   // the map (src/minimap.js): street centrelines, street names, points of interest
   W.mapRoads = OSM.r.map((r) => ({ p: r.p, w: r.w }));
@@ -94,9 +95,9 @@ export function build(world) {
     if (d) { p[0] -= fx * (d + 1.5); p[2] -= fz * (d + 1.5); }
   }
   for (let x = PLAY.x0 + 10; x < PLAY.x1; x += 22) world.cover(x, BW.z1 - 2.8, 0, -1);
-  ctx.progress(0.24, 'coney: crowds'); try { buildBeachLife(world, M); } catch (e) { console.warn('[coney] life', e); }
+  ctx.progress(0.24, 'coney: crowds'); if (!skip.has('crowds')) try { buildBeachLife(world, M); } catch (e) { console.warn('[coney] life', e); }
   ctx.progress(0.25, 'coney: spawns + bikes'); placeSpawnsBikesCover(world, M, piers);   // after every collider exists (city, housing, park, shore, life)
-  try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
+  if (!skip.has('traffic')) try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
 
   W.surfaceAt = (p) => {
     if (p.z > BW.z1 && p.y < -0.5) return 'ground';

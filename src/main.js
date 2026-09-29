@@ -160,6 +160,11 @@ async function prewarm() {
   catch (e) { console.warn('[boot] warm frame', e); }
   finally { for (const o of culled) o.frustumCulled = true; for (const o of shown) o.visible = false; }
   ctx.perf.warm = { compileMs: Math.round(t1 - t0), frameMs: Math.round(performance.now() - t1), programs: renderer.info.programs?.length || 0 };
+  // phones: the big merged static meshes nobody raycasts (parked cars, Brighton, the backdrop, 8th Ave) are on the GPU now,
+  // their JS copies are dead weight (~35 MB): iOS kills the tab near its memory ceiling
+  if (ctx.lite) { const rt = new Set(ctx.raycastTargets || []), seen = new Set();
+    scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern):/.test(o.name || '')) return; seen.add(g);
+      if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }); }
 }
 
 // ---------- loop ----------
