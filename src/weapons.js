@@ -389,8 +389,14 @@ function fireShot(w, opts = {}) {
   // direction with spread (cone; deterministic via ctx.rng)
   cam.updateMatrixWorld(true);
   cam.getWorldDirection(_fwd); _right.set(1, 0, 0).applyQuaternion(cam.quaternion); _up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+  let origin = cam.getWorldPosition(new THREE.Vector3());
+  if (ctx.renderer?.xr?.isPresenting && ctx.vr?.activeAim) {
+    origin = ctx.vr.activeAim.origin.clone();
+    _fwd.copy(ctx.vr.activeAim.dir);
+    _right.set(1, 0, 0).applyQuaternion(ctx.vr.activeAim.quaternion);
+    _up.set(0, 1, 0).applyQuaternion(ctx.vr.activeAim.quaternion);
+  }
   const spread = currentSpread() * DEG;
-  const origin = cam.getWorldPosition(new THREE.Vector3());
   const coneDir = (spreadRad, out) => { const a = rng() * Math.PI * 2, rad = Math.sqrt(rng()) * spreadRad; const tr = Math.tan(rad); return out.copy(_fwd).addScaledVector(_right, Math.cos(a) * tr).addScaledVector(_up, Math.sin(a) * tr).normalize(); };
   const dir = coneDir(spread, new THREE.Vector3());
   S.spreadExtra = Math.min(sp.spreadMax, S.spreadExtra + sp.spreadPerShot);

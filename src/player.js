@@ -430,6 +430,17 @@ function finishFrame(p, ctx, dt, ix, iy, il) {
 
 function applyCamera(p, ctx) {
   const cam = ctx.camera; if (!cam) return;
+  const rig = ctx.playerRig;
+
+  if (ctx.renderer?.xr?.isPresenting) {
+    if (rig) {
+      rig.position.set(p.position.x, p.position.y, p.position.z);
+      rig.rotation.y = p.yaw;
+    }
+    cam.getWorldPosition(p.cameraPosition);
+    return;
+  }
+
   const eyeY = p.position.y + p.height - EYE_DROP + S.eyeSmooth + S.landY + (p.dead ? 0 : -p.slideBlend * 0.08);
   const fwd = forwardVec(p.yaw, _f), right = _r.set(-fwd.z, 0, fwd.x);
   _v.set(p.position.x, eyeY, p.position.z).addScaledVector(right, p.bob.x).addScaledVector(_up, p.bob.y);

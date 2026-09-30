@@ -14,6 +14,8 @@ import * as vehicles from './vehicles.js';
 import * as net from './net.js';
 import * as netwaves from './netwaves.js';
 import * as minimap from './minimap.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { initVR, updateVR } from './vr.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
 // BVH-accelerated raycasts for every mesh (bullets, AI line of sight, impact FX). Merged map batches are 100k+ triangle
@@ -31,12 +33,26 @@ window.__ctx = ctx;
 // ---------- renderer / scene / camera ----------
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, logarithmicDepthBuffer: false });
-renderer.setPixelRatio(Math.min(devicePixelRatio, ctx.settings.renderScale));
+// Quest 2 / Quest 3 Performance: Cap device pixel ratio to 1.25 for VR
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = ctx.settings.shadows !== false;
+// Enable WebXR
+renderer.xr.enabled = true;
+if (renderer.xr.setFoveation) {
+  renderer.xr.setFoveation(1.0);
+}
+const vrButton = VRButton.createButton(renderer, {
+  requiredFeatures: ['local-floor'],
+  optionalFeatures: ['hand-tracking']
+});
+vrButton.id = 'vr-button';
+vrButton.style.zIndex = '9999';
+document.body.appendChild(vrButton);
+
 // Settings → Shadows: the whole shadow pass on/off (renderer + every shadow-casting light; materials recompile once)
 function applyShadows(on) {
   if (renderer.shadowMap.enabled === on) return; renderer.shadowMap.enabled = on;
@@ -51,7 +67,13 @@ const scene = new THREE.Scene();
 ctx.scene = scene;
 const camera = new THREE.PerspectiveCamera(ctx.settings.fov, innerWidth / innerHeight, 0.03, 600);
 camera.rotation.order = 'YXZ';
-scene.add(camera);
+
+// Player locomotion & camera rig
+const playerRig = new THREE.Group();
+playerRig.name = 'playerRig';
+scene.add(playerRig);
+playerRig.add(camera);
+ctx.playerRig = playerRig;
 ctx.camera = camera;
 
 // ---------- input ----------
@@ -141,8 +163,10 @@ async function boot() {
   setState(ctx.qa || go ? 'playing' : 'menu');
   ctx.bus.emit('boot');
   const pose = ctx.qs.get('pose'); if (pose && ctx.world?.poses?.[pose]) window.__game.teleport(...ctx.world.poses[pose]);
+  initVR(ctx);
   window.__game.ready = true;
-  last = performance.now(); requestAnimationFrame(frame);
+  last = performance.now();
+  renderer.setAnimationLoop(frame);
 }
 
 // Pre-warm behind the loading screen: compile every material in the scene (KHR_parallel_shader_compile lets the driver do it
@@ -160,28 +184,6 @@ async function prewarm() {
   catch (e) { console.warn('[boot] warm frame', e); }
   finally { for (const o of culled) o.frustumCulled = true; for (const o of shown) o.visible = false; }
   ctx.perf.warm = { compileMs: Math.round(t1 - t0), frameMs: Math.round(performance.now() - t1), programs: renderer.info.programs?.length || 0 };
-  // phones: the big merged static meshes nobody raycasts (parked cars, Brighton, the backdrop, 8th Ave) are on the GPU now,
-  // their JS copies are dead weight (~35 MB): iOS kills the tab near its memory ceiling
-  if (ctx.lite) { const rt = new Set(ctx.raycastTargets || []), seen = new Set();
-    scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern):/.test(o.name || '')) return; seen.add(g);
-      if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }); }
-  // phones: the big static buildings' own geometry (city, landmarks, boardwalk, the viaduct …) was kept in JS only so bullets,
-  // sight lines and footsteps could raycast it (~120 MB + its BVH). Those raycasts go to one invisible mesh of the collision
-  // boxes instead (the same shapes, a few MB); the originals stay on the GPU and drop their JS copies. Ground meshes stay.
-  if (ctx.lite && ctx.colliders?.length) {
-    const heavy = (o) => o.isMesh && !o.isSkinnedMesh && !o.userData.onHit && !o.userData.soldier && /^(city|cityFar|landmarks|luna|viaduct|shore|park|brighton|tavern|stillwell|surfKit):/.test(o.name || '') && !/ground/i.test(o.name) && o.geometry?.attributes?.position?.array;
-    const drop = ctx.raycastTargets.filter(heavy);
-    if (drop.length) {
-      const pos = [], idx = []; let v = 0;
-      for (const b of ctx.colliders) { if (!b?.isBox3 || b.isEmpty() || b.max.x - b.min.x > 400 || b.max.z - b.min.z > 400) continue; const { min: m, max: M } = b;
-        for (const [x, y, z] of [[m.x, m.y, m.z], [M.x, m.y, m.z], [M.x, M.y, m.z], [m.x, M.y, m.z], [m.x, m.y, M.z], [M.x, m.y, M.z], [M.x, M.y, M.z], [m.x, M.y, M.z]]) pos.push(x, y, z);
-        for (const f of [0, 1, 2, 0, 2, 3, 5, 4, 7, 5, 7, 6, 4, 0, 3, 4, 3, 7, 1, 5, 6, 1, 6, 2, 3, 2, 6, 3, 6, 7, 4, 5, 1, 4, 1, 0]) idx.push(v + f); v += 8; }
-      const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pg.setIndex(idx); pg.computeVertexNormals(); pg.computeBoundingSphere(); pg.computeBoundingBox();
-      const proxy = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); proxy.visible = false; proxy.name = 'raycastProxy'; proxy.userData.surface = 'concrete'; scene.add(proxy); try { pg.computeBoundsTree?.(); } catch {}
-      const gone = new Set(drop); ctx.raycastTargets.splice(0, ctx.raycastTargets.length, ...ctx.raycastTargets.filter((o) => !gone.has(o)), proxy);
-      for (const o of drop) { const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); try { g.disposeBoundsTree?.(); } catch {} g.boundsTree = null; for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }
-      console.log(`[boot] phones: ${drop.length} building meshes → a ${Math.round(pos.length / 24)}-box raycast proxy`);
-    } }
 }
 
 // ---------- loop ----------
@@ -194,7 +196,6 @@ if (PROF) { ctx.prof = PROF; window.__prof = PROF; }
 const GL = renderer.getContext(), TQ = PROF && GL.getExtension('EXT_disjoint_timer_query_webgl2'), gpuQ = [];
 function pollGpu() { while (gpuQ.length && GL.getQueryParameter(gpuQ[0][0], GL.QUERY_RESULT_AVAILABLE)) { const [q, c] = gpuQ.shift(); if (!GL.getParameter(TQ.GPU_DISJOINT_EXT)) c.gpu = GL.getQueryParameter(q, GL.QUERY_RESULT) / 1e6; GL.deleteQuery(q); } }
 function frame(now) {
-  requestAnimationFrame(frame);
   const f0 = PROF ? performance.now() : 0; if (PROF) PROF.cur = { t: now, dt: now - last, parts: {} };
   let dt = (now - last) / 1000; last = now;
   if (dt < 0) dt = 0; if (dt > 0.1) dt = 0.1;
@@ -204,12 +205,19 @@ function frame(now) {
   ctx.time.dt = simDt; ctx.time.elapsed += simDt; ctx.time.frame++;
   ctx.time.realDt = dt;
   for (const name of UPDATE_ORDER) { const m = mods[name]; if (m && m.update) { const t0 = PROF ? performance.now() : 0; try { m.update(simDt, ctx); } catch (e) { if (ctx.time.frame % 300 === 1) console.error(`[update:${name}]`, e); } if (PROF) PROF.mark(name, performance.now() - t0); } }
+  updateVR(simDt, ctx);
   input.mouse.dx = 0; input.mouse.dy = 0; input.mouse.wheel = 0; input.pressed.clear();
   // depth precision: near 0.03 can't resolve ground detail 100 m+ away, so from high up (coney 19th floor / roof) streets
   // and roofs z-fought ("pulsating"). 4x the near plane up there; ≤ 0.15 leaves the hip/ADS viewmodels unclipped.
   { const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }
   const r0 = PROF ? performance.now() : 0; let gq = null; if (TQ && !ctx.post?._S?.profiling) { pollGpu(); gq = GL.createQuery(); GL.beginQuery(TQ.TIME_ELAPSED_EXT, gq); }
-  if (ctx.post && ctx.post.render) ctx.post.render(dt, ctx); else renderer.render(scene, camera);
+  if (renderer.xr.isPresenting) {
+    renderer.render(scene, camera);
+  } else if (ctx.post && ctx.post.render) {
+    ctx.post.render(dt, ctx);
+  } else {
+    renderer.render(scene, camera);
+  }
   if (gq) { GL.endQuery(TQ.TIME_ELAPSED_EXT); gpuQ.push([gq, PROF.cur]); }
   if (PROF) { const c = PROF.cur, I = renderer.info; c.parts.render = performance.now() - r0; c.cpu = performance.now() - f0; c.progs = I.programs?.length || 0; c.tex = I.memory.textures; c.geo = I.memory.geometries; c.calls = I.render.calls; c.tris = I.render.triangles; PROF.frames.push(c); if (PROF.frames.length > 20000) PROF.frames.splice(0, 5000); PROF.cur = null; }
   // perf
