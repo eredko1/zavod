@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { createCtx, clamp } from './ctx.js';
 import * as assets from './assets.js';
 import * as world from './world.js';
-import * as player from './player.js';
-import * as weapons from './weapons.js';
+import * as player from './player.js?v=vr6';
+import * as weapons from './weapons.js?v=vr6';
 import * as ai from './ai.js';
 import * as post from './post.js';
 import * as hud from './hud.js';
@@ -15,7 +15,7 @@ import * as net from './net.js';
 import * as netwaves from './netwaves.js';
 import * as minimap from './minimap.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { initVR, updateVR } from './vr.js';
+import { initVR, updateVR } from './vr.js?v=vr6';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
 // BVH-accelerated raycasts for every mesh (bullets, AI line of sight, impact FX). Merged map batches are 100k+ triangle
@@ -212,6 +212,7 @@ function frame(now) {
   }
   const r0 = PROF ? performance.now() : 0; let gq = null; if (TQ && !ctx.post?._S?.profiling) { pollGpu(); gq = GL.createQuery(); GL.beginQuery(TQ.TIME_ELAPSED_EXT, gq); }
   if (renderer.xr.isPresenting) {
+    renderer.autoClear = true;
     if (playerRig && ctx.player) {
       playerRig.position.set(ctx.player.position.x, ctx.player.position.y, ctx.player.position.z);
       playerRig.rotation.y = ctx.player.yaw;
@@ -235,6 +236,7 @@ function frame(now) {
 }
 
 addEventListener('resize', () => {
+  if (renderer.xr.isPresenting) return;
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   for (const [, m] of MODULES) if (m.onResize) m.onResize(ctx);

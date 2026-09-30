@@ -86,11 +86,18 @@ export function initVR(ctx) {
       playerRig.updateMatrix();
       playerRig.updateMatrixWorld(true);
     }
+    // Set VR camera near plane to 0.15 to prevent 24-bit depth precision Z-fighting on Quest 2
+    camera.near = 0.15;
+    camera.updateProjectionMatrix();
     camera.position.set(0, 0, 0);
     camera.rotation.set(0, 0, 0);
     camera.quaternion.identity();
     camera.updateMatrix();
     camera.updateMatrixWorld(true);
+
+    if (ctx.weapons?.viewmodel) {
+      ctx.weapons.viewmodel.visible = false;
+    }
 
     // Auto-enter playing state in VR
     ctx.setState('playing');
@@ -104,6 +111,11 @@ export function initVR(ctx) {
   renderer.xr.addEventListener('sessionend', () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, ctx.settings?.renderScale ?? 1));
     applyVRShadows(ctx, ctx.settings?.shadows !== false);
+    camera.near = 0.03;
+    camera.updateProjectionMatrix();
+    if (ctx.weapons?.viewmodel) {
+      ctx.weapons.viewmodel.visible = true;
+    }
     if (playerRig) {
       playerRig.position.set(0, 0, 0);
       playerRig.rotation.set(0, 0, 0);
