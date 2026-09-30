@@ -207,13 +207,21 @@ function frame(now) {
   ctx.time.realDt = dt;
   for (const name of UPDATE_ORDER) { const m = mods[name]; if (m && m.update) { const t0 = PROF ? performance.now() : 0; try { m.update(simDt, ctx); } catch (e) { if (ctx.time.frame % 300 === 1) console.error(`[update:${name}]`, e); } if (PROF) PROF.mark(name, performance.now() - t0); } }
   updateVR(simDt, ctx);
-  input.mouse.dx = 0; input.mouse.dy = 0; input.mouse.wheel = 0; input.pressed.clear();
-  // depth precision: near 0.03 can't resolve ground detail 100 m+ away, so from high up (coney 19th floor / roof) streets
-  // and roofs z-fought ("pulsating"). 4x the near plane up there; ≤ 0.15 leaves the hip/ADS viewmodels unclipped.
-  { const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }
+  if (!renderer.xr.isPresenting) {
+    const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
+  }
   const r0 = PROF ? performance.now() : 0; let gq = null; if (TQ && !ctx.post?._S?.profiling) { pollGpu(); gq = GL.createQuery(); GL.beginQuery(TQ.TIME_ELAPSED_EXT, gq); }
   if (renderer.xr.isPresenting) {
+    if (playerRig && ctx.player) {
+      playerRig.position.set(ctx.player.position.x, ctx.player.position.y, ctx.player.position.z);
+      playerRig.rotation.y = ctx.player.yaw;
+      playerRig.updateMatrix();
+      playerRig.updateMatrixWorld(true);
+    }
     renderer.render(scene, camera);
+    if (ctx.player) {
+      camera.getWorldPosition(ctx.player.cameraPosition);
+    }
   } else if (ctx.post && ctx.post.render) {
     ctx.post.render(dt, ctx);
   } else {
@@ -235,6 +243,7 @@ addEventListener('resize', () => {
 // ---------- QA hooks (window.__game) ----------
 window.__game = {
   ready: false, ctx,
+  frame: (t = performance.now()) => frame(t),
   stats: () => ({ fps: +ctx.perf.fps.toFixed(1), frameMs: +ctx.perf.frameMs.toFixed(2), drawCalls: ctx.perf.drawCalls, triangles: ctx.perf.triangles, state: ctx.state, errors: ctx.bootErrors || [], enemies: ctx.ai?.soldiers?.length ?? null, quality: ctx.settings.quality }),
   setState,
   teleport: (x, y, z, yaw = 0, pitch = 0) => ctx.player?.teleport?.(x, y, z, yaw, pitch),

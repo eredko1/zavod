@@ -63,6 +63,12 @@ export async function init(ctx) {
       const gy = groundY(x, z);
       S.hover = y > gy + 0.3 && supportBelow(grid, p.position, RADIUS, 0.3, gy) === -Infinity;
       S.noFallDamageUntil = S.hover ? Infinity : 0;
+      if (ctx.renderer?.xr?.isPresenting && ctx.playerRig) {
+        ctx.playerRig.position.set(x, y, z);
+        ctx.playerRig.rotation.y = yaw;
+        ctx.playerRig.updateMatrix();
+        ctx.playerRig.updateMatrixWorld(true);
+      }
     },
     damage(amount, from) {
       if (p.dead || !(amount > 0)) return;
@@ -450,6 +456,8 @@ function applyCamera(p, ctx) {
     if (rig) {
       rig.position.set(p.position.x, p.position.y, p.position.z);
       rig.rotation.y = p.yaw;
+      rig.updateMatrix();
+      rig.updateMatrixWorld(true);
     }
     cam.getWorldPosition(p.cameraPosition);
     return;
