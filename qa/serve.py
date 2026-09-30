@@ -7,4 +7,4 @@ class H(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
     def log_message(self, *a): pass
 socketserver.TCPServer.allow_reuse_address = True
-with socketserver.ThreadingTCPServer(('127.0.0.1', int(sys.argv[1]) if len(sys.argv) > 1 else 8790), H) as s: s.serve_forever()
+with socketserver.ThreadingTCPServer(('0.0.0.0', int(sys.argv[1]) if len(sys.argv) > 1 else 8790), H) as s: s.serve_forever()

@@ -80,18 +80,19 @@ ctx.camera = camera;
 const input = {
   keys: new Set(), mouse: { dx: 0, dy: 0, buttons: 0, wheel: 0 }, locked: false,
   touch: { axis: { x: 0, y: 0 }, fire: false, ads: false, sprint: false }, // written by touch.js
+  vr: { axis: { x: 0, y: 0 }, fire: false, sprint: false }, // written by vr.js
   // edge-triggered action flags, consumed by player/weapons each frame via consume()
   pressed: new Set(),
   down(code) { return this.keys.has(code); },
   consume(code) { const h = this.pressed.has(code); this.pressed.delete(code); return h; },
   // named actions
-  get fire() { return (this.mouse.buttons & 1) !== 0 || this.touch.fire; },
+  get fire() { return (this.mouse.buttons & 1) !== 0 || this.touch.fire || this.vr.fire; },
   get ads() { return (this.mouse.buttons & 4) !== 0 || this.down('KeyE') || this.touch.ads; }, // RMB (bit 1 << 2), hold E, or touch — was & 2 (the middle button), so right-click never aimed
-  get forward() { return this.down('KeyW') || this.down('ArrowUp') || this.touch.axis.y < -0.3; },
-  get back() { return this.down('KeyS') || this.down('ArrowDown') || this.touch.axis.y > 0.3; },
-  get left() { return this.down('KeyA') || this.down('ArrowLeft') || this.touch.axis.x < -0.3; },
-  get right() { return this.down('KeyD') || this.down('ArrowRight') || this.touch.axis.x > 0.3; },
-  get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight') || (this.touch.sprint && !this.touch.fire && !this.touch.ads); }, // on touch, firing/aiming cancels auto-sprint
+  get forward() { return this.down('KeyW') || this.down('ArrowUp') || this.touch.axis.y < -0.3 || this.vr.axis.y > 0.2; },
+  get back() { return this.down('KeyS') || this.down('ArrowDown') || this.touch.axis.y > 0.3 || this.vr.axis.y < -0.2; },
+  get left() { return this.down('KeyA') || this.down('ArrowLeft') || this.touch.axis.x < -0.3 || this.vr.axis.x < -0.2; },
+  get right() { return this.down('KeyD') || this.down('ArrowRight') || this.touch.axis.x > 0.3 || this.vr.axis.x > 0.2; },
+  get sprint() { return this.down('ShiftLeft') || this.down('ShiftRight') || (this.touch.sprint && !this.touch.fire && !this.touch.ads) || this.vr.sprint; },
   get crouch() { return this.down('KeyC') || this.down('ControlLeft'); },
   get jump() { return this.down('Space'); },
 };

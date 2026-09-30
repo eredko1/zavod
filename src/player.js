@@ -150,6 +150,10 @@ export function update(dt, ctx) {
   let ix = 0, iy = 0, sprintIn = false, crouchIn = false, jumpHeld = false, jumpPress = input.consume('Space');
   if (input.forward) iy += 1; if (input.back) iy -= 1; if (input.right) ix += 1; if (input.left) ix -= 1;
   sprintIn = input.sprint; crouchIn = input.crouch; jumpHeld = input.jump;
+  if (input.vr && (Math.abs(input.vr.axis.x) > 0.05 || Math.abs(input.vr.axis.y) > 0.05)) {
+    ix = input.vr.axis.x; iy = input.vr.axis.y;
+    sprintIn = sprintIn || !!input.vr.sprint;
+  }
   if (S.qa) {
     const Q = S.qa, q = Q.segs[Q.i]; Q.elapsed += dt;
     ix += q.x; iy += q.y; sprintIn = sprintIn || q.sprint; crouchIn = crouchIn || q.crouch;
@@ -238,7 +242,17 @@ export function update(dt, ctx) {
   p.sliding = S.sliding;
 
   // ---- wish velocity ----
-  const fwd = forwardVec(p.yaw, _f), right = _r.set(-fwd.z, 0, fwd.x);
+  let fwd, right;
+  if (ctx.renderer?.xr?.isPresenting) {
+    ctx.camera.getWorldDirection(_f);
+    _f.y = 0;
+    if (_f.lengthSq() < 1e-4) _f.set(0, 0, -1); else _f.normalize();
+    fwd = _f;
+    right = _r.set(-fwd.z, 0, fwd.x);
+  } else {
+    fwd = forwardVec(p.yaw, _f);
+    right = _r.set(-fwd.z, 0, fwd.x);
+  }
   let base = p.crouching ? SPD.crouch : p.ads ? SPD.ads : p.sprinting ? SPD.sprint : SPD.walk;
   const dirMul = il > 0 ? (Math.abs(iy) * (iy < 0 ? BACK_MUL : 1) + Math.abs(ix) * STRAFE_MUL) / (Math.abs(ix) + Math.abs(iy)) : 1;
   const wishSpeed = base * dirMul;
