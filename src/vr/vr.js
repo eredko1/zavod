@@ -19,15 +19,19 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
 const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.018, PINCH_OFF = 0.032, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
-const SEAT_DIST = 0.45, UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
-const UI_HZ = 15, HUD_HZ = 4, GAME_HZ = 24, STAND_H = 1.7;
+// in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
+// over the dashboard
+const SEAT_UI_DIST = 0.95, SEAT_HUD_DIST = 0.65, UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
+const UI_HZ = 15, HUD_HZ = 4, GAME_HZ = 24, STAND_H = 1.7, STAND_EYE = 1.6;
 const PREF_KEY = 'zavod.vr';
+const SMOOTH_TURN = 2.1;   // rad/s at full stick (~120°/s)
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
-const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, ...load() };
+const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, seated: false, ...load() };
 function load() { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch { return {}; } }
 function save() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }
+const mainHand = () => prefs.left ? V.hands.left : V.hands.right, offHand = () => prefs.left ? V.hands.right : V.hands.left;
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
@@ -65,7 +69,7 @@ export async function init(ctx) {
   const exitPL = document.exitPointerLock?.bind(document); document.exitPointerLock = () => { if (V.presenting && ctx.state === 'playing') V.uiHold = true; try { exitPL?.(); } catch {} };
   const reqPL = ctx.requestPointerLock; ctx.requestPointerLock = () => { V.uiHold = false; if (!V.presenting) reqPL?.(); };
   ctx.bus.on('state', () => { V.uiHold = false; });
-  ctx.bus.on('shot', () => { if (V.presenting) pulse(V.hands.right, 0.45, 35); });
+  ctx.bus.on('shot', () => { if (V.presenting) pulse(mainHand(), 0.45, 35); });
   enterButton(ctx); optionsCard(ctx); keyboard(ctx);
   // a page reached by link / reload from inside VR (picking a map reloads): the browser hands the session straight back
   V.granted = !!window.__xrGranted;   // caught by index.html's first script: the event can fire before this module loads
@@ -88,7 +92,7 @@ async function start() {
 
 function begin(session) {
   const { ctx } = V; V.presenting = true; ctx.xr.presenting = true; V.headPrev = null; V.wroteYaw = null; V.mode = 'foot';
-  V.turn = ctx.player?.yaw || 0; V.rigYaw = V.turn;
+  V.turn = ctx.player?.yaw || 0; V.rigYaw = V.turn; V.seatH0 = 0;   // seated height: taken from the first head pose (or the Seated button)
   try { ctx.renderer.xr.setFoveation(1); } catch {}
   try { session.updateTargetFrameRate?.(72)?.catch?.(() => {}); } catch {}
   // shadows are a whole second scene pass per light, per eye: off in the headset, back on after if they were on
@@ -114,7 +118,8 @@ function begin(session) {
 function end() {
   const { ctx } = V; V.presenting = false; ctx.xr.presenting = false; V.session = null; ctx.xrAim = null;
   const vm = ctx.weapons?.viewmodel; if (vm && V.vmParent) { V.vmParent.add(vm); vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); vm.visible = true; }
-  if (vm) { vm.traverse((o) => { if (/^arm_/.test(o.name)) o.visible = true; }); if (V.vmScale0) vm.scale.copy(V.vmScale0); }   // weapons.js only rewrites the screen scale when its fov changes V.arms = null; V.poseMark = null;
+  if (vm) { vm.traverse((o) => { if (/^arm_/.test(o.name)) o.visible = true; }); if (V.vmScale0) vm.scale.copy(V.vmScale0); }   // weapons.js only rewrites the screen scale when its fov changes
+  V.arms = null; V.poseMark = null;
   for (const H of [V.h0, V.h1]) for (const c of H?.grip?.children || []) if (c !== V.gunMount) c.visible = true;
   if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: true });
   if (V.raf0) { window.requestAnimationFrame = V.raf0; window.cancelAnimationFrame = V.caf0; V.rafQ = null; V.raf0 = null; }   // pending callbacks are still queued with the browser
@@ -131,12 +136,13 @@ export function update(dt, ctx) {
   if (!V.presenting) return;
   if (V.rafQ?.size) { const t = performance.now(); for (const e of [...V.rafQ.values()]) if (t - e.t0 > RAF_LATE) { try { e.run(t); } catch (err) { console.warn('[vr] raf', err); } } }
   const frame = ctx.renderer.xr.getFrame(), ref = ctx.renderer.xr.getReferenceSpace(); if (!frame || !ref) return;
-  const pose = frame.getViewerPose(ref); if (pose) { const t = pose.transform; V.head.set(t.position.x, t.position.y, t.position.z); V.headQ.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w); }
+  const pose = frame.getViewerPose(ref); if (pose) { const t = pose.transform; V.head.set(t.position.x, t.position.y, t.position.z); V.headQ.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w); if (!V.seatH0 && V.head.y > 0.3) V.seatH0 = V.head.y; }
   _e.setFromQuaternion(V.headQ, 'YXZ'); const headYaw = _e.y, headPitch = _e.x;
   const inp = ctx.input, p = ctx.player, playing = ctx.state === 'playing';
   V.ui = ctx.state !== 'playing' || V.uiHold || V.quick || !!p?.mounted?.dialog || !!ctx.durakOpen;
   // ---- gamepads ----
-  const L = V.hands.left, R = V.hands.right, Lg = L?.src?.hand ? null : L?.src?.gamepad, Rg = R?.src?.hand ? null : R?.src?.gamepad;   // tracked hands expose a gamepad too (button 0 = pinch): read hands as hands
+  // left-handed: the hands swap jobs (gun + turn stick on the left, move stick + bag on the right)
+  const L = offHand(), R = mainHand(), Lg = L?.src?.hand ? null : L?.src?.gamepad, Rg = R?.src?.hand ? null : R?.src?.gamepad;   // tracked hands expose a gamepad too (button 0 = pinch): read hands as hands
   const btn = (g, i) => !!g?.buttons?.[i]?.pressed, ax = (g, i) => { const v = g?.axes?.[i] || 0; return Math.abs(v) < DEAD ? 0 : v; };
   let mx = 0, my = 0, fire = false, sprint = false;
   if (Lg) { mx = ax(Lg, 2); my = ax(Lg, 3); }
@@ -152,7 +158,8 @@ export function update(dt, ctx) {
   if (btn(Lg, 3)) V.sprintLatch = true; if (!moving) V.sprintLatch = false; sprint = V.sprintLatch || btn(Lg, 0);
   // snap turn on the right stick (crouch: pull it down)
   const rx = ax(Rg, 2), ry = ax(Rg, 3);
-  if (!V.ui) { if (Math.abs(rx) > 0.7 && !V.snapLatch) { V.snapLatch = true; V.turn -= Math.sign(rx) * prefs.snap * Math.PI / 180; V.vigKick = 1; } if (Math.abs(rx) < 0.3) V.snapLatch = false;
+  if (!V.ui) { if (prefs.smooth) { V.turnRate = Math.abs(rx) > 0.2 ? -Math.sign(rx) * (Math.abs(rx) - 0.2) / 0.8 * SMOOTH_TURN : 0; V.turn += V.turnRate * dt; }
+    else { if (Math.abs(rx) > 0.7 && !V.snapLatch) { V.snapLatch = true; V.turn -= Math.sign(rx) * prefs.snap * Math.PI / 180; V.vigKick = 1; } if (Math.abs(rx) < 0.3) V.snapLatch = false; }
     if (ry > 0.75 && !V.crouchLatch) { V.crouchLatch = true; V.crouch = !V.crouch; } if (ry < 0.3) V.crouchLatch = false; }
   else if (Math.abs(ry) > 0.25) scrollUI(ry * 900 * dt);
   // buttons → the game's own keys
@@ -242,7 +249,7 @@ function pointers(ctx, dt, Hs, fire, LH, RH) {
   }
 }
 function scrollUI(dy) {
-  const H = V.hands.right || V.hands.left; if (!H?.at) return;
+  const H = mainHand() || offHand(); if (!H?.at) return;
   let el = hitAt(H.at[0], H.at[1]);
   while (el && el !== document.body) { const cs = getComputedStyle(el); if (/auto|scroll/.test(cs.overflowY) && el.scrollHeight > el.clientHeight) { el.scrollTop += dy; V.drawT = 0; return; } el = el.parentElement; }
 }
@@ -266,7 +273,7 @@ function armsOff(ctx, vm) {
   for (const o of V.arms) o.visible = false;
 }
 function wristUpdate(ctx) {
-  const W = V.wrist, L = V.hands.left, R = V.hands.right;
+  const W = V.wrist, L = offHand(), R = mainHand();   // the menu on the off hand's palm, poked by the main hand
   const hand = L?.src?.hand ? L.hand : null; if (!hand) { W.mesh.visible = W.shown = false; return; }
   const wr = hand.joints['wrist'], mid = hand.joints['middle-finger-metacarpal']; if (!wr || !mid) return;
   if (W.mesh.parent !== wr) wr.add(W.mesh);
@@ -295,30 +302,55 @@ function wristUpdate(ctx) {
 // ~1300 objects / 6M triangles a frame out to the horizon; at 72 Hz the headset manages a few hundred. Small things far away
 // (cars, people, props, train cars) stop drawing past a distance that grows with their size; buildings, ground, sky stay.
 // Hidden by moving them off layer 0 (the eyes' layer), so modules that toggle .visible themselves are untouched.
-const CULL_LAYER = 30, CULL_EVERY = 0.2, CULL_RESCAN = 3;
+const CULL_LAYER = 30, CULL_EVERY = 0.2, CULL_RESCAN = 3, FIG_FAR = 45;
 const cullDist = (r) => r < 1.5 ? 45 : r < 4 ? 75 : r < 10 ? 120 : r < 30 ? 220 : Infinity;
 const _s = new THREE.Sphere();
 function cull(ctx, dt) {
   V.cullT = (V.cullT || 0) - dt; if (V.cullT > 0) return; V.cullT = CULL_EVERY;
-  V.scanT = (V.scanT || 0) - CULL_EVERY; const hidden = V.culled || (V.culled = new Set());
-  // instanced / batched meshes: their geometry's sphere is one copy, not the spread of copies: never culled here
-  if (V.scanT <= 0 || !V.cullList) { V.scanT = CULL_RESCAN; const L = V.cullList = [];
-    ctx.scene.traverse((o) => { if (!(o.isMesh || o.isPoints || o.isLine) || o.isInstancedMesh || o.isBatchedMesh || !o.geometry || o === V.panel || isRig(o)) return; const g = o.geometry; if (!g.boundingSphere) { try { g.computeBoundingSphere(); } catch { return; } } if (!g.boundingSphere || !(g.boundingSphere.radius < 30)) return; L.push(o); });
-    for (const o of hidden) if (!o.parent) { unhide(o); hidden.delete(o); } }   // pooled things that left the scene come back whole
+  V.scanT = (V.scanT || 0) - CULL_EVERY; const hidden = V.culled || (V.culled = new Set()), frozen = V.frozen || (V.frozen = new Set());
+  // instanced / batched meshes: their geometry's sphere is one copy, not the spread of copies: never culled here.
+  // figures (anything with a skeleton): the bone hierarchy is the expensive part (35 people = 2800 bones re-multiplied every frame),
+  // so a far figure's whole rig also stops updating its matrices (see freeze) besides not drawing.
+  if (V.scanT <= 0 || !V.cullList) { V.scanT = CULL_RESCAN; const L = V.cullList = [], F = V.figs = new Set();
+    ctx.scene.traverse((o) => {
+      if (o.isBone && !o.parent?.isBone && o.parent && !isRig(o.parent)) F.add(o.parent);
+      if (!(o.isMesh || o.isPoints || o.isLine) || o.isInstancedMesh || o.isBatchedMesh || !o.geometry || o === V.panel || isRig(o) || !(o.layers.mask & 1)) return;
+      const g = o.geometry; if (!g.boundingSphere) { try { g.computeBoundingSphere(); } catch { return; } } if (!g.boundingSphere || !(g.boundingSphere.radius < 30)) return; L.push(o); });
+    const live = new Set(L); for (const o of hidden) if (!live.has(o)) { unhide(o); hidden.delete(o); }   // gone or pooled away: whole again
+    for (const f of frozen) if (!F.has(f)) { thaw(f); frozen.delete(f); } }
   const eye = ctx.camera.position;
   for (const o of V.cullList) {
     _s.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld); const far = _s.center.distanceTo(eye) - _s.radius > cullDist(_s.radius);
-    if (far) { if (!hidden.has(o)) { o.userData.xrMask = o.layers.mask; o.layers.set(CULL_LAYER); hidden.add(o); } }
+    if (far) { if (!hidden.has(o)) { o.userData.xrMask = o.layers.mask; o.layers.mask = (o.layers.mask & ~1) | (1 << CULL_LAYER); hidden.add(o); } }
     else if (hidden.has(o)) { unhide(o); hidden.delete(o); }
   }
+  for (const f of V.figs) {
+    if (!f.parent) continue;
+    _v.copy(f.position).applyMatrix4(f.parent.matrixWorld);   // its parent still updates: a fresh position
+    const far = _v.distanceTo(eye) > FIG_FAR;
+    if (far && !frozen.has(f)) { freeze(f); frozen.add(f); } else if (!far && frozen.has(f)) { thaw(f); frozen.delete(f); }
+  }
+}
+// a frozen figure keeps its last pose: Object3D.prototype.updateMatrixWorld is shadowed on that one object, so its subtree is skipped
+const NOOP = function () {};
+function freeze(f) { f.updateMatrixWorld = NOOP; }
+function thaw(f) { delete f.updateMatrixWorld; f.matrixWorldNeedsUpdate = true; }
+/** before a raycast: frozen figures catch up (once per frame) so a far shot still hits where they actually are */
+function thawForRay() {
+  const fr = V.frozen; if (!fr?.size || V.rayFrame === V.ctx.time.frame) return; V.rayFrame = V.ctx.time.frame;
+  for (const f of fr) if (f.parent) THREE.Object3D.prototype.updateMatrixWorld.call(f, true);
 }
 function unhide(o) { if (o.userData.xrMask != null) { o.layers.mask = o.userData.xrMask; o.userData.xrMask = null; } }
-function uncullAll() { for (const o of V.culled || []) unhide(o); V.culled = null; V.cullList = null; }
-// culled things must still be hit by bullets, sight lines and footsteps: while in VR every raycast also tests the cull layer
+function uncullAll() { for (const o of V.culled || []) unhide(o); for (const f of V.frozen || []) thaw(f); V.culled = null; V.frozen = null; V.cullList = null; V.figs = null; }
+// culled things must still be hit by bullets, sight lines and footsteps: while in VR a raycast that would have seen layer 0 also sees
+// the cull layer (culling only takes layer 0 away)
 const RC = THREE.Raycaster.prototype, RC0 = { one: RC.intersectObject, all: RC.intersectObjects };
 function raycastSeesCulled(on) {
   if (!on) { RC.intersectObject = RC0.one; RC.intersectObjects = RC0.all; return; }
-  const wrap = (f) => function (...a) { const m = this.layers.mask; this.layers.enable(CULL_LAYER); try { return f.apply(this, a); } finally { this.layers.mask = m; } };
+  const wrap = (f) => function (...a) {
+    const m = this.layers.mask; if (!(m & 1)) return f.apply(this, a);
+    thawForRay(); this.layers.enable(CULL_LAYER); try { return f.apply(this, a); } finally { this.layers.mask = m; }
+  };
   RC.intersectObject = wrap(RC0.one); RC.intersectObjects = wrap(RC0.all);
 }
 function isRig(o) { for (let p = o; p; p = p.parent) if (p === V.rig || p === V.gunMount) return true; return false; }
@@ -349,7 +381,9 @@ function placeRig(ctx, ease) {
   V.rigYaw = base + V.turn;
   rig.rotation.set(0, V.rigYaw, 0);
   _v.set(V.head.x, 0, V.head.z).applyAxisAngle(_up, V.rigYaw);
-  if (foot && p) rig.position.set(p.position.x - _v.x, p.position.y + (p.height - STAND_H), p.position.z - _v.z);
+  // seated play: your real head is ~0.5 m lower than standing; lift the world's floor so your eyes are at the game's standing eye height
+  const lift = prefs.seated ? Math.max(0, STAND_EYE - (V.seatH0 || V.head.y)) : 0;
+  if (foot && p) rig.position.set(p.position.x - _v.x, p.position.y + (p.height - STAND_H) + lift, p.position.z - _v.z);
   else {
     const eye = _v2; if (veh) { const sp = veh.spec, fx = -Math.sin(veh.heading), fz = -Math.cos(veh.heading); eye.set(veh.pos.x - fx * (sp.eyeBack || 0) - fz * (sp.eyeSide || 0), veh.pos.y + (sp.eyeH || 1.2), veh.pos.z - fz * (sp.eyeBack || 0) + fx * (sp.eyeSide || 0)); } else eye.copy(cam.position);
     rig.position.set(eye.x - _v.x, eye.y - V.seatY, eye.z - _v.z);
@@ -362,7 +396,7 @@ function placeRig(ctx, ease) {
 /** weapons.js calls this before it aims: the gun hand's (or a punching hand's) world pose, with this frame's player position */
 export function syncAim(ctx) {
   if (!V.presenting) return; placeRig(ctx, false);
-  const H = V.punchH || V.hands.right; if (!H) return;
+  const H = V.punchH || mainHand(); if (!H) return;
   const src = !V.punchH && V.gunMount?.parent && V.gunMount.visible ? V.gunMount : H.src?.hand ? (H.hand.joints['wrist'] || H.grip) : H.grip;   // a gun aims down its own barrel
   src.updateMatrixWorld(true); src.matrixWorld.decompose(V.aim.position, V.aim.quaternion, _v);
   if (V.punchH) { _v.copy(V.punchH.vel).applyQuaternion(V.rig.quaternion).normalize(); V.aim.lookAt(_v.add(V.aim.position)); }   // a camera-type object: lookAt points its -Z
@@ -379,7 +413,7 @@ export function render(ctx) {
   ctx.renderer.xr.updateCamera(V.cam);
   V.cam.matrixWorld.decompose(cam.position, cam.quaternion, _v); cam.updateMatrixWorld(true);
   // the gun in the right hand: weapons.js posed it for the screen (hip offset); take the hip back out so the grip is in your palm
-  const vm = ctx.weapons?.viewmodel, R = V.hands.right;
+  const vm = ctx.weapons?.viewmodel, R = mainHand();
   if (vm && V.gunMount) {
     const holder = R ? (R.src?.hand ? (R.hand.joints['wrist'] || R.grip) : R.grip) : null;
     if (holder && V.gunMount.parent !== holder) holder.add(V.gunMount);
@@ -398,7 +432,8 @@ export function render(ctx) {
   // comfort tunnel: stick motion and vehicles at speed; a flash on snap turns
   const sp = foot ? Math.hypot(p?.velocity?.x || 0, p?.velocity?.z || 0) * (ctx.input.xrMove ? 1 : 0) : Math.abs(p?.mounted?.speed || 0) * 0.35;
   V.vigKick = Math.max(0, (V.vigKick || 0) - ctx.time.realDt * 4);
-  const want = prefs.vignette ? clamp(sp / 5, 0, 0.85) : 0; V.vig.material.uniforms.k.value += (Math.max(want, prefs.vignette ? V.vigKick * 0.6 : 0) - V.vig.material.uniforms.k.value) * Math.min(1, ctx.time.realDt * 8);
+  // turning smoothly narrows the view too
+  const want = prefs.vignette ? clamp(sp / 5 + Math.abs(V.turnRate || 0) / 3, 0, 0.85) : 0; V.vig.material.uniforms.k.value += (Math.max(want, prefs.vignette ? V.vigKick * 0.6 : 0) - V.vig.material.uniforms.k.value) * Math.min(1, ctx.time.realDt * 8);
   const hp = p?.health ?? 100; if (V.hp != null && hp < V.hp - 0.5) V.hurtK = Math.min(0.85, (V.hurtK || 0) + (V.hp - hp) / 40 + 0.25); V.hp = hp;
   V.hurtK = Math.max(p?.dead ? 0.7 : 0, (V.hurtK || 0) - ctx.time.realDt * 1.2); V.vig.material.uniforms.hurt.value = V.hurtK;
   V.vig.visible = V.vig.material.uniforms.k.value > 0.01 || V.hurtK > 0.01;
@@ -414,7 +449,7 @@ function panel(ctx) {
   const game = !!ctx.durakOpen, due = V.drawT <= 0 && (game || !ui || V.dirty || V.idleT > 1);
   if (due) { V.drawT = 1 / (game ? GAME_HZ : ui ? UI_HZ : HUD_HZ); V.dirty = false; V.idleT = 0; V.mirror.draw(!ui); V.tex.needsUpdate = true; }
   // in a car the dashboard is ~0.6 m away: the HUD comes in front of it (same angular size), menus too
-  const seat = V.mode === 'seat', k = seat ? SEAT_DIST / (ui ? UI_DIST : HUD_DIST) : 1;
+  const seat = V.mode === 'seat', k = seat ? (ui ? SEAT_UI_DIST : SEAT_HUD_DIST) / (ui ? UI_DIST : HUD_DIST) : 1;
   const asp = V.mirror.H / V.mirror.W, w = (ui ? UI_W : HUD_W) * k, d = (ui ? UI_DIST : HUD_DIST) * k;
   _e.setFromQuaternion(V.headQ, 'YXZ'); const hy = _e.y;
   if (ui !== V.panelUI) { V.panelUI = ui; V.panelYaw = hy; V.panelY = V.head.y - (ui ? 0.1 : 0.2); }   // a menu opens straight ahead of you and stays put
@@ -447,11 +482,14 @@ function optionsCard(ctx) {
     + row('Snap turn', `<span>${pill('snap', 30, '30°')}${pill('snap', 45, '45°')}${pill('snap', 90, '90°')}</span>`)
     + row('Comfort tunnel', `<span>${pill('vignette', 1, 'On')}${pill('vignette', 0, 'Off')}</span>`)
     + row('HUD', `<span>${pill('hud', 1, 'On')}${pill('hud', 0, 'Off')}</span>`)
+    + row('Turning', `<span>${pill('smooth', 0, 'Snap')}${pill('smooth', 1, 'Smooth')}</span>`)
+    + row('Gun hand', `<span>${pill('left', 0, 'Right')}${pill('left', 1, 'Left')}</span>`)
+    + row('Playing', `<span>${pill('seated', 0, 'Standing')}${pill('seated', 1, 'Seated')}</span>`)
     + `<div style="font:500 12px system-ui;opacity:.75;line-height:1.45;margin:10px 0">Left stick move · click it or hold left trigger to sprint · right stick ←/→ turn, ↑ next weapon, ↓ crouch, click: quick actions (map, grenade, radio, horn …) · trigger fire / click · right grip F · A jump · B reload · X use · left grip bag · Y menu. Hands: pinch left + drag to walk, pinch right to fire, look at your left palm for buttons (MORE… = quick actions). Fists: punch for real.</div>`
     + `<button data-k="exit" style="width:100%;padding:10px;border-radius:10px;border:0;background:#c0392b;color:#fff;font:800 15px system-ui;cursor:pointer">EXIT VR</button>`;
   const paint = () => { for (const b of el.querySelectorAll('button[data-v]')) { const on = String(+prefs[b.dataset.k]) === b.dataset.v || (b.dataset.k === 'snap' && +b.dataset.v === prefs.snap); b.style.background = on ? '#ffd27a' : '#2a2f38'; b.style.color = on ? '#111' : '#ddd'; } };
   el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); if (b.dataset.k === 'exit') { V.session?.end(); return; }
-    const k = b.dataset.k, v = +b.dataset.v; prefs[k] = k === 'snap' ? v : !!v; save(); paint(); });
+    const k = b.dataset.k, v = +b.dataset.v; prefs[k] = k === 'snap' ? v : !!v; if (k === 'seated' && v) V.seatH0 = V.head.y; save(); paint(); });   // seated: calibrate on your current head height
   document.body.appendChild(el); paint();
   const sync = () => { el.style.display = V.presenting && ctx.state !== 'playing' ? '' : 'none'; }; ctx.bus.on('state', sync); setInterval(sync, 500);
 }

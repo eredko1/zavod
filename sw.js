@@ -9,7 +9,8 @@
 // Same-origin GETs only; the multiplayer broker and CDNs go straight to the network.
 const ASSETS_REV = 1;
 const ASSETS = `zavod-assets-${ASSETS_REV}`, CODE = 'zavod-code';
-const STATIC = /^\/(assets|assets-m|icons)\//, CODE_TIMEOUT_MS = 4000, PRECACHE_PARALLEL = 6, REVALIDATE_DELAY_MS = 20000;
+const STATIC = /^\/(assets|assets-m|icons)\//, CODE_TIMEOUT_MS = 4000, PRECACHE_PARALLEL = 6, REVALIDATE_DELAY_MS = 20000, REVALIDATE_GAP_MS = 250;
+const started = Date.now();
 
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(precache()); });
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
@@ -37,8 +38,11 @@ async function cacheFirst(req, e) {
   if (hit) { if (!checked.has(req.url)) { checked.add(req.url); e.waitUntil(revalidate(cache, req, hit)); } return hit; }
   const res = await fetch(req); if (res.ok) cache.put(req, res.clone()); return res;
 }
-async function revalidate(cache, req, hit) {
-  await new Promise((r) => setTimeout(r, REVALIDATE_DELAY_MS));
+// one at a time, REVALIDATE_GAP_MS apart: a trickle in the background, not 500 requests at once mid-game
+let queue = Promise.resolve();
+function revalidate(cache, req, hit) { const run = queue.then(() => check(cache, req, hit)); queue = run.catch(() => {}); return run; }
+async function check(cache, req, hit) {
+  await new Promise((r) => setTimeout(r, Math.max(REVALIDATE_GAP_MS, REVALIDATE_DELAY_MS - (Date.now() - started))));
   try { const tag = hit.headers.get('etag'), res = await fetch(req.url, { cache: 'no-cache', headers: tag ? { 'If-None-Match': tag } : {} });
     if (res.ok && res.status !== 304 && (!tag || res.headers.get('etag') !== tag)) await cache.put(req, res); } catch { /* offline: keep what we have */ }
 }
