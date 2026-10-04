@@ -34,6 +34,11 @@
 <div id="hud"></div>
 <div id="boot"><div class="t">ZAVOD — LOADING</div><div class="bar"><i id="bootbar"></i></div><div class="t" id="boottxt" style="letter-spacing:.1em;font-size:11px;color:#56687a"></div></div>
 <script type="module" src="./src/main.js"></script>
-<script>if ('serviceWorker' in navigator && !/[?&]qa=1/.test(location.search)) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));</script>
+<script>
+// the offline cache (sw.js) is for the headset and the installed app only: they download all six maps once and start from disk.
+// Web visitors keep plain HTTP caching, so a deploy's new assets reach them at once.
+if ('serviceWorker' in navigator && !/[?&]qa=1/.test(location.search) && (/OculusBrowser|Quest|Pico/i.test(navigator.userAgent) || /[?&](src=app|sw=1)/.test(location.search) || matchMedia('(display-mode: standalone)').matches))
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+</script>
 </body>
 </html>

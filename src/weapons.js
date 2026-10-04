@@ -489,6 +489,7 @@ function stowedFor(p) { const m = p?.mounted; return !!(m && (m.elevator || m.di
 // ------------------------------------------------------------------ per-frame
 export function update(dt, ctx) {
   if (!S) return;
+  ctx.xr?.syncAim?.();   // VR: put the aim on the gun hand for this frame before anything fires
   const p = ctx.player, input = ctx.input, cam = ctx.camera, aim = ctx.xrAim || cam; const playing = ctx.state === 'playing';
   const w = S.weapons[S.cur], sp = w.spec;
   S.time += dt;

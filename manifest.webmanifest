@@ -3,7 +3,7 @@
   "short_name": "ZAVOD",
   "description": "Coney Island with your friends: chill, drive, fight, play darts at the Soc Tav. Built for Meta Quest VR.",
   "id": "/?app=zavod",
-  "start_url": "/?map=coney&mode=chill&vr=1&src=app",
+  "start_url": "/?map=coney&mode=chill&src=app",
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape",

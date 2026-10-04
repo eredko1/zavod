@@ -65,6 +65,17 @@ await ctl('right', "updateButtonValue('trigger', 1)"); await pg.waitForTimeout(4
 const a1 = await pg.evaluate(() => window.__ctx.weapons.current?.ammo ?? window.__ctx.weapons.primary?.ammo);
 ok(a1 < a0, 'right trigger fires', JSON.stringify({ a0, a1 }));
 await shot('gun');
+// …and the bullet really leaves the gun: the aim sits on the gun in the hand, and a target 10 m down the barrel takes the hit
+const hit = await pg.evaluate(async () => {
+  const T = window.__ctx.THREE, sc = window.__ctx.scene, aim = window.__ctx.xrAim, mount = sc.getObjectByName('xrGunMount');
+  const gp = mount.getWorldPosition(new T.Vector3()), d = aim.getWorldDirection(new T.Vector3()), off = aim.position.distanceTo(gp);
+  const box = new T.Mesh(new T.BoxGeometry(1.5, 1.5, 1.5), new T.MeshBasicMaterial()); box.position.copy(aim.position).addScaledVector(d, 10); box.updateMatrixWorld(true);
+  window.__hits = 0; box.userData.onHit = () => { window.__hits++; }; sc.add(box); window.__ctx.raycastTargets.push(box);
+  window.__iwer.controllers.right.updateButtonValue('trigger', 1); await new Promise((r) => setTimeout(r, 300)); window.__iwer.controllers.right.updateButtonValue('trigger', 0); await new Promise((r) => setTimeout(r, 200));
+  sc.remove(box); window.__ctx.raycastTargets.splice(window.__ctx.raycastTargets.indexOf(box), 1);
+  return { off: +off.toFixed(3), hits: window.__hits, aim: aim.position.toArray().map((v) => +v.toFixed(2)) };
+});
+ok(hit.off < 0.3 && hit.hits > 0, 'the aim is on the gun in the hand, and a target 10 m down the barrel is hit', JSON.stringify(hit));
 // ---- fists: a real jab lands a punch ----
 await pg.evaluate(() => window.__ctx.weapons.fists()); await pg.waitForTimeout(700);
 const pre = await pg.evaluate(() => window.__ctx.weapons.combo?.() ?? 0);
@@ -143,6 +154,13 @@ ok(kb.shown && kb.val === 'hi', 'focusing a text field brings up the VR keyboard
 await pg.evaluate(() => window.__game.vr.exit()); await pg.waitForTimeout(800);
 s = await S(); const vmp = await pg.evaluate(() => window.__ctx.weapons.viewmodel.parent === window.__ctx.camera);
 ok(!s.presenting && vmp, 'exit VR: the flat game is back (gun on the screen camera)', JSON.stringify({ presenting: s.presenting, vmp }));
+// enter → exit → enter → exit: the flat game afterwards is exactly the flat game (gun scale and parent, arms, shadows, raycasts)
+const flat = () => pg.evaluate(() => { const vm = window.__ctx.weapons.viewmodel; let arms = 0, armsOn = 0; vm.traverse((o) => { if (/^arm_/.test(o.name)) { arms++; if (o.visible) armsOn++; } });
+  return { scale: vm.scale.toArray().map((v) => +v.toFixed(3)), parent: vm.parent === window.__ctx.camera, arms, armsOn, shadows: window.__ctx.renderer.shadowMap.enabled, rc: window.__ctx.THREE.Raycaster.prototype.intersectObject.name, culled: (() => { let n = 0; window.__ctx.scene.traverse((o) => { if (o.layers.mask === (1 << 30)) n++; }); return n; })() }; });
+const flat1 = await flat();
+for (let i = 0; i < 2; i++) { await pg.evaluate(() => window.__game.vr.enter()); await pg.waitForFunction(() => window.__game.vr.state().presenting, null, { timeout: 15000 }).catch(() => {}); await pg.waitForTimeout(1200); await pg.evaluate(() => window.__game.vr.exit()); await pg.waitForTimeout(700); }
+const flat2 = await flat();
+ok(JSON.stringify(flat1) === JSON.stringify(flat2) && flat2.culled === 0 && flat2.parent, 'enter/exit twice: the flat game is unchanged', JSON.stringify({ flat1, flat2 }));
 ok(errs.length === 0, 'no page errors', JSON.stringify(errs.slice(0, 5)));
 await b.close();
 console.log(fails ? `${fails} FAILED` : 'ALL PASS'); process.exit(fails ? 1 : 0);

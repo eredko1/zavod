@@ -19,7 +19,7 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
 const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.018, PINCH_OFF = 0.032, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
-const UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
+const SEAT_DIST = 0.45, UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
 const UI_HZ = 15, HUD_HZ = 4, GAME_HZ = 24, STAND_H = 1.7;
 const PREF_KEY = 'zavod.vr';
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
@@ -33,7 +33,7 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
 export async function init(ctx) {
   V.ctx = ctx; const { renderer, scene } = ctx;
-  ctx.xr = { presenting: false, prefs, enter: () => start(), exit: () => V.session?.end() };
+  ctx.xr = { presenting: false, prefs, enter: () => start(), exit: () => V.session?.end(), syncAim: () => syncAim(ctx) };
   renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local-floor');
   // the rig: xrCam (the eyes), both controllers, both hands; re-placed each frame (see place())
   const rig = V.rig = new THREE.Group(); rig.name = 'xrRig'; scene.add(rig);
@@ -92,9 +92,10 @@ function begin(session) {
   try { ctx.renderer.xr.setFoveation(1); } catch {}
   try { session.updateTargetFrameRate?.(72)?.catch?.(() => {}); } catch {}
   // shadows are a whole second scene pass per light, per eye: off in the headset, back on after if they were on
+  raycastSeesCulled(true);
   V.shadows0 = ctx.renderer.shadowMap.enabled; if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: false });
   // the gun goes from the screen corner into your right hand
-  const vm = ctx.weapons?.viewmodel; if (vm) { V.vmParent = vm.parent; V.gunMount = V.gunMount || new THREE.Group(); V.gunMount.name = 'xrGunMount'; vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); V.gunMount.add(vm); }
+  const vm = ctx.weapons?.viewmodel; if (vm) { V.vmScale0 = vm.scale.clone(); V.vmParent = vm.parent; V.gunMount = V.gunMount || new THREE.Group(); V.gunMount.name = 'xrGunMount'; vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); V.gunMount.add(vm); }
   ctx.xrAim = V.aim;
   try { ctx.renderer.xr.getReferenceSpace()?.addEventListener?.('reset', () => { V.headPrev = null; }); } catch {}   // a recenter (hold the Meta button) is not a step
   // 2D overlays animate with window.requestAnimationFrame (darts, durak), which a headset browser may stop running during an immersive
@@ -113,13 +114,13 @@ function begin(session) {
 function end() {
   const { ctx } = V; V.presenting = false; ctx.xr.presenting = false; V.session = null; ctx.xrAim = null;
   const vm = ctx.weapons?.viewmodel; if (vm && V.vmParent) { V.vmParent.add(vm); vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); vm.visible = true; }
-  if (vm) vm.traverse((o) => { if (/^arm_/.test(o.name)) o.visible = true; }); V.arms = null; V.poseMark = null;
+  if (vm) { vm.traverse((o) => { if (/^arm_/.test(o.name)) o.visible = true; }); if (V.vmScale0) vm.scale.copy(V.vmScale0); }   // weapons.js only rewrites the screen scale when its fov changes V.arms = null; V.poseMark = null;
   for (const H of [V.h0, V.h1]) for (const c of H?.grip?.children || []) if (c !== V.gunMount) c.visible = true;
   if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: true });
   if (V.raf0) { window.requestAnimationFrame = V.raf0; window.cancelAnimationFrame = V.caf0; V.rafQ = null; V.raf0 = null; }   // pending callbacks are still queued with the browser
   V.crouch = false; V.sprintLatch = false; V.rigY = null; if (V.quick) quick(ctx, false); if (V.tabOn) { key('Tab', false); V.tabOn = false; }
   releaseKeys(); const inp = ctx.input; inp.xrMove = null; inp.touch.axis.x = inp.touch.axis.y = 0; inp.touch.fire = false;
-  V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll();
+  V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll(); raycastSeesCulled(false);
   ctx.camera.aspect = innerWidth / innerHeight; ctx.camera.updateProjectionMatrix();
   if (ctx.state === 'playing') ctx.setState('paused');
   console.log('[vr] session ended');
@@ -177,8 +178,7 @@ export function update(dt, ctx) {
     if (along > PUNCH_V && v.length() > PUNCH_V && V.time - H.punchT > PUNCH_GAP) { H.punchT = V.time; punch = H; } }
   V.time = (V.time || 0) + dt;
   // the aim: the gun hand's grip (or the punching hand) as a world pose for weapons.js
-  const aimH = punch || R; if (aimH) { const src = !punch && V.gunMount?.parent && V.gunMount.visible ? V.gunMount : aimH.src?.hand ? (aimH.hand.joints['wrist'] || aimH.grip) : aimH.grip;   // a gun aims down its own barrel V.rig.updateMatrixWorld(); src.updateMatrixWorld(); src.matrixWorld.decompose(V.aim.position, V.aim.quaternion, _v);
-    if (punch) { _v.copy(punch.vel).applyQuaternion(V.rig.quaternion).normalize(); V.aim.lookAt(_v.add(V.aim.position)); } V.aim.updateMatrixWorld(); }   // a camera-type object: lookAt points its -Z
+  V.punchH = punch;   // syncAim() aims from this hand this frame
   if (V.ui) V.fireLock = true; else if (!fire) V.fireLock = false;   // the trigger that just clicked a menu must be let go before it shoots
   inp.touch.fire = playing && !V.ui && !V.fireLock && (fists ? (!!punch && !V.punchPrev) || fire : fire);
   V.punchPrev = !!punch;
@@ -300,18 +300,27 @@ const cullDist = (r) => r < 1.5 ? 45 : r < 4 ? 75 : r < 10 ? 120 : r < 30 ? 220 
 const _s = new THREE.Sphere();
 function cull(ctx, dt) {
   V.cullT = (V.cullT || 0) - dt; if (V.cullT > 0) return; V.cullT = CULL_EVERY;
-  V.scanT = (V.scanT || 0) - CULL_EVERY;
+  V.scanT = (V.scanT || 0) - CULL_EVERY; const hidden = V.culled || (V.culled = new Set());
+  // instanced / batched meshes: their geometry's sphere is one copy, not the spread of copies: never culled here
   if (V.scanT <= 0 || !V.cullList) { V.scanT = CULL_RESCAN; const L = V.cullList = [];
-    ctx.scene.traverse((o) => { if (!(o.isMesh || o.isPoints || o.isLine) || !o.geometry || o === V.panel || isRig(o)) return; const g = o.geometry; if (!g.boundingSphere) { try { g.computeBoundingSphere(); } catch { return; } } if (!g.boundingSphere || !(g.boundingSphere.radius < 30)) return; L.push(o); }); }
-  const eye = ctx.camera.position; let hid = 0;
+    ctx.scene.traverse((o) => { if (!(o.isMesh || o.isPoints || o.isLine) || o.isInstancedMesh || o.isBatchedMesh || !o.geometry || o === V.panel || isRig(o)) return; const g = o.geometry; if (!g.boundingSphere) { try { g.computeBoundingSphere(); } catch { return; } } if (!g.boundingSphere || !(g.boundingSphere.radius < 30)) return; L.push(o); });
+    for (const o of hidden) if (!o.parent) { unhide(o); hidden.delete(o); } }   // pooled things that left the scene come back whole
+  const eye = ctx.camera.position;
   for (const o of V.cullList) {
     _s.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld); const far = _s.center.distanceTo(eye) - _s.radius > cullDist(_s.radius);
-    if (far) { if (o.userData.xrMask == null) { o.userData.xrMask = o.layers.mask; o.layers.set(CULL_LAYER); } hid++; }
-    else if (o.userData.xrMask != null) { o.layers.mask = o.userData.xrMask; o.userData.xrMask = null; }
+    if (far) { if (!hidden.has(o)) { o.userData.xrMask = o.layers.mask; o.layers.set(CULL_LAYER); hidden.add(o); } }
+    else if (hidden.has(o)) { unhide(o); hidden.delete(o); }
   }
-  V.culled = hid;
 }
-function uncullAll() { for (const o of V.cullList || []) if (o.userData.xrMask != null) { o.layers.mask = o.userData.xrMask; o.userData.xrMask = null; } V.cullList = null; }
+function unhide(o) { if (o.userData.xrMask != null) { o.layers.mask = o.userData.xrMask; o.userData.xrMask = null; } }
+function uncullAll() { for (const o of V.culled || []) unhide(o); V.culled = null; V.cullList = null; }
+// culled things must still be hit by bullets, sight lines and footsteps: while in VR every raycast also tests the cull layer
+const RC = THREE.Raycaster.prototype, RC0 = { one: RC.intersectObject, all: RC.intersectObjects };
+function raycastSeesCulled(on) {
+  if (!on) { RC.intersectObject = RC0.one; RC.intersectObjects = RC0.all; return; }
+  const wrap = (f) => function (...a) { const m = this.layers.mask; this.layers.enable(CULL_LAYER); try { return f.apply(this, a); } finally { this.layers.mask = m; } };
+  RC.intersectObject = wrap(RC0.one); RC.intersectObjects = wrap(RC0.all);
+}
 function isRig(o) { for (let p = o; p; p = p.parent) if (p === V.rig || p === V.gunMount) return true; return false; }
 
 // ---- comfort: a soft tunnel while you're moved by the stick, a car or a snap ---------------------------------------------------
@@ -326,7 +335,9 @@ function vignette() {
 }
 
 // ---- before the eyes render: place the rig, copy the head into ctx.camera, the gun into the hand, the panel ------------------
-export function render(ctx) {
+// where the game wants the eye this frame → the rig. Run twice a frame: before weapons fire (syncAim) and before the eyes render;
+// only the second eases stairs.
+function placeRig(ctx, ease) {
   const p = ctx.player, cam = ctx.camera, rig = V.rig;
   // where the game wants the eye: on foot the player's capsule; otherwise whatever wrote the camera (car seat, ride, cutscene)
   const foot = !p?.mounted || p.mounted.dialog, mode = foot ? 'foot' : 'seat';
@@ -343,9 +354,24 @@ export function render(ctx) {
     const eye = _v2; if (veh) { const sp = veh.spec, fx = -Math.sin(veh.heading), fz = -Math.cos(veh.heading); eye.set(veh.pos.x - fx * (sp.eyeBack || 0) - fz * (sp.eyeSide || 0), veh.pos.y + (sp.eyeH || 1.2), veh.pos.z - fz * (sp.eyeBack || 0) + fx * (sp.eyeSide || 0)); } else eye.copy(cam.position);
     rig.position.set(eye.x - _v.x, eye.y - V.seatY, eye.z - _v.z);
   }
-  // stairs and curbs: the flat game hides a step-up with an eased eye; here the rig eases up (falls and teleports snap)
-  if (foot) { const dy = rig.position.y - (V.rigY ?? rig.position.y); V.rigY = dy > 0 && dy < 0.6 ? V.rigY + dy * Math.min(1, ctx.time.realDt * 12) : rig.position.y; rig.position.y = V.rigY; } else V.rigY = null;
+  // stairs and curbs: the flat game hides a step with an eased eye; here the rig eases, up and down, on the ground (falls, jumps and
+  // teleports follow at once)
+  if (foot) { const dy = rig.position.y - (V.rigY ?? rig.position.y); if (ease) V.rigY = Math.abs(dy) < 0.6 && p.onGround ? V.rigY + dy * Math.min(1, ctx.time.realDt * 12) : rig.position.y; if (V.rigY != null) rig.position.y = V.rigY; } else V.rigY = null;
   rig.updateMatrixWorld(true);
+}
+/** weapons.js calls this before it aims: the gun hand's (or a punching hand's) world pose, with this frame's player position */
+export function syncAim(ctx) {
+  if (!V.presenting) return; placeRig(ctx, false);
+  const H = V.punchH || V.hands.right; if (!H) return;
+  const src = !V.punchH && V.gunMount?.parent && V.gunMount.visible ? V.gunMount : H.src?.hand ? (H.hand.joints['wrist'] || H.grip) : H.grip;   // a gun aims down its own barrel
+  src.updateMatrixWorld(true); src.matrixWorld.decompose(V.aim.position, V.aim.quaternion, _v);
+  if (V.punchH) { _v.copy(V.punchH.vel).applyQuaternion(V.rig.quaternion).normalize(); V.aim.lookAt(_v.add(V.aim.position)); }   // a camera-type object: lookAt points its -Z
+  V.aim.updateMatrixWorld(true);
+}
+export function render(ctx) {
+  const p = ctx.player, cam = ctx.camera;
+  placeRig(ctx, true);
+  const foot = !p?.mounted || p.mounted.dialog;
   // the eye cameras have no parent: anything that asks one for its world position mid-render (sky, LODs, billboards' onBeforeRender)
   // would rebuild its world matrix from the bare head pose, i.e. put the eyes back at the world origin. Their world matrices are
   // set by WebXRManager.updateCamera from the rig; freeze them there.
@@ -387,7 +413,9 @@ function panel(ctx) {
   V.drawT -= ctx.time.realDt; V.idleT = (V.idleT || 0) + ctx.time.realDt;
   const game = !!ctx.durakOpen, due = V.drawT <= 0 && (game || !ui || V.dirty || V.idleT > 1);
   if (due) { V.drawT = 1 / (game ? GAME_HZ : ui ? UI_HZ : HUD_HZ); V.dirty = false; V.idleT = 0; V.mirror.draw(!ui); V.tex.needsUpdate = true; }
-  const asp = V.mirror.H / V.mirror.W, w = ui ? UI_W : HUD_W, d = ui ? UI_DIST : HUD_DIST;
+  // in a car the dashboard is ~0.6 m away: the HUD comes in front of it (same angular size), menus too
+  const seat = V.mode === 'seat', k = seat ? SEAT_DIST / (ui ? UI_DIST : HUD_DIST) : 1;
+  const asp = V.mirror.H / V.mirror.W, w = (ui ? UI_W : HUD_W) * k, d = (ui ? UI_DIST : HUD_DIST) * k;
   _e.setFromQuaternion(V.headQ, 'YXZ'); const hy = _e.y;
   if (ui !== V.panelUI) { V.panelUI = ui; V.panelYaw = hy; V.panelY = V.head.y - (ui ? 0.1 : 0.2); }   // a menu opens straight ahead of you and stays put
   else if (!ui && Math.abs(wrap(hy - V.panelYaw)) > HUD_FOLLOW) V.panelYaw += wrap(hy - V.panelYaw) * Math.min(1, ctx.time.realDt * 2.5);   // the HUD drifts after you
@@ -438,7 +466,8 @@ function quick(ctx, on) {
     el.style.cssText = 'position:fixed;z-index:9500;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,92vw);padding:18px;background:rgba(14,16,20,.95);border:1px solid rgba(255,210,122,.6);border-radius:16px;display:none;grid-template-columns:repeat(4,1fr);gap:10px;font:700 17px system-ui';
     el.innerHTML = QUICK.map(([t, k]) => `<button data-k="${k}" style="padding:16px 8px;border-radius:10px;border:0;background:#2a2f38;color:#eee;font:inherit;cursor:pointer">${t}</button>`).join('');
     el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); const k = b.dataset.k; quick(ctx, false);
-      if (k === 'close') return; if (k === 'crouch') { V.crouch = !V.crouch; return; } if (k === 'Tab') { key('Tab', !V.tabOn); V.tabOn = !V.tabOn; return; } tap(k); });
+      if (k === 'close') return; if (k === 'KeyV' && ctx.player?.mounted && !ctx.player.mounted.dialog) return;   // V is the chase cam in a vehicle
+      if (k === 'crouch') { V.crouch = !V.crouch; return; } if (k === 'Tab') { key('Tab', !V.tabOn); V.tabOn = !V.tabOn; return; } tap(k); });
     document.body.appendChild(el);
   }
   V.quick = !!on; V.quickEl.style.display = on ? 'grid' : 'none'; V.drawT = 0;
@@ -469,7 +498,7 @@ function keyboard(ctx) {
 function qaHooks() {
   return {
     state: () => ({ presenting: V.presenting, ui: V.ui, mode: V.mode, turn: +V.turn.toFixed(3), rigYaw: +V.rigYaw.toFixed(3), head: V.head.toArray().map((v) => +v.toFixed(3)), rig: V.rig.position.toArray().map((v) => +v.toFixed(2)),
-      cam: V.ctx.camera.position.toArray().map((v) => +v.toFixed(2)), hands: Object.keys(V.hands), panel: V.panel.visible, mirrorMs: +V.mirror.ms.toFixed(1), keys: [...V.keys], aim: V.aim.position.toArray().map((v) => +v.toFixed(2)), wrist: V.wrist.shown, culled: V.culled || 0, inputs: V.session ? V.session.inputSources.length : 0, at: (V.hands.right?.at || []).map(Math.round), click: V.lastClick || null }),
+      cam: V.ctx.camera.position.toArray().map((v) => +v.toFixed(2)), hands: Object.keys(V.hands), panel: V.panel.visible, mirrorMs: +V.mirror.ms.toFixed(1), keys: [...V.keys], aim: V.aim.position.toArray().map((v) => +v.toFixed(2)), wrist: V.wrist.shown, culled: V.culled?.size || 0, inputs: V.session ? V.session.inputSources.length : 0, at: (V.hands.right?.at || []).map(Math.round), click: V.lastClick || null }),
     enter: () => start(), exit: () => V.session?.end(), mirror: () => V.mirror.canvas.toDataURL('image/png'), prefs,
   };
 }

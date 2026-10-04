@@ -1,14 +1,15 @@
 // ZAVOD service worker: the headset app (and any browser) loads the game from local storage instead of the network.
 // - Install: downloads every file in precache.json (all six maps as the headset loads them, ~70 MB; qa/vr-maps-test.mjs --precache
 //   writes the list) in the background, so the first launch already fills the cache and the next ones start from disk.
-// - assets/, assets-m/, icons/ (textures, models, sounds: big, rarely change): cache first. They're kept under ASSETS_REV: bump it
-//   when assets change and the next visit downloads the new set (the old one is deleted on activate).
+// - assets/, assets-m/, icons/ (textures, models, sounds: big, rarely change): cache first, then each one is re-checked once per worker
+//   lifetime, REVALIDATE_DELAY_MS after the game started, with an ETag request (unchanged: a few hundred bytes; changed: replaced for
+//   the next launch). ASSETS_REV drops the whole set at once (the old cache is deleted on activate).
 // - the page, src/ and vendor/ (the code: one coherent version per deploy): network first, the cache only when offline or the network
 //   is slow (CODE_TIMEOUT_MS), so a deploy shows up on the next launch and code from two deploys never mixes on a good connection.
 // Same-origin GETs only; the multiplayer broker and CDNs go straight to the network.
 const ASSETS_REV = 1;
 const ASSETS = `zavod-assets-${ASSETS_REV}`, CODE = 'zavod-code';
-const STATIC = /^\/(assets|assets-m|icons)\//, CODE_TIMEOUT_MS = 4000, PRECACHE_PARALLEL = 6;
+const STATIC = /^\/(assets|assets-m|icons)\//, CODE_TIMEOUT_MS = 4000, PRECACHE_PARALLEL = 6, REVALIDATE_DELAY_MS = 20000;
 
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(precache()); });
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
@@ -27,12 +28,19 @@ async function precache() {
 self.addEventListener('fetch', (e) => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin || req.headers.has('range')) return;
-  e.respondWith(STATIC.test(url.pathname) ? cacheFirst(req) : networkFirst(req));
+  e.respondWith(STATIC.test(url.pathname) ? cacheFirst(req, e) : networkFirst(req));
 });
 
-async function cacheFirst(req) {
-  const cache = await caches.open(ASSETS), hit = await cache.match(req, { ignoreSearch: true }); if (hit) return hit;
+const checked = new Set();
+async function cacheFirst(req, e) {
+  const cache = await caches.open(ASSETS), hit = await cache.match(req);
+  if (hit) { if (!checked.has(req.url)) { checked.add(req.url); e.waitUntil(revalidate(cache, req, hit)); } return hit; }
   const res = await fetch(req); if (res.ok) cache.put(req, res.clone()); return res;
+}
+async function revalidate(cache, req, hit) {
+  await new Promise((r) => setTimeout(r, REVALIDATE_DELAY_MS));
+  try { const tag = hit.headers.get('etag'), res = await fetch(req.url, { cache: 'no-cache', headers: tag ? { 'If-None-Match': tag } : {} });
+    if (res.ok && res.status !== 304 && (!tag || res.headers.get('etag') !== tag)) await cache.put(req, res); } catch { /* offline: keep what we have */ }
 }
 async function networkFirst(req) {
   const cache = await caches.open(CODE), nav = req.mode === 'navigate';
