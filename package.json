@@ -2,7 +2,20 @@
   "name": "zavod",
   "version": "1.0.0",
   "main": "index.js",
-  "files": ["index.html", "favicon.svg", "src/", "assets/", "assets-m/", "vendor/three/", "vendor/three-mesh-bvh/", "vercel.json"],
+  "files": [
+    "index.html",
+    "favicon.svg",
+    "src/",
+    "assets/",
+    "assets-m/",
+    "vendor/three/",
+    "vendor/three-mesh-bvh/",
+    "vercel.json",
+    "manifest.webmanifest",
+    "sw.js",
+    "icons/",
+    "precache.json"
+  ],
   "scripts": {
     "serve": "./qa/serve.sh",
     "test:review": "node qa/review-test.mjs",
@@ -19,6 +32,7 @@
     "three-mesh-bvh": "^0.9.15"
   },
   "devDependencies": {
+    "iwer": "^2.5.0",
     "playwright-core": "^1.61.1"
   }
 }

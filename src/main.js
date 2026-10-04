@@ -14,6 +14,7 @@ import * as vehicles from './vehicles.js';
 import * as net from './net.js';
 import * as netwaves from './netwaves.js';
 import * as minimap from './minimap.js';
+import * as vr from './vr/vr.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
 // BVH-accelerated raycasts for every mesh (bullets, AI line of sight, impact FX). Merged map batches are 100k+ triangle
@@ -30,7 +31,9 @@ window.__ctx = ctx;
 
 // ---------- renderer / scene / camera ----------
 const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, logarithmicDepthBuffer: false });
+// a headset gets MSAA: three sizes the XR framebuffer's samples from this flag, and without it every edge shimmers in VR (on Quest's
+// tiled GPU 4x MSAA is nearly free). The flat game keeps its own post-process AA.
+const renderer = new THREE.WebGLRenderer({ antialias: !!ctx.xrDevice, powerPreference: 'high-performance', stencil: false, depth: true, logarithmicDepthBuffer: false });
 renderer.setPixelRatio(Math.min(devicePixelRatio, ctx.settings.renderScale));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -87,14 +90,14 @@ addEventListener('mouseup', e => { const b = btnOf(e); input.mouse.buttons &= ~(
 addEventListener('contextmenu', e => { if (input.locked || ctx.state === 'playing') e.preventDefault(); });   // never let a menu steal the pointer lock mid-fight
 addEventListener('wheel', e => { input.mouse.wheel += Math.sign(e.deltaY); }, { passive: true });
 addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('pointerlockchange', () => { input.locked = document.pointerLockElement === renderer.domElement; ctx.bus.emit('pointerlock', input.locked); if (!input.locked && ctx.state === 'playing') setState('paused'); });
+document.addEventListener('pointerlockchange', () => { input.locked = document.pointerLockElement === renderer.domElement; ctx.bus.emit('pointerlock', input.locked); if (!input.locked && ctx.state === 'playing' && !ctx.xr?.presenting) setState('paused'); });
 ctx.requestPointerLock = () => { const q = (o) => { try { const r = renderer.domElement.requestPointerLock(o); r?.catch?.(() => { if (o) q(); }); } catch { if (o) q(); } }; q({ unadjustedMovement: true }); };   // promise rejections (no user gesture, headless) are harmless
 
 // ---------- state ----------
 function setState(s) {
   const prev = ctx.state; if (prev === s) return;
   ctx.state = s; ctx.bus.emit('state', { state: s, prev });
-  if (ctx.isTouch) { input.locked = s === 'playing'; ctx.bus.emit('pointerlock', input.locked); return; }
+  if (ctx.isTouch || ctx.xr?.presenting) { input.locked = s === 'playing'; ctx.bus.emit('pointerlock', input.locked); return; }
   if (s === 'playing' && !input.locked && !ctx.qa) ctx.requestPointerLock();
   if (s !== 'playing' && input.locked) document.exitPointerLock();
 }
@@ -117,8 +120,8 @@ addEventListener('keydown', e => {
 const bootbar = document.getElementById('bootbar'), boottxt = document.getElementById('boottxt');
 ctx.progress = (frac, txt) => { bootbar.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`; if (txt) boottxt.textContent = txt; };
 
-const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch], ['vehicles', vehicles], ['net', net], ['netwaves', netwaves], ['minimap', minimap]];
-const UPDATE_ORDER = ['touch', 'vehicles', 'player', 'weapons', 'ai', 'world', 'audio', 'hud', 'net', 'netwaves', 'minimap']; // vehicles before player: a mounted player is driven by the vehicle // post.render() runs last
+const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch], ['vehicles', vehicles], ['net', net], ['netwaves', netwaves], ['minimap', minimap], ['vr', vr]];
+const UPDATE_ORDER = ['vr', 'touch', 'vehicles', 'player', 'weapons', 'ai', 'world', 'audio', 'hud', 'net', 'netwaves', 'minimap']; // vehicles before player: a mounted player is driven by the vehicle // post.render() runs last
 const mods = Object.fromEntries(MODULES);
 
 async function boot() {
@@ -142,7 +145,7 @@ async function boot() {
   ctx.bus.emit('boot');
   const pose = ctx.qs.get('pose'); if (pose && ctx.world?.poses?.[pose]) window.__game.teleport(...ctx.world.poses[pose]);
   window.__game.ready = true;
-  last = performance.now(); requestAnimationFrame(frame);
+  last = performance.now(); renderer.setAnimationLoop(frame);   // the renderer's loop: it switches to the headset's frame clock in VR
 }
 
 // Pre-warm behind the loading screen: compile every material in the scene (KHR_parallel_shader_compile lets the driver do it
@@ -151,6 +154,7 @@ async function boot() {
 // uploaded the first time it came into view: a 1-8 s first frame and 0.1-0.3 s hitches when turning.
 async function prewarm() {
   ctx.progress(0.98, 'warming up shaders');
+  ctx.bus.emit('prewarm');   // last call to build anything that samples other modules' meshes (their arrays may be freed below)
   const t0 = performance.now();
   try { await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 20000))]); } catch (e) { console.warn('[boot] compileAsync', e); }
   const t1 = performance.now(), culled = [], shown = [], lit = new Set();
@@ -194,7 +198,6 @@ if (PROF) { ctx.prof = PROF; window.__prof = PROF; }
 const GL = renderer.getContext(), TQ = PROF && GL.getExtension('EXT_disjoint_timer_query_webgl2'), gpuQ = [];
 function pollGpu() { while (gpuQ.length && GL.getQueryParameter(gpuQ[0][0], GL.QUERY_RESULT_AVAILABLE)) { const [q, c] = gpuQ.shift(); if (!GL.getParameter(TQ.GPU_DISJOINT_EXT)) c.gpu = GL.getQueryParameter(q, GL.QUERY_RESULT) / 1e6; GL.deleteQuery(q); } }
 function frame(now) {
-  requestAnimationFrame(frame);
   const f0 = PROF ? performance.now() : 0; if (PROF) PROF.cur = { t: now, dt: now - last, parts: {} };
   let dt = (now - last) / 1000; last = now;
   if (dt < 0) dt = 0; if (dt > 0.1) dt = 0.1;
@@ -207,9 +210,10 @@ function frame(now) {
   input.mouse.dx = 0; input.mouse.dy = 0; input.mouse.wheel = 0; input.pressed.clear();
   // depth precision: near 0.03 can't resolve ground detail 100 m+ away, so from high up (coney 19th floor / roof) streets
   // and roofs z-fought ("pulsating"). 4x the near plane up there; ≤ 0.15 leaves the hip/ADS viewmodels unclipped.
-  { const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }
+  if (!ctx.xr?.presenting) { const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }
   const r0 = PROF ? performance.now() : 0; let gq = null; if (TQ && !ctx.post?._S?.profiling) { pollGpu(); gq = GL.createQuery(); GL.beginQuery(TQ.TIME_ELAPSED_EXT, gq); }
-  if (ctx.post && ctx.post.render) ctx.post.render(dt, ctx); else renderer.render(scene, camera);
+  if (ctx.xr?.presenting) vr.render(ctx);   // the headset: straight to the eyes (the post chain is screen-space, one view)
+  else if (ctx.post && ctx.post.render) ctx.post.render(dt, ctx); else renderer.render(scene, camera);
   if (gq) { GL.endQuery(TQ.TIME_ELAPSED_EXT); gpuQ.push([gq, PROF.cur]); }
   if (PROF) { const c = PROF.cur, I = renderer.info; c.parts.render = performance.now() - r0; c.cpu = performance.now() - f0; c.progs = I.programs?.length || 0; c.tex = I.memory.textures; c.geo = I.memory.geometries; c.calls = I.render.calls; c.tris = I.render.triangles; PROF.frames.push(c); if (PROF.frames.length > 20000) PROF.frames.splice(0, 5000); PROF.cur = null; }
   // perf

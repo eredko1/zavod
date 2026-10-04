@@ -140,6 +140,7 @@ export async function init(ctx) {
     get grenades() { return S.grenadeCount; },
     /** the primary you carry: { id, ammo, reserve } */
     get currentId() { return S.weapons[S.cur]?.id ?? null; },
+    get spec() { return S.weapons[S.cur]?.spec ?? null; },
     get primary() { const w = S.weapons[0]; return w ? { id: w.id, ammo: w.ammo, reserve: w.reserve } : null; },
     get spread() { return currentSpread(); },
     get sprinting() { return S.sprint > 0.5; },
@@ -364,7 +365,7 @@ function currentSpread() {
 }
 
 function ejectFor(w, p) {
-  const cam = S.ctx.camera, rng = S.ctx.rng; cam.getWorldDirection(_fwd); _right.set(1, 0, 0).applyQuaternion(cam.quaternion); _up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+  const cam = S.ctx.xrAim || S.ctx.camera, rng = S.ctx.rng; cam.getWorldDirection(_fwd); _right.set(1, 0, 0).applyQuaternion(cam.quaternion); _up.set(0, 1, 0).applyQuaternion(cam.quaternion);
   const ej = w.parts.eject.getWorldPosition(new THREE.Vector3());
   _v.copy(_right).multiplyScalar(2.2 + rng() * 1.2).addScaledVector(_up, 1.6 + rng() * 0.8).addScaledVector(_fwd, -0.3 + rng() * 0.4); if (p?.velocity) _v.add(p.velocity);
   S.fx.ejectBrass(ej, _v, w.spec.brassScale ?? (w.spec.slot === 0 ? 1 : 0.8));
@@ -378,7 +379,7 @@ function quickStab() {
   S.rpv.z -= 9; S.rrv.x -= 5; S.rrv.z += 4;   // the gun lunges forward with the stab
 }
 function fireShot(w, opts = {}) {
-  const ctx = S.ctx, sp = w.spec, cam = ctx.camera, p = ctx.player, rng = ctx.rng;
+  const ctx = S.ctx, sp = w.spec, cam = ctx.xrAim || ctx.camera, p = ctx.player, rng = ctx.rng;
   const now = S.time;
   if (now - w.lastShot > 0.35) w.shots = 0;
   if (!sp.melee) w.ammo = Math.max(0, w.ammo - 1); w.shots++; w.lastShot = now; w.boltT = 0; w.trigT = 0; S.fired++;
@@ -488,7 +489,8 @@ function stowedFor(p) { const m = p?.mounted; return !!(m && (m.elevator || m.di
 // ------------------------------------------------------------------ per-frame
 export function update(dt, ctx) {
   if (!S) return;
-  const p = ctx.player, input = ctx.input, cam = ctx.camera; const playing = ctx.state === 'playing';
+  ctx.xr?.syncAim?.();   // VR: put the aim on the gun hand for this frame before anything fires
+  const p = ctx.player, input = ctx.input, cam = ctx.camera, aim = ctx.xrAim || cam; const playing = ctx.state === 'playing';
   const w = S.weapons[S.cur], sp = w.spec;
   S.time += dt;
   if ((S.envCheck += dt) > 1) { S.envCheck = 0; S._ensureEnv(); }
@@ -575,8 +577,8 @@ export function update(dt, ctx) {
   if (S.throwing) {
     const th = S.throwing; th.t += dt;
     if (!th.pinned && th.t > 0.12) { th.pinned = true; ctx.bus.emit('grenade', { stage: 'pin' }); }
-    if (!th.thrown && th.t > 0.5) { th.thrown = true; S.grenadeCount = Math.max(0, S.grenadeCount - 1); cam.updateMatrixWorld(true); cam.getWorldDirection(_fwd); _right.set(1, 0, 0).applyQuaternion(cam.quaternion);
-      const o = cam.getWorldPosition(new THREE.Vector3()).addScaledVector(_fwd, 0.35).addScaledVector(_right, 0.2).add(_v.set(0, -0.15, 0));
+    if (!th.thrown && th.t > 0.5) { th.thrown = true; S.grenadeCount = Math.max(0, S.grenadeCount - 1); aim.updateMatrixWorld(true); aim.getWorldDirection(_fwd); _right.set(1, 0, 0).applyQuaternion(aim.quaternion);
+      const o = aim.getWorldPosition(new THREE.Vector3()).addScaledVector(_fwd, 0.35).addScaledVector(_right, 0.2).add(_v.set(0, -0.15, 0));
       const v = new THREE.Vector3().copy(_fwd).multiplyScalar(17).add(_v.set(0, 3.2, 0)); if (p?.velocity) v.addScaledVector(p.velocity, 0.6);
       S.grenades.spawn(o, v); ctx.bus.emit('grenade', { stage: 'throw', position: o.clone() }); S.rrv.x -= 4; S.rpv.z += 0.5; }
     lowerT = Math.max(lowerT, th.t < 0.5 ? sstep(th.t / 0.3) : 1 - sstep((th.t - 0.5) / 0.55));
@@ -739,7 +741,7 @@ export function update(dt, ctx) {
   lerp3(pos, [pos.x, pos.y, pos.z], sp.lower.pos, S.lower); lerp3(rot, [rot.x, rot.y, rot.z], sp.lower.rot, S.lower);
   pos.add(reloadOff.pos).add(insp); rot.add(reloadOff.rot); if (inspRot) { rot.x += inspRot[0]; rot.y += inspRot[1]; rot.z += inspRot[2]; }
   // wall clip avoidance: pull back when something is right in front
-  if (ctx.colliders?.length && (ctx.time.frame % 3 === 0)) { cam.getWorldDirection(_fwd); _ray.set(cam.getWorldPosition(_up), _fwd); const reach = sp.wallReach ?? 0.8; let best = reach; for (let i = 0; i < ctx.colliders.length; i++) { const b = ctx.colliders[i]; if (!b?.min) continue; const hp = _ray.intersectBox(b, _v3); if (hp) { const d = hp.distanceTo(_ray.origin); if (d < best) best = d; } } S.wallTarget = best < reach ? (reach - best) : 0; }
+  if (ctx.colliders?.length && (ctx.time.frame % 3 === 0)) { aim.getWorldDirection(_fwd); _ray.set(aim.getWorldPosition(_up), _fwd); const reach = sp.wallReach ?? 0.8; let best = reach; for (let i = 0; i < ctx.colliders.length; i++) { const b = ctx.colliders[i]; if (!b?.min) continue; const hp = _ray.intersectBox(b, _v3); if (hp) { const d = hp.distanceTo(_ray.origin); if (d < best) best = d; } } S.wallTarget = best < reach ? (reach - best) : 0; }
   S.wallPull = damp(S.wallPull, S.wallTarget || 0, 12, dt); pos.z += S.wallPull * 0.55; pos.y -= S.wallPull * 0.08; rot.x += S.wallPull * 0.9; rot.y += S.wallPull * 0.4;
   if (S.showcase) { const sc = S.showcase; pos.set(sc.x, sc.y, -sc.dist); rot.set(sc.pitch, sc.yaw, 0); }
   S.poseNode.position.copy(pos); S.poseNode.rotation.set(rot.x, rot.y, rot.z);
