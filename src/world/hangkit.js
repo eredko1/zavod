@@ -37,6 +37,7 @@ export const ITEMS = {
   gin: { kind: 'booze', icon: '🍸', name: 'Tanqueray, neat', drunk: 0.55, dur: 150, glass: 'shot', liq: 0xe8eef0 },
   drone: { kind: 'gear', icon: '🛸', name: 'killer drone (hunts bad guys, 45 s)', drone: true },
   shrooms: { kind: 'trip', icon: '🍄', name: 'Feliks\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
+  coke: { kind: 'smoke', icon: '❄️', name: 'bag of coke', rush: 60 },   // B: a bump. Sobers you up some, a minute of speed, then the crash
   zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
 };
 
@@ -134,7 +135,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
-    V.cash = V.startCash; V.inv.length = 0; V.inv.push('bic', 'cigs', 'drone', 'drone'); V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; endTrip(); V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
+    V.cash = V.startCash; V.inv.length = 0; V.inv.push('bic', 'cigs', 'drone', 'drone'); V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; V.rushT = 0; if (V.ctx?.player) V.ctx.player.rush = 0; endTrip(); V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
     for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
     for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
     for (const m of V.puddles || []) m.visible = false;
@@ -265,6 +266,7 @@ function useItem(want) {
   if (ITEMS[it]?.hi) return lightUp(false, false, ITEMS[it].hi);
   if (ITEMS[it]?.cig) { const L = V.left || (V.left = {}); L[it] = (L[it] > 0 ? L[it] : ITEMS[it].cig) - 1; if (L[it] > 0) { V.inv.splice(k, 0, it); renderCash(); } return lightUp(false, true); }   // one out of the pack
   if (ITEMS[it]?.drone) { import('./drones.js').then((m) => { if (!m.launchDrone(ctx)) { V.inv.push(it); renderCash(); } }).catch((e) => console.warn('[hangkit] drone', e)); return; }   // one up at a time: a refused launch goes back in the bag
+  if (ITEMS[it]?.rush) { V.drunk = Math.max(0, (V.drunk || 0) - 0.35); V.rushT = ITEMS[it].rush; if (ctx.player) ctx.player.rush = V.rushT; ctx.hud?.toast?.('*sniff* …OKAY. Okay okay okay. Who wants darts? I\'ll play everybody.', 2800); return; }
   if (ITEMS[it]?.trip) { V.tripT = ITEMS[it].trip; V.tripMax = V.tripT; ctx.hud?.toast?.('*chews* …земля дышит. The ground is breathing, bro.', 3000); return; }
   if (it === 'spliff') { V.magicT = 90; ctx.hud?.toast?.('«Заклинанье?» — «Затянись. Тут колдуют без слов!»', 2600); return lightUp(true); }
   const spec = ITEMS[it];
@@ -379,6 +381,7 @@ function updateJoint(dt) {
 function updateHigh(dt) {
   const { ctx } = V; const cv = ctx.canvas; if (!cv) return;
   if (V.tripT > 0) { V.tripT -= dt; return trip(cv, dt); } else if (V.tripFx) { endTrip(); cv.style.filter = ''; cv.style.transform = ''; }
+  if (V.rushT > 0) { V.rushT -= dt; if (ctx.player) ctx.player.rush = V.rushT; if (V.rushT <= 0) { V.high = Math.min(1, V.high + 0.15); V.highT = Math.max(V.highT, 45); ctx.hud?.toast?.('…the crash. Everything is too loud. Sit down.', 2600); } }
   if (V.highT > 0) { V.highT -= dt; if (V.highT < 40) V.high = Math.max(0, V.high - dt / 40); }
   if (V.drunkT > 0) { V.drunkT -= dt; if (V.drunkT < 30) V.drunk = Math.max(0, V.drunk - dt / 30); } else V.drunk = 0;
   const k = V.high, d = V.drunk || 0;
