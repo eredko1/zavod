@@ -123,7 +123,7 @@ function end() {
   for (const H of [V.h0, V.h1]) for (const c of H?.grip?.children || []) if (c !== V.gunMount) c.visible = true;
   if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: true });
   if (V.raf0) { window.requestAnimationFrame = V.raf0; window.cancelAnimationFrame = V.caf0; V.rafQ = null; V.raf0 = null; }   // pending callbacks are still queued with the browser
-  V.crouch = false; V.sprintLatch = false; V.rigY = null; if (V.quick) quick(ctx, false); if (V.tabOn) { key('Tab', false); V.tabOn = false; }
+  V.crouch = false; V.sprintLatch = false; V.rigY = null; V.turnRate = 0; if (V.quick) quick(ctx, false); if (V.tabOn) { key('Tab', false); V.tabOn = false; }
   releaseKeys(); const inp = ctx.input; inp.xrMove = null; inp.touch.axis.x = inp.touch.axis.y = 0; inp.touch.fire = false;
   V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll(); raycastSeesCulled(false);
   ctx.camera.aspect = innerWidth / innerHeight; ctx.camera.updateProjectionMatrix();
@@ -158,6 +158,7 @@ export function update(dt, ctx) {
   if (btn(Lg, 3)) V.sprintLatch = true; if (!moving) V.sprintLatch = false; sprint = V.sprintLatch || btn(Lg, 0);
   // snap turn on the right stick (crouch: pull it down)
   const rx = ax(Rg, 2), ry = ax(Rg, 3);
+  if (V.ui || !prefs.smooth) V.turnRate = 0;
   if (!V.ui) { if (prefs.smooth) { V.turnRate = Math.abs(rx) > 0.2 ? -Math.sign(rx) * (Math.abs(rx) - 0.2) / 0.8 * SMOOTH_TURN : 0; V.turn += V.turnRate * dt; }
     else { if (Math.abs(rx) > 0.7 && !V.snapLatch) { V.snapLatch = true; V.turn -= Math.sign(rx) * prefs.snap * Math.PI / 180; V.vigKick = 1; } if (Math.abs(rx) < 0.3) V.snapLatch = false; }
     if (ry > 0.75 && !V.crouchLatch) { V.crouchLatch = true; V.crouch = !V.crouch; } if (ry < 0.3) V.crouchLatch = false; }
@@ -314,7 +315,7 @@ function cull(ctx, dt) {
   if (V.scanT <= 0 || !V.cullList) { V.scanT = CULL_RESCAN; const L = V.cullList = [], F = V.figs = new Set();
     ctx.scene.traverse((o) => {
       if (o.isBone && !o.parent?.isBone && o.parent && !isRig(o.parent)) F.add(o.parent);
-      if (!(o.isMesh || o.isPoints || o.isLine) || o.isInstancedMesh || o.isBatchedMesh || !o.geometry || o === V.panel || isRig(o) || !(o.layers.mask & 1)) return;
+      if (!(o.isMesh || o.isPoints || o.isLine) || o.isInstancedMesh || o.isBatchedMesh || !o.geometry || o === V.panel || isRig(o) || (!(o.layers.mask & 1) && !hidden.has(o))) return;   // culled ones have lost layer 0: keep them listed
       const g = o.geometry; if (!g.boundingSphere) { try { g.computeBoundingSphere(); } catch { return; } } if (!g.boundingSphere || !(g.boundingSphere.radius < 30)) return; L.push(o); });
     const live = new Set(L); for (const o of hidden) if (!live.has(o)) { unhide(o); hidden.delete(o); }   // gone or pooled away: whole again
     for (const f of frozen) if (!F.has(f)) { thaw(f); frozen.delete(f); } }
@@ -349,7 +350,7 @@ function raycastSeesCulled(on) {
   if (!on) { RC.intersectObject = RC0.one; RC.intersectObjects = RC0.all; return; }
   const wrap = (f) => function (...a) {
     const m = this.layers.mask; if (!(m & 1)) return f.apply(this, a);
-    thawForRay(); this.layers.enable(CULL_LAYER); try { return f.apply(this, a); } finally { this.layers.mask = m; }
+    this.layers.enable(CULL_LAYER); try { return f.apply(this, a); } finally { this.layers.mask = m; }
   };
   RC.intersectObject = wrap(RC0.one); RC.intersectObjects = wrap(RC0.all);
 }
@@ -395,7 +396,7 @@ function placeRig(ctx, ease) {
 }
 /** weapons.js calls this before it aims: the gun hand's (or a punching hand's) world pose, with this frame's player position */
 export function syncAim(ctx) {
-  if (!V.presenting) return; placeRig(ctx, false);
+  if (!V.presenting) return; placeRig(ctx, false); thawForRay();   // far figures catch up before the player's own shots only (AI sight lines, footsteps don't need it)
   const H = V.punchH || mainHand(); if (!H) return;
   const src = !V.punchH && V.gunMount?.parent && V.gunMount.visible ? V.gunMount : H.src?.hand ? (H.hand.joints['wrist'] || H.grip) : H.grip;   // a gun aims down its own barrel
   src.updateMatrixWorld(true); src.matrixWorld.decompose(V.aim.position, V.aim.quaternion, _v);
@@ -424,7 +425,8 @@ export function render(ctx) {
     V.gunMount.visible = !!holder && ctx.weapons.currentId !== 'fists';
     vm.scale.set(1, 1, 1);   // weapons.js widens it on screen to fake a 50° viewmodel fov; in a hand it's life size
     armsOff(ctx, vm);
-    if (R?.grip) for (const c of R.grip.children) if (c !== V.gunMount) c.visible = !V.gunMount.visible;   // the gun replaces the controller model in your hand
+    if (R?.grip) for (const c of R.grip.children) if (c !== V.gunMount) c.visible = !V.gunMount.visible;
+    const O = offHand(); if (O?.grip) for (const c of O.grip.children) if (c !== V.gunMount) c.visible = true;   // after a gun-hand switch   // the gun replaces the controller model in your hand
   }
   wristUpdate(ctx);
   panel(ctx);
@@ -485,7 +487,7 @@ function optionsCard(ctx) {
     + row('Turning', `<span>${pill('smooth', 0, 'Snap')}${pill('smooth', 1, 'Smooth')}</span>`)
     + row('Gun hand', `<span>${pill('left', 0, 'Right')}${pill('left', 1, 'Left')}</span>`)
     + row('Playing', `<span>${pill('seated', 0, 'Standing')}${pill('seated', 1, 'Seated')}</span>`)
-    + `<div style="font:500 12px system-ui;opacity:.75;line-height:1.45;margin:10px 0">Left stick move · click it or hold left trigger to sprint · right stick ←/→ turn, ↑ next weapon, ↓ crouch, click: quick actions (map, grenade, radio, horn …) · trigger fire / click · right grip F · A jump · B reload · X use · left grip bag · Y menu. Hands: pinch left + drag to walk, pinch right to fire, look at your left palm for buttons (MORE… = quick actions). Fists: punch for real.</div>`
+    + `<div style="font:500 12px system-ui;opacity:.75;line-height:1.45;margin:10px 0">Left stick move · click it or hold left trigger to sprint · right stick ←/→ turn, ↑ next weapon, ↓ crouch, click: quick actions (map, grenade, radio, horn …) · trigger fire / click · right grip F · A jump · B reload · X use · left grip bag · Y menu. Hands: pinch left + drag to walk, pinch right to fire, look at your left palm for buttons (MORE… = quick actions). Fists: punch for real. Left-handed: the two hands swap.</div>`
     + `<button data-k="exit" style="width:100%;padding:10px;border-radius:10px;border:0;background:#c0392b;color:#fff;font:800 15px system-ui;cursor:pointer">EXIT VR</button>`;
   const paint = () => { for (const b of el.querySelectorAll('button[data-v]')) { const on = String(+prefs[b.dataset.k]) === b.dataset.v || (b.dataset.k === 'snap' && +b.dataset.v === prefs.snap); b.style.background = on ? '#ffd27a' : '#2a2f38'; b.style.color = on ? '#111' : '#ddd'; } };
   el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); if (b.dataset.k === 'exit') { V.session?.end(); return; }
