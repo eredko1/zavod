@@ -86,7 +86,7 @@ export function buildTavernPeople(world) {
   { const wb = person({ avatar: 'm10', seed: 80 }, { top: 'track', jacket: 0x23446e, stripe: 0xe8e8e8, bottom: 'jeans' }, 1.68); wb.group.position.set(18.0, SW, oz - 8.0); wb.group.rotation.y = -0.9; P.wb = wb; }
   K.spot({ pos: drop, r: 1.8, dy: 2, when: () => P.job === 'envelope', prompt: 'F — HAND THE ENVELOPE TO THE GUY IN THE WINDBREAKER', act: () => { P.job = 'paid'; K.earn(40); say('Guy in the windbreaker: «Tony sent you? …Good. Now forget my face.» (+$40 — Big Tony pays on delivery)', 4200); } });
   world.updaters.push((dt) => { try { update(dt); } catch (e) { if (!P.warned) { P.warned = true; console.warn('[tavern] people', e); } } });
-  if (typeof window !== 'undefined' && window.__game) window.__game.tavernPeople = { kit: kitQA, kenny: () => kPos.toArray(), crew: () => crew.map((c) => ({ name: c.name, pos: c.f.group.position.toArray().map((v) => +v.toFixed(2)) })), job: () => P.job, greeted: () => P.greeted };
+  if (typeof window !== 'undefined' && window.__game) window.__game.tavernPeople = { kit: kitQA, kenny: () => kPos.toArray(), crew: () => crew.map((c) => ({ name: c.name, pos: c.f.group.position.toArray().map((v) => +v.toFixed(2)) })), job: () => P.job, greeted: () => P.greeted, talk: (id) => { const c = crew.find((c) => c.id === id); K.openDialog(c.name, crewTalk(c.id, false)); } };
   console.log('[tavern] people:', P.figs.length);
 }
 
@@ -162,6 +162,14 @@ function crewTalk(id, again) {
     if (!P.job || P.job === 'paid') ch.push({ label: 'Got any work?', go: () => { P.job = 'envelope'; return { text: 'BIG TONY: «Easy job. Take this envelope to the guy in the windbreaker by the N train, across the street. Don\'t open it. Don\'t count it. 唔好問. Forty dollars when he gets it.» (F at the N entrance)', choices: [{ label: 'On it', go: null }] }; } });
     else if (P.job === 'envelope') ch.push({ label: 'About the envelope…', go: () => ({ text: 'BIG TONY: «Why are you still here? The N. Across the street. Windbreaker. 快啲!»', choices: [{ label: 'Going', go: null }] }) });
   }
+  // the side business: SONNY has the green, DUCK has the white. Quietly, at the table, not in front of Kenny
+  if (id === 'sonny') ch.push({ label: 'You holding?', go: () => ({ text: 'SONNY: «Shh. 細聲啲. Not so loud, Kenny runs a clean bar. …What you need?»', choices: [
+    { label: 'Bag of weed — $10', go: () => ({ text: sell('weed', 10, 'SONNY', { ok: 'SONNY: «Smoke it in the yard, not in here. Kenny smells it, we both get thrown out.» (B)', broke: 'SONNY: «Ten bucks. You got ten bucks? No? 冇錢冇得傾.»' }), choices: [{ label: 'Thanks', go: null }] }) },
+    { label: 'Fat blunt — $20', go: () => ({ text: sell('blunt', 20, 'SONNY', { ok: 'SONNY: «Rolled it myself. Out back. Go slow, it\'s strong.» (B)', broke: 'SONNY: «Twenty. Come back with twenty.»' }), choices: [{ label: 'Thanks', go: null }] }) },
+    { label: 'Nah', go: null }] }) });
+  if (id === 'duck') ch.push({ label: 'Heard you got something stronger…', go: () => ({ text: 'DUCK: «Who told you? …Sonny told you. Okay. Forty. Bathroom, not the table. Tony doesn\'t like it at the table.»', choices: [
+    { label: 'Bag of coke — $40', go: () => ({ text: sell('coke', 40, 'DUCK', { ok: 'DUCK: «You didn\'t get it from me. You don\'t know me. I\'m Duck from the duck place.» (B)', broke: 'DUCK: «Forty. Not thirty-five. Forty. I lost forty at darts, I need forty.»' }), choices: [{ label: 'Thanks', go: null }] }) },
+    { label: 'Never mind', go: null }] }) });
   if (id === 'sonny') ch.push({ label: 'Can I sit here?', go: () => ({ text: 'SONNY: «This table is reserved. Since 1998. For us. The bar is right there, 朋友. Kenny will take care of you.»', choices: [{ label: 'Sure', go: null }] }) });
   ch.push({ label: 'Later', go: null });
   return { text: again ? pick(lines) : lines[0], choices: ch };

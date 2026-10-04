@@ -241,7 +241,7 @@ export function update(dt, ctx) {
   const fwd = forwardVec(p.yaw, _f), right = _r.set(-fwd.z, 0, fwd.x);
   let base = p.crouching ? SPD.crouch : p.ads ? SPD.ads : p.sprinting ? SPD.sprint : SPD.walk;
   const dirMul = il > 0 ? (Math.abs(iy) * (iy < 0 ? BACK_MUL : 1) + Math.abs(ix) * STRAFE_MUL) / (Math.abs(ix) + Math.abs(iy)) : 1;
-  const wishSpeed = base * dirMul;
+  const wishSpeed = base * dirMul * (p.rush > 0 ? 1.25 : 1);   // hangkit's coke: a minute of jittery speed
   const wx = (fwd.x * iy + right.x * ix) / (il || 1), wz = (fwd.z * iy + right.z * ix) / (il || 1);
   const v = p.velocity;
   if (S.sliding) {

@@ -99,6 +99,14 @@ if (parts.includes('bar')) {
   await pg.evaluate(() => { const d = window.__game.tavern.door; window.__game.teleport(d[0] - 0.8, d[1], d[2] + 5.5, Math.PI - 0.6, 0.02); }); await pg.waitForTimeout(6000);
   const g = await pg.evaluate(() => ({ greeted: window.__game.tavernPeople.greeted(), crew: window.__game.tavernPeople.crew() })); ok(g.greeted, 'BIG TONY walks up and says his piece', JSON.stringify(g.crew[0]));
   await pg.screenshot({ path: `${out}/tavern-crew.png` });
+  // the side business: SONNY sells weed, DUCK sells coke (B: a minute of speed, sobers you up some)
+  const deal = async (who, ask, item) => { await pg.evaluate((who) => { const K = window.__game.tavernPeople; K.kit.close(); K.kit.give(100); K.talk(who); }, who); await pg.waitForTimeout(300);
+    for (const re of [ask, item]) { const d = await pg.evaluate(() => window.__game.tavernPeople.kit.state().dialog); const i = d?.choices?.findIndex((c) => new RegExp(re).test(c)) ?? -1; if (i < 0) return { name: d?.name, choices: d?.choices }; await pg.evaluate((i) => window.__game.tavernPeople.kit.choose(i), i); await pg.waitForTimeout(300); }
+    return pg.evaluate(() => window.__game.tavernPeople.kit.state()); };
+  st = await deal('sonny', 'holding', 'weed'); ok(st.inv?.includes('weed'), 'SONNY sells a bag of weed', JSON.stringify(st.inv || st));
+  st = await deal('duck', 'stronger', 'coke'); ok(st.inv?.includes('coke'), 'DUCK sells a bag of coke', JSON.stringify(st.inv || st));
+  await pg.evaluate(() => window.__game.tavernPeople.kit.close()); await pg.keyboard.press('KeyB'); await pg.waitForTimeout(600);
+  const rush = await pg.evaluate(() => window.__ctx.player.rush || 0); ok(rush > 50, 'B: a bump of coke gives the rush', String(rush));
   await pg.evaluate(() => { const d = window.__game.tavern.door; window.__game.teleport(d[0] - 2.2, d[1], d[2] + 10.5, Math.PI + 1.25, 0.05); }); await pg.waitForTimeout(1500);
   await pg.screenshot({ path: `${out}/tavern-regulars.png` });
 }
