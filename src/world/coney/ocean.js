@@ -120,7 +120,12 @@ export function buildOcean(world, { waterZ, WATER_Y, SAND_TOP, BZ1 }) {
     #define W(KX, KZ, DX, DZ, A, Q, L, PH) { float th = KX * p.x + KZ * p.y - (PH); float lod = 1.0 - smoothstep(L * 0.16, L * 0.33, sp); float c = cos(th); disp.x += Q * A * DX * c * lod; disp.z += Q * A * DZ * c * lod; disp.y += A * sin(th) * lod; }
     void main() {
       vec4 w = modelMatrix * vec4(position, 1.0);
-      vec2 p = w.xz; float r = length(position.xz); float sp = r * ${f(q - 1)} + 0.25;     // local grid spacing
+      float r = length(position.xz); float sp = r * ${f(q - 1)} + 0.25;     // local grid spacing
+      // the grid follows the camera; sampling the waves where its vertices happen to be made the swell swim / pulse as you moved
+      // (fast on a jet ski). Snap each vertex to a world-anchored grid at its ring's spacing (rounded to a power of two): the
+      // waves stay put, only the mesh slides under them.
+      float spq = exp2(ceil(log2(sp))); w.xz = floor(w.xz / spq + 0.5) * spq;
+      vec2 p = w.xz;
       float zw = wz(p.x), d = p.y - zw;
       vec3 disp = vec3(0.0);
       ${WDEF.join('\n      ')}
