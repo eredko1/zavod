@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>try { navigator.xr && navigator.xr.addEventListener('sessiongranted', () => { window.__xrGranted = true; }); } catch (e) {}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ZAVOD</title>
 <link rel="icon" href="./favicon.svg">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0b0f14">
+<link rel="apple-touch-icon" href="./icons/zavod-192.png">
 <link rel="stylesheet" href="./src/hud.css">
 <script type="importmap">
 { "imports": {
@@ -30,5 +34,6 @@
 <div id="hud"></div>
 <div id="boot"><div class="t">ZAVOD — LOADING</div><div class="bar"><i id="bootbar"></i></div><div class="t" id="boottxt" style="letter-spacing:.1em;font-size:11px;color:#56687a"></div></div>
 <script type="module" src="./src/main.js"></script>
+<script>if ('serviceWorker' in navigator && !/[?&]qa=1/.test(location.search)) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));</script>
 </body>
 </html>

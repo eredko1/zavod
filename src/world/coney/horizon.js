@@ -174,7 +174,8 @@ export function buildHorizon(world) {
   const sprawl = buildSprawl(world, R, texF, texR); sprawl.meshes.forEach(count);
   const sky = buildSkyline(world, R); sky.meshes.forEach(count);
   // lights sample the rides' struts and the scene's lamp meshes: those are built after us (landmarks, park), so defer to frame 1
-  let lightsDone = false; world.updaters.push(() => { if (lightsDone) return; lightsDone = true; try { const L = buildLights(world, R, sprawl, sky); L.forEach(count); cyc.lights = L; console.info(`[horizon] lights: ${stats.dc} draws total`); } catch (e) { console.warn('[horizon] lights', e); } });
+  // (or at the pre-warm, whichever comes first: on phones / the headset the pre-warm frees those meshes' vertex arrays before frame 1)
+  let lightsDone = false; const lights = () => { if (lightsDone) return; lightsDone = true; try { const L = buildLights(world, R, sprawl, sky); L.forEach(count); cyc.lights = L; console.info(`[horizon] lights: ${stats.dc} draws total`); } catch (e) { console.warn('[horizon] lights', e); } }; world.updaters.push(lights); ctx.bus?.on?.('prewarm', lights);
   const fw = buildFireworks(world); count(fw.mesh);
   const cyc = buildCycle(world, fw);
   world.W.horizon = { stats, cycle: cyc, fireworks: fw, sprawl };

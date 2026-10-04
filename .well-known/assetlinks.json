@@ -1,0 +1,4 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": { "namespace": "android_app", "package_name": "app.zavod.vr", "sha256_cert_fingerprints": ["FE:EA:83:4D:3E:F7:9E:08:AB:63:E2:BE:2A:44:44:4D:3E:BB:6A:74:1F:A2:A7:0F:1C:8B:31:1B:06:03:6A:BC"] }
+}]

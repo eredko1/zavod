@@ -141,6 +141,7 @@ function close() {
   if (!U) return; const b = U.b, Tb = D.tables[b];
   if (Tb) { if (Tb.host === me()) { if (Tb.phase === 'play' && Tb.seats.some((s) => s.id !== me() && s.id !== AI)) hostLeave(b, me()); else { D.tables[b] = null; send('st', { b, T: null }); } } else send('leave', { b }); }
   cancelAnimationFrame(U.raf); removeEventListener('resize', size); U.root.remove(); U = null; D.ctx.durakOpen = false; drawChalk(b);
+  try { D.ctx.requestPointerLock?.(); } catch {}   // back to the game (desktop: the mouse; VR: out of the 2D-screen mode)
 }
 function onKey(e) {
   if (!U) return;

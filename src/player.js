@@ -150,6 +150,7 @@ export function update(dt, ctx) {
   let ix = 0, iy = 0, sprintIn = false, crouchIn = false, jumpHeld = false, jumpPress = input.consume('Space');
   if (input.forward) iy += 1; if (input.back) iy -= 1; if (input.right) ix += 1; if (input.left) ix -= 1;
   sprintIn = input.sprint; crouchIn = input.crouch; jumpHeld = input.jump;
+  if (input.xrMove) { ix = input.xrMove.x; iy = input.xrMove.y; }   // VR thumbstick / hand pinch-drag: analog
   if (S.qa) {
     const Q = S.qa, q = Q.segs[Q.i]; Q.elapsed += dt;
     ix += q.x; iy += q.y; sprintIn = sprintIn || q.sprint; crouchIn = crouchIn || q.crouch;
@@ -283,6 +284,7 @@ export function update(dt, ctx) {
   // ---- integrate + collide (substepped when fast) ----
   const tPhys = performance.now();
   const grounded = wasGround || coyote;
+  if (p.xrStep) { p.position.x += p.xrStep.x; p.position.z += p.xrStep.z; p.xrStep.set(0, 0, 0); }   // VR room-scale: you physically stepped; the capsule follows (and the walls push back)
   const distance = v.length() * dt, steps = clamp(Math.ceil(distance / 0.2), 1, 8), sdt = dt / steps;
   let ground = false, landedVy = 0, blocked = null, bnx = 0, bnz = 0, stepped = 0, ceiling = false;
   const opts = { grounded: grounded && !jumped, step: STEP, groundY: gy, wishX: wx * (il > 0 ? 1 : 0), wishZ: wz * (il > 0 ? 1 : 0) };
