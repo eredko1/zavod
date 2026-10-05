@@ -16,8 +16,10 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+import { hangkit as K } from '../world/hangkit.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
+const HAND_LIFT = 0.05, POKE_NEAR = 0.16;   // pinched left hand raised this far above where you pinched: jump / jet pack thrust
 const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.025, PINCH_OFF = 0.04, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
 // in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
 // over the dashboard
@@ -25,6 +27,7 @@ const SEAT_UI_DIST = 0.95, SEAT_HUD_DIST = 0.65, UI_DIST = 1.2, UI_W = 1.6, HUD_
 const UI_HZ = 15, HUD_HZ = 2, GAME_HZ = 24, STAND_H = 1.7, EYE_DEFAULT = 2.0;
 const PREF_KEY = 'zavod.vr';
 const SMOOTH_TURN = 2.1;   // rad/s at full stick (~120°/s)
+const ACT_DIST = 0.55, ACT_DROP = 0.38, WATCH_HZ = 4, SIGHT_FAR = 80;
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
@@ -122,7 +125,7 @@ function begin(session) {
   session.addEventListener('end', end);
   const sel = (on) => (e) => { for (const H of Object.values(V.hands)) if (H.src === e.inputSource) H.select = on; };
   session.addEventListener('selectstart', sel(true)); session.addEventListener('selectend', sel(false));
-  document.body.classList.add('xr-on');
+  document.body.classList.add('xr-on'); ensureXrCss();
   if (ctx.state === 'paused' && !V.granted) ctx.setState('playing');
   V.granted = false;
   console.log('[vr] session started');
@@ -136,6 +139,7 @@ function end() {
   for (const H of [V.h0, V.h1]) for (const c of H?.grip?.children || []) if (c !== V.gunMount) c.visible = true;
   if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: true });
   if (V.raf0) { window.requestAnimationFrame = V.raf0; window.cancelAnimationFrame = V.caf0; V.rafQ = null; V.raf0 = null; }   // pending callbacks are still queued with the browser
+  if (V.sight) V.sight.dot.visible = V.sight.beam.visible = false; if (V.act) V.act.mesh.visible = false;
   V.crouch = false; V.sprintLatch = false; V.rigY = null; V.turnRate = 0; if (V.quick) quick(ctx, false); if (V.tabOn) { key('Tab', false); V.tabOn = false; }
   releaseKeys(); const inp = ctx.input; inp.xrMove = null; inp.touch.axis.x = inp.touch.axis.y = 0; inp.touch.fire = false;
   V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll(); raycastSeesCulled(false); for (const l of V.lightsOff || []) l.visible = true; V.lightsOff = null;
@@ -164,7 +168,8 @@ export function update(dt, ctx) {
   // a pinch: the headset's own select (what the Quest system UI uses; fingertip joint centres stay ~2 cm apart even when touching, so
   // distance alone misses real pinches), or the fingertips close enough as a fallback
   for (const H of [LH, RH]) if (H) { const d = jointDist(H.hand, 'thumb-tip', 'index-finger-tip'); H.pinch = !!H.select || (H.pinch ? d < PINCH_OFF : d < PINCH_ON); }
-  if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { if (!LH.stick0) LH.stick0 = tip.position.clone(); _v.subVectors(tip.position, LH.stick0).applyAxisAngle(_up, -headYaw); mx = clamp(_v.x / HAND_STICK, -1, 1); my = clamp(_v.z / HAND_STICK, -1, 1); } } else LH.stick0 = null; }
+  // the hand stick is in the frame you pinched in: keep the hand forward, turn your head, and you walk where you look
+  if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { if (!LH.stick0) { LH.stick0 = tip.position.clone(); LH.yaw0 = headYaw; } _v.subVectors(tip.position, LH.stick0); V.handLift = _v.y > HAND_LIFT; _v.applyAxisAngle(_up, -LH.yaw0); mx = clamp(_v.x / HAND_STICK, -1, 1); my = clamp(_v.z / HAND_STICK, -1, 1); } } else { LH.stick0 = null; V.handLift = false; } }
   // movement: analog to the player, and the touch stick for cars (vehicles.js reads it as analog throttle / steer)
   const moving = Math.hypot(mx, my) > 0.05;
   inp.xrMove = playing && !V.ui && moving ? { x: mx, y: -my } : null;
@@ -181,7 +186,7 @@ export function update(dt, ctx) {
   // buttons → the game's own keys
   const keys = new Set();
   if (sprint && !V.ui) keys.add('ShiftLeft'); if (V.crouch && !V.ui) keys.add('KeyC');
-  if (btn(Rg, 4)) keys.add('Space');            // A: jump (hold a bike jump)
+  if (btn(Rg, 4) || (V.handLift && !V.ui)) keys.add('Space');            // A (or lift the pinched left hand): jump / jet pack thrust / bike jump
   if (btn(Rg, 5)) keys.add('KeyR');             // B: reload
   if (btn(Rg, 1)) keys.add('KeyF');             // right grip: interact / talk / get in & out
   if (btn(Lg, 4)) keys.add('KeyB');             // X: use the last thing you bought (drink, smoke …)
@@ -192,7 +197,10 @@ export function update(dt, ctx) {
   if (btn(Lg, 5) && !V.menuLatch) { V.menuLatch = true; ctx.setState(ctx.state === 'playing' ? 'paused' : 'playing'); } else if (!btn(Lg, 5)) V.menuLatch = false;
   // right stick up: next weapon (fists → the bag's guns → fists)
   if (!V.ui && playing && ry < -0.75 && !V.cycleLatch) { V.cycleLatch = true; cycleWeapon(ctx); } if (ry > -0.3) V.cycleLatch = false;
-  fire = btn(Rg, 0) || !!RH?.pinch;
+  // never fire while a menu is up, the palm menu is showing (you're about to poke it), your finger is near it, or you're pointing at the action button
+  const guard = V.ui || V.wrist.shown || V.overAction || pokeNear();
+  fire = !guard && (btn(Rg, 0) || !!RH?.pinch);
+  actionButton(ctx, R, !!(btn(Rg, 0) || RH?.pinch));
   // the hands' velocities (in the rig: your own motion, not the train's) for punches
   for (const H of [L, R]) if (H) { const src = H.src?.hand ? H.hand.joints['wrist'] : H.grip; if (src) { _v.copy(src.position); if (dt > 0 && H.seeded === H.src) H.vel.subVectors(_v, H.prev).divideScalar(dt); else H.vel.set(0, 0, 0); H.seeded = H.src; H.prev.copy(_v); } }   // the first sample of a new input has no history: no phantom 20 m/s jab
   // fists: a fast forward jab of either hand lands a punch from that hand
@@ -220,6 +228,11 @@ export function update(dt, ctx) {
 }
 const _up = new THREE.Vector3(0, 1, 0);
 function pulse(H, k, ms) { try { H?.src?.gamepad?.hapticActuators?.[0]?.pulse?.(k, ms); } catch {} }
+/** the main hand's index fingertip within reach of the off hand's wrist (poking the palm menu) */
+function pokeNear() {
+  const M = mainHand(), O = offHand(); if (!M?.src?.hand || !O?.src?.hand) return false;
+  const tip = M.hand.joints['index-finger-tip'], wr = O.hand.joints['wrist']; return !!(tip && wr && tip.position.distanceTo(wr.position) < POKE_NEAR);
+}
 function cycleWeapon(ctx) {
   const W = ctx.weapons; if (!W) return; const bag = W.bag || [], cur = W.currentId;
   if (cur === 'fists') { if (bag.length) W.selectBag(0); return; }
@@ -319,7 +332,7 @@ function wristUpdate(ctx) {
 // ~1300 objects / 6M triangles a frame out to the horizon; at 72 Hz the headset manages a few hundred. Small things far away
 // (cars, people, props, train cars) stop drawing past a distance that grows with their size; buildings, ground, sky stay.
 // Hidden by moving them off layer 0 (the eyes' layer), so modules that toggle .visible themselves are untouched.
-const CULL_LAYER = 30, CULL_EVERY = 0.2, CULL_RESCAN = 3, FIG_FAR = 45, INST_MIN = 8;
+const CULL_LAYER = 30, CULL_EVERY = 0.2, CULL_RESCAN = 3, FIG_FAR = 45, INST_MIN = 8, INST_STILL_MS = 4000;
 const cullDist = (r) => r < 1.5 ? 45 : r < 4 ? 75 : r < 10 ? 120 : r < 30 ? 220 : Infinity;
 const _s = new THREE.Sphere();
 function cull(ctx, dt) {
@@ -364,14 +377,17 @@ function uncullAll() { for (const o of V.culled || []) unhide(o); for (const f o
 // ---- instanced props spread over the map (parked cars: one InstancedMesh per car part holding every car of a kind, ~1500 cars,
 // half the triangles of a Coney frame): only the copies in range are packed into the draw list. The full lists are kept and put
 // back on exit. Instances a module moves itself (traffic, crowds) are left alone: their matrices change between our writes.
+// A mesh is only culled after its matrices stayed untouched for a whole rescan (traffic stopped at a red light looks static for a
+// moment); one that moves later is put back whole at once and never touched again.
 function instTrack(o) {
-  const I = V.inst || (V.inst = new Map()); if (I.has(o)) return;
+  const I = V.inst || (V.inst = new Map()); if (I.has(o) || V.instSkip?.has(o)) return;
   const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere?.radius ?? Infinity; if (!(r < 30)) return;
-  I.set(o, { all: o.instanceMatrix.array.slice(), col: o.instanceColor?.array.slice() || null, n: o.count, r, ver: o.instanceMatrix.version, cx: g.boundingSphere.center });
+  I.set(o, { all: o.instanceMatrix.array.slice(), col: o.instanceColor?.array.slice() || null, n: o.count, r, ver: o.instanceMatrix.version, cx: g.boundingSphere.center, since: performance.now() });
 }
 function instCull(o, eye) {
   const e = V.inst.get(o); if (!o.parent) { instRestore(o); V.inst.delete(o); return; }
-  if (o.instanceMatrix.version !== e.ver) { V.inst.delete(o); return; }   // someone else animates it: hands off (its own matrices stand)
+  if (o.instanceMatrix.version !== e.ver) { instRestore(o); V.inst.delete(o); (V.instSkip || (V.instSkip = new WeakSet())).add(o); return; }   // someone animates it: whole again, hands off for good
+  if (performance.now() - e.since < INST_STILL_MS) return;
   o.updateWorldMatrix(true, false); const me = o.matrixWorld.elements, lim = cullDist(e.r) + e.r, A = e.all, M = o.instanceMatrix.array, C = o.instanceColor?.array;
   let k = 0;
   for (let i = 0; i < e.n; i++) {
@@ -398,6 +414,72 @@ function raycastSeesCulled(on) {
   RC.intersectObject = wrap(RC0.one); RC.intersectObjects = wrap(RC0.all);
 }
 function isRig(o) { for (let p = o; p; p = p.parent) if (p === V.rig || p === V.gunMount) return true; return false; }
+
+// ---- the action button: whatever F does right here (get in the car, talk, board, strap on the jet pack …) as a big pill below
+// your gaze: point the gun hand at it and pinch / pull the trigger, or poke it. With controllers the right grip still works.
+function actionButton(ctx, R, press) {
+  const A = V.act || (V.act = mkAction()), p = ctx.player, veh = p?.mounted && !p.mounted.dialog && p.mounted.spec;
+  const label = (ctx.interactPrompt || '').replace(/^F\s*[—-]\s*/, '').split('  ·')[0] || (veh ? 'GET OUT' : ctx.vehicles?.nearBike ? 'GET ON' : '');
+  A.mesh.visible = !!label && !V.ui && ctx.state === 'playing'; V.overAction = false;
+  if (!A.mesh.visible) { A.prev = press; return; }
+  if (label !== A.label) { A.label = label; A.draw(label); }
+  // below and ahead of your gaze, lazily following your head yaw (in the rig, so it rides along in a car)
+  _e.setFromQuaternion(V.headQ, 'YXZ'); A.yaw = A.yaw == null ? _e.y : A.yaw + wrap(_e.y - A.yaw) * 0.1;
+  A.mesh.position.set(V.head.x - Math.sin(A.yaw) * ACT_DIST, V.head.y - ACT_DROP, V.head.z - Math.cos(A.yaw) * ACT_DIST); A.mesh.rotation.set(-0.35, A.yaw, 0);
+  A.mesh.updateMatrixWorld(true);
+  let hover = false;
+  if (R) { R.ray.updateMatrixWorld(); _m.identity().extractRotation(R.ray.matrixWorld); _ray.ray.origin.setFromMatrixPosition(R.ray.matrixWorld); _ray.ray.direction.set(0, 0, -1).applyMatrix4(_m); hover = !!_ray.intersectObject(A.mesh, false)[0];
+    const tip = R.src?.hand ? R.hand.joints['index-finger-tip'] : null; if (tip) { _v.setFromMatrixPosition(tip.matrixWorld); A.mesh.worldToLocal(_v); if (Math.abs(_v.x) < 0.18 && Math.abs(_v.y) < 0.05 && Math.abs(_v.z) < 0.03) { hover = true; if (!A.poked) { A.poked = true; tap('KeyF'); pulse(R, 0.4, 30); } } else if (_v.z > 0.05) A.poked = false; } }
+  V.overAction = hover; A.mesh.material.color.setScalar(hover ? 1 : 0.8);
+  if (hover && press && !A.prev) { tap('KeyF'); pulse(R, 0.4, 30); }
+  A.prev = press;
+}
+function mkAction() {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128; const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.09), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false })); mesh.renderOrder = 9993; mesh.name = 'xrAction'; V.rig.add(mesh);
+  const draw = (t) => { g.clearRect(0, 0, 512, 128); g.fillStyle = 'rgba(255,210,122,0.95)'; g.beginPath(); g.roundRect(4, 4, 504, 120, 60); g.fill(); g.fillStyle = '#111'; g.font = '800 44px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(('✋ ' + t).slice(0, 26), 256, 66); tex.needsUpdate = true; };
+  return { mesh, draw, label: null, yaw: null, prev: false, poked: false };
+}
+
+// ---- the watch: health, ammo and cash on the back of the off wrist (or above the off controller), always readable --------------
+function watch(ctx) {
+  const O = offHand(), W = V.watch || (V.watch = mkWatch()); const holder = O ? (O.src?.hand ? O.hand.joints['wrist'] : O.grip) : null;
+  W.mesh.visible = !!holder; if (!holder) return;
+  if (W.mesh.parent !== holder) holder.add(W.mesh);
+  if (O.src?.hand) W.mesh.position.set(0, 0.045, 0.03); else W.mesh.position.set(0, 0.06, 0.04);   // the back of the hand / above the controller
+  W.mesh.lookAt(V.cam.getWorldPosition(_v2));
+  W.t -= ctx.time.realDt; if (W.t > 0) return; W.t = 1 / WATCH_HZ;
+  const p = ctx.player, hp = Math.max(0, Math.round(p?.health ?? 0)), max = p?.maxHealth || 100, w = ctx.weapons, cur = w?.current, id = w?.currentId;
+  const ammo = id === 'fists' || id === 'knife' ? '—' : `${cur?.ammo ?? '?'} / ${cur?.reserve ?? '?'}`, cash = K.state?.()?.cash;
+  const key = `${hp}|${ammo}|${cash}|${id}`; if (key === W.key) return; W.key = key;
+  const g = W.g; g.clearRect(0, 0, 256, 128); g.fillStyle = 'rgba(10,12,16,0.85)'; g.beginPath(); g.roundRect(2, 2, 252, 124, 18); g.fill();
+  g.fillStyle = '#333'; g.fillRect(14, 16, 228, 22); g.fillStyle = hp > max * 0.5 ? '#5fd35f' : hp > max * 0.25 ? '#f0c040' : '#e04040'; g.fillRect(14, 16, 228 * hp / max, 22);
+  g.fillStyle = '#fff'; g.font = '700 18px system-ui'; g.textBaseline = 'middle'; g.fillText(`♥ ${hp}`, 18, 27);
+  g.font = '800 30px system-ui'; g.fillStyle = '#ffd27a'; g.fillText(`${String(id || '').toUpperCase().slice(0, 7)} ${ammo}`, 14, 68);
+  g.font = '700 24px system-ui'; g.fillStyle = '#9be89b'; g.fillText(cash != null ? `$${cash}` : '', 14, 104); W.tex.needsUpdate = true;
+}
+function mkWatch() {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const g = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.05), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false })); mesh.renderOrder = 9991; mesh.name = 'xrWatch';
+  return { mesh, g, tex, t: 0, key: '' };
+}
+
+// ---- gun sight: a red dot where the barrel points, and a faint beam to it ---------------------------------------------------
+function sight(ctx) {
+  const S = V.sight || (V.sight = mkSight(ctx)); const id = ctx.weapons?.currentId, on = !!id && id !== 'fists' && id !== 'knife' && !V.ui && V.gunMount?.visible;
+  S.dot.visible = S.beam.visible = on; if (!on) return;
+  if ((S.n = (S.n || 0) + 1) % 2) return;   // every other frame is plenty for a dot
+  syncAim(ctx); const o = V.aim.getWorldPosition(_v), d = V.aim.getWorldDirection(_v2);
+  _ray.ray.origin.copy(o); _ray.ray.direction.copy(d); _ray.far = SIGHT_FAR; const hit = _ray.intersectObjects(ctx.raycastTargets, false)[0]; _ray.far = Infinity;
+  const end = hit ? hit.point : o.clone().addScaledVector(d, SIGHT_FAR), dist = o.distanceTo(end);
+  S.dot.position.copy(end).addScaledVector(d, -0.03); S.dot.scale.setScalar(Math.max(0.012, dist * 0.004)); S.dot.visible = !!hit;
+  const P = S.beam.geometry.attributes.position; P.setXYZ(0, o.x, o.y, o.z); P.setXYZ(1, end.x, end.y, end.z); P.needsUpdate = true; S.beam.geometry.computeBoundingSphere();
+}
+function mkSight(ctx) {
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6), new THREE.MeshBasicMaterial({ color: 0xff2020, depthTest: false, toneMapped: false })); dot.renderOrder = 9994; dot.name = 'xrSightDot';
+  const beam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.25 })); beam.frustumCulled = false; beam.name = 'xrSightBeam';
+  ctx.scene.add(dot, beam); return { dot, beam };
+}
 
 // ---- comfort: a soft tunnel while you're moved by the stick, a car or a snap ---------------------------------------------------
 function vignette() {
@@ -473,6 +555,7 @@ export function render(ctx) {
     const O = offHand(); if (O?.grip) for (const c of O.grip.children) if (c !== V.gunMount) c.visible = true;   // after a gun-hand switch   // the gun replaces the controller model in your hand
   }
   wristUpdate(ctx);
+  watch(ctx); sight(ctx);
   panel(ctx);
   cull(ctx, ctx.time.realDt);
   // comfort tunnel: stick motion and vehicles at speed; a flash on snap turns
@@ -508,6 +591,8 @@ function panel(ctx) {
 }
 
 // ---- 2D: the ENTER VR button and the VR options card (mirrored into the headset with the pause menu) --------------------------
+// in VR the page's touch controls are hidden (the headset's controllers / hands drive the game); back on the 2D page they return
+function ensureXrCss() { if (document.getElementById('xrCss')) return; const st = document.createElement('style'); st.id = 'xrCss'; st.textContent = 'body.xr-on #touch{display:none!important}'; document.head.appendChild(st); }
 function enterButton(ctx) {
   if (!navigator.xr) return;
   navigator.xr.isSessionSupported('immersive-vr').then((ok) => {

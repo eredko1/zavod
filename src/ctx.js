@@ -31,10 +31,11 @@ export function createCtx() {
   if (mode) { qs.set('ai', '0'); qs.set('waves', '0'); }
   const qa = qs.get('qa') === '1';
   const seed = +(qs.get('seed') || 1337);
-  // a VR headset's browser (Quest / Pico, or ?vr=1): no touch controls (the controllers and hands drive it), and the phone-weight
-  // build: a mobile GPU rendering two eyes at 72 Hz. ?low=0 lifts the weight cap.
+  // a VR headset's browser (Quest / Pico, or ?vr=1): the phone-weight build (a mobile GPU rendering two eyes at 72 Hz; ?low=0 lifts
+  // the cap)
   const xrDevice = qs.get('vr') === '1' || (qs.get('vr') !== '0' && /OculusBrowser|Quest|Pico/i.test(navigator.userAgent || ''));
-  const isTouch = qs.get('touch') === '1' || (qs.get('touch') !== '0' && !xrDevice && (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1));
+  // a headset's 2D browser page plays like a tablet (the controllers point and click the touch controls); in VR they're hidden
+  const isTouch = qs.get('touch') === '1' || (qs.get('touch') !== '0' && (matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1));
   // low-power laptops / desktops (integrated Intel HD/UHD, Mesa, software GL, <=4 cores or <=4 GB): the same light path as phones
   // (small textures, fewer people, no shadows, lower render scale) without the touch controls. ?low=1 forces it, ?low=0 turns it off.
   const lowPower = qs.get('low') === '1' || (qs.get('low') !== '0' && !isTouch && (xrDevice || weakGPU()));

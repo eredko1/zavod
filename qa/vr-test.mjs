@@ -162,6 +162,21 @@ if (parked) { await pg.evaluate((c) => window.__game.teleport(c[0] + 1.6, 0.2, c
   const m = await pg.evaluate(() => { const v = window.__ctx.player.mounted; return { mounted: !!v && !v.dialog, car: !!v?.spec?.car, mode: window.__game.vr.state().mode }; });
   ok(m.mounted && m.mode === 'seat', 'grip by a parked car: in the driver\'s seat', JSON.stringify(m));
   await grip(); await pg.waitForTimeout(700); const out = await pg.evaluate(() => ({ mounted: !!window.__ctx.player.mounted, mode: window.__game.vr.state().mode })); ok(!out.mounted && out.mode === 'foot', 'grip again: out of the car', JSON.stringify(out)); }
+// the action button: by a parked car it reads STEAL CAR; point the right controller at it and pull the trigger: you're in
+if (parked) { await pg.evaluate((c) => window.__game.teleport(c[0] + 1.6, 0.2, c[1] + 0.2, 0, 0), parked); await pg.waitForTimeout(900);
+  const btnAt = await pg.evaluate(() => { const T = window.__ctx.THREE, m = window.__ctx.scene.getObjectByName('xrAction'), rig = window.__ctx.scene.getObjectByName('xrRig'); if (!m?.visible) return null; m.updateMatrixWorld(true); return rig.worldToLocal(m.getWorldPosition(new T.Vector3())).toArray(); });
+  ok(!!btnAt, 'by a parked car: the action button shows', JSON.stringify(btnAt));
+  if (btnAt) { await dev((t) => { const c = window.__iwer.controllers.right, o = c.position, d = [t[0] - o.x, t[1] - o.y, t[2] - o.z], L = Math.hypot(...d); d.forEach((v, i) => { d[i] = v / L; }); const ax = [d[1], -d[0], 0], al = Math.hypot(...ax), ang = Math.acos(-d[2]), sn = Math.sin(ang / 2); if (al > 1e-6) c.quaternion.set(ax[0] / al * sn, ax[1] / al * sn, 0, Math.cos(ang / 2)); }, btnAt);
+    await pg.waitForTimeout(300); const a0 = await pg.evaluate(() => window.__ctx.weapons.primary?.ammo);
+    await ctl('right', "updateButtonValue('trigger', 1)"); await pg.waitForTimeout(200); await ctl('right', "updateButtonValue('trigger', 0)"); await pg.waitForTimeout(900);
+    const m = await pg.evaluate(() => ({ mounted: !!window.__ctx.player.mounted && !window.__ctx.player.mounted.dialog })); ok(m.mounted, 'trigger on the action button: in the car (and no shot fired)', JSON.stringify(m));
+    await grip(); await pg.waitForTimeout(600); await dev(() => window.__iwer.controllers.right.quaternion.set(0, 0, 0, 1)); } }
+// the watch on the left wrist / controller, and the gun's red dot
+const wt = await pg.evaluate(() => { const w = window.__ctx.scene.getObjectByName('xrWatch'); return { watch: !!w?.visible && !!w.parent }; });
+ok(wt.watch, 'the watch (health / ammo / cash) is on the left controller', JSON.stringify(wt));
+await pg.evaluate(() => { const W = window.__ctx.weapons; W.collect('ak74', 120); W.selectBag(W.bag.indexOf('ak74')); window.__game.teleport(206.8, 0, -402.8, 0, 0); }); await pg.waitForTimeout(1200);
+const dot = await pg.evaluate(() => ({ beam: !!window.__ctx.scene.getObjectByName('xrSightBeam')?.visible }));
+ok(dot.beam, 'a gun shows its laser sight', JSON.stringify(dot));
 const sh = await pg.evaluate(() => window.__game.tavernPeople?.kit?.shafts?.().find((t) => t.kind !== 'stairs' && t.lobby.length));
 if (sh) { const c = sh.lobby[0]; await pg.evaluate((c) => window.__game.teleport(c[0], c[1], c[2], 0, 0), c); await pg.waitForTimeout(600); const y0 = (await P()).pos[1]; await grip(); await pg.waitForTimeout(6000);
   const e = await pg.evaluate(() => ({ y: +window.__ctx.player.position.y.toFixed(1), mounted: !!window.__ctx.player.mounted }));
