@@ -89,6 +89,13 @@ await pg.waitForTimeout(300); for (let i = 0; i < 6; i++) { await dev(() => { co
 const combo = await pg.evaluate(() => window.__ctx.weapons.combo?.() ?? 0);
 ok(punched || combo > pre, 'a fast jab of the right hand throws a punch', JSON.stringify({ punched, combo, pre }));
 
+// ---- a knife: a fast swing of the hand slashes ----
+let slashed = false; await pg.exposeFunction('__slashSeen', () => { slashed = true; });
+await pg.evaluate(() => { window.__ctx.weapons.collect('knife', 0); window.__ctx.weapons.selectBag(window.__ctx.weapons.bag.indexOf('knife')); window.__ctx.bus.on('shot', () => window.__slashSeen()); }); await pg.waitForTimeout(800);
+for (let i = 0; i < 6; i++) { await dev(() => { const c = window.__iwer.controllers.right; c.position.set(c.position.x + 0.13, c.position.y, c.position.z); }); await pg.waitForTimeout(16); }
+await pg.waitForTimeout(300); for (let i = 0; i < 6; i++) { await dev(() => { const c = window.__iwer.controllers.right; c.position.set(c.position.x - 0.13, c.position.y, c.position.z); }); await pg.waitForTimeout(40); }
+ok(slashed, 'a fast sideways swing with the knife slashes', String(slashed));
+
 // ---- Y: the pause menu on the panel; the laser clicks RESUME ----
 await ctl('left', "updateButtonValue('y-button', 1)"); await pg.waitForTimeout(200); await ctl('left', "updateButtonValue('y-button', 0)"); await pg.waitForTimeout(800);
 p = await P(); s = await S(); ok(p.state === 'paused' && s.ui && s.panel, 'Y: paused, the menu panel is up', JSON.stringify({ state: p.state, ui: s.ui, panel: s.panel }));

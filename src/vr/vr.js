@@ -19,7 +19,7 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { hangkit as K } from '../world/hangkit.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
-const HAND_LIFT = 0.05, POKE_NEAR = 0.16;   // pinched left hand raised this far above where you pinched: jump / jet pack thrust
+const HAND_LIFT = 0.05, POKE_NEAR = 0.16, PUNCH_V_HAND = 1.7, SLASH_V = 2.4, SLASH_V_HAND = 2.0;   // pinched left hand raised this far above where you pinched: jump / jet pack thrust
 const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.025, PINCH_OFF = 0.04, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
 // in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
 // over the dashboard
@@ -204,14 +204,16 @@ export function update(dt, ctx) {
   // the hands' velocities (in the rig: your own motion, not the train's) for punches
   for (const H of [L, R]) if (H) { const src = H.src?.hand ? H.hand.joints['wrist'] : H.grip; if (src) { _v.copy(src.position); if (dt > 0 && H.seeded === H.src) H.vel.subVectors(_v, H.prev).divideScalar(dt); else H.vel.set(0, 0, 0); H.seeded = H.src; H.prev.copy(_v); } }   // the first sample of a new input has no history: no phantom 20 m/s jab
   // fists: a fast forward jab of either hand lands a punch from that hand
-  const fists = ctx.weapons?.currentId === 'fists'; let punch = null;
-  if (fists && playing && !V.ui) for (const H of [L, R]) if (H) { const fwd = _v2.set(-Math.sin(headYaw), 0, -Math.cos(headYaw)); const v = H.vel, along = v.dot(fwd);
-    if (along > PUNCH_V && v.length() > PUNCH_V && V.time - H.punchT > PUNCH_GAP) { H.punchT = V.time; punch = H; } }
+  // a knife (any melee weapon in the hand): a fast swing of that hand, any direction, slashes along the swing
+  const fists = ctx.weapons?.currentId === 'fists', blade = !fists && !!ctx.weapons?.spec?.melee; let punch = null;
+  if (fists && playing && !V.ui && !V.wrist.shown) for (const H of [L, R]) if (H) { const fwd = _v2.set(-Math.sin(headYaw), 0, -Math.cos(headYaw)); const v = H.vel, along = v.dot(fwd), lim = H.src?.hand ? PUNCH_V_HAND : PUNCH_V;   // tracked hands are smoothed: a real jab reads slower
+    if (along > lim && v.length() > lim && V.time - H.punchT > PUNCH_GAP) { H.punchT = V.time; punch = H; } }
+  if (blade && playing && !V.ui && R && R.vel.length() > (R.src?.hand ? SLASH_V_HAND : SLASH_V) && V.time - R.punchT > PUNCH_GAP) { R.punchT = V.time; punch = R; }
   V.time = (V.time || 0) + dt;
   // the aim: the gun hand's grip (or the punching hand) as a world pose for weapons.js
   V.punchH = punch;   // syncAim() aims from this hand this frame
   if (V.ui) V.fireLock = true; else if (!fire) V.fireLock = false;   // the trigger that just clicked a menu must be let go before it shoots
-  inp.touch.fire = playing && !V.ui && !V.fireLock && (fists ? (!!punch && !V.punchPrev) || fire : fire);
+  inp.touch.fire = playing && !V.ui && !V.fireLock && (fists || blade ? (!!punch && !V.punchPrev) || fire : fire);
   V.punchPrev = !!punch;
   if (punch) pulse(punch, 0.6, 60);
   // UI: lasers, clicks, the wrist menu
