@@ -18,6 +18,7 @@ const dir = await N(() => { const S = window.__game.subway.line('F'), st = S.sta
 await N((d) => window.__game.subway.line('F').drive(d), dir); await pg.waitForTimeout(400);
 let D = await N(() => window.__game.subway.line('F').driving());
 ok(D && D.at === 'STW' && D.v === 0, 'took the controls, berthed at Stillwell', JSON.stringify(D));
+await pg.waitForTimeout(800); await pg.screenshot({ path: `${process.env.OUT || '/tmp'}/train-cab.png` });
 const hud = await N(() => document.getElementById('trainHud')?.textContent || ''); ok(/mph/.test(hud) && /AT CONEY/i.test(hud), 'the cab display shows speed and the station', hud.slice(0, 120));
 await pg.keyboard.press('KeyF'); await pg.waitForTimeout(1600); D = await N(() => window.__game.subway.line('F').driving()); ok(D.doors > 0.8, 'F at the platform opens the doors', JSON.stringify(D));
 await pg.keyboard.down('KeyW'); await pg.waitForTimeout(2500); D = await N(() => window.__game.subway.line('F').driving()); ok(D.doors < 0.2, 'power closes the doors first (no traction with them open)', JSON.stringify(D));
@@ -29,7 +30,7 @@ ok(D.v < 0.1 && D.s !== s1, 'brake: it stops', JSON.stringify(D));
 await pg.keyboard.down('KeyW'); await pg.waitForTimeout(9000); D = await N(() => window.__game.subway.line('F').driving()); await pg.keyboard.up('KeyW');
 ok(D.tripped || D.v <= D.limit + 2.3, 'over the limit near the station trips the emergency brake', JSON.stringify(D));
 await pg.keyboard.down('KeyS'); for (let i = 0; i < 60 && (await N(() => window.__game.subway.line('F').driving().v)) > 0.05; i++) await pg.waitForTimeout(250); await pg.keyboard.up('KeyS'); await pg.waitForTimeout(300);   // the lever stays where you leave it: pull it back to brake
-await pg.keyboard.press('KeyR'); await pg.waitForTimeout(300); const D2 = await N(() => window.__game.subway.line('F').driving()); ok(D2.dir === -D.dir, 'R when stopped: change ends', JSON.stringify(D2));
+await pg.keyboard.press('KeyR'); await pg.waitForTimeout(300); await pg.waitForTimeout(800); await pg.screenshot({ path: `${process.env.OUT || '/tmp'}/train-cab-rear.png` }); const D2 = await N(() => window.__game.subway.line('F').driving()); ok(D2.dir === -D.dir, 'R when stopped: change ends', JSON.stringify(D2));
 const p0 = await N(() => window.__ctx.player.position.toArray()); ok(Math.abs(p0[1] - 8.6) < 3, 'you ride in the cab', JSON.stringify(p0.map((v) => +v.toFixed(1))));
 // drive back into Stillwell and get off: stop on the mark, doors, F
 await N(() => { const L = window.__game.subway.line('F'); L.stopDrive(); }); const off = await N(() => window.__game.subway.line('F').driving()); ok(!off, 'the dispatcher takes the train back (stopDrive)');

@@ -316,8 +316,14 @@ const D_ACC = 1.2, D_BRK = 1.4, D_EMERG = 2.7, D_DRAG = 0.04, LIM_LINE = 18, LIM
 const mph = (v) => Math.round(v * 2.237);
 function takeControls(dir) {
   const s = headS(); R.drive = { s, v: 0, lever: 0, dir, doors: 0, wantDoors: false, tripped: false, at: null, stopped: true, t0: now() };
+  faceTrack(dir);
   K.toast(`You're driving the ${R.id}. W / S (or the stick): power ↔ brake · SPACE emergency · F at a platform: doors · R: change ends`, 5200);
   driveHud(true);
+}
+/** turn the driver to look down the track out of the cab windshield (the car's local +z points to the head of the train) */
+function faceTrack(dir) {
+  const g = R.cars[dir > 0 ? 0 : NCAR - 1]; g.updateMatrixWorld(true); const m = g.matrixWorld.elements, p = R.ctx.player;
+  if (p) { p.yaw = dir > 0 ? Math.atan2(-m[8], -m[10]) : Math.atan2(m[8], m[10]); p.pitch = 0; if (R.aboard) R.aboard.head = null; }
 }
 function leaveControls() { R.drive = null; R.ctx.trainCab = false; driveHud(false); R.lastH = null; }
 const stopsSorted = () => R.stopsSorted || (R.stopsSorted = R.stops.slice().sort((a, b) => a.s - b.s));
@@ -333,7 +339,7 @@ function driveKeys(inp, playing) {
   if (P.has('KeyF')) { P.delete('KeyF');
     if (D.stopped && D.at && D.doors > 0.8) { const was = R.aboard; leaveControls(); if (was) alight(); return; }
     if (D.stopped && D.at) D.wantDoors = true; else K.toast(D.stopped ? 'Doors only at a platform, berthed (within the station marks).' : 'Stop the train first.', 1600); }
-  if (P.has('KeyR')) { P.delete('KeyR'); if (D.stopped && D.doors < 0.05) { D.dir = -D.dir; D.lever = 0; K.toast(`Changed ends: now heading ${D.dir > 0 ? R.cfg.bound.out : R.cfg.bound.in}.`, 1800); } else K.toast('Stop with the doors closed to change ends.', 1500); }
+  if (P.has('KeyR')) { P.delete('KeyR'); if (D.stopped && D.doors < 0.05) { D.dir = -D.dir; D.lever = 0; faceTrack(D.dir); K.toast(`Changed ends: now heading ${D.dir > 0 ? R.cfg.bound.out : R.cfg.bound.in}.`, 1800); } else K.toast('Stop with the doors closed to change ends.', 1500); }
 }
 function driveStep(dt) {
   const D = R.drive, ctx = R.ctx, inp = ctx.input; ctx.trainCab = true; if (!dt) return;
