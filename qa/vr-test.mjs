@@ -125,6 +125,14 @@ await pg.waitForTimeout(1200); p2 = await P();
 await dev(() => window.__iwer.hands.left.setPinchValueImmediate(0)); await pg.waitForTimeout(300);
 ok(Math.hypot(p2.pos[0] - p.pos[0], p2.pos[2] - p.pos[2]) > 1, 'left pinch + drag walks', JSON.stringify({ from: p.pos, to: p2.pos }));
 await shot('hands');
+// hands: a right-hand pinch fires the gun in that hand; the palm menu faces your eyes (it read backwards on the left hand)
+await pg.evaluate(() => { const W = window.__ctx.weapons; W.collect('ak74', 120); W.selectBag(W.bag.indexOf('ak74')); }); await pg.waitForTimeout(900);
+const ha0 = await pg.evaluate(() => window.__ctx.weapons.primary?.ammo);
+await dev(() => window.__iwer.hands.right.setPinchValueImmediate(1)); await pg.waitForTimeout(400); await dev(() => window.__iwer.hands.right.setPinchValueImmediate(0)); await pg.waitForTimeout(300);
+const ha1 = await pg.evaluate(() => window.__ctx.weapons.primary?.ammo);
+ok(ha1 < ha0, 'hands: a right pinch fires the gun', JSON.stringify({ ha0, ha1 }));
+const face = await pg.evaluate(() => { const T = window.__ctx.THREE, m = window.__ctx.scene.getObjectByName('xrWrist'); if (!m?.parent) return null; m.updateMatrixWorld(true); const n = new T.Vector3(0, 0, 1).transformDirection(m.matrixWorld), eye = window.__ctx.camera.position.clone().sub(m.getWorldPosition(new T.Vector3())).normalize(), up = new T.Vector3(0, 1, 0).transformDirection(m.matrixWorld); return { facing: +n.dot(eye).toFixed(2), upright: +up.y.toFixed(2) }; });
+ok(face && face.facing > 0.95 && face.upright > 0.5, 'the palm menu faces your eyes, upright', JSON.stringify(face));
 await dev(() => { window.__iwer.primaryInputMode = 'controller'; }); await pg.waitForTimeout(600);
 
 // ---- a car: the seat drives the view, the rig keeps its heading; getting out keeps it too ----
