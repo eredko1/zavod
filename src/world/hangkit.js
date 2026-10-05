@@ -92,7 +92,7 @@ const api = {
 };
 export const hangkit = api;
 /** generic QA hook for maps without their own (window.__game.hangout) */
-export const kitQA = { state: () => ({ ...api.state(), ...api.points() }), ride: (i, dir = 'up', k = 0) => callElevator(i, k, dir), choose: (i) => choose(i), close: () => closeDialog(), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; }, give: (n) => api.earn(n), use: () => useItem() };
+export const kitQA = { state: () => ({ ...api.state(), ...api.points() }), shafts: () => V.shafts.map((t) => ({ kind: t.kind, lobby: t.lobby.cars.map((c) => c.pos.toArray()) })), ride: (i, dir = 'up', k = 0) => callElevator(i, k, dir), choose: (i) => choose(i), close: () => closeDialog(), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; }, give: (n) => api.earn(n), use: () => useItem() };
 
 // bus handlers live for the page (the world may be rebuilt); they always act on the current V
 function bindOnce(ctx) {

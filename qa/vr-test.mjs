@@ -34,7 +34,7 @@ await shot('enter');
 s = await S(); ok(s.hands.includes('left') && s.hands.includes('right'), 'both controllers connected', JSON.stringify(s.hands));
 ok(!s.ui && s.panel, 'playing: HUD panel shown, not in UI mode', JSON.stringify({ ui: s.ui, panel: s.panel }));
 // the camera the game reads sits at the head: ~1.6 m over the player's feet
-let p = await P(); ok(Math.abs(s.cam[1] - p.pos[1] - 1.6) < 0.35 && Math.hypot(s.cam[0] - p.pos[0], s.cam[2] - p.pos[2]) < 0.05, 'ctx.camera = the real head, standing over the capsule', JSON.stringify({ cam: s.cam, feet: p.pos }));
+let p = await P(); ok(Math.abs(s.cam[1] - p.pos[1] - 2.0) < 0.1 && Math.hypot(s.cam[0] - p.pos[0], s.cam[2] - p.pos[2]) < 0.05, 'ctx.camera = the real head over the capsule, eyes at 2.0 m', JSON.stringify({ cam: s.cam, feet: p.pos }));
 
 // ---- look: turning the head turns the player ----
 await dev(() => { const q = window.__iwer.quaternion; const s = Math.sin(Math.PI / 4), c = Math.cos(Math.PI / 4); q.set(0, s, 0, c); });   // 90° left
@@ -135,6 +135,36 @@ if (car.mounted) {
   const spd = await pg.evaluate(() => window.__ctx.player.mounted?.speed || 0); ok(spd > 1, 'left stick drives', spd.toFixed(1));
   await shot('car');
 } else console.log('SKIP car (no QA mount hook)', JSON.stringify(car));
+
+// ---- the world's F interactions, from the right grip: jet pack, a car, an elevator; X uses what you bought ----
+const grip = async () => { await ctl('right', "updateButtonValue('squeeze', 1)"); await pg.waitForTimeout(200); await ctl('right', "updateButtonValue('squeeze', 0)"); await pg.waitForTimeout(600); };
+await pg.waitForFunction(() => { const h = window.__game.vr.state().hands; return h.includes('right') && h.includes('left'); }, null, { timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(500);   // controllers back after the hand-tracking part
+if (await pg.evaluate(() => !!window.__ctx.player.mounted && !window.__ctx.player.mounted.dialog)) await grip();   // still in the car from the seat check: out first
+const jp = await pg.evaluate(() => window.__game.jetpack.packs()[0]);
+await pg.evaluate((j) => window.__game.teleport(j[0] + 0.6, j[1], j[2], 0, 0), jp); await pg.waitForTimeout(500); await grip();
+let jet = await pg.evaluate(() => window.__game.jetpack.state()); ok(jet.worn, 'grip by the jet pack straps it on', JSON.stringify(jet));
+await ctl('right', "updateButtonValue('a-button', 1)"); await pg.waitForTimeout(1500); jet = await pg.evaluate(() => window.__game.jetpack.state()); await ctl('right', "updateButtonValue('a-button', 0)");
+ok(jet.y > 1.5, 'hold A: the jet pack flies', JSON.stringify(jet)); await pg.waitForTimeout(2500);
+await pg.evaluate(async () => { const { clickAt } = await import('/src/vr/mirror.js'); window.__vrQuickTest = clickAt; });
+await ctl('right', "updateButtonValue('thumbstick', 1)"); await pg.waitForTimeout(150); await ctl('right', "updateButtonValue('thumbstick', 0)"); await pg.waitForTimeout(400);
+await pg.evaluate(() => { const b = [...document.querySelectorAll('#vrQuick button')].find((x) => x.dataset.k === 'KeyX'); const r = b.getBoundingClientRect(); window.__vrQuickTest(r.left + r.width / 2, r.top + r.height / 2); }); await pg.waitForTimeout(500);
+jet = await pg.evaluate(() => window.__game.jetpack.state()); ok(!jet.worn, 'quick actions → Jetpack takes it off', JSON.stringify(jet));
+const parked = await pg.evaluate(() => { const c = window.__ctx.world.parkedCars.find((c) => Math.hypot(c.x - 206, c.z + 395) < 400); return c && [c.x, c.z]; });
+if (parked) { await pg.evaluate((c) => window.__game.teleport(c[0] + 1.6, 0.2, c[1] + 0.2, 0, 0), parked); await pg.waitForTimeout(800); await grip(); await pg.waitForTimeout(900);
+  const m = await pg.evaluate(() => { const v = window.__ctx.player.mounted; return { mounted: !!v && !v.dialog, car: !!v?.spec?.car, mode: window.__game.vr.state().mode }; });
+  ok(m.mounted && m.mode === 'seat', 'grip by a parked car: in the driver\'s seat', JSON.stringify(m));
+  await grip(); await pg.waitForTimeout(700); const out = await pg.evaluate(() => ({ mounted: !!window.__ctx.player.mounted, mode: window.__game.vr.state().mode })); ok(!out.mounted && out.mode === 'foot', 'grip again: out of the car', JSON.stringify(out)); }
+const sh = await pg.evaluate(() => window.__game.tavernPeople?.kit?.shafts?.().find((t) => t.kind !== 'stairs' && t.lobby.length));
+if (sh) { const c = sh.lobby[0]; await pg.evaluate((c) => window.__game.teleport(c[0], c[1], c[2], 0, 0), c); await pg.waitForTimeout(600); const y0 = (await P()).pos[1]; await grip(); await pg.waitForTimeout(6000);
+  const e = await pg.evaluate(() => ({ y: +window.__ctx.player.position.y.toFixed(1), mounted: !!window.__ctx.player.mounted }));
+  ok(e.y > y0 + 3 || e.mounted, 'grip at the elevator: it takes you up', JSON.stringify({ y0, ...e })); }
+else console.log('SKIP elevator (no shafts)');
+const inv0 = await pg.evaluate(() => window.__game.tavernPeople?.kit?.state()?.inv?.length ?? null);
+await pg.evaluate(() => window.__game.tavernPeople?.kit?.give?.(50)); await pg.evaluate(() => window.__ctx.hangkit?.give?.('tsingtao') ?? window.__game.hangkit?.give?.('tsingtao'));
+await ctl('left', "updateButtonValue('x-button', 1)"); await pg.waitForTimeout(200); await ctl('left', "updateButtonValue('x-button', 0)"); await pg.waitForTimeout(800);
+const inv1 = await pg.evaluate(() => window.__game.tavernPeople?.kit?.state()?.inv?.length ?? null);
+ok(inv0 != null && inv1 < inv0 + 1, 'X uses the last thing you bought (a tool / drink / smoke)', JSON.stringify({ inv0, inv1 }));
+await pg.evaluate((s) => window.__game.teleport(206.8, 0, -402.8, 0, 0)); await pg.waitForTimeout(600);
 
 // ---- quick actions (right stick click) and the VR keyboard ----
 await ctl('right', "updateButtonValue('thumbstick', 1)"); await pg.waitForTimeout(200); await ctl('right', "updateButtonValue('thumbstick', 0)"); await pg.waitForTimeout(500);
