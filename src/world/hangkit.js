@@ -245,6 +245,7 @@ function update(dt) {
     if (!act) { const f = nearestFriendCar(3.8); if (f) { prompt = `F — HOP IN WITH ${f.name}`; act = () => enterPassenger(f.id); } }
   }
   ctx.interactNear = !!act;   // next frame's weapons.js leaves F alone while a prompt is up
+  ctx.interactPrompt = prompt;   // VR's action button (src/vr/vr.js) shows it
   V.promptT -= dt;
   if (prompt && !ctx.isTouch && (prompt !== V.lastPrompt || V.promptT <= 0)) { ctx.hud?.toast?.(prompt, 700); V.promptT = 0.4; }   // phones: the big action button already shows it
   if (ctx.isTouch) { if (prompt) { ctx.actionLabel = prompt.replace(/^F\s*[—-]\s*/, '').split('  ·')[0]; V.ownLabel = true; } else if (V.ownLabel) { ctx.actionLabel = null; V.ownLabel = false; } }   // phones: the action button (touch.js) names it, a tap = F
