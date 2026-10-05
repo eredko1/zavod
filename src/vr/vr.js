@@ -22,7 +22,7 @@ const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.018, PINCH_OFF = 0.032, PUNCH
 // in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
 // over the dashboard
 const SEAT_UI_DIST = 0.95, SEAT_HUD_DIST = 0.65, UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
-const UI_HZ = 15, HUD_HZ = 4, GAME_HZ = 24, STAND_H = 1.7, EYE_DEFAULT = 2.0;
+const UI_HZ = 15, HUD_HZ = 2, GAME_HZ = 24, STAND_H = 1.7, EYE_DEFAULT = 2.0;
 const PREF_KEY = 'zavod.vr';
 const SMOOTH_TURN = 2.1;   // rad/s at full stick (~120°/s)
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
@@ -104,6 +104,9 @@ function begin(session) {
   try { session.updateTargetFrameRate?.(72)?.catch?.(() => {}); } catch {}
   // shadows are a whole second scene pass per light, per eye: off in the headset, back on after if they were on
   raycastSeesCulled(true);
+  // point / spot lights (lamps, the gun's screen fill lights, muzzle flash, deli lamps) cost every lit pixel of both eyes, even at
+  // intensity 0: off while in VR, sun / sky / moon stay. Done once here (a light switching on later would recompile every shader)
+  V.lightsOff = []; ctx.scene.traverse((o) => { if ((o.isPointLight || o.isSpotLight) && o.visible) { o.visible = false; V.lightsOff.push(o); } });
   V.shadows0 = ctx.renderer.shadowMap.enabled; if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: false });
   // the gun goes from the screen corner into your right hand
   const vm = ctx.weapons?.viewmodel; if (vm) { V.vmScale0 = vm.scale.clone(); V.vmParent = vm.parent; V.gunMount = V.gunMount || new THREE.Group(); V.gunMount.name = 'xrGunMount'; vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); V.gunMount.add(vm); }
@@ -132,7 +135,7 @@ function end() {
   if (V.raf0) { window.requestAnimationFrame = V.raf0; window.cancelAnimationFrame = V.caf0; V.rafQ = null; V.raf0 = null; }   // pending callbacks are still queued with the browser
   V.crouch = false; V.sprintLatch = false; V.rigY = null; V.turnRate = 0; if (V.quick) quick(ctx, false); if (V.tabOn) { key('Tab', false); V.tabOn = false; }
   releaseKeys(); const inp = ctx.input; inp.xrMove = null; inp.touch.axis.x = inp.touch.axis.y = 0; inp.touch.fire = false;
-  V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll(); raycastSeesCulled(false);
+  V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll(); raycastSeesCulled(false); for (const l of V.lightsOff || []) l.visible = true; V.lightsOff = null;
   ctx.camera.aspect = innerWidth / innerHeight; ctx.camera.updateProjectionMatrix();
   if (ctx.state === 'playing') ctx.setState('paused');
   console.log('[vr] session ended');
@@ -310,7 +313,7 @@ function wristUpdate(ctx) {
 // ~1300 objects / 6M triangles a frame out to the horizon; at 72 Hz the headset manages a few hundred. Small things far away
 // (cars, people, props, train cars) stop drawing past a distance that grows with their size; buildings, ground, sky stay.
 // Hidden by moving them off layer 0 (the eyes' layer), so modules that toggle .visible themselves are untouched.
-const CULL_LAYER = 30, CULL_EVERY = 0.2, CULL_RESCAN = 3, FIG_FAR = 45;
+const CULL_LAYER = 30, CULL_EVERY = 0.2, CULL_RESCAN = 3, FIG_FAR = 45, INST_MIN = 8;
 const cullDist = (r) => r < 1.5 ? 45 : r < 4 ? 75 : r < 10 ? 120 : r < 30 ? 220 : Infinity;
 const _s = new THREE.Sphere();
 function cull(ctx, dt) {
@@ -322,6 +325,7 @@ function cull(ctx, dt) {
   if (V.scanT <= 0 || !V.cullList) { V.scanT = CULL_RESCAN; const L = V.cullList = [], F = V.figs = new Set();
     ctx.scene.traverse((o) => {
       if (o.isBone && !o.parent?.isBone && o.parent && !isRig(o.parent)) F.add(o.parent);
+      if (o.isInstancedMesh && o.count > INST_MIN && !isRig(o)) instTrack(o);
       if (!(o.isMesh || o.isPoints || o.isLine) || o.isInstancedMesh || o.isBatchedMesh || !o.geometry || o === V.panel || isRig(o) || (!(o.layers.mask & 1) && !hidden.has(o))) return;   // culled ones have lost layer 0: keep them listed
       const g = o.geometry; if (!g.boundingSphere) { try { g.computeBoundingSphere(); } catch { return; } } if (!g.boundingSphere || !(g.boundingSphere.radius < 30)) return; L.push(o); });
     const live = new Set(L); for (const o of hidden) if (!live.has(o)) { unhide(o); hidden.delete(o); }   // gone or pooled away: whole again
@@ -332,6 +336,7 @@ function cull(ctx, dt) {
     if (far) { if (!hidden.has(o)) { o.userData.xrMask = o.layers.mask; o.layers.mask = (o.layers.mask & ~1) | (1 << CULL_LAYER); hidden.add(o); } }
     else if (hidden.has(o)) { unhide(o); hidden.delete(o); }
   }
+  for (const o of V.inst?.keys() || []) instCull(o, eye);
   for (const f of V.figs) {
     if (!f.parent) continue;
     _v.copy(f.position).applyMatrix4(f.parent.matrixWorld);   // its parent still updates: a fresh position
@@ -349,7 +354,32 @@ function thawForRay() {
   for (const f of fr) if (f.parent) THREE.Object3D.prototype.updateMatrixWorld.call(f, true);
 }
 function unhide(o) { if (o.userData.xrMask != null) { o.layers.mask = o.userData.xrMask; o.userData.xrMask = null; } }
-function uncullAll() { for (const o of V.culled || []) unhide(o); for (const f of V.frozen || []) thaw(f); V.culled = null; V.frozen = null; V.cullList = null; V.figs = null; }
+function uncullAll() { for (const o of V.culled || []) unhide(o); for (const f of V.frozen || []) thaw(f); for (const o of V.inst?.keys() || []) instRestore(o); V.culled = null; V.frozen = null; V.cullList = null; V.figs = null; V.inst = null; }
+// ---- instanced props spread over the map (parked cars: one InstancedMesh per car part holding every car of a kind, ~1500 cars,
+// half the triangles of a Coney frame): only the copies in range are packed into the draw list. The full lists are kept and put
+// back on exit. Instances a module moves itself (traffic, crowds) are left alone: their matrices change between our writes.
+function instTrack(o) {
+  const I = V.inst || (V.inst = new Map()); if (I.has(o)) return;
+  const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); const r = g.boundingSphere?.radius ?? Infinity; if (!(r < 30)) return;
+  I.set(o, { all: o.instanceMatrix.array.slice(), col: o.instanceColor?.array.slice() || null, n: o.count, r, ver: o.instanceMatrix.version, cx: g.boundingSphere.center });
+}
+function instCull(o, eye) {
+  const e = V.inst.get(o); if (!o.parent) { instRestore(o); V.inst.delete(o); return; }
+  if (o.instanceMatrix.version !== e.ver) { V.inst.delete(o); return; }   // someone else animates it: hands off (its own matrices stand)
+  o.updateWorldMatrix(true, false); const me = o.matrixWorld.elements, lim = cullDist(e.r) + e.r, A = e.all, M = o.instanceMatrix.array, C = o.instanceColor?.array;
+  let k = 0;
+  for (let i = 0; i < e.n; i++) {
+    const b = i * 16, x = A[b + 12], y = A[b + 13], z = A[b + 14];   // instance origin (local) → world through the mesh
+    const wx = me[0] * x + me[4] * y + me[8] * z + me[12], wy = me[1] * x + me[5] * y + me[9] * z + me[13], wz = me[2] * x + me[6] * y + me[10] * z + me[14];
+    const dx = wx - eye.x, dy = wy - eye.y, dz = wz - eye.z; if (dx * dx + dy * dy + dz * dz > lim * lim) continue;
+    if (k !== i) { M.set(A.subarray(b, b + 16), k * 16); if (C) C.set(e.col.subarray(i * 3, i * 3 + 3), k * 3); }
+    else if (M[b + 12] !== x || M[b + 14] !== z) { M.set(A.subarray(b, b + 16), b); if (C) C.set(e.col.subarray(i * 3, i * 3 + 3), i * 3); }
+    k++;
+  }
+  if (k !== o.count || k !== e.k) { o.count = k; o.instanceMatrix.needsUpdate = true; if (o.instanceColor) o.instanceColor.needsUpdate = true; }
+  e.k = k; e.ver = o.instanceMatrix.version;
+}
+function instRestore(o) { const e = V.inst?.get(o); if (!e) return; o.instanceMatrix.array.set(e.all); if (e.col && o.instanceColor) o.instanceColor.array.set(e.col); o.count = e.n; o.instanceMatrix.needsUpdate = true; if (o.instanceColor) o.instanceColor.needsUpdate = true; }
 // culled things must still be hit by bullets, sight lines and footsteps: while in VR a raycast that would have seen layer 0 also sees
 // the cull layer (culling only takes layer 0 away)
 const RC = THREE.Raycaster.prototype, RC0 = { one: RC.intersectObject, all: RC.intersectObjects };
