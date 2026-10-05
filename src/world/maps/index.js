@@ -5,5 +5,6 @@ import * as terminal from './terminal.js';
 import * as wsp from './wsp.js';
 import * as sbu from './sbu.js';
 import * as coney from './coney.js';
-export const MAPS = { zavod, railyard, terminal, wsp, sbu, coney };
+import * as nyc from './nyc.js';
+export const MAPS = { zavod, railyard, terminal, wsp, sbu, coney, nyc };
 export const DEFAULT_MAP = 'zavod';

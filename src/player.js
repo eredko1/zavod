@@ -292,6 +292,7 @@ export function update(dt, ctx) {
     p.position.addScaledVector(v, sdt);
     opts.groundY = groundY(p.position.x, p.position.z);
     resolveCapsule(grid, p.position, RADIUS, p.height, v, opts, _info);
+    if (ctx.meshCollision) ctx.meshCollision.resolveCapsule(p.position, RADIUS, p.height, v, _info);   // maps built from real geometry (world/meshcollide.js)
     ground = _info.ground; if (_info.landedVy < landedVy) landedVy = _info.landedVy;
     if (_info.blocked) { blocked = _info.blocked; bnx = _info.blockedNX; bnz = _info.blockedNZ; }
     stepped += _info.stepped; ceiling = ceiling || _info.ceiling;

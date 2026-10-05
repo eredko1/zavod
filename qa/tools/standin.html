@@ -1,0 +1,43 @@
+<!doctype html><meta charset="utf-8"><script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }</script>
+<script type="module">
+// The NYC stand-in (qa/tools/make-nyc-standin.mjs writes it to assets/maps/nyc-standin.glb): a 240 m block-out in Map Lab's
+// layout: every mesh carries { role, surfaceClass } in its glTF extras (walkable-ground / walkable-elevated / blocking), vertex
+// colours, metres, y up, x east.
+import * as THREE from 'three';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+const COL = { roadbed: 0x3a3d42, paved: 0xb8b2a6, land: 0x6f8a4a, deck: 0x7a6a58, wall: 0xc9b9a0, roof: 0x5a5550, water: 0x2a5a7a };
+const parts = {};   // 'role:class' → geometries
+const box = (key, x0, y0, z0, x1, y1, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).toNonIndexed(); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); (parts[key] || (parts[key] = [])).push(g); };
+const H = 120, ROADS = [-60, 0, 60], RW = 6, SW = 4, CURB = 0.15;
+// roadbed under everything (the streets show where nothing else sits on top)
+box('walkable-ground:roadbed', -H, -0.3, -H, H, 0, H - 8);   // the street surface, up to the water's edge
+// blocks between the streets: a curb-high sidewalk ring and a courtyard of grass, buildings standing on the sidewalk line
+const edges = [-H, ...ROADS.flatMap((r) => [r - RW, r + RW]), H];
+let seed = 7; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+for (let i = 0; i + 1 < edges.length; i += 2) for (let k = 0; k + 1 < edges.length; k += 2) {
+  const x0 = edges[i], x1 = edges[i + 1], z0 = edges[k], z1 = edges[k + 1]; if (x1 - x0 < 10 || z1 - z0 < 10) continue;
+  box('walkable-ground:paved', x0, 0, z0, x1, CURB, z1);   // the sidewalk slab: its edge is the curb
+  box('walkable-ground:land', x0 + SW, CURB, z0 + SW, x1 - SW, CURB + 0.02, z1 - SW);
+  // two or three buildings per block along its north and south edges, leaving a gap to walk through
+  for (const [za, zb] of [[z0 + SW, z0 + SW + 12], [z1 - SW - 12, z1 - SW]]) { let x = x0 + SW; while (x < x1 - SW - 8) { const w = 10 + R() * 12, h = 8 + R() * 30, xe = Math.min(x + w, x1 - SW); box('blocking:wall', x, CURB, za, xe, CURB + h, zb); box('blocking:roof', x, CURB + h, za, xe, CURB + h + 0.3, zb); x = xe + 4; } }
+}
+// a ramp up to an elevated deck (3 m) over the east street, with railings
+const RAMP = { x0: 64, x1: 84, z0: 20, z1: 26 }, DECK = { x0: 84, x1: 110, z0: 14, z1: 32, y: 3 };
+{ const g = new THREE.PlaneGeometry(RAMP.x1 - RAMP.x0, RAMP.z1 - RAMP.z0); g.rotateX(-Math.PI / 2); const L = RAMP.x1 - RAMP.x0, a = Math.atan2(DECK.y, L); g.rotateZ(a); g.translate((RAMP.x0 + RAMP.x1) / 2, DECK.y / 2, (RAMP.z0 + RAMP.z1) / 2); (parts['walkable-elevated:deck'] || (parts['walkable-elevated:deck'] = [])).push(g.toNonIndexed());
+  // its underside so it reads solid from below (not walkable)
+  box('blocking:wall', DECK.x0 + 2, 0, DECK.z0 + 2, DECK.x0 + 3, DECK.y - 0.3, DECK.z0 + 3); box('blocking:wall', DECK.x1 - 3, 0, DECK.z1 - 3, DECK.x1 - 2, DECK.y - 0.3, DECK.z1 - 2); }
+box('walkable-elevated:deck', DECK.x0, DECK.y - 0.3, DECK.z0, DECK.x1, DECK.y, DECK.z1);
+box('blocking:wall', DECK.x0, DECK.y, DECK.z0, DECK.x1, DECK.y + 1.05, DECK.z0 + 0.12); box('blocking:wall', DECK.x0, DECK.y, DECK.z1 - 0.12, DECK.x1, DECK.y + 1.05, DECK.z1); box('blocking:wall', DECK.x1 - 0.12, DECK.y, DECK.z0, DECK.x1, DECK.y + 1.05, DECK.z1);
+// a strip of water along the south edge (a different surface class to test)
+box('walkable-ground:water', -H, -0.25, H - 8, H, -0.05, H);
+const scene = new THREE.Scene();
+for (const [key, list] of Object.entries(parts)) {
+  const g = mergeGeometries(list.map((q) => { for (const k of Object.keys(q.attributes)) if (!['position', 'normal', 'uv'].includes(k)) q.deleteAttribute(k); return q; }), false);
+  const cls = key.split(':')[1], c = new THREE.Color(COL[cls] ?? 0xff00ff), n = g.attributes.position.count, cols = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const j = 0.92 + ((i * 2654435761) % 997) / 997 * 0.08; cols.set([c.r * j, c.g * j, c.b * j], i * 3); }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, name: cls })); m.name = key.replace(':', '__'); m.userData = { role: key.split(':')[0], surfaceClass: cls }; scene.add(m);   // glTF extras (node names lose ':')
+}
+new GLTFExporter().parse(scene, (buf) => { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); window.__glb = btoa(s); }, (e) => { window.__err = String(e); }, { binary: true });
+</script>
