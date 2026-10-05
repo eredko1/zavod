@@ -5,7 +5,7 @@
 // (cash, stash, B, elevators, stealing, passengers, merc cash, respawn-at) lives in ../hangkit.js. CONEY agent.
 import * as THREE from 'three';
 import { buildKit, hangkit as K } from '../hangkit.js';
-import { buildDeli, sammyTalk, fadeNear, nameTag } from '../deli.js';
+import { buildDeli, sammyTalk, fadeNear, nameTag, findDeliSpot, storeTalk } from '../deli.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { dressFigure, standTall, addAfro, addLongHair, addKnife } from '../outfits.js';
 import { buildLocals, sammyLotion } from './locals.js';
@@ -60,6 +60,7 @@ export function buildHangout(world, M) {
   // every Luna Park tower: 3 lobby cars up to the 19th floor, each gallery side's cars back down (shaft index = tower index)
   for (const t of towers) K.shaft({ kind: 'elevator', floors: 19, lobby: { cars: t.lobby.cars }, tops: t.top.map((s) => ({ cars: s.cars, face: s.view.yaw })) });
   try { placeDeli(world); } catch (e) { console.warn('[hangout] deli', e); }
+  try { buildStores(world, H.deli ? [H.deli.door] : []); } catch (e) { console.warn('[hangout] stores', e); }
   try { buildLocals(world, H); } catch (e) { console.warn('[hangout] locals', e); }   // POPS, SHADES, NET GOST + the mangal (coney/locals.js)
   try { if (ctx.mode === 'chill') buildChill(world, H); else buildCrews(world); } catch (e) { console.warn('[hangout] chill/crews', e); }
   try { buildJobs(world); } catch (e) { console.warn('[hangout] jobs', e); }
@@ -109,6 +110,50 @@ function placeDeli(world) {
     }
   }
   console.warn('[hangout] no free spot for the deli on W 8th St');
+}
+
+// ---- the rest of the block: a bodega, a pizzeria, Chinese takeout, a liquor store … on free stretches of the main streets. Every
+// one walks in (the shared store kit in deli.js: no extra lights or textures per store) and has someone behind the counter.
+const STORES = [
+  { type: 'bodega', name: 'MERMAID DELI & GROCERY', who: 'ALI', avatar: 'm20', shirt: 0x2f4a3a },
+  { type: 'pizza', name: "COSMO'S PIZZA", who: 'COSMO', avatar: 'm10', shirt: 0xf0efe6 },
+  { type: 'chinese', name: 'GOLDEN DRAGON 金龍 KITCHEN', who: 'MRS. CHEN', avatar: 'f09', bun: true, shirt: 0x8a1a1a, hair: 0x111111 },
+  { type: 'liquor', name: 'SURF WINE & LIQUOR', who: 'RAJ', avatar: 'm02', shirt: 0x2a3550 },
+  { type: 'bodega', name: 'NEPTUNE CANDY & GROCERY', who: 'HECTOR', avatar: 'm10', shirt: 0x5a3a20 },
+  { type: 'pizza', name: "TONY'S PIZZERIA", who: 'TONY JR.', avatar: 'm20', shirt: 0xe9e2cf },
+];
+const STORE_SPACING = 70, STORE_N = { full: 6, lite: 4 };
+const STORE_REACH = 14;   // m around the storefront that must be walkable (the store is 8 x 11 behind its door, plus the sidewalk)
+function playable(world, c, m) {
+  const W = world.W, B = W.bounds, Z = W.zones || [];
+  const inside = (x, z) => (B && x > B.min.x && x < B.max.x && z > B.min.z && z < B.max.z) || Z.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+  return [[-m, -m], [m, -m], [-m, m], [m, m], [0, 0]].every(([dx, dz]) => inside(c.x + dx, c.z + dz));
+}
+export function buildStores(world, avoid = []) {
+  const want = world.ctx.lite ? STORE_N.lite : STORE_N.full, placed = [...avoid], out = [];
+  // candidate frontages: along the wide streets, a store's depth back from the kerb, facing the street (door toward the road)
+  const cands = [];
+  for (const r of OSM.r) { if (r.w < 12) continue; for (let i = 0; i + 1 < r.p.length; i++) { const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 20) continue;
+    const ux = (bx - ax) / L, uz = (bz - az) / L; for (let d = 10; d < L - 10; d += 25) for (const side of [-1, 1]) { const nx = -uz * side, nz = ux * side, off = r.w / 2 + 3.5;
+      cands.push({ x: ax + ux * d + nx * off, z: az + uz * d + nz * off, yaw: Math.atan2(nx, nz) }); } } }
+  let seed = 4242; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = cands.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); const t = cands[i]; cands[i] = cands[j]; cands[j] = t; }
+  for (const c of cands) {
+    if (out.length >= want) break;
+    if (placed.some((q) => Math.hypot(q.x - c.x, q.z - c.z) < STORE_SPACING)) continue;
+    if (!playable(world, c, STORE_REACH)) continue;   // inside the walkable world (the map bounds or a zone like Brighton): the whole store
+    const spot = findDeliSpot(world, [c], 6, { fallback: false }); if (!spot) continue;
+    const S = STORES[out.length % STORES.length];
+    try {
+      const D = buildDeli(world, { ...spot, name: S.name, style: S.type, vendorName: S.who, avatar: S.avatar, shirt: S.shirt, bun: S.bun, hair: S.hair, lamp: false });
+      K.vendor({ name: S.who, pos: D.sammy, r: 2.3, fig: D.fig, talk: storeTalk(S.type, S.who) });
+      (world.W.mapPOIs || (world.W.mapPOIs = [])).push({ name: S.name.split(' ').slice(0, 2).join(' '), x: D.door.x, z: D.door.z, kind: 'shop' });
+      placed.push(spot); out.push({ ...spot, type: S.type, name: S.name, who: S.who, counter: D.counter.toArray(), door: D.door.toArray() });
+    } catch (e) { console.warn('[hangout] store', S.name, e); }
+  }
+  console.log('[hangout] stores:', out.map((s) => s.name).join(' · '));
+  if (typeof window !== 'undefined' && window.__game) window.__game.stores = out;
+  return out;
 }
 
 function buildIgor(world, M, pos) {
