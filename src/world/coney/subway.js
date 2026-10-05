@@ -119,7 +119,7 @@ function buildLine() {
   if (cfg.id === 'D') buildElStation(world, stops[1].s, { id: 'B50', name: 'Bay 50 St', zone: 'BAY 50 ST', hint: 'the D back to Coney', street: false });
   // ---- boarding ----
   const me = R; R.doorPos = new THREE.Vector3(0, -999, 0);
-  K.spot({ pos: R.doorPos, r: 4.6, dy: 3, when: () => !me.aboard && !!me.boardable, prompt: () => `F — BOARD THE ${cfg.id}  ·  next: ${me.boardable?.next?.name || ''}`, act: () => { R = me; board(); } });
+  K.spot({ pos: R.doorPos, r: BOARD_REACH + 0.2, dy: 3, when: () => !me.aboard && !!me.boardable, prompt: () => `F — BOARD THE ${cfg.id}  ·  next: ${me.boardable?.next?.name || ''}`, act: () => { R = me; board(); } });
   console.log(`[subway] ${cfg.id} route`, Math.round(R.L), 'm ·', stops.map((q) => `${q.id}@${Math.round(q.s)}`).join(' '), '· cycle', Math.round(R.cycle), 's');
   return true;
 }
@@ -244,8 +244,9 @@ function update(dt) {
   R.boardable = null; R.open = open; R.side = dwellSide; R.leg = l;
   const playing = ctx.state === 'playing', p = ctx.player;
   if (l.kind === 'dwell' && (!l.next.hidden || R.id === 'N') && open > 0.8 && !R.aboard && !p.dead && !p.mounted) {   // (not onto a train about to run out of the map)
-    const me = p.position; let best = null, bd = 4.5;
-    R.cars.forEach((g, c) => { for (const dz of DOORZ) for (const sx of dwellSide === 2 ? [-1, 1] : [dwellSide]) { _a.set(sx * 2.2, FLOOR, dz).applyMatrix4(g.matrixWorld); const d = Math.hypot(_a.x - me.x, _a.z - me.z); if (d < bd && Math.abs(_a.y - me.y) < 2.5) { bd = d; best = { c, dz, sx }; R.doorPos.copy(_a); } } });
+    // any door, either side of the train, within BOARD_REACH: from the platform across the track too (you used to have to hop it)
+    const me = p.position; let best = null, bd = BOARD_REACH;
+    R.cars.forEach((g, c) => { for (const dz of DOORZ) for (const sx of [-1, 1]) { _a.set(sx * 2.2, FLOOR, dz).applyMatrix4(g.matrixWorld); const d = Math.hypot(_a.x - me.x, _a.z - me.z); if (d < bd && Math.abs(_a.y - me.y) < 2.5) { bd = d; best = { c, dz, sx }; R.doorPos.copy(_a); } } });
     if (best) R.boardable = { ...best, next: l.next };
   }
   // the car body is solid to someone on a platform (it has no colliders — it moves): walking into its side pushes you back
@@ -295,6 +296,7 @@ function update(dt) {
   if (R.aboard || lab || R.boardable) ctx.interactNear = true;   // weapons.js leaves F (the touch button) to us
 }
 const DOORZ = [-6.2, -2.1, 2.1, 6.2], JOINT = 11.9, _inv = new THREE.Matrix4();
+const BOARD_REACH = 9;   // m from a door to board: covers the platform across one track
 const mss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 /** the next train out of a stop, per line and direction: [{ line, color, fg, to, dest, arrive (s until the doors open), leave, boarding }] */
 function departures(id) {
