@@ -66,6 +66,7 @@ export function buildSubway(world) {
       until: w((id) => { const t = now() % L.cycle; const l = L.legs.find((g) => g.kind === 'dwell' && g.stop.id === id); return l ? ((l.t0 - t) % L.cycle + L.cycle) % L.cycle : null; }),
       debug: w(() => ({ side: L.stops.map((q) => q.sideCache || null), cars: L.cars.map((g) => g.position.toArray().map((v) => +v.toFixed(1))), open: L.lastOpen })),
       nepStairs: () => STN.NEP?.stairs, board: w(() => board()), alight: w(() => alight()), skew: (sec) => { SKEW += sec; },
+      drive: w((dir) => takeControls(dir ?? 1)), driving: w(() => L.drive && { s: +L.drive.s.toFixed(1), v: +L.drive.v.toFixed(2), lever: +L.drive.lever.toFixed(2), doors: +L.drive.doors.toFixed(2), at: L.drive.at?.id || null, tripped: L.drive.tripped, limit: L.drive.limit, dir: L.drive.dir }), stopDrive: w(() => leaveControls()),
     }; };
   if (typeof window !== 'undefined' && window.__game) window.__game.subway = { ...api(F), line: (id) => { const L = LINES.find((q) => q.id === id); return L ? api(L) : null; }, lines: () => LINES.map((q) => q.id) };
 }
@@ -168,8 +169,9 @@ function ptAt(s, out = new THREE.Vector3()) {
   const a = P[lo], b = P[hi], k = (s - a.s) / Math.max(1e-6, b.s - a.s); return out.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);
 }
 const now = () => Date.now() / 1000 + SKEW + (R?.off || 0);
-function legNow() { const t = now() % R.cycle; return R.legs.find((l) => t >= l.t0 && t < l.t1) || R.legs[0]; }
+function legNow() { if (R.drive) return driveLeg(); const t = now() % R.cycle; return R.legs.find((l) => t >= l.t0 && t < l.t1) || R.legs[0]; }
 function headS() {
+  if (R.drive) return R.drive.s;
   const l = legNow(), t = now() % R.cycle;
   if (l.kind === 'dwell') return l.stop.s;
   const D = l.b.s - l.a.s, d = Math.abs(D), T = l.t1 - l.t0, u = t - l.t0; const dA = VMAX * VMAX / ACC;
@@ -215,12 +217,13 @@ function bulletAtlas() {   // D F N Q bullets in a row, 128 px each, transparent
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
 function update(dt) {
   if (!R?.P) return; const { ctx } = R;
+  if (R.drive) driveStep(dt);
   const h = headS(), l = legNow(), t = now() % R.cycle;
   const ds = R.lastH == null ? 0 : h - R.lastH; R.lastH = h; const speed = Math.abs(ds) / Math.max(1e-3, dt), moving = l.kind === 'run' ? Math.sign(l.b.s - l.a.s) : 0;
   const curve = (() => { ptAt(h - 30, _a); ptAt(h - 10, _b); const a1 = Math.atan2(_b.x - _a.x, _b.z - _a.z); ptAt(h + 10, _a); const a2 = Math.atan2(_a.x - _b.x, _a.z - _b.z); let d = a2 - a1; d = Math.atan2(Math.sin(d), Math.cos(d)); return d; })();
-  trackSound(speed, Math.abs(curve)); R.acc = (R.acc || 0) + ((speed - (R.lastV ?? speed)) / Math.max(1e-3, dt) - (R.acc || 0)) * Math.min(1, dt * 3); R.lastV = speed;
+  R.curveNow = curve; trackSound(speed, Math.abs(curve)); R.acc = (R.acc || 0) + ((speed - (R.lastV ?? speed)) / Math.max(1e-3, dt) - (R.acc || 0)) * Math.min(1, dt * 3); R.lastV = speed;
   // doors: open 2 s into a dwell, close (chime) 4 s before it ends
-  const open = l.kind === 'dwell' && !l.stop.hidden ? Math.max(0, Math.min(1, (t - l.t0 - 1.5) / 1.2, (l.t1 - 3 - t) / 1.2)) : 0;
+  const open = R.drive ? R.drive.doors : l.kind === 'dwell' && !l.stop.hidden ? Math.max(0, Math.min(1, (t - l.t0 - 1.5) / 1.2, (l.t1 - 3 - t) / 1.2)) : 0;
   const dwellSide = l.kind === 'dwell' && !l.stop.hidden ? sideAt(l.stop) : 0; R.lastOpen = [+open.toFixed(2), dwellSide];
   const cam = ctx.camera.position, far = ctx.lite ? 320 : 900;
   R.cars.forEach((g, c) => {
@@ -260,15 +263,16 @@ function update(dt) {
   }
   // riding: you stand in the car and can walk its aisle (WASD / stick, relative to where you look); the car carries you and
   // turns you with it on the curves. At a stop: F, or walk out through an open door on the platform side, gets you off.
-  if (R.aboard && l.kind === 'dwell' && l.next.hidden && open > 0.8 && t > l.t1 - 5.5) { if ((R.id === 'D' || R.id === 'N') && R.W.tavern) { if (R.stayKey !== l.t0) { R.stayKey = l.t0; R.W.tavern.stayOn(); } } else { K.toast(`The ${R.id} runs on to ${l.next.name}, past the edge of the map. Everybody off at ${l.stop.name}.`, 4200); alight(); } }
-  if (R.aboard && (R.id === 'D' || R.id === 'N') && R.W.tavern && l.kind === 'run' && l.b.hidden && t - l.t0 > 4) { alight(true); R.W.tavern.arrive(R.id === 'N' ? 'Nx' : 'D'); }
+  if (!R.drive && R.aboard && l.kind === 'dwell' && l.next.hidden && open > 0.8 && t > l.t1 - 5.5) { if ((R.id === 'D' || R.id === 'N') && R.W.tavern) { if (R.stayKey !== l.t0) { R.stayKey = l.t0; R.W.tavern.stayOn(); } } else { K.toast(`The ${R.id} runs on to ${l.next.name}, past the edge of the map. Everybody off at ${l.stop.name}.`, 4200); alight(); } }
+  if (!R.drive && R.aboard && (R.id === 'D' || R.id === 'N') && R.W.tavern && l.kind === 'run' && l.b.hidden && t - l.t0 > 4) { alight(true); R.W.tavern.arrive(R.id === 'N' ? 'Nx' : 'D'); }
   if (R.aboard) {
     const A = R.aboard, g = R.cars[A.c]; g.updateMatrixWorld(true);
     const head = Math.atan2(g.matrixWorld.elements[8], g.matrixWorld.elements[10]);   // the car's local +z in world
     if (A.head != null) { let d = head - A.head; d = Math.atan2(Math.sin(d), Math.cos(d)); p.yaw += d; } A.head = head;
     R.canAlight = l.kind === 'dwell' && open > 0.8;
     const inp = ctx.input; let ix = 0, iy = 0;
-    if (playing && inp) { if (inp.forward) iy += 1; if (inp.back) iy -= 1; if (inp.right) ix += 1; if (inp.left) ix -= 1; }
+    if (playing && inp && !R.drive) { if (inp.forward) iy += 1; if (inp.back) iy -= 1; if (inp.right) ix += 1; if (inp.left) ix -= 1; }
+    if (R.drive) { A.c = R.drive.dir > 0 ? 0 : NCAR - 1; A.lz = R.drive.dir > 0 ? CAB_Z : -CAB_Z; A.lx = CAB_X; }   // in the cab, at the controls
     const il = Math.hypot(ix, iy);
     if (il > 0) { const sp = (inp.sprint ? 3.4 : 2.2) * Math.min(dt, 0.05) / il;   // walking pace inside a car
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
@@ -285,18 +289,89 @@ function update(dt) {
       const cam = ctx.camera, bob = il > 0 ? Math.sin((A.walkT || 0) * 9) * 0.025 : 0; cam.position.set(_a.x, _a.y + 1.62 + bob, _a.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); p.cameraPosition?.copy?.(cam.position);
       if (R.canAlight && !R.hintOff) { R.hintOff = true; K.toast(`${ctx.isTouch ? 'GET OFF' : 'F'} — get off at ${l.stop.name} (or walk out the open doors)`, 3200); }
       if (l.kind !== 'dwell') R.hintOff = false;
-      if (R.canAlight && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); alight(); }   // the touch GET OFF button injects F
+      // the front of the lead car: take the controls
+      const lead = l.kind === 'dwell' ? l.dir || 1 : Math.sign(l.b.s - l.a.s) || 1, cabEnd = (lead > 0 && A.c === 0 && A.lz > CAB_REACH) || (lead < 0 && A.c === NCAR - 1 && A.lz < -CAB_REACH);
+      R.cabHere = !R.drive && cabEnd;
+      if (R.drive) driveKeys(inp, playing);
+      else if (cabEnd && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); takeControls(lead); }
+      else if (R.canAlight && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); alight(); }   // the touch GET OFF button injects F
     }
   }
   // doors closing: the chime + the conductor, for riders and for anyone standing at the open doors
-  if (l.kind === 'dwell' && t > l.t1 - 4.6 && t < l.t1 - 4.2 && R.closeKey !== l.t0 && (R.aboard || R.boardable)) { R.closeKey = l.t0; chime(); K.toast('Stand clear of the closing doors, please.', 2400); if (R.aboard) pa(R.ctx, 'Stand clear of the closing doors, please.'); }
+  if (!R.drive && l.kind === 'dwell' && t > l.t1 - 4.6 && t < l.t1 - 4.2 && R.closeKey !== l.t0 && (R.aboard || R.boardable)) { R.closeKey = l.t0; chime(); K.toast('Stand clear of the closing doors, please.', 2400); if (R.aboard) pa(R.ctx, 'Stand clear of the closing doors, please.'); }
   // touch: the contextual action button (touch.js) says what F does here
-  const lab = R.aboard && R.canAlight ? 'GET OFF' : null;   // boarding is a hangkit spot: its "F — BOARD THE F" prompt already gets a tap button on phones (netui.js)
+  const lab = R.drive ? (R.drive.stopped && R.drive.at ? (R.drive.doors > 0.8 ? 'GET OFF' : 'OPEN DOORS') : null) : R.cabHere ? `DRIVE THE ${R.id}` : R.aboard && R.canAlight ? 'GET OFF' : null;   // boarding is a hangkit spot: its "F — BOARD THE F" prompt already gets a tap button on phones (netui.js)
   if (lab) { ctx.actionLabel = lab; R.ownLabel = true; } else if (R.ownLabel) { ctx.actionLabel = null; R.ownLabel = false; }
   if (R.aboard || lab || R.boardable) ctx.interactNear = true;   // weapons.js leaves F (the touch button) to us
 }
 const DOORZ = [-6.2, -2.1, 2.1, 6.2], JOINT = 11.9, _inv = new THREE.Matrix4();
-const BOARD_REACH = 9;   // m from a door to board: covers the platform across one track
+const BOARD_REACH = 9;
+// ---- driving a train: the master controller (a lever, power ↔ brake), the emergency brake, speed limits that trip you (like NYCT's
+// grade timers), doors only at a platform and only when stopped, no power with the doors open, bumper blocks at the ends. Your train
+// leaves the shared timetable on your screen only (everyone else keeps seeing the scheduled one).
+const CAB_Z = CAR / 2 - 1.15, CAB_X = 0.55, CAB_REACH = CAR / 2 - 3.6;
+const D_ACC = 1.2, D_BRK = 1.4, D_EMERG = 2.7, D_DRAG = 0.04, LIM_LINE = 18, LIM_SLOW = 6.7, LIM_TRIP = 2.2, LEVER_RATE = 1.6, BERTH = 5;
+const mph = (v) => Math.round(v * 2.237);
+function takeControls(dir) {
+  const s = headS(); R.drive = { s, v: 0, lever: 0, dir, doors: 0, wantDoors: false, tripped: false, at: null, stopped: true, t0: now() };
+  K.toast(`You're driving the ${R.id}. W / S (or the stick): power ↔ brake · SPACE emergency · F at a platform: doors · R: change ends`, 5200);
+  driveHud(true);
+}
+function leaveControls() { R.drive = null; R.ctx.trainCab = false; driveHud(false); R.lastH = null; }
+const stopsSorted = () => R.stopsSorted || (R.stopsSorted = R.stops.slice().sort((a, b) => a.s - b.s));
+function nextStop(s, dir) { const L = stopsSorted(); return dir > 0 ? L.find((q) => q.s > s + 1) || L[L.length - 1] : [...L].reverse().find((q) => q.s < s - 1) || L[0]; }
+function driveLeg() {
+  const D = R.drive, at = D.at;
+  if (at) return { kind: 'dwell', stop: at, next: nextStop(at.s, D.dir), dir: D.dir, t0: D.t0, t1: D.t0 + 1e6 };
+  const b = nextStop(D.s, D.dir), a = nextStop(D.s, -D.dir); return { kind: 'run', a, b, t0: D.t0, t1: D.t0 + 1e6 };
+}
+function driveKeys(inp, playing) {
+  const D = R.drive; if (!playing || !inp) return;
+  const P = inp.pressed;
+  if (P.has('KeyF')) { P.delete('KeyF');
+    if (D.stopped && D.at && D.doors > 0.8) { const was = R.aboard; leaveControls(); if (was) alight(); return; }
+    if (D.stopped && D.at) D.wantDoors = true; else K.toast(D.stopped ? 'Doors only at a platform, berthed (within the station marks).' : 'Stop the train first.', 1600); }
+  if (P.has('KeyR')) { P.delete('KeyR'); if (D.stopped && D.doors < 0.05) { D.dir = -D.dir; D.lever = 0; K.toast(`Changed ends: now heading ${D.dir > 0 ? R.cfg.bound.out : R.cfg.bound.in}.`, 1800); } else K.toast('Stop with the doors closed to change ends.', 1500); }
+}
+function driveStep(dt) {
+  const D = R.drive, ctx = R.ctx, inp = ctx.input; ctx.trainCab = true; if (!dt) return;
+  // the lever: W / S nudge it, a stick sets it directly (up = power, down = brake)
+  const ay = inp?.touch?.axis?.y || 0;
+  if (Math.abs(ay) > 0.15) D.lever = Math.max(-1, Math.min(1, -ay)); else { if (inp?.forward) D.lever = Math.min(1, D.lever + LEVER_RATE * dt); if (inp?.back) D.lever = Math.max(-1, D.lever - LEVER_RATE * dt); }
+  const emerg = !!inp?.jump || D.tripped;
+  if (D.lever > 0.05 && D.doors > 0) { D.wantDoors = false; if (!D.chimed) { D.chimed = true; chime(); K.toast('Stand clear of the closing doors, please.', 2000); } }
+  // doors
+  D.doors = Math.max(0, Math.min(1, D.doors + (D.wantDoors ? 1 : -1) * dt / 1.2)); if (D.doors === 0) D.chimed = false;
+  // traction / braking
+  let a = 0;
+  if (emerg) a = -D_EMERG; else if (D.lever > 0.05) a = D.doors > 0.02 ? 0 : D.lever * D_ACC * Math.max(0, 1 - D.v / (LIM_LINE * 1.25)); else if (D.lever < -0.05) a = D.lever * D_BRK; else a = -D_DRAG;
+  D.v = Math.max(0, D.v + a * dt); D.s += D.dir * D.v * dt;
+  // bumper blocks: the ends of the track
+  const lo = LEN + 2, hi = R.L - 2; if (D.s < lo || D.s > hi) { if (D.v > 2) { K.toast('*BANG* — into the bumper block.', 2000); ctx.player?.damage?.(Math.min(40, D.v * 3)); } D.s = Math.max(lo, Math.min(hi, D.s)); D.v = 0; }
+  // speed limits: slow through stations and sharp curves; over the limit by LIM_TRIP and the train trips (emergency until it stops)
+  const nearStn = stopsSorted().some((q) => !q.hidden && Math.abs(q.s - D.s) < 70), curveK = Math.abs(R.curveNow || 0);
+  D.limit = nearStn || curveK > 0.12 ? LIM_SLOW : LIM_LINE;
+  if (!D.tripped && D.v > D.limit + LIM_TRIP) { D.tripped = true; K.toast(`TRIPPED — ${mph(D.v)} mph in a ${mph(D.limit)} zone. Emergency brakes until you stop.`, 3000); }
+  if (D.tripped && D.v === 0) D.tripped = false;
+  // berthed at a platform: stopped with the train's head on the station mark
+  D.stopped = D.v < 0.05;
+  const berth = stopsSorted().find((q) => Math.abs(q.s - D.s) < BERTH);
+  const was = D.at; D.at = D.stopped && berth && !berth.hidden ? berth : null;
+  if (D.at && !was) { D.t0 = now(); R.lastAnn = ''; } else if (!D.at && was) D.t0 = now();
+  // the N / D off the edge of the map: on to 8th Ave, like riding
+  if ((R.id === 'D' || R.id === 'N') && R.W.tavern && berth?.hidden && D.dir > 0 && D.s > berth.s - BERTH) { leaveControls(); alight(true); R.W.tavern.arrive(R.id === 'N' ? 'Nx' : 'D'); return; }
+  driveHud(true);
+}
+function driveHud(on) {
+  let el = document.getElementById('trainHud');
+  if (!on) { if (el) el.style.display = 'none'; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'trainHud'; el.style.cssText = 'position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:45;padding:10px 16px;border-radius:12px;background:rgba(10,12,16,.82);border:1px solid rgba(255,255,255,.18);color:#eee;font:700 15px Barlow Condensed,system-ui;letter-spacing:.04em;min-width:300px;text-align:center;pointer-events:none'; document.body.appendChild(el); }
+  const D = R.drive; if (!D) return; el.style.display = 'block';
+  const nx = nextStop(D.s, D.dir), dist = Math.max(0, Math.round(Math.abs(nx.s - D.s)));
+  const lev = D.lever > 0.05 ? `POWER ${Math.round(D.lever * 4)}` : D.lever < -0.05 ? `BRAKE ${Math.round(-D.lever * 4)}` : 'COAST';
+  const html = `<b style="background:${R.cfg.color};color:${R.cfg.fg || '#fff'};border-radius:50%;padding:1px 8px;margin-right:6px">${R.id}</b> <span style="font-size:22px">${mph(D.v)}</span> mph <span style="opacity:.7">/ limit ${mph(D.limit || LIM_LINE)}</span> · ${lev}${D.tripped ? ' · <span style="color:#ff5050">TRIPPED</span>' : ''}<br><span style="opacity:.85">${D.at ? 'AT ' + D.at.name.toUpperCase() : 'NEXT ' + (nx.hidden ? 'END OF LINE' : nx.name.toUpperCase()) + ' · ' + dist + ' m'} · DOORS ${D.doors > 0.8 ? 'OPEN' : D.doors > 0.02 ? 'MOVING' : 'CLOSED'}</span>`;
+  if (html !== el._h) { el._h = html; el.innerHTML = html; }
+}   // m from a door to board: covers the platform across one track
 const mss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 /** the next train out of a stop, per line and direction: [{ line, color, fg, to, dest, arrive (s until the doors open), leave, boarding }] */
 function departures(id) {
