@@ -138,6 +138,12 @@ const ha0 = await pg.evaluate(() => window.__ctx.weapons.primary?.ammo);
 await dev(() => window.__iwer.hands.right.setPinchValueImmediate(1)); await pg.waitForTimeout(400); await dev(() => window.__iwer.hands.right.setPinchValueImmediate(0)); await pg.waitForTimeout(300);
 const ha1 = await pg.evaluate(() => window.__ctx.weapons.primary?.ammo);
 ok(ha1 < ha0, 'hands: a right pinch fires the gun', JSON.stringify({ ha0, ha1 }));
+// hands-only quick draw: a finger gun (IWER's 'point' pose: index out, the rest curled) brings the gun up from fists
+await pg.evaluate(() => window.__ctx.weapons.fists()); await pg.waitForTimeout(600);
+await dev(() => { window.__iwer.hands.right.poseId = 'point'; }); await pg.waitForTimeout(900);
+const drawn = await pg.evaluate(() => window.__ctx.weapons.currentId);
+ok(drawn && drawn !== 'fists' && drawn !== 'knife', 'hands: a finger gun draws the gun', String(drawn));
+await dev(() => { window.__iwer.hands.right.poseId = 'relaxed'; }); await pg.waitForTimeout(300);
 const face = await pg.evaluate(() => { const T = window.__ctx.THREE, m = window.__ctx.scene.getObjectByName('xrWrist'); if (!m?.parent) return null; m.updateMatrixWorld(true); const n = new T.Vector3(0, 0, 1).transformDirection(m.matrixWorld), eye = window.__ctx.camera.position.clone().sub(m.getWorldPosition(new T.Vector3())).normalize(), up = new T.Vector3(0, 1, 0).transformDirection(m.matrixWorld); return { facing: +n.dot(eye).toFixed(2), upright: +up.y.toFixed(2) }; });
 ok(face && face.facing > 0.95 && face.upright > 0.5, 'the palm menu faces your eyes, upright', JSON.stringify(face));
 await dev(() => { window.__iwer.primaryInputMode = 'controller'; }); await pg.waitForTimeout(600);
