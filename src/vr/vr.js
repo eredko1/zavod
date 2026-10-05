@@ -28,6 +28,8 @@ const SEAT_UI_DIST = 0.95, SEAT_HUD_DIST = 0.65, UI_DIST = 1.2, UI_W = 1.6, HUD_
 const UI_HZ = 15, HUD_HZ = 2, GAME_HZ = 24, STAND_H = 1.7, EYE_DEFAULT = 2.0;
 const PREF_KEY = 'zavod.vr';
 const SMOOTH_TURN = 2.1;   // rad/s at full stick (~120°/s)
+const PALM_BACK = 0.07, PALM_FWD = 0.07;
+const FINGER_OUT = 0.07, FINGER_CURLED = 0.055, POSE_HOLD = 0.2, HAMMER_ON = 0.03, HAMMER_OFF = 0.045;   // hand-pose gestures (m, s)   // the model's wrist sits this far behind your palm; a tracked hand's palm is this far ahead of its wrist
 const ACT_DIST = 0.55, ACT_DROP = 0.38, WATCH_HZ = 4, SIGHT_FAR = 80;
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
@@ -201,15 +203,23 @@ export function update(dt, ctx) {
   if (btn(Lg, 5) && !V.menuLatch) { V.menuLatch = true; ctx.setState(ctx.state === 'playing' ? 'paused' : 'playing'); } else if (!btn(Lg, 5)) V.menuLatch = false;
   // right stick up: next weapon (fists → the bag's guns → fists)
   if (!V.ui && playing && ry < -0.75 && !V.cycleLatch) { V.cycleLatch = true; cycleWeapon(ctx); } if (ry > -0.3) V.cycleLatch = false;
+  // hands-only quick draw: a finger gun brings your gun up, a fist puts it away (fists); in the finger-gun pose the thumb dropping onto
+  // the middle finger like a hammer fires (a pinch still does too)
+  const gesture = RH && playing && !V.ui && !V.wrist.shown ? handPose(RH.hand) : null, now = V.time || 0;
+  if (gesture !== V.pose) { V.pose = gesture; V.poseT = now; } const held = gesture && now - V.poseT > POSE_HOLD;
+  if (held && gesture === 'gun' && V.poseDone !== V.poseT) { V.poseDone = V.poseT; drawGun(ctx); pulse(RH, 0.3, 30); }
+  if (held && gesture === 'fist' && V.poseDone !== V.poseT && ctx.weapons?.currentId !== 'fists' && !ctx.weapons?.spec?.melee) { V.poseDone = V.poseT; ctx.weapons?.fists?.(); }
+  if (RH) { const d = jointDist(RH.hand, 'thumb-tip', 'middle-finger-phalanx-proximal'); RH.hammer = gesture === 'gun' && (RH.hammer ? d < HAMMER_OFF : d < HAMMER_ON); }
   // never fire while a menu is up, the palm menu is showing (you're about to poke it), your finger is near it, or you're pointing at the action button
   const guard = V.ui || V.wrist.shown || V.overAction || pokeNear();
-  fire = !guard && (btn(Rg, 0) || !!RH?.pinch);
+  fire = !guard && (btn(Rg, 0) || !!RH?.pinch || !!RH?.hammer);
   actionButton(ctx, R, !!(btn(Rg, 0) || RH?.pinch));
   // the hands' velocities (in the rig: your own motion, not the train's) for punches
   for (const H of [L, R]) if (H) { const src = H.src?.hand ? H.hand.joints['wrist'] : H.grip; if (src) { _v.copy(src.position); if (dt > 0 && H.seeded === H.src) H.vel.subVectors(_v, H.prev).divideScalar(dt); else H.vel.set(0, 0, 0); H.seeded = H.src; H.prev.copy(_v); } }   // the first sample of a new input has no history: no phantom 20 m/s jab
   // fists: a fast forward jab of either hand lands a punch from that hand
   // a knife (any melee weapon in the hand): a fast swing of that hand, any direction, slashes along the swing
   const fists = ctx.weapons?.currentId === 'fists', blade = !fists && !!ctx.weapons?.spec?.melee; let punch = null;
+  if (!fists && !blade && ctx.weapons?.currentId) V.lastGun = ctx.weapons.currentId;
   if (fists && playing && !V.ui && !V.wrist.shown) for (const H of [L, R]) if (H) { const fwd = _v2.set(-Math.sin(headYaw), 0, -Math.cos(headYaw)); const v = H.vel, along = v.dot(fwd), lim = H.src?.hand ? PUNCH_V_HAND : PUNCH_V;   // tracked hands are smoothed: a real jab reads slower
     if (along > lim && v.length() > lim && V.time - H.punchT > PUNCH_GAP) { H.punchT = V.time; punch = H; } }
   if (blade && playing && !V.ui && R && R.vel.length() > (R.src?.hand ? SLASH_V_HAND : SLASH_V) && V.time - R.punchT > PUNCH_GAP) { R.punchT = V.time; punch = R; }
@@ -238,6 +248,20 @@ function pulse(H, k, ms) { try { H?.src?.gamepad?.hapticActuators?.[0]?.pulse?.(
 function pokeNear() {
   const M = mainHand(), O = offHand(); if (!M?.src?.hand || !O?.src?.hand) return false;
   const tip = M.hand.joints['index-finger-tip'], wr = O.hand.joints['wrist']; return !!(tip && wr && tip.position.distanceTo(wr.position) < POKE_NEAR);
+}
+/** a tracked hand's pose: 'gun' (index out, the other three curled), 'fist' (all four curled) or null */
+function handPose(hand) {
+  const ext = (f) => jointDist(hand, `${f}-finger-tip`, `${f}-finger-metacarpal`);
+  const i = ext('index'), m = ext('middle'), r = ext('ring'), k = ext('pinky'); if (i === 1) return null;   // joints not tracked
+  const curled = (d) => d < FINGER_CURLED, out = (d) => d > FINGER_OUT;
+  if (out(i) && curled(m) && curled(r) && curled(k)) return 'gun';
+  if (curled(i) && curled(m) && curled(r) && curled(k)) return 'fist';
+  return null;
+}
+/** up comes the last gun you held (or the first in the bag) */
+function drawGun(ctx) {
+  const W = ctx.weapons; if (!W) return; const cur = W.currentId; if (cur && cur !== 'fists' && !W.spec?.melee) return;
+  const bag = W.bag || [], want = bag.includes(V.lastGun) ? V.lastGun : bag.find((id) => id && id !== 'knife'); if (want) W.selectBag(bag.indexOf(want));
 }
 function cycleWeapon(ctx) {
   const W = ctx.weapons; if (!W) return; const bag = W.bag || [], cur = W.currentId;
@@ -303,6 +327,13 @@ function wristMenu() {
 }
 // the flat game's gloved forearms (baked per weapon into groups named arm_left / arm_right) float beside your real hand in VR: hide
 // them every frame (reload / inspect animations show them again), with the list cached per weapon
+/** the current weapon's right-hand wrist, in the weapon's own space (cached per weapon) */
+function gripWrist(vm, id) {
+  if (V.gripFor === id) return V.grip;
+  V.gripFor = id; V.grip = null;
+  vm.traverse((o) => { if (V.grip || o.name !== 'arm_right' || !o.parent) return; let vis = true; for (let q = o.parent; q && q !== vm; q = q.parent) if (!q.visible) vis = false; if (vis) V.grip = o.position.clone(); });
+  return V.grip;
+}
 function armsOff(ctx, vm) {
   const id = ctx.weapons.currentId; if (V.armsFor !== id || !V.arms) { V.armsFor = id; V.arms = []; vm.traverse((o) => { if (/^arm_/.test(o.name)) V.arms.push(o); }); }
   for (const o of V.arms) o.visible = false;
@@ -548,9 +579,15 @@ export function render(ctx) {
   // the gun in the right hand: weapons.js posed it for the screen (hip offset); take the hip back out so the grip is in your palm
   const vm = ctx.weapons?.viewmodel, R = mainHand();
   if (vm && V.gunMount) {
-    const holder = R ? (R.src?.hand ? (R.hand.joints['wrist'] || R.grip) : R.grip) : null;
+    // controllers: the grip space (its -Z runs along the controller like a pistol grip). Hands: the system's pointing ray (smoothed,
+    // steady to aim) for the direction, placed at the palm; the gun mount then lives in the rig
+    const handHeld = !!R?.src?.hand, holder = R ? (handHeld ? V.rig : R.grip) : null;
     if (holder && V.gunMount.parent !== holder) holder.add(V.gunMount);
-    if (R?.src?.hand) { V.gunMount.position.set(0, -0.02, -0.06); V.gunMount.rotation.set(-0.5, 0, 0); } else { V.gunMount.position.set(0, -0.01, 0.05); V.gunMount.rotation.set(0, 0, 0); }
+    if (handHeld) { const wr = R.hand.joints['wrist']; if (wr) { V.gunMount.quaternion.copy(R.ray.quaternion); V.gunMount.position.copy(wr.position).add(_v.set(0, 0, -PALM_FWD).applyQuaternion(R.ray.quaternion)); } }
+    else { V.gunMount.position.set(0, 0, 0); V.gunMount.rotation.set(0, 0, 0); }
+    // the grip in your palm: every weapon model carries the flat game's right hand posed on its grip (arm_right, hidden in VR);
+    // shift the gun so that hand's wrist sits just behind the palm, instead of the model's origin
+    const wrist = gripWrist(vm, ctx.weapons.currentId); if (wrist) vm.position.set(-wrist.x, -wrist.y, PALM_BACK - wrist.z);
     // only once per weapons.js write (it re-poses every frame it runs; paused, it doesn't, and we mustn't subtract twice)
     const sp = ctx.weapons.spec, pose = vm.children[0];
     if (sp?.hip && pose && !(V.poseMark && pose.position.equals(V.poseMark))) { pose.position.x -= sp.hip.pos[0]; pose.position.y -= sp.hip.pos[1]; pose.position.z -= sp.hip.pos[2]; pose.rotation.x -= sp.hip.rot[0]; pose.rotation.y -= sp.hip.rot[1]; pose.rotation.z -= sp.hip.rot[2]; (V.poseMark || (V.poseMark = new THREE.Vector3())).copy(pose.position); }
