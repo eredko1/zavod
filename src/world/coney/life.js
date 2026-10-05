@@ -10,6 +10,36 @@ import { BW, sandHeight, waterZ, SAND_TOP } from './shore.js';
 import { bbox } from '../osmkit.js';
 import { buildFolk } from './folk.js';
 
+// the town: people on the sidewalks of every street north of the boardwalk (Surf, Mermaid, Neptune, W 8th, Stillwell, the side
+// streets by the towers): walkers heading along the street, a few standing on their phones. Instanced like the rest (one draw call
+// per body part for all of them); coney/folk.js brings the nearest ones to life. Their own seeded generator: the world's shared R
+// sequence (and everything placed after this) stays exactly as it was, and every client places the same people.
+const TOWN_N = { full: 600, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6;
+function townCrowd(world, blocked) {
+  let seed = 90127; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const want = world.ctx.lite ? TOWN_N.lite : TOWN_N.full, out = [], inRoad = (x, z) => OSM.r.some((r) => r.w >= 6 && segNear(x, z, r.p, r.w / 2));
+  const roads = OSM.r.filter((r) => r.w >= 6 && r.p.some(([x, z]) => x > PLAY.x0 && x < PLAY.x1 && z > PLAY.z0 && z < BW.z0 - 4));
+  const cand = [];
+  for (const r of roads) for (let i = 0; i + 1 < r.p.length; i++) {
+    const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 2) continue;
+    const ux = (bx - ax) / L, uz = (bz - az) / L, off = r.w / 2 + SIDEWALK;
+    for (let d = TOWN_STEP / 2; d < L; d += TOWN_STEP) for (const side of [-1, 1]) {
+      const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
+      if (x < PLAY.x0 || x > PLAY.x1 || z < PLAY.z0 || z > BW.z0 - 4) continue;
+      cand.push({ x, z, ry: Math.atan2(ux, uz) + (R() < 0.5 ? 0 : Math.PI) });
+    }
+  }
+  for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); const t = cand[i]; cand[i] = cand[j]; cand[j] = t; }   // spread the budget over the whole town
+  for (const c of cand) {
+    if (out.length >= want) break;
+    const x = c.x + (R() - 0.5) * 2, z = c.z + (R() - 0.5) * 2;
+    if (blocked(x, z) || inRoad(x, z) || out.some((o) => Math.abs(o.x - x) < 2.5 && Math.abs(o.z - z) < 2.5)) continue;
+    const gy = world.W.groundHeight?.(x, z), walk = R() < 0.7; out.push({ x, y: Number.isFinite(gy) ? gy : 0, z, ry: walk ? c.ry : R() * Math.PI * 2, pose: walk ? 'walk' : R() < 0.5 ? 'phone' : 'stand', bag: R() < 0.2 ? 1 : 0, outfit: 'city', zone: 'town' });
+  }
+  console.log('[life] town crowd', out.length, 'of', cand.length, 'sidewalk spots');
+  return out;
+}
+function segNear(x, z, p, w) { for (let i = 0; i + 1 < p.length; i++) { const ax = p[i][0], az = p[i][1], dx = p[i + 1][0] - ax, dz = p[i + 1][1] - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), ex = x - ax - dx * t, ez = z - az - dz * t; if (ex * ex + ez * ez < w * w) return true; } return false; }
 const hash = (x, z) => { const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - Math.floor(v); };   // extra variety without consuming the seeded rng
 
 export function buildBeachLife(world, M) {
@@ -48,6 +78,7 @@ export function buildBeachLife(world, M) {
   const blocked = (x, z) => OSM.b.some((b) => { const q = b._bb || (b._bb = bbox(b.p)); return x > q.x0 - 1 && x < q.x1 + 1 && z > q.z0 - 1 && z < q.z1 + 1; });
   crowd.push(...scatter(R, 160, PLAY.x0 + 40, PLAY.x1 - 20, -140, BW.z0 - 2, 0, blocked, { walk: 0.6, bag: 0.05, gap: 3 }).map((c) => ({ ...c, zone: 'park' })));
   for (const r of OSM.rd) { if (!(r.x > PLAY.x0 && r.x < PLAY.x1 && r.z > PLAY.z0 && r.z < BW.z0)) continue; const n = 2 + ((R() * 5) | 0); for (let k = 0; k < n; k++) { const a = R() * 6.3, d = 8 + R() * 3; crowd.push({ x: r.x + Math.cos(a) * d, y: 0, z: r.z + Math.sin(a) * d, ry: Math.atan2(-Math.cos(a), -Math.sin(a)), pose: R() < 0.4 ? 'phone' : 'stand', bag: 0, zone: 'queue' }); } }
+  crowd.push(...townCrowd(world, blocked));
   const cams = Object.values(world.W.poses || {});
   const spots = crowd.filter((c) => !cams.some((p) => Math.hypot(p[0] - c.x, p[2] - c.z) < 3.5));
   const handle = buildCrowd(world, spots);
