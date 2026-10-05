@@ -67,6 +67,7 @@ export async function init(ctx) {
     damage(amount, from) {
       if (p.dead || !(amount > 0)) return;
       if (performance.now() < (p.protectUntil || 0)) return;   // spawn protection (3 s after every respawn)
+      if (p.guard > 0) { amount *= p.guard; ctx.bus.emit('blocked', { amount }); }   // VR: fists up in front of your face (src/vr/physical.js)
       p.health = Math.max(0, p.health - amount); S.lastDamage = S.time;
       ctx.bus.emit('playerDamaged', { amount, from: from ?? null });
       if (p.health <= 0) die();

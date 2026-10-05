@@ -126,6 +126,9 @@ function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
   else { for (const [slot, g] of Object.entries(geos)) { if (!g) continue; const m = new THREE.Mesh(g, mat[slot] || CM[slot]); m.castShadow = slot === 'paint'; m.receiveShadow = true; m.userData.surface = 'metal'; kit.add(m); meshes.push(m); }
     cab = carInterior(kind, geos); kit.add(cab.group); }
   const sp = carSpecFor(kind);
+  // the bus and the real models have no wheel of ours in their cabin: an invisible one where the driver's hands go (VR grabs it:
+  // src/vr/physical.js), turning about the car's forward axis like the procedural ones turn about their column
+  if (!cab.wheel.parent) { const col = new THREE.Group(); col.rotation.y = Math.PI / 2; col.position.set(sp.eyeSide, sp.eyeH - 0.42, sp.eyeBack - 0.42); body.add(col); col.add(cab.wheel); }
   const headlight = new THREE.SpotLight(0xfff2d8, 0, 55, 0.5, 0.5, 1.4); headlight.position.set(0, 0.8, -sp.hz + 0.1); headlight.target.position.set(0, 0, -16); group.add(headlight); group.add(headlight.target); headlight.visible = false;
   const lens = { material: lampW };
   const dummy = new THREE.Group();
@@ -730,6 +733,9 @@ export function update(dt, ctx) {
     if (Math.abs(ax) > 0.12) steer = Math.sign(ax) * clamp((Math.abs(ax) - 0.12) / 0.7, 0, 1) ** 1.2;
     if (ay < -0.15) thr = Math.max(thr, clamp((-ay - 0.15) / 0.55, 0, 1));
     if (ay > 0.2) brake = Math.max(brake, clamp((ay - 0.2) / 0.55, 0, 1));
+    // VR: your hands on the wheel / the bars (src/vr/physical.js) steer, and with tracked hands push / pull is gas / brake
+    if (input.xrSteer != null) steer = clamp(input.xrSteer, -1, 1);
+    if (input.xrThrottle != null) { const t = input.xrThrottle; if (t > 0) thr = Math.max(thr, t); else if (t < 0) brake = Math.max(brake, -t); }
     // nitro: hold Shift with the gas down (phones: stick pushed all the way up) — ~4 s of boost, refills in ~12 s
     const want = ((key('ShiftLeft') || key('ShiftRight')) && thr > 0.3) || ay < -0.92;
     S.nitro = S.nitro ?? 1;

@@ -89,7 +89,7 @@ const api = {
   shaft(s) { V.shafts.push({ kind: 'elevator', floors: 10, ...s }); return V.shafts.length - 1; },
   onUpdate(fn) { V.onUpdate.push(fn); },
   toast: (t, ms) => V?.ctx.hud?.toast?.(t, ms),
-  puff: (at) => puff(at), useItem: (want) => useItem(want), drop: (item) => { if (!V) return false; const i = V.inv.lastIndexOf(item); if (i < 0) return false; V.inv.splice(i, 1); renderCash(); return true; }, left: (item) => V?.left?.[item] || 0, callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
+  puff: (at) => puff(at), useItem: (want) => useItem(want), shafts: () => V?.shafts || [], itemModel: (kind) => itemModel(kind), drop: (item) => { if (!V) return false; const i = V.inv.lastIndexOf(item); if (i < 0) return false; V.inv.splice(i, 1); renderCash(); return true; }, left: (item) => V?.left?.[item] || 0, callElevator: (i, k, dir, s) => callElevator(i, k, dir, s), steal: (c) => steal(c), stealLocal: (i, mine) => stealLocal(i, mine),
   nearestParked: (r) => nearestParked(r), endRide: (f) => endRide(f), leavePassenger: () => leavePassenger(), pickRespawn: () => pickRespawn(),
   openDialog: (name, node) => openDialog(name, node), closeDialog: () => closeDialog(), choose: (i) => choose(i), dropCash: (at, n) => dropCash(at, n),
   /** QA: where the interaction points are */
@@ -100,7 +100,7 @@ const api = {
 };
 export const hangkit = api;
 /** generic QA hook for maps without their own (window.__game.hangout) */
-export const kitQA = { state: () => ({ ...api.state(), ...api.points() }), shafts: () => V.shafts.map((t) => ({ kind: t.kind, lobby: t.lobby.cars.map((c) => c.pos.toArray()) })), ride: (i, dir = 'up', k = 0) => callElevator(i, k, dir), choose: (i) => choose(i), close: () => closeDialog(), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; }, give: (n) => api.earn(n), use: () => useItem() };
+export const kitQA = { item: (it) => api.give(it), state: () => ({ ...api.state(), ...api.points() }), shafts: () => V.shafts.map((t) => ({ kind: t.kind, lobby: t.lobby.cars.map((c) => c.pos.toArray()) })), ride: (i, dir = 'up', k = 0) => callElevator(i, k, dir), choose: (i) => choose(i), close: () => closeDialog(), steal: () => { const c = nearestParked(1e9); if (c) steal(c); return !!c; }, give: (n) => api.earn(n), use: () => useItem() };
 
 // bus handlers live for the page (the world may be rebuilt); they always act on the current V
 function bindOnce(ctx) {
@@ -292,6 +292,11 @@ function drink(mine, spec = ITEMS.bottle, kind = 'bottle') {
   clearTimeout(V.bottleT); V.bottleT = setTimeout(() => { m.visible = false; if (ctx.weapons?.viewmodel && V.smokeT <= 0) ctx.weapons.viewmodel.visible = true; }, 2600);
 }
 const _models = {};
+/** a drink to hold in a VR hand (a fresh copy, upright at the origin); null for anything that isn't drunk */
+function itemModel(kind) {
+  const I = ITEMS[kind]; if (!I || !(I.drunk || I.glass || I.milk || kind === 'kvass')) return null;
+  const m = bottleModel(kind).clone(); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.visible = true; return m;
+}
 function bottleModel(kind) {
   if (_models[kind]) return _models[kind];
   const g = new THREE.Group();
