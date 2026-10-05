@@ -4,11 +4,14 @@
 import * as THREE from 'three';
 import { Batch } from './sbu/geo.js';
 
-export const cen = (p) => { let x = 0, z = 0; for (const q of p) { x += q[0]; z += q[1]; } return [x / p.length, z / p.length]; };
-export const pip = (x, z, p) => { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, zi] = p[i], [xj, zj] = p[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
-export const bbox = (p) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of p) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { x0, x1, z0, z1 }; };
-export function segDist(x, z, p) { let best = 1e9; for (let i = 0; i + 1 < p.length; i++) { const [ax, az] = p[i], [bx, bz] = p[i + 1]; const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t)); } return best; }
-export function walk(pts, step, fn) { let next = step / 2, acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const [x0, z0] = pts[i], [x1, z1] = pts[i + 1]; const L = Math.hypot(x1 - x0, z1 - z0); if (L < 1e-3) continue; const ux = (x1 - x0) / L, uz = (z1 - z0) / L; while (next <= acc + L) { const d = next - acc; fn(x0 + ux * d, z0 + uz * d, ux, uz); next += step; } acc += L; } }
+// hot helpers (called millions of times while a map builds): plain indexed reads, no destructuring (each one allocated an iterator)
+export const cen = (p) => { let x = 0, z = 0; for (let i = 0; i < p.length; i++) { x += p[i][0]; z += p[i][1]; } return [x / p.length, z / p.length]; };
+export const pip = (x, z, p) => { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const xi = p[i][0], zi = p[i][1], xj = p[j][0], zj = p[j][1]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+export const bbox = (p) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (let i = 0; i < p.length; i++) { const x = p[i][0], z = p[i][1]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { x0, x1, z0, z1 }; };
+export function segDist(x, z, p) { let best = 1e9; for (let i = 0; i + 1 < p.length; i++) { const ax = p[i][0], az = p[i][1], bx = p[i + 1][0], bz = p[i + 1][1]; const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t)); } return best; }
+/** distance from (x, z) to the segment a-b */
+export function segDist1(x, z, ax, az, bx, bz) { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); return Math.hypot(x - ax - dx * t, z - az - dz * t); }
+export function walk(pts, step, fn) { let next = step / 2, acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const x0 = pts[i][0], z0 = pts[i][1], x1 = pts[i + 1][0], z1 = pts[i + 1][1]; const L = Math.hypot(x1 - x0, z1 - z0); if (L < 1e-3) continue; const ux = (x1 - x0) / L, uz = (z1 - z0) / L; while (next <= acc + L) { const d = next - acc; fn(x0 + ux * d, z0 + uz * d, ux, uz); next += step; } acc += L; } }
 
 /** Ribbon (road / path) along a polyline at height y: flat strip of width w, mitred joints. */
 export function ribbon(pts, w, y) {

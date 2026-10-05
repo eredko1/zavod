@@ -128,7 +128,8 @@ export function update(dt, ctx) {
     if (rainOn !== update._rainOn) { update._rainOn = rainOn; E.ambience.rain.gain.setTargetAtTime(rainOn ? 1 : 0, now, 0.25); }
     E.ambience.rainOff = !rainOn;
     // per-map ambience hints: dry day maps get no storm; interiors get no wind (proper day/interior beds are a later block)
-    if (amb !== update._amb) { update._amb = amb; const indoor = /terminal/.test(amb); E.ambience.indoor = indoor; E.ambience.wind.gain.setTargetAtTime(indoor ? 0.05 : 1, now, 0.3); }
+    // Coney: no wind-noise bed (on the beach it read as an endless surf hiss) and no industrial hum; the world's own sounds carry it
+    if (amb !== update._amb) { update._amb = amb; const indoor = /terminal/.test(amb), quiet = amb === 'coney'; E.ambience.indoor = indoor; E.ambience.wind.gain.setTargetAtTime(quiet ? 0 : indoor ? 0.05 : 1, now, 0.3); E.ambience.hum.gain.setTargetAtTime(quiet ? 0 : 1, now, 0.3); }
     E.ambience.schedule(now + 0.8);
     const p = ctx.player;
     E.updateVitals(now, { health: p?.health ?? 100, maxHealth: p?.maxHealth ?? 100, playing: ctx.state === 'playing', paused: ctx.state === 'paused' });

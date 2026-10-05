@@ -55,15 +55,7 @@ export async function init(ctx) {
     try { hand.add(hmf.createHandModel(hand, 'mesh')); } catch (e) { console.warn('[vr] hand model', e); }
     H.laser = laser(); ray.add(H.laser.line, H.laser.dot); V['h' + i] = H;
   }
-  // the 2D layer: the DOM mirror on a panel (menus / dialogs in front of you, the HUD a little further, lazily following)
-  V.mirror = createMirror(2048);
-  // repaint on change: any DOM mutation marks the mirror dirty (canvas overlays like the minimap, darts, durak redraw without
-  // mutating, so those get a steady rate instead; see panel())
-  new MutationObserver(() => { V.dirty = true; }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true }); setGLCanvas(renderer.domElement);
-  V.tex = new THREE.CanvasTexture(V.mirror.canvas); V.tex.colorSpace = THREE.SRGBColorSpace; V.tex.generateMipmaps = true; V.tex.minFilter = THREE.LinearMipmapLinearFilter; V.tex.anisotropy = 8;   // text stays crisp, not shimmering, at panel distance
-  V.panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: V.tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
-  V.panel.name = 'xrPanel'; V.panel.renderOrder = 9990; V.panel.visible = false; V.panel.frustumCulled = false; rig.add(V.panel);
-  V.panelYaw = 0; V.drawT = 0;
+  V.panel = null;   // see ensurePanel()
   V.wrist = wristMenu(); V.vig = vignette(); V.cam.add(V.vig);
   // the overlays that need a mouse release pointer lock on desktop: that's our "a 2D screen is up" signal, whatever screen it is
   const exitPL = document.exitPointerLock?.bind(document); document.exitPointerLock = () => { if (V.presenting && ctx.state === 'playing') V.uiHold = true; try { exitPL?.(); } catch {} };
@@ -79,6 +71,20 @@ export async function init(ctx) {
   return { get presenting() { return V.presenting; }, enter: () => start(), exit: () => V.session?.end(), prefs };
 }
 
+// the 2D layer is built the first time VR starts: phones never pay for its canvas, GPU texture or DOM watcher
+function ensurePanel() {
+  if (V.panel) return;
+  // the 2D layer: the DOM mirror on a panel (menus / dialogs in front of you, the HUD a little further, lazily following)
+  V.mirror = createMirror(2048);
+  // repaint on change: any DOM mutation marks the mirror dirty (canvas overlays like the minimap, darts, durak redraw without
+  // mutating, so those get a steady rate instead; see panel())
+  new MutationObserver(() => { V.dirty = true; }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true }); setGLCanvas(V.ctx.renderer.domElement);
+  V.tex = new THREE.CanvasTexture(V.mirror.canvas); V.tex.colorSpace = THREE.SRGBColorSpace; V.tex.generateMipmaps = true; V.tex.minFilter = THREE.LinearMipmapLinearFilter; V.tex.anisotropy = 8;   // text stays crisp, not shimmering, at panel distance
+  V.panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: V.tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+  V.panel.name = 'xrPanel'; V.panel.renderOrder = 9990; V.panel.visible = false; V.panel.frustumCulled = false; V.rig.add(V.panel);
+  V.panelYaw = 0; V.drawT = 0;
+}
+
 async function start() {
   const { ctx } = V; if (V.presenting || V.starting || !navigator.xr) return; V.starting = true;
   try {
@@ -91,6 +97,7 @@ async function start() {
 }
 
 function begin(session) {
+  ensurePanel();
   const { ctx } = V; V.presenting = true; ctx.xr.presenting = true; V.headPrev = null; V.wroteYaw = null; V.mode = 'foot';
   V.turn = ctx.player?.yaw || 0; V.rigYaw = V.turn; V.seatH0 = 0;   // seated height: taken from the first head pose (or the Seated button)
   try { ctx.renderer.xr.setFoveation(1); } catch {}
@@ -538,7 +545,7 @@ function keyboard(ctx) {
 function qaHooks() {
   return {
     state: () => ({ presenting: V.presenting, ui: V.ui, mode: V.mode, turn: +V.turn.toFixed(3), rigYaw: +V.rigYaw.toFixed(3), head: V.head.toArray().map((v) => +v.toFixed(3)), rig: V.rig.position.toArray().map((v) => +v.toFixed(2)),
-      cam: V.ctx.camera.position.toArray().map((v) => +v.toFixed(2)), hands: Object.keys(V.hands), panel: V.panel.visible, mirrorMs: +V.mirror.ms.toFixed(1), keys: [...V.keys], aim: V.aim.position.toArray().map((v) => +v.toFixed(2)), wrist: V.wrist.shown, culled: V.culled?.size || 0, inputs: V.session ? V.session.inputSources.length : 0, at: (V.hands.right?.at || []).map(Math.round), click: V.lastClick || null }),
-    enter: () => start(), exit: () => V.session?.end(), mirror: () => V.mirror.canvas.toDataURL('image/png'), prefs,
+      cam: V.ctx.camera.position.toArray().map((v) => +v.toFixed(2)), hands: Object.keys(V.hands), panel: !!V.panel?.visible, mirrorMs: +(V.mirror?.ms || 0).toFixed(1), keys: [...V.keys], aim: V.aim.position.toArray().map((v) => +v.toFixed(2)), wrist: V.wrist.shown, culled: V.culled?.size || 0, inputs: V.session ? V.session.inputSources.length : 0, at: (V.hands.right?.at || []).map(Math.round), click: V.lastClick || null }),
+    enter: () => start(), exit: () => V.session?.end(), mirror: () => V.mirror?.canvas.toDataURL('image/png'), prefs,
   };
 }

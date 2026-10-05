@@ -58,9 +58,10 @@ export function buildOcean(world, { waterZ, WATER_Y, SAND_TOP, BZ1 }) {
     const S = 256, data = new Uint8Array(S * S * 4); let seed = 7; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     const H = new Float32Array(S * S), comps = [];
     for (let i = 0; i < 14; i++) { const fx = Math.round((R() - 0.5) * (6 + i * 2.2)), fy = Math.round((R() - 0.5) * (6 + i * 2.2)) || 1; comps.push([fx, fy, R() * 6.28, 1 / Math.hypot(fx, fy) ** 1.1]); }
-    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let h = 0; for (const [fx, fy, p, a] of comps) h += a * Math.sin((fx * x + fy * y) / S * 6.2832 + p); H[y * S + x] = h; }
+    // indexed reads (destructuring in these per-pixel loops allocated an iterator each time)
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let h = 0; for (let k = 0; k < comps.length; k++) { const c = comps[k]; h += c[3] * Math.sin((c[0] * x + c[1] * y) / S * 6.2832 + c[2]); } H[y * S + x] = h; }
     const worley = (n) => { const pts = []; for (let i = 0; i < n; i++) pts.push([R() * S, R() * S]); const out = new Float32Array(S * S);
-      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let d1 = 1e9, d2 = 1e9; for (const [px, py] of pts) { let dx = Math.abs(px - x), dy = Math.abs(py - y); if (dx > S / 2) dx = S - dx; if (dy > S / 2) dy = S - dy; const d = dx * dx + dy * dy; if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; } out[y * S + x] = Math.sqrt(d2) - Math.sqrt(d1); }
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { let d1 = 1e9, d2 = 1e9; for (let k = 0; k < pts.length; k++) { let dx = Math.abs(pts[k][0] - x), dy = Math.abs(pts[k][1] - y); if (dx > S / 2) dx = S - dx; if (dy > S / 2) dy = S - dy; const d = dx * dx + dy * dy; if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; } out[y * S + x] = Math.sqrt(d2) - Math.sqrt(d1); }
       return out; };
     const w1 = worley(26), w2 = worley(90);
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {

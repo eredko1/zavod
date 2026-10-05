@@ -470,7 +470,7 @@ export function buildProps(world, M) {
   };
   for (const [x, z, ry] of [[PIT.x0 - 7.6, -122, 0], [PIT.x0 - 7.6, -80, 0], [120.5, 131, Math.PI / 2], [178.5, 131, -Math.PI / 2],
                             [204, -101, 0], [272, -101, 0], [LIB.entX0 - 12, LIB_LAWN.z1 - 2, 0], [LIB.entX1 + 12, LIB_LAWN.z1 - 2, 0]]) bannerPole(x, z, ry);
-  if (bannerGeos.length) { const bg = BGU.mergeGeometries(bannerGeos.map(g => g.toNonIndexed()), false); const bm = new THREE.Mesh(bg, bannerMat); bm.castShadow = true; bm.name = 'sbu:banners'; bm.userData.surface = 'wood'; scene.add(bm); ctx.raycastTargets.push(bm); }
+  if (bannerGeos.length) { const bg = BGU.mergeGeometries(bannerGeos.map(g => g.index ? g.toNonIndexed() : g), false); const bm = new THREE.Mesh(bg, bannerMat); bm.castShadow = true; bm.name = 'sbu:banners'; bm.userData.surface = 'wood'; scene.add(bm); ctx.raycastTargets.push(bm); }
   // picnic tables on the lawns
   for (const [x, z, ry] of [[132, 126, 0.4], [152, 122, -0.6], [166, 129, 0.2], [PIT.x0 - 12, -104, 0.3], [PIT.x0 - 12, -88, -0.4], [224, -110, 0.5], [250, -112, -0.3]]) {
     const y = W.groundHeight(x, z);
