@@ -14,7 +14,7 @@ import { buildFolk } from './folk.js';
 // streets by the towers): walkers heading along the street, a few standing on their phones. Instanced like the rest (one draw call
 // per body part for all of them); coney/folk.js brings the nearest ones to life. Their own seeded generator: the world's shared R
 // sequence (and everything placed after this) stays exactly as it was, and every client places the same people.
-const TOWN_N = { full: 360, lite: 200 }, TOWN_STEP = 9, SIDEWALK = 1.6;
+const TOWN_N = { full: 600, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6;
 function townCrowd(world, blocked) {
   let seed = 90127; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const want = world.ctx.lite ? TOWN_N.lite : TOWN_N.full, out = [], inRoad = (x, z) => OSM.r.some((r) => r.w >= 6 && segNear(x, z, r.p, r.w / 2));
@@ -36,7 +36,7 @@ function townCrowd(world, blocked) {
     if (blocked(x, z) || inRoad(x, z) || out.some((o) => Math.abs(o.x - x) < 2.5 && Math.abs(o.z - z) < 2.5)) continue;
     const gy = world.W.groundHeight?.(x, z), walk = R() < 0.7; out.push({ x, y: Number.isFinite(gy) ? gy : 0, z, ry: walk ? c.ry : R() * Math.PI * 2, pose: walk ? 'walk' : R() < 0.5 ? 'phone' : 'stand', bag: R() < 0.2 ? 1 : 0, outfit: 'city', zone: 'town' });
   }
-  console.log('[life] town crowd', out.length, 'of', cand.length, 'sidewalk spots', JSON.stringify(out.slice(0, 3).map((o) => [Math.round(o.x), +o.y.toFixed(1), Math.round(o.z)])));
+  console.log('[life] town crowd', out.length, 'of', cand.length, 'sidewalk spots');
   return out;
 }
 function segNear(x, z, p, w) { for (let i = 0; i + 1 < p.length; i++) { const ax = p[i][0], az = p[i][1], dx = p[i + 1][0] - ax, dz = p[i + 1][1] - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), ex = x - ax - dx * t, ez = z - az - dz * t; if (ex * ex + ez * ez < w * w) return true; } return false; }

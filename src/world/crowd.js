@@ -363,8 +363,33 @@ export function buildCrowd(world, spots, opts = {}) {
     }
   }
   // handle: hide(spot, true) swaps one person out of the instanced crowd (a live NPC stands there instead — coney/folk.js)
-  return { spots, hide(s, on) { if (!s?._refs || !!s._hidden === !!on) return; s._hidden = !!on; for (const [im, i, m] of s._refs) { im.setMatrixAt(i, on ? ZERO_M : m); im.instanceMatrix.needsUpdate = true; } } };
+  const H = { spots, packed: false, hide(s, on) { if (!s?._refs || !!s._hidden === !!on) return; s._hidden = !!on; if (H.packed) { H.dirty = true; return; } for (const [im, i, m] of s._refs) { im.setMatrixAt(i, on ? ZERO_M : m); im.instanceMatrix.needsUpdate = true; } } };
+  // phones and the headset: only the people in range are packed into the draw lists, a few times a second (the whole crowd is
+  // ~1000 triangles a person, and every instance costs its vertices even when hidden). Desktop draws everyone, as before.
+  const meshes = []; scene.traverse((o) => { if (o.isInstancedMesh && o.name.startsWith('crowd:') && !o.userData.crowdFull) meshes.push(o); });
+  for (const im of meshes) { const ents = []; for (const s of spots) for (const r of s._refs || []) if (r[0] === im) ents[r[1]] = s;
+    im.userData.crowdFull = { n: im.count, M: im.instanceMatrix.array.slice(), C: im.instanceColor?.array.slice() || null, A: Object.entries(im.geometry.attributes).filter(([, a]) => a.isInstancedBufferAttribute).map(([k, a]) => [a, a.array.slice(), a.itemSize]), ents }; }
+  const pack = (eye, far) => {
+    const f2 = far * far;
+    for (const im of meshes) { const F = im.userData.crowdFull, Mx = im.instanceMatrix.array, C = im.instanceColor?.array; let k = 0;
+      for (let i = 0; i < F.n; i++) { const s = F.ents[i]; if (!s || s._hidden) continue; const dx = s.x - eye.x, dz = s.z - eye.z; if (dx * dx + dz * dz > f2) continue;
+        { Mx.set(F.M.subarray(i * 16, i * 16 + 16), k * 16); if (C) C.set(F.C.subarray(i * 3, i * 3 + 3), k * 3); for (const [a, src, n] of F.A) a.array.set(src.subarray(i * n, i * n + n), k * n); }
+        k++; }
+      im.count = k; im.instanceMatrix.needsUpdate = true; if (C) im.instanceColor.needsUpdate = true; for (const [a] of F.A) a.needsUpdate = true; }
+    H.packed = true; H.dirty = false;
+  };
+  const unpack = () => { for (const im of meshes) { const F = im.userData.crowdFull; im.instanceMatrix.array.set(F.M); if (F.C) im.instanceColor.array.set(F.C); for (const [a, src] of F.A) { a.array.set(src); a.needsUpdate = true; } im.count = F.n; im.instanceMatrix.needsUpdate = true; if (F.C) im.instanceColor.needsUpdate = true; }
+    H.packed = false; for (const s of spots) if (s._hidden) for (const [im, i] of s._refs || []) { im.setMatrixAt(i, ZERO_M); im.instanceMatrix.needsUpdate = true; } };
+  let t = 0, lastX = 1e9, lastZ = 1e9;
+  world.updaters?.push?.((dt) => {
+    const ctx = world.ctx, on = !!ctx?.lite || !!ctx?.xr?.presenting; if (!on) { if (H.packed) unpack(); return; }
+    t -= dt; const eye = ctx.camera.position, moved = Math.abs(eye.x - lastX) + Math.abs(eye.z - lastZ) > CROWD_REPACK_M;
+    if (t > 0 && !moved && !H.dirty && H.packed) return; t = CROWD_PACK_EVERY; lastX = eye.x; lastZ = eye.z;
+    pack(eye, ctx.xr?.presenting ? CROWD_FAR_VR : CROWD_FAR_LITE);
+  });
+  return H;
 }
+const CROWD_PACK_EVERY = 0.25, CROWD_REPACK_M = 6, CROWD_FAR_VR = 70, CROWD_FAR_LITE = 150;
 const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
 function ref(s, im, i, m) { (s._refs || (s._refs = [])).push([im, i, m]); }
 
