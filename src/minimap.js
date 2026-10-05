@@ -5,6 +5,7 @@
 // (blue + name), mercenaries / cops (red), chill-mode gopniks (orange), vendors (yellow), bikes (green).
 import * as THREE from 'three';
 import { kit } from './world/hangkit.js';
+import { onTap } from './tap.js';
 
 let M = null;
 const KIND = { park: ['#7fd08a', '▲'], shop: ['#ffd27a', '$'], ride: ['#ff8ad1', '✦'], transit: ['#8ac7ff', 'Ⓜ'], landmark: ['#e8e2d0', '●'], danger: ['#ff6a5a', '!'], road: ['#9fe39a', '➜'] };
@@ -23,8 +24,8 @@ export function init(ctx) {
   M = { ctx, mini, mctx: mini.getContext('2d'), size, big, bcan: big.querySelector('canvas'), img: null, shotAt: 0, frame: 0, open: false };
   const toggle = () => { M.open = !M.open; big.classList.toggle('on', M.open); if (M.open) { pickImg(); big.querySelector('.h').textContent = (ctx.world?.maps?.find((m) => m.id === ctx.world?.mapId)?.name || 'MAP').toUpperCase() + (M.level != null ? `  ·  LEVEL ${M.level === 0 ? 'STREET' : M.level}` : ''); drawBig(); } };
   addEventListener('keydown', (e) => { if (e.code === 'KeyM' && !e.repeat && (ctx.state === 'playing' || M.open) && !document.querySelector('.hkdlg.on') && !document.querySelector('.zvon.on')) { toggle(); } if (e.code === 'Escape' && M.open) toggle(); });
-  mini.addEventListener('click', (e) => { e.stopPropagation(); toggle(); }); mini.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); toggle(); }, { passive: false });
-  big.addEventListener('click', () => { if (M.open) toggle(); }); big.addEventListener('touchstart', (e) => { e.preventDefault(); if (M.open) toggle(); }, { passive: false });
+  mini.addEventListener('click', (e) => { e.stopPropagation(); toggle(); }); onTap(mini, () => toggle());   // phones: a real tap, not a thumb landing on it
+  big.addEventListener('click', () => { if (M.open) toggle(); }); onTap(big, () => { if (M.open) toggle(); });
   ctx.bus.on('state', ({ state }) => {
     mini.style.display = state === 'playing' && M.img ? 'block' : 'none';
     if (state === 'playing' && !M.img && !M.pending) { M.pending = true; setTimeout(async () => { try { await snapshot(); } catch (e) { console.warn('[map] snapshot', e); } M.pending = false; mini.style.display = ctx.state === 'playing' ? 'block' : 'none'; }, 1500); }

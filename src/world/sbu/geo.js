@@ -22,10 +22,22 @@ export function worldUV(geo, scale = 0.5, offset = 0) {
   return geo;
 }
 
-/** BoxGeometry spanning [min,max] (world space). */
+/** a box spanning [min,max] (world space): non-indexed, 6 faces × 2 triangles, with normals and 0..1 face UVs (same faces, winding and
+ *  UV layout as BoxGeometry). Written straight into typed arrays: the maps build tens of thousands of these, and BoxGeometry's JS
+ *  arrays + index (then Batch's non-indexed copy) were hundreds of MB of garbage during load, which is what iPhones die of. */
+const BOX_FACES = [[0, 2, 1, 1], [0, 2, 1, -1], [0, 1, 2, 1], [0, 1, 2, -1], [0, 1, 2, 0], [0, 1, 2, 0]];
 export function boxGeo(min, max) {
-  const g = new THREE.BoxGeometry(Math.max(0.001, max[0] - min[0]), Math.max(0.001, max[1] - min[1]), Math.max(0.001, max[2] - min[2]));
-  g.translate((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
+  const x0 = min[0], y0 = min[1], z0 = min[2], x1 = Math.max(max[0], x0 + 0.001), y1 = Math.max(max[1], y0 + 0.001), z1 = Math.max(max[2], z0 + 0.001);
+  const P = new Float32Array(108), N = new Float32Array(108), U = new Float32Array(72); let p = 0, u = 0;
+  // each face: 4 corners (as BoxGeometry orders them: top-left, top-right, bottom-left, bottom-right in the face's own u/v), two triangles
+  const face = (c, n) => { for (const k of [0, 2, 1, 2, 3, 1]) { const v = c[k]; P[p] = v[0]; P[p + 1] = v[1]; P[p + 2] = v[2]; N[p] = n[0]; N[p + 1] = n[1]; N[p + 2] = n[2]; p += 3; U[u++] = k & 1; U[u++] = k < 2 ? 1 : 0; } };
+  face([[x1, y1, z1], [x1, y1, z0], [x1, y0, z1], [x1, y0, z0]], [1, 0, 0]);    // +x
+  face([[x0, y1, z0], [x0, y1, z1], [x0, y0, z0], [x0, y0, z1]], [-1, 0, 0]);   // -x
+  face([[x0, y1, z0], [x1, y1, z0], [x0, y1, z1], [x1, y1, z1]], [0, 1, 0]);    // +y
+  face([[x0, y0, z1], [x1, y0, z1], [x0, y0, z0], [x1, y0, z0]], [0, -1, 0]);   // -y
+  face([[x0, y1, z1], [x1, y1, z1], [x0, y0, z1], [x1, y0, z1]], [0, 0, 1]);    // +z
+  face([[x1, y1, z0], [x0, y1, z0], [x1, y0, z0], [x0, y0, z0]], [0, 0, -1]);   // -z
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2));
   return g;
 }
 

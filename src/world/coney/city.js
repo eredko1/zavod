@@ -7,7 +7,7 @@ import { Batch, boxGeo } from '../sbu/geo.js';
 import { facade, block } from '../sbu/buildings.js';
 import { OSM, PLAY } from './osm.js';
 import { BW } from './shore.js';
-import { ribbon, walk, footprint, footprintAngle, decompose, segDist, bbox, cen, pip } from '../osmkit.js';
+import { ribbon, walk, footprint, footprintAngle, decompose, segDist, segDist1, bbox, cen, pip } from '../osmkit.js';
 import { placeCars } from '../carkit.js';
 import { BUS_STOPS } from './traffic.js';   // no parking at the bus stops
 
@@ -121,6 +121,15 @@ let signSeq = 0, lastShutter = -1;
 /** 35 % of shutters carry one of 8 graffiti pieces, the rest one of 8 clean/stickered variants; never the same cell twice in a row */
 const pickShutter = (R) => { let c; do c = R() < 0.35 ? (R() * 8) | 0 : 8 + ((R() * 8) | 0); while (c === lastShutter); return (lastShutter = c); };
 
+/** a +n-facing quad u0..u1 x y0..y1 at depth n, non-indexed (2 triangles), UVs in the atlas rect [a, b, du, dv]. Built directly:
+ *  Coney's facades are tens of thousands of these, and PlaneGeometry's JS arrays + index + Batch's non-indexed copy were ~0.7 GB of
+ *  garbage while the map loads (iPhones kill the tab near the peak) */
+function quadGeo(u0, u1, y0, y1, n, a, b, du, dv) {
+  const P = new Float32Array([u0, y1, n, u0, y0, n, u1, y1, n, u0, y0, n, u1, y0, n, u1, y1, n]);
+  const U = new Float32Array([a, b + dv, a, b, a + du, b + dv, a, b, a + du, b, a + du, b + dv]);
+  const N = new Float32Array(18); for (let i = 2; i < 18; i += 3) N[i] = 1;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); return g;
+}
 /** Face kit: local frame on one wall face — u along the face (centred on its midpoint), y up, n outward from the wall plane. */
 function faceKit(B, alongX, sgn, mid, c) {
   const place = (g) => { if (alongX) { if (sgn < 0) g.rotateY(Math.PI); } else g.rotateY(sgn > 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(alongX ? mid : c, 0, alongX ? c : mid); return g; };
@@ -129,9 +138,7 @@ function faceKit(B, alongX, sgn, mid, c) {
     geo(key, g, o = { uv: false }) { B.add(key, place(g), o); },
     /** outward-facing quad u0..u1 x y0..y1 at n, UVs remapped into the atlas rect [u0, v0, du, dv] */
     quad(key, u0, u1, y0, y1, n, [a, bb, du, dv]) {
-      const g = new THREE.PlaneGeometry(u1 - u0, y1 - y0); g.translate((u0 + u1) / 2, (y0 + y1) / 2, n);
-      const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, a + uv.getX(i) * du, bb + uv.getY(i) * dv);
-      B.add(key, place(g), { uv: false });
+      B.add(key, place(quadGeo(u0, u1, y0, y1, n, a, bb, du, dv)), { uv: false });
     },
   };
 }
@@ -278,7 +285,7 @@ function streetKit(world, M) {
     if (ints.some((q) => Math.hypot(q.x - e[0], q.z - e[1]) < 4 && q.dx * dx + q.dz * dz > 0.9)) continue; ints.push({ x: e[0], z: e[1], dx, dz, w: r.w }); } }
   const nearInt = (x, z, rad) => ints.some((q) => Math.hypot(q.x - x, q.z - z) < rad);
   const blocked = (x, z, rad = 0.4) => ctx.colliders.some((b) => x > b.min.x - rad && x < b.max.x + rad && z > b.min.z - rad && z < b.max.z + rad && b.max.y > 0.2 && b.min.y < 2.5);
-  const surfTan = (x, z) => { let best = 1e9, t = [1, 0]; for (const r of SURF) for (let i = 0; i + 1 < r.p.length; i++) { const d = segDist(x, z, [r.p[i], r.p[i + 1]]); if (d < best) { best = d; const ax = r.p[i + 1][0] - r.p[i][0], az = r.p[i + 1][1] - r.p[i][1], L = Math.hypot(ax, az) || 1; t = [ax / L, az / L]; } } return t; };
+  const surfTan = (x, z) => { let best = 1e9, t = [1, 0]; for (const r of SURF) for (let i = 0; i + 1 < r.p.length; i++) { const d = segDist1(x, z, r.p[i][0], r.p[i][1], r.p[i + 1][0], r.p[i + 1][1]); if (d < best) { best = d; const ax = r.p[i + 1][0] - r.p[i][0], az = r.p[i + 1][1] - r.p[i][1], L = Math.hypot(ax, az) || 1; t = [ax / L, az / L]; } } return t; };
   const stripes = (cx, cz, ux, uz, span, len) => { const a = Math.atan2(ux, uz); for (let s = -span / 2 + 0.5; s <= span / 2 - 0.5; s += 1.2) { const g = boxGeo([-0.3, 0.04, -len / 2], [0.3, 0.047, len / 2]); g.rotateY(a); g.translate(cx + uz * s, 0, cz - ux * s); K.add('paint', g, { uv: false }); } };
   for (const q of ints) {
     if (!inPlay(q.x, q.z)) continue;

@@ -86,7 +86,7 @@ export function buildDetail(world, M) {
   const cardGeo = (() => {
     const a = new THREE.PlaneGeometry(0.42, 0.3); a.translate(0, 0.15, 0);
     const b = new THREE.PlaneGeometry(0.42, 0.3); b.rotateY(Math.PI / 2); b.translate(0, 0.15, 0);
-    return BGU.mergeGeometries([a.toNonIndexed(), b.toNonIndexed()], false);
+    return BGU.mergeGeometries([a.index ? a.toNonIndexed() : a, b.index ? b.toNonIndexed() : b], false);
   })();
   const LAWNS = [
     [PIT.x0 + 2, PIT.z0 + 2, PIT.x1 - 1, PIT.z1 - 2, 3.1],       // the grass terraces (steps / staller poses) — sparser: seen at a grazing angle
@@ -130,7 +130,7 @@ export function buildDetail(world, M) {
     }
     for (let i = 0; i < 3; i++) {
       if (!lists[i].length) continue;
-      const merged = BGU.mergeGeometries(lists[i].map(g => g.toNonIndexed()), false);
+      const merged = BGU.mergeGeometries(lists[i].map(g => g.index ? g.toNonIndexed() : g), false);
       const mesh = new THREE.Mesh(merged, M.treeline[i]);
       mesh.name = 'sbu:treeline' + i; mesh.renderOrder = -1; scene.add(mesh);
       for (const g of lists[i]) g.dispose();

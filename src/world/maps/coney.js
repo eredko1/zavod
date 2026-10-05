@@ -25,7 +25,7 @@ import { Batch, boxGeo } from '../sbu/geo.js';
 export const meta = {
   id: 'coney', name: 'CONEY ISLAND', subtitle: 'DAY OPS · BOARDWALK', time: 'day', weather: 'clear',
   description: 'Summer afternoon on the seaside amusement strip: the wonder wheel and the wooden coaster, the parachute tower, sideshow fronts, the plank boardwalk and a packed beach down to the surf.',
-  grade: 'day', ambience: 'sbu-day', thumb: 'assets/thumbs/sbu.jpg',
+  grade: 'day', ambience: 'coney', thumb: 'assets/thumbs/sbu.jpg',
 };
 
 export function build(world) {
@@ -158,16 +158,20 @@ function placeSpawnsBikesCover(world, M, piers) {
   // ---- road geometry -----------------------------------------------------------------------------------------------------
   const surf = OSM.r.filter((r) => r.w >= 20), streets = OSM.r.filter((r) => r.w >= 9 && r.w < 20);
   const avePts = surf.flatMap((r) => r.p).filter((p) => p[0] > PLAY.x0 - 60 && p[0] < PLAY.x1 + 60).sort((a, b) => a[0] - b[0]);
-  const zAve = (x) => { for (let i = 0; i + 1 < avePts.length; i++) { const [ax, az] = avePts[i], [bx, bz] = avePts[i + 1]; if (x >= ax && x <= bx) return bx - ax < 1e-3 ? az : az + (bz - az) * (x - ax) / (bx - ax); } return x < avePts[0][0] ? avePts[0][1] : avePts[avePts.length - 1][1]; };
-  const dSet = (x, z, set) => { let d = 1e9; for (const r of set) d = Math.min(d, segDist(x, z, r.p) - r.w / 2); return d; };   // distance to the kerb (negative = in the carriageway)
+  const zAve = (x) => { for (let i = 0; i + 1 < avePts.length; i++) { const ax = avePts[i][0], az = avePts[i][1], bx = avePts[i + 1][0], bz = avePts[i + 1][1]; if (x >= ax && x <= bx) return bx - ax < 1e-3 ? az : az + (bz - az) * (x - ax) / (bx - ax); } return x < avePts[0][0] ? avePts[0][1] : avePts[avePts.length - 1][1]; };
+  // "within m of the kerb of any road in the set": each road carries its bounding box, so the spawn scan (a cell every 4 m over the whole
+  // map) only measures the few roads nearby instead of all of them (tens of millions of segment checks while the map loaded)
+  const boxed = (set) => set.map((r) => { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (let i = 0; i < r.p.length; i++) { x0 = Math.min(x0, r.p[i][0]); x1 = Math.max(x1, r.p[i][0]); z0 = Math.min(z0, r.p[i][1]); z1 = Math.max(z1, r.p[i][1]); } return { p: r.p, w: r.w, x0, x1, z0, z1 }; });
+  const surfB = boxed(surf), streetsB = boxed(streets);
+  const nearKerb = (x, z, set, m) => { for (let i = 0; i < set.length; i++) { const r = set[i], pad = r.w / 2 + m; if (x < r.x0 - pad || x > r.x1 + pad || z < r.z0 - pad || z > r.z1 + pad) continue; if (segDist(x, z, r.p) - r.w / 2 < m) return true; } return false; };
   const BP = LM.ballpark;
   const areaOf = (x, z) => {
     if (z > BW.z1) return onPier(x, z) ? 'pier' : 'beach';
     if (z >= BW.z0 - 1) return 'boardwalk';
     const za = zAve(x);
     if (x > BP.x0 && x < BP.x1 && z > za + 11.5 && z < BP.z0) return 'ballpark';
-    if (dSet(x, z, surf) < 5) return 'surfave';
-    if (dSet(x, z, streets) < 4) return 'street';
+    if (nearKerb(x, z, surfB, 5)) return 'surfave';
+    if (nearKerb(x, z, streetsB, 4)) return 'street';
     return z > za ? 'park' : 'north';
   };
 
@@ -234,6 +238,7 @@ function placeSpawnsBikesCover(world, M, piers) {
   const inNav = (x, z, m) => x > Math.max(bb.min.x, bcx - half) + m && x < Math.min(bb.max.x, bcx + half) - m && z > Math.max(bb.min.z, bcz - half) + m && z < Math.min(bb.max.z, bcz + half) - m;
   const cands = {};
   for (let z = PLAY.z0 + 6; z < PLAY.z1 - 5; z += 4) for (let x = PLAY.x0 + 6; x < PLAY.x1 - 5; x += 4) {
+    if (z <= BW.z1 && !inNav(x, z, 6)) continue;   // the cheap test first: only the pier (z > BW.z1) may lie outside the nav window
     const a = areaOf(x, z); if (a === 'pier' ? (z > BW.z1 + 70 || !inNav(x, z, -40)) : !inNav(x, z, 6)) continue;
     const y = spawnY(x, z); if (y === null) continue;
     (cands[a] || (cands[a] = [])).push(new THREE.Vector3(x, y, z));

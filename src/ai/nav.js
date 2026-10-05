@@ -14,6 +14,7 @@ const K = 4;                // candidate slots per cell (base + 3 highest tops)
 const L = 3;                // final layers per cell
 const MAX_EXPAND = 60000;
 const MAX_CELLS = 900000;       // ~1 m cells on the 0.8 x 1.1 km campus; 0.5 m on the small maps
+const MAX_CELLS_LITE = 300000;  // phones / headset: ~1.7x coarser cells on the big maps, a third of the arrays (the grid is built twice while loading)
 
 class Heap {
   constructor() { this.a = []; this.k = []; }
@@ -51,7 +52,7 @@ export class NavGrid {
     let minX = -60, maxX = 60, minZ = -60, maxZ = 60;
     if (b && isFinite(b.min.x) && b.max.x - b.min.x > 4) { minX = b.min.x; maxX = b.max.x; minZ = b.min.z; maxZ = b.max.z; }
     const span = Math.max(maxX - minX, maxZ - minZ); if (span > 1200) { const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2; minX = cx - 600; maxX = cx + 600; minZ = cz - 600; maxZ = cz + 600; }   // big OSM maps (campus, coney) are ~0.8-1.1 km
-    const area = (maxX - minX) * (maxZ - minZ); if (area / (cell * cell) > MAX_CELLS) cell = Math.ceil(Math.sqrt(area / MAX_CELLS) * 20) / 20; // big maps: coarser cells, capped node count
+    const area = (maxX - minX) * (maxZ - minZ); const maxCells = ctx.lite ? MAX_CELLS_LITE : MAX_CELLS; if (area / (cell * cell) > maxCells) cell = Math.ceil(Math.sqrt(area / maxCells) * 20) / 20; // big maps: coarser cells, capped node count
     this.cell = cell; this.minX = minX; this.minZ = minZ;
     const w = this.w = Math.max(4, Math.ceil((maxX - minX) / cell)), h = this.h = Math.max(4, Math.ceil((maxZ - minZ) / cell));
     const n = this.n = w * h;

@@ -2,6 +2,8 @@
 // knife, then smokes (weed, spliffs, cigs, vapes), lighters, booze, drinks, food, loot. Tap a gun to draw it; items can be
 // used (same as B, but the one you pick) or dropped. Mounted by hangkit.buildKit on every hangout map. Owned by: main.
 import { ITEMS } from './hangkit.js';
+import { onTap } from '../tap.js';
+const STRIP_FOLD_MS = 4000;
 
 const CATS = [['smoke', 'Smokes'], ['tool', 'Lighters'], ['booze', 'Booze'], ['drink', 'Drinks'], ['food', 'Food'], ['loot', 'Loot'], ['gear', 'Gear'], ['trip', 'Trips'], ['misc', 'Other']];
 let I = null;
@@ -14,7 +16,7 @@ export function mountInventory(ctx, K) {
   if (ctx.isTouch) document.body.appendChild(btn);
   I = { ctx, K, root, btn, open: false };
   ctx.bus.on('inventory', () => { if (I.ctx.state === 'playing') toggle(); });   // hangkit's BAG button on phones
-  btn.addEventListener('touchstart', (e) => { e.preventDefault(); toggle(); }, { passive: false });
+  onTap(btn, () => toggle());
   root.addEventListener('click', onClick); root.addEventListener('touchend', (e) => { const t = e.target.closest('[data-a]'); if (t) { e.preventDefault(); onClick(e); } });
   // 0: the stash — a quick numbered list of what you can smoke / drink / eat / use; 1-9 uses it, 0 or Esc closes
   const quick = document.createElement('div'); quick.className = 'inv-quick'; quick.style.display = 'none'; document.body.appendChild(quick); I.quick = quick; I.quickItems = [];
@@ -31,7 +33,11 @@ export function mountInventory(ctx, K) {
   // the weapon strip: every gun you carry, always on screen — click / tap to draw it (1–9 on a keyboard), BAG opens the rest
   const strip = document.createElement('div'); strip.className = 'inv-strip' + (ctx.isTouch ? ' touch' : ''); document.body.appendChild(strip); I.strip = strip; let sig = '';
   strip.addEventListener('click', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else if (t.dataset.g === 'drone') I.K.useItem?.('drone'); else if (t.dataset.g === 'fists') I.ctx.weapons?.fists?.(); else I.ctx.weapons?.selectBag?.(+t.dataset.g); });
-  strip.addEventListener('touchstart', (e) => { const t = e.target.closest('[data-g]'); if (!t) return; e.preventDefault(); e.stopPropagation(); if (t.dataset.g === 'bag') toggle(true); else if (t.dataset.g === 'drone') I.K.useItem?.('drone'); else if (t.dataset.g === 'fists') I.ctx.weapons?.fists?.(); else I.ctx.weapons?.selectBag?.(+t.dataset.g); }, { passive: false });
+  // phones: the strip is one chip (what you're holding); tap it to open the row, tap a weapon to draw it and the row folds back up.
+  // Taps only (a thumb resting or sliding across doesn't switch guns or open the bag).
+  let foldT = 0; const fold = (open) => { strip.classList.toggle('open', open); clearTimeout(foldT); if (open) foldT = setTimeout(() => fold(false), STRIP_FOLD_MS); };
+  if (ctx.isTouch) onTap(strip, (t) => { if (!strip.classList.contains('open')) { fold(true); return; } fold(false);
+    if (t.dataset.g === 'bag') toggle(true); else if (t.dataset.g === 'drone') I.K.useItem?.('drone'); else if (t.dataset.g === 'fists') I.ctx.weapons?.fists?.(); else I.ctx.weapons?.selectBag?.(+t.dataset.g); }, '[data-g]');
   setInterval(() => { const W = I.ctx.weapons; let bag = []; try { bag = W?.bag || []; } catch {} const cur = W?.currentId, show = I.ctx.state === 'playing' && !I.open;
     const drones = (I.K.state?.()?.inv || []).filter((x) => x === 'drone').length; const n = bag.map((id, i) => `${i}:${id}:${id === cur ? 1 : 0}`).join(',') + show + drones + cur; if (n === sig) return; sig = n; strip.style.display = show ? 'flex' : 'none';
     strip.innerHTML = (W?.fists ? `<button data-g="fists" class="${cur === 'fists' ? 'on' : ''}"><b>7</b>✊ FISTS</button>` : '') + bag.map((id, i) => `<button data-g="${i}" class="${id === cur ? 'on' : ''}"><b>${i + 1}</b>${esc(String(id).toUpperCase().replace('AK74', 'AK').replace('M24', 'SNIPER'))}</button>`).join('') + (drones ? `<button data-g="drone" class="bag">🛸 DRONE ×${drones}</button>` : '') + `<button data-g="bag" class="bag">🎒 BAG${I.ctx.isTouch ? '' : ' (I)'}</button>`; }, 350);
@@ -88,7 +94,8 @@ const CSS = `
 .inv-box .row.gun{cursor:pointer}.inv-box .row.gun.on{background:rgba(212,170,70,.25)}
 .inv-box button[data-a]:not(.row){padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(212,170,70,.9);color:#111;font:700 12px Barlow;cursor:pointer}
 .inv-box button.ghost{background:transparent;color:#f1eee6}.inv-box .empty{opacity:.65}.inv-box footer{margin-top:10px;font-size:12px;opacity:.55}
-.inv-strip{position:fixed;right:22px;bottom:150px;z-index:41;display:none;gap:4px;font:700 11px 'Barlow Condensed',Arial;letter-spacing:.08em}.inv-strip.touch{top:calc(env(safe-area-inset-top,0px) + 58px);bottom:auto;right:auto;left:50%;transform:translateX(-50%);flex-direction:row;flex-wrap:wrap;justify-content:center;max-width:72vw}@media (orientation:portrait){.inv-strip.touch{top:calc(env(safe-area-inset-top,0px) + 92px);left:auto;right:10px;transform:none;justify-content:flex-end;max-width:58vw}}
+.inv-strip{position:fixed;right:22px;bottom:150px;z-index:41;display:none;gap:4px;font:700 11px 'Barlow Condensed',Arial;letter-spacing:.08em}.inv-strip.touch{top:calc(env(safe-area-inset-top,0px) + 14px);bottom:auto;right:calc(env(safe-area-inset-right,0px) + 76px);left:auto;transform:none;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;max-width:62vw}@media (orientation:portrait){.inv-strip.touch{top:calc(env(safe-area-inset-top,0px) + 92px);left:auto;right:10px;transform:none;justify-content:flex-end;max-width:58vw}}
+.inv-strip.touch:not(.open) button:not(.on){display:none}.inv-strip.touch:not(.open):not(:has(.on)) button[data-g=bag]{display:flex}.inv-strip.touch:not(.open) button.on::after{content:'▾';margin-left:4px;opacity:.7}.inv-strip.touch.open button{padding:9px 11px}
 .inv-strip button{display:flex;gap:4px;align-items:center;padding:5px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.5);color:#e8e6df;font:inherit;cursor:pointer}.inv-strip button b{opacity:.6}.inv-strip button.on{background:rgba(212,170,70,.85);color:#111}.inv-strip button.bag{background:rgba(40,90,60,.75)}
 .inv-quick{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:57;min-width:280px;max-width:calc(100vw - 32px);background:rgba(16,18,20,.92);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:10px 12px;font:500 14px Barlow,Arial;color:#f1eee6}
 .inv-quick h4{margin:0 0 6px;font:700 14px 'Barlow Condensed',Arial;letter-spacing:.18em}.inv-quick h4 small{opacity:.6;letter-spacing:.05em;margin-left:6px}.inv-quick button{display:flex;gap:8px;width:100%;text-align:left;padding:6px 8px;margin:2px 0;border:0;border-radius:6px;background:rgba(255,255,255,.06);color:inherit;font:inherit;cursor:pointer}.inv-quick button b{color:#d4aa46}.inv-quick p{opacity:.7;margin:4px 0}
