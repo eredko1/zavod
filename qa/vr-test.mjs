@@ -157,6 +157,13 @@ if (car.mounted) {
   await shot('car');
 } else console.log('SKIP car (no QA mount hook)', JSON.stringify(car));
 
+// ---- holsters: the right hand over the right shoulder + squeeze draws the rifle ----
+await pg.evaluate(() => { window.__ctx.weapons.collect('ak74', 90); window.__ctx.weapons.fists(); }); await pg.waitForTimeout(500);
+await dev(() => { window.__iwer.quaternion.set(0, 0, 0, 1); const c = window.__iwer.controllers.right; c.position.set(0.17, 1.52, 0.16); c.quaternion.set(0, 0, 0, 1); }); await pg.waitForTimeout(400);
+await ctl('right', "updateButtonValue('squeeze', 1)"); await pg.waitForTimeout(250); await ctl('right', "updateButtonValue('squeeze', 0)"); await pg.waitForTimeout(700);
+const hol = await pg.evaluate(() => window.__ctx.weapons.currentId); ok(hol === 'ak74', 'squeeze over the right shoulder: the rifle comes out', String(hol));
+await dev(() => { const c = window.__iwer.controllers.right; c.position.set(0.2, 1.4, -0.3); const l = window.__iwer.controllers.left; l.position.set(-0.2, 1.4, -0.3); }); await pg.waitForTimeout(300);
+
 // ---- the world's F interactions, from the right grip: jet pack, a car, an elevator; X uses what you bought ----
 const grip = async () => { await ctl('right', "updateButtonValue('squeeze', 1)"); await pg.waitForTimeout(200); await ctl('right', "updateButtonValue('squeeze', 0)"); await pg.waitForTimeout(600); };
 await pg.waitForFunction(() => { const h = window.__game.vr.state().hands; return h.includes('right') && h.includes('left'); }, null, { timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(500);   // controllers back after the hand-tracking part
