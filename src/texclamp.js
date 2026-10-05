@@ -2,6 +2,8 @@
 // canvas before (re)upload. Phones: 1024 px (people 512); older / low-memory devices: 512 (people 256). Desktop: untouched
 // (well, capped at 2048). Saves hundreds of MB of GPU memory on the big maps — iOS kills a tab that grows past ~1–1.5 GB.
 // Owned by: main (world.js calls it after the map builds).
+export const IOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const IOS_MAX = 384;
 const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap', 'specularMap'];
 
 export function textureBudget(ctx) {
@@ -12,6 +14,8 @@ export function textureBudget(ctx) {
   const low = (mem && mem <= 4) || (cores && cores <= 4) || /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) || ctx.qs?.get?.('lowmem') === '1';
   const tm = +ctx.qs?.get?.('texmax') || 0;   // QA: try a tighter cap
   if (tm) return { max: tm, people: Math.min(tm, 256), low: true };
+  // iPhones / iPads: 384 (people 256): a tab is killed near its memory ceiling right as the game finishes loading
+  if (IOS()) return { max: IOS_MAX, people: 256, low: true };
   return low ? { max: 512, people: 256, low: true } : { max: 1024, people: 512, low: false };
 }
 

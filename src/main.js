@@ -16,6 +16,7 @@ import * as netwaves from './netwaves.js';
 import * as minimap from './minimap.js';
 import * as vr from './vr/vr.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+import { IOS } from './texclamp.js';
 
 // BVH-accelerated raycasts for every mesh (bullets, AI line of sight, impact FX). Merged map batches are 100k+ triangle
 // meshes whose bounding sphere covers the whole map, so an unaccelerated ray tested every triangle (14 fps with AI on the
@@ -24,6 +25,7 @@ THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
+const SAFE_TEXMAX = 256;   // safe mode's texture cap (after a load that never finished on a phone)
 const ctx = createCtx();
 // Phones: every image loader (textures, GLTF props, HDR stays) is redirected to the <=512px mirror in assets-m/ (see qa/build-mobile-assets.sh)
 if (ctx.lite && ctx.qs.get('fullassets') !== '1') THREE.DefaultLoadingManager.setURLModifier((url) => /\/assets\/.*\.(jpe?g|png)(\?.*)?$/i.test(url) ? url.replace('/assets/', '/assets-m/').replace(/\.png(\?.*)?$/i, '.jpg$1') : url);
@@ -118,7 +120,14 @@ addEventListener('keydown', e => {
 
 // ---------- boot ----------
 const bootbar = document.getElementById('bootbar'), boottxt = document.getElementById('boottxt');
-ctx.progress = (frac, txt) => { bootbar.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`; if (txt) boottxt.textContent = txt; };
+// crash breadcrumb: each loading phase is saved as it starts and 'ok' when the game is up. A phone tab killed for memory (iOS: "Can't
+// open this page") leaves its last phase behind: the next load shows it, and comes up in safe mode (smaller textures, gentler warm-up)
+const CRUMB = 'zavod.boot', crumb = (() => { try { return localStorage.getItem(CRUMB); } catch { return null; } })();
+ctx.lastCrash = crumb && crumb !== 'ok' ? crumb : null;
+const SAFE = 'zavod.safe', wasSafe = (() => { try { return localStorage.getItem(SAFE) === '1'; } catch { return false; } })();   // sticky: a phone that crashed once stays safe
+if ((ctx.lastCrash || wasSafe) && ctx.lite && !ctx.qs.get('texmax') && ctx.qs.get('safe') !== '0') { ctx.safeMode = true; try { localStorage.setItem(SAFE, '1'); } catch {} ctx.qs.set('texmax', String(SAFE_TEXMAX)); console.warn('[boot] last load stopped at', ctx.lastCrash, '- safe mode'); }
+const saveCrumb = (v) => { try { localStorage.setItem(CRUMB, v); } catch {} };
+ctx.progress = (frac, txt) => { bootbar.style.width = `${Math.round(clamp(frac, 0, 1) * 100)}%`; if (txt) { boottxt.textContent = txt + (ctx.lastCrash ? `  ·  last load stopped at: ${ctx.lastCrash}${ctx.safeMode ? ' (safe mode)' : ''}` : ''); saveCrumb(txt); } };
 
 const MODULES = [['assets', assets], ['world', world], ['player', player], ['weapons', weapons], ['ai', ai], ['audio', audio], ['post', post], ['hud', hud], ['touch', touch], ['vehicles', vehicles], ['net', net], ['netwaves', netwaves], ['minimap', minimap], ['vr', vr]];
 const UPDATE_ORDER = ['vr', 'touch', 'vehicles', 'player', 'weapons', 'ai', 'world', 'audio', 'hud', 'net', 'netwaves', 'minimap']; // vehicles before player: a mounted player is driven by the vehicle // post.render() runs last
@@ -138,7 +147,7 @@ async function boot() {
   const bvhFor = () => { for (const o of ctx.raycastTargets) { const g = o.geometry; if (!o.isMesh || o.isSkinnedMesh || !g || g.boundsTree || o.userData.soldier) continue; const n = (g.index ? g.index.count : g.attributes.position?.count || 0) / 3; if (n > 500) { try { g.computeBoundsTree({ maxLeafTris: 8 }); } catch (e) { /* non-indexable geometry: plain raycast */ } } } };
   bvhFor(); ctx.bus.on?.('boot', () => setTimeout(bvhFor, 4000)); setTimeout(bvhFor, 12000);   // async GLTF props arrive later
   await prewarm();
-  ctx.progress(1, 'ready');
+  ctx.progress(1, 'ready'); saveCrumb('ok');
   document.getElementById('boot').classList.add('hide');
   const go = ctx.qs.get('go') === '1'; if (go) try { const u = new URL(location.href); u.searchParams.delete('go'); history.replaceState(null, '', u); } catch {}   // ?go=1: picked on the menu before the reload
   setState(ctx.qa || go ? 'playing' : 'menu');
@@ -159,10 +168,19 @@ async function prewarm() {
   try { await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 20000))]); } catch (e) { console.warn('[boot] compileAsync', e); }
   const t1 = performance.now(), culled = [], shown = [], lit = new Set();
   scene.traverse((o) => { if (o.isLight) for (let p = o; p; p = p.parent) lit.add(p); });   // never reveal a hidden light: a new light count recompiles every program
-  scene.traverse((o) => { if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) { o.frustumCulled = false; culled.push(o); } if (!o.visible && !lit.has(o)) { o.visible = true; shown.push(o); } });
-  try { if (ctx.post?.render) ctx.post.render(0, ctx); else renderer.render(scene, camera); renderer.setRenderTarget(null); }
-  catch (e) { console.warn('[boot] warm frame', e); }
-  finally { for (const o of culled) o.frustumCulled = true; for (const o of shown) o.visible = false; }
+  scene.traverse((o) => { if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) culled.push(o); if (!o.visible && !lit.has(o)) shown.push(o); });
+  // iPhones: the warm-up in WARM_PASSES_IOS slices with a pause between (everything uploading in one frame is the spike that gets the
+  // tab killed just as loading finishes; between slices the GC and the driver can release their staging copies)
+  const passes = ctx.safeMode ? WARM_PASSES_SAFE : IOS() ? WARM_PASSES_IOS : 1;
+  for (let k = 0; k < passes; k++) {
+    const part = (a) => a.filter((_, i) => i % passes === k), c = part(culled), sh = part(shown);
+    if (passes > 1) ctx.progress(0.98, `warming up ${k + 1}/${passes}`);
+    for (const o of c) o.frustumCulled = false; for (const o of sh) o.visible = true;
+    try { if (ctx.post?.render) ctx.post.render(0, ctx); else renderer.render(scene, camera); renderer.setRenderTarget(null); }
+    catch (e) { console.warn('[boot] warm frame', e); }
+    finally { for (const o of c) o.frustumCulled = true; for (const o of sh) o.visible = false; }
+    if (passes > 1) await new Promise((r) => setTimeout(r, WARM_PAUSE_MS));
+  }
   ctx.perf.warm = { compileMs: Math.round(t1 - t0), frameMs: Math.round(performance.now() - t1), programs: renderer.info.programs?.length || 0 };
   // phones: the big merged static meshes nobody raycasts (parked cars, Brighton, the backdrop, 8th Ave) are on the GPU now,
   // their JS copies are dead weight (~35 MB): iOS kills the tab near its memory ceiling
@@ -187,6 +205,8 @@ async function prewarm() {
       console.log(`[boot] phones: ${drop.length} building meshes → a ${Math.round(pos.length / 24)}-box raycast proxy`);
     } }
 }
+
+const WARM_PASSES_IOS = 6, WARM_PASSES_SAFE = 12, WARM_PAUSE_MS = 60;
 
 // ---------- loop ----------
 let last = performance.now(); let fpsAcc = 0, fpsN = 0;
