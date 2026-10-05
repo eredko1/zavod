@@ -115,20 +115,18 @@ const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); 
  * @param o.x/z storefront centre on the ground · o.y ground height · o.yaw rotation so local +z = into the store · o.name awning text
  * @returns { sammy: Vector3 (vendor point), door: Vector3 (outside the door), inside: Vector3, group }
  */
-export function buildDeli(world, o) {
-  const { scene, ctx } = world; const y0 = o.y || 0;
-  const Wd = 8, D = 11, Hh = 4.2, CEIL = 3.2, T = 0.22;
-  const root = new THREE.Group(); root.position.set(o.x, y0, o.z); root.rotation.y = o.yaw; scene.add(root);
-  const L = (x, z, y = 0) => new THREE.Vector3(x, y, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), o.yaw).add(new THREE.Vector3(o.x, y0, o.z));
-  // colliders: rotated walls become 0.5 m AABB cells so the interior stays walkable
-  const cellBox = (x0, z0, x1, z1, yb, yt) => {
-    const nx = Math.max(1, Math.ceil(Math.abs(x1 - x0) / 0.5)), nz = Math.max(1, Math.ceil(Math.abs(z1 - z0) / 0.5));
-    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
-      const ax = x0 + (x1 - x0) * i / nx, bx = x0 + (x1 - x0) * (i + 1) / nx, az = z0 + (z1 - z0) * k / nz, bz = z0 + (z1 - z0) * (k + 1) / nz;
-      const cs = [L(ax, az), L(bx, az), L(ax, bz), L(bx, bz)];
-      world.box([Math.min(...cs.map((c) => c.x)), y0 + yb, Math.min(...cs.map((c) => c.z))], [Math.max(...cs.map((c) => c.x)), y0 + yt, Math.max(...cs.map((c) => c.z))]);
-    }
-  };
+// ---- the shared store kit (built once, used by every store on the map) --------------------------------------------------------
+// store looks: sign colours, awning stripe, window cards (four small cards + the strip under the counter window)
+export const STYLES = {
+  bodega: { sign: '#f4d21c', ink: '#c3121b', aw: '#b3121c', cards: ['OPEN', 'COLD BEER', 'LOTTO', 'ATM', 'HERO · COFFEE · BACON EGG & CHEESE'] },
+  ru: { sign: '#0f5a32', ink: '#ffffff', aw: '#146b3a', band: '#e8c24a', cards: [] },
+  pizza: { sign: '#b3121c', ink: '#ffffff', aw: '#2f8a3a', cards: ['OPEN', 'PIZZA', '$1.50 SLICE', 'HOT', 'SLICES · CALZONES · GARLIC KNOTS'] },
+  chinese: { sign: '#c8102e', ink: '#ffd23b', aw: '#c8102e', cards: ['OPEN', '炒饭 · FRIED RICE', 'DUMPLINGS', '外卖', 'LO MEIN · EGG ROLL · GENERAL TSO'] },
+  liquor: { sign: '#141414', ink: '#ffd23b', aw: '#1a1a1a', cards: ['OPEN', 'WINE & LIQUOR', 'LOTTO', 'ICE', 'HENNESSY · CIROC · 40s · LOOSIES'] },
+};
+let KIT = null;
+function kit() {
+  if (KIT) return KIT;
   const M = {
     brick: new THREE.MeshStandardMaterial({ color: 0x8a4a36, roughness: 0.92 }),
     wall: new THREE.MeshStandardMaterial({ color: 0xe9e2cf, roughness: 0.9 }),
@@ -144,8 +142,44 @@ export function buildDeli(world, o) {
     dark: new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.6 }),
     floor: new THREE.MeshStandardMaterial({ roughness: 0.55, map: canvasTex(256, 256, (g) => { for (let i = 0; i < 8; i++) for (let k = 0; k < 8; k++) { g.fillStyle = (i + k) % 2 ? '#e6dfcc' : '#8a6f55'; g.fillRect(i * 32, k * 32, 32, 32); } g.fillStyle = 'rgba(40,30,20,0.12)'; for (let n = 0; n < 900; n++) g.fillRect(Math.random() * 256, Math.random() * 256, 2, 2); }) }),
   };
-  M.floor.map.wrapS = M.floor.map.wrapT = THREE.RepeatWrapping; M.floor.map.repeat.set(Wd / 2.4, D / 2.4);
+  M.floor.map.wrapS = M.floor.map.wrapT = THREE.RepeatWrapping; M.floor.map.repeat.set(8 / 2.4, 11 / 2.4);
   const PAL = [0xc8201e, 0x2a62c8, 0xf2c418, 0x2f9a48, 0xe86a1c, 0x7a3fb0, 0xf0f0ea, 0x1a1a1a].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 }));
+  // every store's name on one atlas (1024 x 1024 = 8 signs): one texture upload for the whole map, each sign a UV window into it
+  const atlas = document.createElement('canvas'); atlas.width = 1024; atlas.height = SIGN_ROWS * 128; const ag = atlas.getContext('2d'), atex = new THREE.CanvasTexture(atlas); atex.colorSpace = THREE.SRGBColorSpace; atex.anisotropy = 4;
+  let row = 0; const signs = new Map(), cards = new Map(), awns = new Map();
+  KIT = { M, PAL, bottleA: new THREE.MeshStandardMaterial({ color: 0x6a3a10, roughness: 0.15 }), bottleB: new THREE.MeshStandardMaterial({ color: 0x2a4a1a, roughness: 0.15 }),
+    sign(txt, sty) { const key = txt + sty.sign; if (signs.has(key)) return signs.get(key);
+      const r = row++ % SIGN_ROWS, y = r * 128, w = 1024, h = 128; ag.fillStyle = sty.sign; ag.fillRect(0, y, w, h); if (sty.band) { ag.fillStyle = sty.band; ag.fillRect(0, y + 8, w, 4); ag.fillRect(0, y + h - 12, w, 4); }
+      ag.fillStyle = sty.ink; let fs = 86; do { ag.font = `900 ${fs}px Arial Black, Arial`; fs -= 4; } while (ag.measureText(txt).width > w - 40 && fs > 30); ag.textAlign = 'center'; ag.textBaseline = 'middle'; ag.fillText(txt, w / 2, y + h / 2 + 4); atex.needsUpdate = true;
+      const t = atex.clone(); t.repeat.set(1, 1 / SIGN_ROWS); t.offset.set(0, 1 - (r + 1) / SIGN_ROWS); t.needsUpdate = true;
+      const m = new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.55, roughness: 0.5 }); signs.set(key, m); return m; },
+    card(txt, fg, bg, glow) { const key = [txt, fg, bg, glow].join('|'); if (cards.has(key)) return cards.get(key);
+      const t = canvasTex(256, 96, (g, W, H) => { g.fillStyle = bg; g.fillRect(0, 0, W, H); g.fillStyle = fg; let fs = 54; do { g.font = `800 ${fs}px Arial`; fs -= 3; } while (g.measureText(txt).width > W - 12 && fs > 14); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, W / 2, H / 2 + 2); });
+      const m = new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: glow, transparent: true }); cards.set(key, m); return m; },
+    awning(col) { if (awns.has(col)) return awns.get(col); const t = canvasTex(512, 64, (g, w, h) => { for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#f2efe6' : col; g.fillRect(i * w / 16, 0, w / 16, h); } });
+      const m = new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 }); awns.set(col, m); return m; },
+  };
+  return KIT;
+}
+const SIGN_ROWS = 8;
+
+export function buildDeli(world, o) {
+  const { scene, ctx } = world; const y0 = o.y || 0;
+  const Wd = 8, D = 11, Hh = 4.2, CEIL = 3.2, T = 0.22;
+  const root = new THREE.Group(); root.position.set(o.x, y0, o.z); root.rotation.y = o.yaw; scene.add(root);
+  const L = (x, z, y = 0) => new THREE.Vector3(x, y, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), o.yaw).add(new THREE.Vector3(o.x, y0, o.z));
+  // colliders: rotated walls become 0.5 m AABB cells so the interior stays walkable
+  const cellBox = (x0, z0, x1, z1, yb, yt) => {
+    const nx = Math.max(1, Math.ceil(Math.abs(x1 - x0) / 0.5)), nz = Math.max(1, Math.ceil(Math.abs(z1 - z0) / 0.5));
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+      const ax = x0 + (x1 - x0) * i / nx, bx = x0 + (x1 - x0) * (i + 1) / nx, az = z0 + (z1 - z0) * k / nz, bz = z0 + (z1 - z0) * (k + 1) / nz;
+      const cs = [L(ax, az), L(bx, az), L(ax, bz), L(bx, bz)];
+      world.box([Math.min(...cs.map((c) => c.x)), y0 + yb, Math.min(...cs.map((c) => c.z))], [Math.max(...cs.map((c) => c.x)), y0 + yt, Math.max(...cs.map((c) => c.z))]);
+    }
+  };
+  // one kit for every store on the map: shared materials, textures and window cards (a store is just its sign and its stock)
+  const KT = kit(), M = KT.M, PAL = KT.PAL;
+  const st = STYLES[o.style] || STYLES.bodega;
   const box = (m, x0, y0b, z0, x1, y1, z1, collide = false) => { const e = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0b, z1 - z0), m); e.position.set((x0 + x1) / 2, (y0b + y1) / 2, (z0 + z1) / 2); e.castShadow = e.receiveShadow = true; root.add(e); if (collide) cellBox(x0, z0, x1, z1, y0b, y1); return e; };
   const hx = Wd / 2;
   // shell: side + back walls, front piers / sills / header, roof, ceiling, floor
@@ -159,18 +193,17 @@ export function buildDeli(world, o) {
   box(M.ceil, -hx, CEIL, 0.2, hx, CEIL + 0.04, D);
   const fl = box(M.floor, -hx, 0, 0.2, hx, 0.03, D); fl.castShadow = false;
   for (let k = 0; k < 3; k++) for (const x of [-1.8, 1.8]) box(M.tube, x - 0.08, CEIL - 0.05, 2 + k * 3.2, x + 0.08, CEIL, 3.6 + k * 3.2);
-  // interior light so the store reads lit from the street at any time of day
-  const lamp = new THREE.PointLight(0xf2f6ff, 14, 13, 1.6); lamp.position.set(0, CEIL - 0.3, D / 2); root.add(lamp);
+  // interior light so the store reads lit from the street at any time of day (the extra stores go without: a real light costs every
+  // lit pixel in the game; their tubes and fridges glow on their own)
+  if (o.lamp !== false) { const lamp = new THREE.PointLight(0xf2f6ff, 14, 13, 1.6); lamp.position.set(0, CEIL - 0.3, D / 2); root.add(lamp); }
   // sign board + awning
   const ru = o.style === 'ru';   // the Russian grocery: green sign, Cyrillic vinyl, produce out front
-  const sign = canvasTex(1024, 128, (g, w, h) => { g.fillStyle = ru ? '#0f5a32' : '#f4d21c'; g.fillRect(0, 0, w, h); if (ru) { g.fillStyle = '#e8c24a'; g.fillRect(0, 8, w, 4); g.fillRect(0, h - 12, w, 4); } g.fillStyle = ru ? '#ffffff' : '#c3121b'; const txt = o.name || "SAMMY'S DELI & GROCERY"; let fs = 86; do { g.font = `900 ${fs}px Arial Black, Arial`; fs -= 4; } while (g.measureText(txt).width > w - 40 && fs > 30); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 4); });
-  const sb = new THREE.Mesh(new THREE.BoxGeometry(Wd + 0.3, 0.95, 0.12), [M.dark, M.dark, M.dark, M.dark, new THREE.MeshStandardMaterial({ map: sign, emissive: 0xffffff, emissiveMap: sign, emissiveIntensity: 0.55, roughness: 0.5 }), M.dark]);
+  const sign = KT.sign(o.name || "SAMMY'S DELI & GROCERY", ru ? STYLES.ru : st);
+  const sb = new THREE.Mesh(new THREE.BoxGeometry(Wd + 0.3, 0.95, 0.12), [M.dark, M.dark, M.dark, M.dark, sign, M.dark]);
   sb.rotation.y = Math.PI; sb.position.set(0, 3.45, -0.14); root.add(sb);
-  const aw = canvasTex(512, 64, (g, w, h) => { for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#f2efe6' : ru ? '#146b3a' : '#b3121c'; g.fillRect(i * w / 16, 0, w / 16, h); } });
-  const awn = new THREE.Mesh(new THREE.PlaneGeometry(Wd + 0.2, 1.3), new THREE.MeshStandardMaterial({ map: aw, side: THREE.DoubleSide, roughness: 0.9 })); awn.position.set(0, 2.62, -0.6); awn.rotation.x = -Math.PI / 2 + 0.55; root.add(awn);
+  const awn = new THREE.Mesh(new THREE.PlaneGeometry(Wd + 0.2, 1.3), KT.awning(ru ? '#146b3a' : st.aw)); awn.position.set(0, 2.62, -0.6); awn.rotation.x = -Math.PI / 2 + 0.55; root.add(awn);
   // window signs: OPEN / COLD BEER / LOTTO / ATM (emissive neon-ish cards just inside the glass)
-  const card = (txt, fg, bg, x, y, w, h, glow = 1.4) => { const t = canvasTex(256, 96, (g, W, H) => { g.fillStyle = bg; g.fillRect(0, 0, W, H); g.fillStyle = fg; g.font = '800 54px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, W / 2, H / 2 + 2); });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: glow, transparent: true })); m.position.set(x, y, 0.13); m.rotation.y = Math.PI; root.add(m); };
+  const card = (txt, fg, bg, x, y, w, h, glow = 1.4) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), KT.card(txt, fg, bg, glow)); m.position.set(x, y, 0.13); m.rotation.y = Math.PI; root.add(m); };
   if (ru) {
     card('ОТКРЫТО', '#ff3b3b', '#120404', -2.6, 2.1, 0.9, 0.34, 2.2); card('КВАС · KVASS', '#e8c24a', '#1a1204', -2.0, 1.5, 1.4, 0.42, 1.6); card('ИКРА · CAVIAR', '#ffffff', '#8a1020', 2.4, 2.2, 1.0, 0.34, 1.2); card('ПЕЛЬМЕНИ', '#1a1a1a', '#e8e2d0', 2.9, 1.35, 0.9, 0.3, 0.6);
     card('СВЕЖАЯ РЫБА · SMOKED FISH · ХЛЕБ', '#f2efe6', '#0f5a32', 1.9, 0.95, 1.9, 0.26, 0.5);
@@ -184,8 +217,9 @@ export function buildDeli(world, o) {
       for (let k = 0; k < 18; k++) { mt.makeTranslation(x - 0.2 + (k % 6) * 0.08, yb + 0.16 + Math.floor(k / 6) * 0.03 + Math.random() * 0.02, zc - 0.12 + Math.floor(k / 6) * 0.1); im.setMatrixAt(k, mt); } root.add(im); }
     cellBox(-3.75, -0.98, -1.85, -0.52, 0, 0.55); cellBox(1.25, -0.98, 3.15, -0.52, 0, 0.55);
   } else {
-    card('OPEN', '#ff3b3b', '#120404', -2.6, 2.1, 0.9, 0.34, 2.2); card('COLD BEER', '#3bd0ff', '#040a12', -2.0, 1.5, 1.4, 0.42, 2); card('LOTTO', '#ffd23b', '#1a1204', 2.4, 2.2, 0.9, 0.34, 1.6); card('ATM', '#ffffff', '#0a3a8a', 3.1, 1.3, 0.5, 0.3, 0.8);
-    card('HERO · COFFEE · BACON EGG & CHEESE', '#1a1a1a', '#f2efe6', 1.9, 0.95, 1.9, 0.26, 0.35);
+    const [c1, c2, c3, c4, strip] = st.cards;
+    card(c1, '#ff3b3b', '#120404', -2.6, 2.1, 0.9, 0.34, 2.2); card(c2, '#3bd0ff', '#040a12', -2.0, 1.5, 1.4, 0.42, 2); card(c3, '#ffd23b', '#1a1204', 2.4, 2.2, 0.9, 0.34, 1.6); card(c4, '#ffffff', '#0a3a8a', 3.1, 1.3, 0.5, 0.3, 0.8);
+    card(strip, '#1a1a1a', '#f2efe6', 1.9, 0.95, 1.9, 0.26, 0.35);
   }
   // counter (runs into the store along the right wall) with plexiglass, register, lotto machine, candy rack
   const cx0 = 1.9, cx1 = 2.6, cz0 = 1.1, cz1 = 4.2;
@@ -197,7 +231,7 @@ export function buildDeli(world, o) {
   box(M.frame, cx0 - 0.06, 0.15, cz0 + 0.25, cx0 - 0.02, 0.95, cz0 + 2.6);   // candy rack back panel
   for (let r = 0; r < 4; r++) for (let k = 0; k < 16; k++) box(PAL[(k * 5 + r * 3) % 8], cx0 - 0.3, 0.2 + r * 0.2, cz0 + 0.3 + k * 0.145, cx0 - 0.06, 0.29 + r * 0.2, cz0 + 0.41 + k * 0.145);
   // behind the counter: cigarette + liquor shelves on the right wall
-  for (let s = 0; s < 4; s++) { box(M.shelf, hx - 0.45, 1.15 + s * 0.4, 0.9, hx - 0.05, 1.18 + s * 0.4, 4.6); for (let k = 0; k < 14; k++) { const m = PAL[(k * 3 + s) % 8]; if (s < 2) box(m, hx - 0.4, 1.18 + s * 0.4, 1.0 + k * 0.25, hx - 0.12, 1.34 + s * 0.4, 1.2 + k * 0.25); else { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.3, 8), s === 2 ? new THREE.MeshStandardMaterial({ color: 0x6a3a10, roughness: 0.15 }) : new THREE.MeshStandardMaterial({ color: 0x2a4a1a, roughness: 0.15 })); b.position.set(hx - 0.25, 1.33 + s * 0.4, 1.05 + k * 0.25); root.add(b); } } }
+  for (let s = 0; s < 4; s++) { box(M.shelf, hx - 0.45, 1.15 + s * 0.4, 0.9, hx - 0.05, 1.18 + s * 0.4, 4.6); for (let k = 0; k < 14; k++) { const m = PAL[(k * 3 + s) % 8]; if (s < 2) box(m, hx - 0.4, 1.18 + s * 0.4, 1.0 + k * 0.25, hx - 0.12, 1.34 + s * 0.4, 1.2 + k * 0.25); else { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.3, 8), s === 2 ? KT.bottleA : KT.bottleB); b.position.set(hx - 0.25, 1.33 + s * 0.4, 1.05 + k * 0.25); root.add(b); } } }
   // aisles: two gondolas + a wall shelf of chips / cans
   const gondola = (x, z0, z1) => { box(M.shelf, x - 0.35, 0, z0, x + 0.35, 0.12, z1, true); box(M.shelf, x - 0.03, 0, z0, x + 0.03, 1.6, z1, true);
     for (let s = 0; s < 4; s++) for (const side of [-1, 1]) { box(M.shelf, x + side * 0.35 - (side > 0 ? 0.32 : 0), 0.3 + s * 0.38, z0, x + side * 0.35 + (side < 0 ? 0.32 : 0), 0.32 + s * 0.38, z1);
@@ -214,7 +248,7 @@ export function buildDeli(world, o) {
   const sammy = buildFigure({ avatar: o.avatar ?? (o.bun ? 'f09' : 'm20'), pose: 'sit', skin: o.skin ?? 0xb88760, hair: o.hair ?? 0x221c18, beard: false, shirt: o.shirt ?? 0x2f3d52, pants: 0x2b2b2e, belly: 0, slim: true, glasses: !!o.glasses, shortSleeve: false, bun: !!o.bun });   // thin, clean-shaven
   sammy.group.position.set(3.25, 0.32, 2.6); sammy.group.rotation.y = -Math.PI / 2; root.add(sammy.group);   // on a tall stool: head clears the counter
   box(M.frame, 3.12, 0, 2.47, 3.38, 0.82, 2.73);   // stool
-  const tag = nameTag(o.vendorName || 'SAMMY'); tag.position.set(0, 1.85, 0); sammy.group.add(tag);
+  const tag = nameTag(o.vendorName || 'SAMMY', o.tagColor); tag.position.set(0, 1.85, 0); sammy.group.add(tag);
   { const cat = new THREE.Group(); const fur = new THREE.MeshStandardMaterial({ color: 0xd08a3c, roughness: 0.95 });
     const e = (geo, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, fur); m.position.set(x, y, z); m.scale.set(sx, sy, sz); cat.add(m); };
     e(new THREE.SphereGeometry(0.13, 12, 8), 0, 0.09, 0, 1.6, 0.7, 1); e(new THREE.SphereGeometry(0.075, 10, 8), 0.2, 0.1, 0.03); e(new THREE.ConeGeometry(0.025, 0.05, 6), 0.21, 0.17, 0.0); e(new THREE.ConeGeometry(0.025, 0.05, 6), 0.21, 0.17, 0.06);
@@ -259,6 +293,20 @@ export function sammyTalk(vendorName = 'SAMMY', { cousin = false, extra = null }
     : question(cousin ? `Ahh, welcome, welcome! My cousin has the store in Coney Island — same family, same prices, same question. ` : `Ahh, my friend! Come in, come in, close the door, the cat gets out. `);
 }
 
+// ---- the other stores on the block: what they sell, how they talk ---------------------------------------------------------------
+const MENUS = {
+  bodega: { hi: ['What you need, boss?', 'Yo. Chopped cheese is fresh.', 'Close the door, the AC.'], items: [['chopped', 'Chopped cheese', 7], ['coffee', 'Coffee, light and sweet', 2], ['cigs', 'Pack of Newports', 12], ['tallboy', 'Tallboy', 3], ['bic', 'Lighter', 2]] },
+  pizza: { hi: ['Slice? Plain or pepperoni?', 'Fresh pie in two minutes.', 'Cash only, my friend.'], items: [['slice', 'Plain slice', 3], ['slice', 'Pepperoni slice', 4], ['knots', 'Garlic knots (6)', 4], ['kvass', 'Can of soda', 2]] },
+  chinese: { hi: ['Hello! What you want?', 'Number four very good today.', '你好 — order here, pick up there.'], items: [['dumplings', 'Pork dumplings (8)', 5], ['lomein', 'Chicken lo mein', 8], ['eggroll', 'Egg roll', 2], ['kvass', 'Can of soda', 2]] },
+  liquor: { hi: ['ID? …Nah, I\'m playing. What you need?', 'Henny\'s on sale.', 'Ice is in the back.'], items: [['nutcracker', 'Nutcracker (Henny mix)', 10], ['vodka', 'Shot of vodka', 4], ['forty', '40oz', 5], ['gin', 'Tanqueray', 9], ['bottle', 'Bottle of liquor', 15]] },
+};
+export function storeTalk(type, vendorName) {
+  const Mn = MENUS[type] || MENUS.bodega, pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const lines = { ok: 'Here you go. Have a good one.', broke: 'That\'s not enough, boss.', full: 'Your hands are full — eat that first.' };
+  const shop = () => ({ text: `${vendorName}: «${pick(Mn.hi)}»`, choices: [...Mn.items.map(([item, label, price]) => ({ label: `${label} — $${price}`, go: () => ({ text: `${vendorName}: «${sell(item, price, vendorName, lines)}»`, choices: [{ label: 'Something else', go: shop }, { label: 'Thanks', go: null }] }) })), { label: 'Just looking', go: null }] });
+  return () => shop();
+}
+
 /** Rasta dealer's talk (wsp / sbu): ten dollars a bag. */
 export function rastaTalk(vendorName = 'RAS') {
   return (K, again) => ({
@@ -275,7 +323,7 @@ export function rastaTalk(vendorName = 'RAS') {
  *  searching outward up to `reach` m along the frontage and back from it; on maps with a ground mask (world.maskSample) the
  *  store must stand on sidewalk / paving (never road or lawn) with a road just outside its door. Falls back to scanning the
  *  whole playable area. Returns { x, z, yaw } or null. */
-export function findDeliSpot(world, candidates, reach = 40, { exclude = [] } = {}) {
+export function findDeliSpot(world, candidates, reach = 40, { exclude = [], fallback = true } = {}) {
   const cols = world.ctx.colliders.filter((b) => !(b.max.y <= 1.6 && b.max.x - b.min.x < 5.2 && b.max.z - b.min.z < 5.2));   // parked cars move out of the way
   const V = world.maskSample;
   const out = (x, z) => exclude.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
@@ -299,8 +347,8 @@ export function findDeliSpot(world, candidates, reach = 40, { exclude = [] } = {
       if (clear(x, z, cand.yaw)) { bump(x, z, cand.yaw); return { x, z, yaw: cand.yaw }; }
     }
   }
-  // fallback: every valid frontage on the map, nearest to where friends meet wins
-  const B = world.W?.bounds; if (!B) return null; const [mx, , mz] = world.W.onlineStart || [0, 0, 0]; let best = null, bd = Infinity;
+  // fallback: every valid frontage on the map, nearest to where friends meet wins (slow: callers placing many stores skip it)
+  const B = world.W?.bounds; if (!B || !fallback) return null; const [mx, , mz] = world.W.onlineStart || [0, 0, 0]; let best = null, bd = Infinity;
   for (const yaw of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) for (let x = B.min.x + 10; x < B.max.x - 10; x += 2) for (let z = B.min.z + 10; z < B.max.z - 10; z += 2) {
     const d = Math.hypot(x - mx, z - mz); if (d < bd && clear(x, z, yaw)) { bd = d; best = { x, z, yaw }; } }
   if (best) bump(best.x, best.z, best.yaw);
