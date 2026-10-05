@@ -158,7 +158,7 @@ if (await pg.evaluate(() => !!window.__ctx.player.mounted && !window.__ctx.playe
 const jp = await pg.evaluate(() => window.__game.jetpack.packs()[0]);
 await pg.evaluate((j) => window.__game.teleport(j[0] + 0.6, j[1], j[2], 0, 0), jp); await pg.waitForTimeout(500); await grip();
 let jet = await pg.evaluate(() => window.__game.jetpack.state()); ok(jet.worn, 'grip by the jet pack straps it on', JSON.stringify(jet));
-await ctl('right', "updateButtonValue('a-button', 1)"); await pg.waitForTimeout(1500); jet = await pg.evaluate(() => window.__game.jetpack.state()); await ctl('right', "updateButtonValue('a-button', 0)");
+await ctl('right', "updateButtonValue('a-button', 1)"); await pg.waitForTimeout(2500); jet = await pg.evaluate(() => window.__game.jetpack.state()); await ctl('right', "updateButtonValue('a-button', 0)");
 ok(jet.y > 1.5, 'hold A: the jet pack flies', JSON.stringify(jet)); await pg.waitForTimeout(2500);
 await pg.evaluate(async () => { const { clickAt } = await import('/src/vr/mirror.js'); window.__vrQuickTest = clickAt; });
 await ctl('right', "updateButtonValue('thumbstick', 1)"); await pg.waitForTimeout(150); await ctl('right', "updateButtonValue('thumbstick', 0)"); await pg.waitForTimeout(400);

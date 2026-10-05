@@ -272,7 +272,7 @@ function update(dt) {
     R.canAlight = l.kind === 'dwell' && open > 0.8;
     const inp = ctx.input; let ix = 0, iy = 0;
     if (playing && inp && !R.drive) { if (inp.forward) iy += 1; if (inp.back) iy -= 1; if (inp.right) ix += 1; if (inp.left) ix -= 1; }
-    if (R.drive) { A.c = R.drive.dir > 0 ? 0 : NCAR - 1; A.lz = R.drive.dir > 0 ? CAB_Z : -CAB_Z; A.lx = CAB_X; }   // in the cab, at the controls
+    if (R.drive) { A.c = R.drive.dir > 0 ? 0 : NCAR - 1; A.lz = R.drive.dir > 0 ? CAB_Z : -CAB_Z; A.lx = R.drive.dir > 0 ? -CAB_X : CAB_X; }   // in the operator's cab (right-hand side facing the way you drive)
     const il = Math.hypot(ix, iy);
     if (il > 0) { const sp = (inp.sprint ? 3.4 : 2.2) * Math.min(dt, 0.05) / il;   // walking pace inside a car
       const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw);
@@ -290,7 +290,8 @@ function update(dt) {
       if (R.canAlight && !R.hintOff) { R.hintOff = true; K.toast(`${ctx.isTouch ? 'GET OFF' : 'F'} — get off at ${l.stop.name} (or walk out the open doors)`, 3200); }
       if (l.kind !== 'dwell') R.hintOff = false;
       // the front of the lead car: take the controls
-      const lead = l.kind === 'dwell' ? l.dir || 1 : Math.sign(l.b.s - l.a.s) || 1, cabEnd = (lead > 0 && A.c === 0 && A.lz > CAB_REACH) || (lead < 0 && A.c === NCAR - 1 && A.lz < -CAB_REACH);
+      // either end of the train has a cab: the front of the first car drives toward the head, the back of the last car the other way
+      const cabDir = A.c === 0 && A.lz > CAB_REACH ? 1 : A.c === NCAR - 1 && A.lz < -CAB_REACH ? -1 : 0, cabEnd = !!cabDir, lead = cabDir;
       R.cabHere = !R.drive && cabEnd;
       if (R.drive) driveKeys(inp, playing);
       else if (cabEnd && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); takeControls(lead); }
@@ -309,7 +310,8 @@ const BOARD_REACH = 9;
 // ---- driving a train: the master controller (a lever, power ↔ brake), the emergency brake, speed limits that trip you (like NYCT's
 // grade timers), doors only at a platform and only when stopped, no power with the doors open, bumper blocks at the ends. Your train
 // leaves the shared timetable on your screen only (everyone else keeps seeing the scheduled one).
-const CAB_Z = CAR / 2 - 1.15, CAB_X = 0.55, CAB_REACH = CAR / 2 - 3.6;
+// the operator's cab: the right-hand side of the very end of the lead car, facing down the track
+const CAB_Z = CAR / 2 - 0.85, CAB_X = 0.95, CAB_REACH = CAR / 2 - 3.6;
 const D_ACC = 1.2, D_BRK = 1.4, D_EMERG = 2.7, D_DRAG = 0.04, LIM_LINE = 18, LIM_SLOW = 6.7, LIM_TRIP = 2.2, LEVER_RATE = 1.6, BERTH = 5;
 const mph = (v) => Math.round(v * 2.237);
 function takeControls(dir) {

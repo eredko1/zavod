@@ -19,6 +19,7 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { hangkit as K } from '../world/hangkit.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
+const JET_DEAD = 0.03, JET_FULL = 0.15, JET_SMOOTH = 4;   // hand-lift throttle: 3 cm deadzone, full at +18 cm, ~0.25 s smoothing
 const HAND_LIFT = 0.05, POKE_NEAR = 0.16, PUNCH_V_HAND = 1.7, SLASH_V = 2.4, SLASH_V_HAND = 2.0;   // pinched left hand raised this far above where you pinched: jump / jet pack thrust
 const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.025, PINCH_OFF = 0.04, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
 // in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
@@ -169,7 +170,7 @@ export function update(dt, ctx) {
   // distance alone misses real pinches), or the fingertips close enough as a fallback
   for (const H of [LH, RH]) if (H) { const d = jointDist(H.hand, 'thumb-tip', 'index-finger-tip'); H.pinch = !!H.select || (H.pinch ? d < PINCH_OFF : d < PINCH_ON); }
   // the hand stick is in the frame you pinched in: keep the hand forward, turn your head, and you walk where you look
-  if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { if (!LH.stick0) { LH.stick0 = tip.position.clone(); LH.yaw0 = headYaw; } _v.subVectors(tip.position, LH.stick0); V.handLift = _v.y > HAND_LIFT; _v.applyAxisAngle(_up, -LH.yaw0); mx = clamp(_v.x / HAND_STICK, -1, 1); my = clamp(_v.z / HAND_STICK, -1, 1); } } else { LH.stick0 = null; V.handLift = false; } }
+  if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { if (!LH.stick0) { LH.stick0 = tip.position.clone(); LH.yaw0 = headYaw; } _v.subVectors(tip.position, LH.stick0); V.handLift = _v.y > HAND_LIFT; V.handLiftY = _v.y; _v.applyAxisAngle(_up, -LH.yaw0); mx = clamp(_v.x / HAND_STICK, -1, 1); my = clamp(_v.z / HAND_STICK, -1, 1); } } else { LH.stick0 = null; V.handLift = false; V.handLiftY = null; } }
   // movement: analog to the player, and the touch stick for cars (vehicles.js reads it as analog throttle / steer)
   const moving = Math.hypot(mx, my) > 0.05;
   inp.xrMove = playing && !V.ui && moving ? { x: mx, y: -my } : null;
@@ -186,7 +187,10 @@ export function update(dt, ctx) {
   // buttons → the game's own keys
   const keys = new Set();
   if (sprint && !V.ui) keys.add('ShiftLeft'); if (V.crouch && !V.ui) keys.add('KeyC');
-  if (btn(Rg, 4) || (V.handLift && !V.ui)) keys.add('Space');            // A (or lift the pinched left hand): jump / jet pack thrust / bike jump
+  // jet pack worn: a smooth throttle (lift height of the pinched left hand, or A ramping up) instead of the jump key
+  const jet = !!p?.jet && !p.mounted;
+  if (jet) { const want = V.ui ? 0 : LH?.pinch && V.handLiftY != null ? clamp((V.handLiftY - JET_DEAD) / JET_FULL, 0, 1) : btn(Rg, 4) ? 1 : 0; V.jetT = (V.jetT || 0) + (want - (V.jetT || 0)) * Math.min(1, dt * JET_SMOOTH); inp.jetThrottle = V.jetT; }
+  else { inp.jetThrottle = null; V.jetT = 0; if (btn(Rg, 4) || (V.handLift && !V.ui)) keys.add('Space'); }   // A (or lift the pinched left hand): jump / bike jump
   if (btn(Rg, 5)) keys.add('KeyR');             // B: reload
   if (btn(Rg, 1)) keys.add('KeyF');             // right grip: interact / talk / get in & out
   if (btn(Lg, 4)) keys.add('KeyB');             // X: use the last thing you bought (drink, smoke …)
