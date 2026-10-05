@@ -421,7 +421,7 @@ function isRig(o) { for (let p = o; p; p = p.parent) if (p === V.rig || p === V.
 // your gaze: point the gun hand at it and pinch / pull the trigger, or poke it. With controllers the right grip still works.
 function actionButton(ctx, R, press) {
   const A = V.act || (V.act = mkAction()), p = ctx.player, veh = p?.mounted && !p.mounted.dialog && p.mounted.spec;
-  const label = (ctx.interactPrompt || '').replace(/^F\s*[—-]\s*/, '').split('  ·')[0] || (veh ? 'GET OUT' : ctx.vehicles?.nearBike ? 'GET ON' : '');
+  const label = (ctx.interactPrompt || '').replace(/^F\s*[—-]\s*/, '').split('  ·')[0] || ctx.actionLabel || (veh ? 'GET OUT' : ctx.vehicles?.nearBike ? 'GET ON' : '');   // actionLabel: the subway's DRIVE / OPEN DOORS / GET OFF
   A.mesh.visible = !!label && !V.ui && ctx.state === 'playing'; V.overAction = false;
   if (!A.mesh.visible) { A.prev = press; return; }
   if (label !== A.label) { A.label = label; A.draw(label); }

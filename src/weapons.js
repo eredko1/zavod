@@ -513,7 +513,7 @@ export function update(dt, ctx) {
       } else startSwap(1 - S.cur);
     }
     if (input.consume('KeyV') && !S.swap && !S.throwing && S.time - (S.stabT ?? -9) > 0.6) quickStab();   // V: stab / jab whatever's in front of you, any weapon
-    if (input.consume('KeyR')) startReload();
+    if (!ctx.trainCab && input.consume('KeyR')) startReload();   // in a train cab R changes ends (coney/subway.js)
     if (input.consume('KeyG')) startThrow();
     if ((!ctx.ai?.nearPickup && !ctx.vehicles?.nearBike && !ctx.interactNear && input.consume('KeyF'))) startInspect();   // interactNear: a map interaction (hangout) owns F
     const trig = !!input.fire; if (trig && !S.triggerHeld) S.triggerPressed = true; if (!trig) S.dryLatch = false; S.triggerHeld = trig;
