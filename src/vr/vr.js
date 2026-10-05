@@ -18,7 +18,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
-const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.018, PINCH_OFF = 0.032, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
+const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.025, PINCH_OFF = 0.04, PUNCH_V = 2.1, PUNCH_GAP = 0.28, HAND_STICK = 0.07;
 // in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
 // over the dashboard
 const SEAT_UI_DIST = 0.95, SEAT_HUD_DIST = 0.65, UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
@@ -117,8 +117,11 @@ function begin(session) {
   V.raf0 = window.requestAnimationFrame; V.caf0 = window.cancelAnimationFrame; V.rafQ = new Map(); V.rafId = 1e6;
   window.requestAnimationFrame = (cb) => { const id = ++V.rafId, e = { t0: performance.now(), rid: 0, run: (t) => { if (!V.rafQ?.delete(id) && V.rafQ) return; V.caf0.call(window, e.rid); cb(t); } }; e.rid = V.raf0.call(window, e.run); V.rafQ.set(id, e); return id; };
   window.cancelAnimationFrame = (id) => { const e = V.rafQ?.get(id); if (e) { V.rafQ.delete(id); V.caf0.call(window, e.rid); } else V.caf0.call(window, id); };
-  session.addEventListener('visibilitychange', () => { if (session.visibilityState !== 'visible' && ctx.state === 'playing') ctx.setState('paused'); });
+  // the Quest's own menu (Meta button) pauses the game; coming back resumes it (if that's what paused it), no 2D menu to fight with
+  session.addEventListener('visibilitychange', () => { if (session.visibilityState !== 'visible') { if (ctx.state === 'playing') { ctx.setState('paused'); V.sysPaused = true; } } else if (V.sysPaused) { V.sysPaused = false; if (ctx.state === 'paused') ctx.setState('playing'); } });
   session.addEventListener('end', end);
+  const sel = (on) => (e) => { for (const H of Object.values(V.hands)) if (H.src === e.inputSource) H.select = on; };
+  session.addEventListener('selectstart', sel(true)); session.addEventListener('selectend', sel(false));
   document.body.classList.add('xr-on');
   if (ctx.state === 'paused' && !V.granted) ctx.setState('playing');
   V.granted = false;
@@ -158,7 +161,9 @@ export function update(dt, ctx) {
   if (Lg) { mx = ax(Lg, 2); my = ax(Lg, 3); }
   // hands: a left pinch is a joystick (pinch, then move the hand the way you want to go)
   const LH = L?.src?.hand ? L : null, RH = R?.src?.hand ? R : null;
-  for (const H of [LH, RH]) if (H) { const d = jointDist(H.hand, 'thumb-tip', 'index-finger-tip'); H.pinch = H.pinch ? d < PINCH_OFF : d < PINCH_ON; }
+  // a pinch: the headset's own select (what the Quest system UI uses; fingertip joint centres stay ~2 cm apart even when touching, so
+  // distance alone misses real pinches), or the fingertips close enough as a fallback
+  for (const H of [LH, RH]) if (H) { const d = jointDist(H.hand, 'thumb-tip', 'index-finger-tip'); H.pinch = !!H.select || (H.pinch ? d < PINCH_OFF : d < PINCH_ON); }
   if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { if (!LH.stick0) LH.stick0 = tip.position.clone(); _v.subVectors(tip.position, LH.stick0).applyAxisAngle(_up, -headYaw); mx = clamp(_v.x / HAND_STICK, -1, 1); my = clamp(_v.z / HAND_STICK, -1, 1); } } else LH.stick0 = null; }
   // movement: analog to the player, and the touch stick for cars (vehicles.js reads it as analog throttle / steer)
   const moving = Math.hypot(mx, my) > 0.05;
@@ -288,7 +293,8 @@ function wristUpdate(ctx) {
   const hand = L?.src?.hand ? L.hand : null; if (!hand) { W.mesh.visible = W.shown = false; return; }
   const wr = hand.joints['wrist'], mid = hand.joints['middle-finger-metacarpal']; if (!wr || !mid) return;
   if (W.mesh.parent !== wr) wr.add(W.mesh);
-  W.mesh.position.set(0, -0.045, -0.05); W.mesh.rotation.set(Math.PI / 2, 0, 0);   // above the palm (a joint's -Y is out of the palm)
+  // just off the palm (a joint's -Y points out of the palm), turned to face your eyes, upright: readable on either hand
+  W.mesh.position.set(0, -0.06, -0.04); W.mesh.lookAt(V.cam.getWorldPosition(_v2));
   // shown when the palm faces your eyes
   wr.updateMatrixWorld(); _v.set(0, -1, 0).transformDirection(wr.matrixWorld); _v2.setFromMatrixPosition(wr.matrixWorld); const eye = V.cam.getWorldPosition(new THREE.Vector3()).sub(_v2).normalize();
   W.shown = _v.dot(eye) > 0.55; W.mesh.visible = W.shown;
