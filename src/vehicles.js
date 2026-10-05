@@ -513,6 +513,7 @@ function applyView(dt) {
   const seatY = sp.car ? 0.3 : 0.47;
   p.position.set(bike.pos.x + _r.x * (leanS * 0.4 + (sp.car ? sp.eyeSide : 0)), bike.pos.y + seatY + bike.susp, bike.pos.z + _r.z * (leanS * 0.4 + (sp.car ? sp.eyeSide : 0)));
   p.velocity.set(0, 0, 0); p.onGround = true; p.height = 1.7;
+  if (C.xr?.presenting && S.chase) setChase(false);   // VR: you ARE the rider (the chase cam's rider model sat around your head)
   if (bike.rider) bike.rider.visible = S.chase;
   showViewmodel(!S.chase);
   if (S.chase) return applyChase(bike, dt);
