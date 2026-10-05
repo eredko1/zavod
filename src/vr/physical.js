@@ -7,16 +7,19 @@
 //  · elevators: a glowing call button by each elevator door; poke it (fingertip or the controller's tip) to call the car.
 //  · fist fights: both fists up in front of your face block (player.guard: damage taken ×GUARD_K); punches can land from any
 //    direction away from you (hooks, uppercuts), harder the faster they are (ctx.xrPunchK).
+//  · darts: at the oche (darts.js's ctx.darts) a dart sits in your gun hand; hold the trigger (or pinch), swing and let go. It flies with
+//    your hand's speed under (softened) gravity and scores where it meets the board on the wall.
 import * as THREE from 'three';
 
 const GRAB_WHEEL = 0.3, GRAB_BARS = 0.2, WHEEL_TURN = 2.6, BARS_TURN = 0.55, PUSH_DEAD = 0.03, PUSH_FULL = 0.1;
 const MOUTH_R = 0.12, USE_SHOW_S = 1.4, SMOKE_SHOW_S = 8;
 const GUARD_R = 0.38, GUARD_K = 0.35, BUTTON_R = 0.07, BUTTON_NEAR = 12;
+const DART_G = 9.81 * 0.6, DART_VK = 1.1, DART_MIN_V = 1.2, DART_EMA = 0.45, STUCK_KEEP_S = 2.5;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
 
 export function createPhysical(host) {
   const { V } = host;
-  const P = { wheel: null, hold, xButton, update, guard: false, buttons: null, qa: () => ({ wheel: P.wheel ? { kind: P.wheel.kind, hands: P.wheel.hands.length, angle: +P.wheel.angle.toFixed(3), steer: +(host.ctx.input.xrSteer ?? 0).toFixed(3), thr: +(host.ctx.input.xrThrottle ?? 0).toFixed(3) } : null, held: V.held?.item || null, guard: P.guard, buttons: P.buttons?.length || 0 }) };
+  const P = { wheel: null, hold, xButton, update, guard: false, buttons: null, qa: () => ({ wheel: P.wheel ? { kind: P.wheel.kind, hands: P.wheel.hands.length, angle: +P.wheel.angle.toFixed(3), steer: +(host.ctx.input.xrSteer ?? 0).toFixed(3), thr: +(host.ctx.input.xrThrottle ?? 0).toFixed(3) } : null, held: V.held?.item || null, guard: P.guard, buttons: P.buttons?.length || 0, darts: !!V.darts, dartReady: !!P.dart?.hand.visible, lastDart: P.lastDart || null }) };
 
   // ---- the wheel / the bars ---------------------------------------------------------------------------------------------------
   /** the thing you steer, for the vehicle you're driving: a car's wheel (rotates about its own X), or the bars (the fork turns about Y) */
@@ -132,8 +135,54 @@ export function createPhysical(host) {
     if (p) p.guard = P.guard ? GUARD_K : 0;
   }
 
+  // ---- darts --------------------------------------------------------------------------------------------------------------------
+  function dartMesh() {
+    const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, metalness: 0.8, roughness: 0.3 }), f = new THREE.MeshStandardMaterial({ color: 0xe03a2a, side: THREE.DoubleSide });
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.05, 8), m); barrel.rotation.x = Math.PI / 2; g.add(barrel);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.0015, 0.03, 6), m); tip.rotation.x = -Math.PI / 2; tip.position.z = -0.04; g.add(tip);
+    for (let i = 0; i < 2; i++) { const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.018, 0.03), f); fl.position.z = 0.04; fl.rotation.set(Math.PI / 2, i * Math.PI / 2, 0); g.add(fl); }
+    return g;
+  }
+  function darts(ctx, dt) {
+    const A = ctx.darts, Dt = P.dart || (P.dart = { hand: dartMesh(), held: false, v: new THREE.Vector3(), prev: null, fly: [], stuck: [] });
+    const on = !!A?.vr?.(); V.darts = on;
+    const M = host.mainHand(), holder = M ? (M.src?.hand ? M.hand.joints['wrist'] : M.grip) : null;
+    const ready = on && A.myTurn() && !!holder && !Dt.fly.length;
+    if (ready && Dt.hand.parent !== holder) { holder.add(Dt.hand); if (M.src?.hand) Dt.hand.position.set(0, -0.02, -0.09); else Dt.hand.position.set(0, 0.0, -0.06); Dt.hand.rotation.set(0, 0, 0); }
+    Dt.hand.visible = ready;
+    const pressed = !!M && (M.src?.hand ? !!M.pinch : !!M.src?.gamepad?.buttons?.[0]?.pressed);
+    // the dart's world velocity, smoothed (the release frame alone is noisy)
+    if (ready) { const w = Dt.hand.getWorldPosition(new THREE.Vector3()); if (Dt.prev && dt > 0) Dt.v.lerp(_v.subVectors(w, Dt.prev).divideScalar(dt), DART_EMA); Dt.prev = w; } else { Dt.prev = null; Dt.v.set(0, 0, 0); }
+    if (on && !A.myTurn() && pressed && !Dt.pressPrev) A.go?.();
+    if (ready && pressed && !Dt.pressPrev) Dt.held = true;
+    if (Dt.held && !pressed) { Dt.held = false; if (ready) throwDart(ctx, A, Dt, M); }
+    if (!ready) Dt.held = false;
+    Dt.pressPrev = pressed;
+    // darts in the air, then in the board
+    for (const f of Dt.fly) { f.t += dt; const t = Math.min(f.t, f.T); f.mesh.position.copy(f.p0).addScaledVector(f.v, t); f.mesh.position.y -= 0.5 * DART_G * t * t;
+      _v.copy(f.v); _v.y -= DART_G * t; f.mesh.lookAt(_v2.copy(f.mesh.position).sub(_v)); if (f.t >= f.T && !f.done) { f.done = true; host.pulse(f.H, 0.3, 20); } }
+    for (let i = Dt.fly.length - 1; i >= 0; i--) if (Dt.fly[i].done) { Dt.stuck.push({ mesh: Dt.fly[i].mesh, t: 0 }); Dt.fly.splice(i, 1); }
+    const turn = A?.turn?.() ?? -1; if (turn !== Dt.turn) { Dt.turn = turn; for (const s of Dt.stuck) s.t = s.t || 1e-6; }
+    for (let i = Dt.stuck.length - 1; i >= 0; i--) { const s = Dt.stuck[i]; if (s.t > 0 || !on) { s.t += dt; if (s.t > STUCK_KEEP_S || !on) { s.mesh.parent?.remove(s.mesh); Dt.stuck.splice(i, 1); } } }
+  }
+  /** let go: where does it meet the board's plane (with gravity), and what's that on the board */
+  function throwDart(ctx, A, Dt, H) {
+    const B = A.board(); if (!B) return; const v = Dt.v.clone().multiplyScalar(DART_VK), p0 = Dt.hand.getWorldPosition(new THREE.Vector3());
+    const n = new THREE.Vector3().crossVectors(B.right, B.up).normalize();   // out of the board, towards the thrower
+    const toward = -v.dot(n), d = _v.subVectors(p0, B.c).dot(n);
+    if (v.length() < DART_MIN_V || toward <= 0.3 || d <= 0) { ctx.hud?.toast?.('Throw it at the board: a quick swing forward and let go', 1600); return; }
+    const T = d / toward, hit = p0.clone().addScaledVector(v, T); hit.y -= 0.5 * DART_G * T * T;
+    _v.subVectors(hit, B.c); const x = _v.dot(B.right) / B.r1, y = _v.dot(B.up) / B.r1;
+    if (!A.throwAt(x, y)) return;
+    host.pulse(H, 0.5, 30);
+    const mesh = Dt.hand.clone(); mesh.visible = true; ctx.scene.add(mesh); mesh.position.copy(p0);
+    Dt.fly.push({ mesh, p0, v, T: Math.min(T, 2), t: 0, H });
+    P.lastDart = { x: +x.toFixed(3), y: +y.toFixed(3), v: +v.length().toFixed(2), T: +T.toFixed(2) };
+  }
+
   function update(ctx, dt) {
     if (ctx.state !== 'playing') return;
+    darts(ctx, dt);
     steer(ctx, dt); heldUpdate(ctx, dt); guard(ctx);
     try { buttons(ctx); } catch (e) { console.warn('[vr] call buttons', e); P.buttons = P.buttons || []; }
   }

@@ -168,7 +168,8 @@ export function update(dt, ctx) {
   const pose = frame.getViewerPose(ref); if (pose) { const t = pose.transform; V.head.set(t.position.x, t.position.y, t.position.z); V.headQ.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w); if (!V.seatH0 && V.head.y > 0.3) V.seatH0 = V.head.y; }
   _e.setFromQuaternion(V.headQ, 'YXZ'); const headYaw = _e.y, headPitch = _e.x;
   const inp = ctx.input, p = ctx.player, playing = ctx.state === 'playing';
-  V.ui = ctx.state !== 'playing' || V.uiHold || V.quick || !!p?.mounted?.dialog || !!ctx.durakOpen;
+  const vrDarts = !!ctx.darts?.vr?.();   // at the oche in VR: real darts, not a 2D board on the panel (physical.js)
+  V.ui = ctx.state !== 'playing' || (V.uiHold && !vrDarts) || V.quick || !!p?.mounted?.dialog || (!!ctx.durakOpen && !vrDarts);
   // ---- gamepads ----
   // left-handed: the hands swap jobs (gun + turn stick on the left, move stick + bag on the right)
   // any make of controller reads the same (pad.js: Quest, PSVR2 / Index / WMR on a PC, Vive wands); tracked hands expose a gamepad too
@@ -236,7 +237,7 @@ export function update(dt, ctx) {
   if (held && gesture === 'gun' && V.poseDone !== V.poseT) { V.poseDone = V.poseT; drawGun(ctx); pulse(RH, 0.3, 30); }
   if (held && gesture === 'fist' && V.poseDone !== V.poseT && !V.holsterUsed && !V.wheelR && ctx.weapons?.currentId !== 'fists' && !ctx.weapons?.spec?.melee) { V.poseDone = V.poseT; ctx.weapons?.fists?.(); }
   // never fire while a menu is up, the palm menu is showing (you're about to poke it), your finger is near it, or you're pointing at the action button
-  const guard = V.ui || V.tabletBusy || (V.wrist.shown && !!offHand()?.src?.hand) || V.overAction || pokeNear() || V.wheelR;
+  const guard = V.ui || V.tabletBusy || (V.wrist.shown && !!offHand()?.src?.hand) || V.overAction || pokeNear() || V.wheelR || V.darts;
   fire = !guard && (Rp.trig || !!RH?.pinch);
   actionButton(ctx, R, !!(Rp.trig || RH?.pinch));
   // the hands' velocities (in the rig: your own motion, not the train's) for punches

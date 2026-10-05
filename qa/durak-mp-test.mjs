@@ -10,7 +10,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const errs = [];
 const mk = async (n, w = 700, h = 420) => { const p = await b.newPage({ viewport: { width: w, height: h } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message));
   await p.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-  await p.goto(`http://localhost:8790/?qa=1&mp=1&room=${room}&map=coney&ai=0&time=day&name=${n}`, { timeout: 150000 });
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&mp=1&room=${room}&map=coney&ai=0&time=day&name=${n}`, { timeout: 150000 });
   await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected && window.__game.durakMP && window.__game.hangout?.arkady(), null, { timeout: 150000 }); return p; };
 const A = await mk('ALPHA'), B = await mk('BRAVO', 390, 760);   // B on a phone-width screen: 3 seats must fit 390px
 await A.waitForFunction(() => window.__ctx.net.list().length >= 1, null, { timeout: 30000 }); await B.waitForFunction(() => window.__ctx.net.list().length >= 1, null, { timeout: 30000 });

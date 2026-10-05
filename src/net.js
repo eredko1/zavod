@@ -81,7 +81,7 @@ export async function init(ctx) {
   name = name || 'OP-' + id.slice(0, 4).toUpperCase();
   const base = `${PROTO}/${map}/${room}${ctx.mode ? '.' + ctx.mode : ''}/`;   // chill-mode players get their own room (no mercs from a waves host)
   const pick = (qs.get('brokers') || '').split(',').map((v) => parseInt(v, 10)).filter((v) => v >= 0 && v < ALL_BROKERS.length);
-  S = { ctx, mqtt: null, id, inst: rid(), room, name, map, base, brokers: pick.length ? pick.map((i) => ALL_BROKERS[i]) : ALL_BROKERS,
+  S = { ctx, mqtt: null, id, inst: rid(), room, name, map, base, fault: faultOf(qs.get('netfault')), brokers: pick.length ? pick.map((i) => ALL_BROKERS[i]) : ALL_BROKERS,
     links: [], peers: new Map(), score: new Map(), stolen: new Set(), buckets: new Map(), dedupe: new Map(), disp: new Map(), outbox: [],
     seq: 0, sseq: 0, lastSend: 0, lastSync: 0, everUp: false, hiddenAt: 0, lastAttacker: null, protectT: PROTECT, respawnT: -1, tab: false, board: false };
   S.score.set(id, { name, k: 0, d: 0, gone: false });
@@ -129,7 +129,7 @@ function api() {
     scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
     send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'gunoffer', 'gunpaid', 'shroompaid', 'dk', 'folk', 'juke', 'dt'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
     qaPeers: () => [...S.peers.values()].map((p) => ({ veh: p.veh?.k || null, riderVisible: !!p.inst.group.visible, y: +p.inst.group.position.y.toFixed(2) })),
-    peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk } : null; },
+    peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk, seen: p.seen } : null; },
     list: () => [...S.peers.keys()],
     stolen: () => [...S.stolen].sort((a, b) => a - b),
     links: () => S.links.map((L) => ({ url: L.url, up: L.up, rtt: Math.round(L.rtt || 0), tries: L.tries })),
@@ -247,7 +247,23 @@ function fresh(key, q) {
   if (d.set.size > 500) for (const v of d.set) if (v < d.max - 400) d.set.delete(v);
   return true;
 }
+/** QA: ?netfault=loss=0.3,delay=800,dup=0.2 drops / delays (so reorders) / duplicates incoming messages, each copy on its own:
+ * the pressure tests (qa/durak-stress-test.mjs, qa/darts-mp-test.mjs) play through a bad phone connection with it */
+function faultOf(v) {
+  if (!v) return null; const o = { loss: 0, delay: 0, dup: 0 };
+  for (const kv of String(v).split(',')) { const [k, x] = kv.split('='); if (k in o && Number.isFinite(+x)) o[k] = Math.max(0, +x); }
+  console.log('[net] fault injection', JSON.stringify(o)); return o;
+}
 function onRaw(L, topic, buf) {
+  const F = S?.fault;
+  if (F && !buf?.__f) {
+    L.lastRx = performance.now();   // the link itself is alive (the watchdog isn't what's being tested)
+    if (Math.random() < F.loss) return;
+    const go = () => { const b = buf; b.__f = 1; onRaw(L, topic, b); };
+    if (F.delay) setTimeout(go, Math.random() * F.delay); else go();
+    if (Math.random() < F.dup) setTimeout(go, Math.random() * (F.delay || 50));
+    return;
+  }
   const now = performance.now(); L.lastRx = now;
   if (!S || !buf || buf.length > MAX_MSG) return;
   let m; try { m = JSON.parse(buf.toString()); } catch { return; }
