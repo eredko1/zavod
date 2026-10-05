@@ -16,7 +16,10 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
-import { hangkit as K } from '../world/hangkit.js';
+import { hangkit as K, ITEMS } from '../world/hangkit.js';
+import { read as readPad, NO_PAD } from './pad.js';
+import { createTablet } from './tablet.js';
+import { createPhysical } from './physical.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
 const JET_DEAD = 0.03, JET_FULL = 0.15, JET_SMOOTH = 4;   // hand-lift throttle: 3 cm deadzone, full at +18 cm, ~0.25 s smoothing
@@ -30,10 +33,12 @@ const PREF_KEY = 'zavod.vr';
 const SMOOTH_TURN = 2.1;   // rad/s at full stick (~120°/s)
 const PALM_BACK = 0.07, PALM_FWD = 0.07;
 const FINGER_OUT = 0.07, FINGER_CURLED = 0.055, POSE_HOLD = 0.2;   // hand-pose gestures (m, s)   // the model's wrist sits this far behind your palm; a tracked hand's palm is this far ahead of its wrist
+const GRIP_OUT = 0.4;   // s: the right grip held off the wheel to get out of a vehicle
 const ACT_DIST = 0.55, ACT_DROP = 0.38, WATCH_HZ = 4, SIGHT_FAR = 80;
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
+let T = null, P = null;   // the wrist tablet (tablet.js), hands-on actions (physical.js)
 const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, eye: EYE_DEFAULT, ...load() };
 function load() { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch { return {}; } }
 function save() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }
@@ -62,7 +67,9 @@ export async function init(ctx) {
     H.laser = laser(); ray.add(H.laser.line, H.laser.dot); V['h' + i] = H;
   }
   V.panel = null;   // see ensurePanel()
-  V.wrist = wristMenu(); V.vig = vignette(); V.cam.add(V.vig);
+  V.wrist = { shown: false }; V.vig = vignette(); V.cam.add(V.vig);
+  const host = { V, prefs, ctx, K, ITEMS, save, tap, key, pulse, quick, mainHand, offHand, handPose, jointDist, handPos, tipOf, get P() { return P; } };
+  T = createTablet(host); P = createPhysical(host);
   // the overlays that need a mouse release pointer lock on desktop: that's our "a 2D screen is up" signal, whatever screen it is
   const exitPL = document.exitPointerLock?.bind(document); document.exitPointerLock = () => { if (V.presenting && ctx.state === 'playing') V.uiHold = true; try { exitPL?.(); } catch {} };
   const reqPL = ctx.requestPointerLock; ctx.requestPointerLock = () => { V.uiHold = false; if (!V.presenting) reqPL?.(); };
@@ -131,6 +138,7 @@ function begin(session) {
   document.body.classList.add('xr-on'); ensureXrCss();
   if (ctx.state === 'paused' && !V.granted) ctx.setState('playing');
   V.granted = false;
+  if (!prefs.tut) T.tutorial(true);   // first time in VR: the walk-through
   console.log('[vr] session started');
 }
 
@@ -143,6 +151,7 @@ function end() {
   if (V.shadows0) ctx.bus.emit('setting', { key: 'shadows', value: true });
   if (V.raf0) { window.requestAnimationFrame = V.raf0; window.cancelAnimationFrame = V.caf0; V.rafQ = null; V.raf0 = null; }   // pending callbacks are still queued with the browser
   if (V.sight) V.sight.dot.visible = V.sight.beam.visible = false; if (V.act) V.act.mesh.visible = false;
+  P.end(ctx); T.toggle(false); T.tutorial(false);
   V.crouch = false; V.sprintLatch = false; V.rigY = null; V.turnRate = 0; if (V.quick) quick(ctx, false); if (V.tabOn) { key('Tab', false); V.tabOn = false; }
   releaseKeys(); const inp = ctx.input; inp.xrMove = null; inp.touch.axis.x = inp.touch.axis.y = 0; inp.touch.fire = false;
   V.panel.visible = false; document.body.classList.remove('xr-on'); uncullAll(); raycastSeesCulled(false); for (const l of V.lightsOff || []) l.visible = true; V.lightsOff = null;
@@ -162,10 +171,11 @@ export function update(dt, ctx) {
   V.ui = ctx.state !== 'playing' || V.uiHold || V.quick || !!p?.mounted?.dialog || !!ctx.durakOpen;
   // ---- gamepads ----
   // left-handed: the hands swap jobs (gun + turn stick on the left, move stick + bag on the right)
-  const L = offHand(), R = mainHand(), Lg = L?.src?.hand ? null : L?.src?.gamepad, Rg = R?.src?.hand ? null : R?.src?.gamepad;   // tracked hands expose a gamepad too (button 0 = pinch): read hands as hands
-  const btn = (g, i) => !!g?.buttons?.[i]?.pressed, ax = (g, i) => { const v = g?.axes?.[i] || 0; return Math.abs(v) < DEAD ? 0 : v; };
-  let mx = 0, my = 0, fire = false, sprint = false;
-  if (Lg) { mx = ax(Lg, 2); my = ax(Lg, 3); }
+  // any make of controller reads the same (pad.js: Quest, PSVR2 / Index / WMR on a PC, Vive wands); tracked hands expose a gamepad too
+  // (button 0 = pinch): read hands as hands
+  const L = offHand(), R = mainHand(), Lp = L && !L.src?.hand ? readPad(L.src, 'move') : NO_PAD, Rp = R && !R.src?.hand ? readPad(R.src, 'turn') : NO_PAD;
+  V.Lp = Lp; V.Rp = Rp;
+  let mx = Lp.x, my = Lp.y, fire = false, sprint = false;
   // hands: a left pinch is a joystick (pinch, then move the hand the way you want to go)
   const LH = L?.src?.hand ? L : null, RH = R?.src?.hand ? R : null;
   // a pinch: the headset's own select (what the Quest system UI uses; fingertip joint centres stay ~2 cm apart even when touching, so
@@ -177,10 +187,12 @@ export function update(dt, ctx) {
   const moving = Math.hypot(mx, my) > 0.05;
   inp.xrMove = playing && !V.ui && moving ? { x: mx, y: -my } : null;
   inp.touch.axis.x = playing && !V.ui ? mx : 0; inp.touch.axis.y = playing && !V.ui ? my : 0;
-  // sprint: click the left stick (latched until you let go of the stick) or hold the left trigger (also nitro in a car)
-  if (btn(Lg, 3)) V.sprintLatch = true; if (!moving) V.sprintLatch = false; sprint = V.sprintLatch || btn(Lg, 0);
+  // sprint: click the left stick while moving (latched until you let go of the stick) or hold the left trigger (also nitro in a car).
+  // Controllers without face buttons: the left stick clicked standing still opens the tablet instead
+  const tabletClick = Lp.menu || (!Lp.face && Lp.stickClick && !moving);
+  if (Lp.stickClick && moving) V.sprintLatch = true; if (!moving) V.sprintLatch = false; sprint = V.sprintLatch || Lp.trig;
   // snap turn on the right stick (crouch: pull it down)
-  const rx = ax(Rg, 2), ry = ax(Rg, 3);
+  const rx = Rp.x, ry = Rp.y;
   if (V.ui || !prefs.smooth) V.turnRate = 0;
   if (!V.ui) { if (prefs.smooth) { V.turnRate = Math.abs(rx) > 0.2 ? -Math.sign(rx) * (Math.abs(rx) - 0.2) / 0.8 * SMOOTH_TURN : 0; V.turn += V.turnRate * dt; }
     else { if (Math.abs(rx) > 0.7 && !V.snapLatch) { V.snapLatch = true; V.turn -= Math.sign(rx) * prefs.snap * Math.PI / 180; V.vigKick = 1; } if (Math.abs(rx) < 0.3) V.snapLatch = false; }
@@ -190,34 +202,43 @@ export function update(dt, ctx) {
   const keys = new Set();
   if (sprint && !V.ui) keys.add('ShiftLeft'); if (V.crouch && !V.ui) keys.add('KeyC');
   // jet pack worn: a smooth throttle (lift height of the pinched left hand, or A ramping up) instead of the jump key
-  const jet = !!p?.jet && !p.mounted;
-  if (jet) { const want = V.ui ? 0 : LH?.pinch && V.handLiftY != null ? clamp((V.handLiftY - JET_DEAD) / JET_FULL, 0, 1) : btn(Rg, 4) ? 1 : 0; V.jetT = (V.jetT || 0) + (want - (V.jetT || 0)) * Math.min(1, dt * JET_SMOOTH); inp.jetThrottle = V.jetT; }
-  else { inp.jetThrottle = null; V.jetT = 0; if (btn(Rg, 4) || (V.handLift && !V.ui)) keys.add('Space'); }   // A (or lift the pinched left hand): jump / bike jump
-  if (btn(Rg, 5)) keys.add('KeyR');             // B: reload
+  const jet = !!p?.jet && !p.mounted, jumpBtn = Rp.a || (!Rp.face && Rp.stickClick);   // no A button: the right stick click jumps
+  if (jet) { const want = V.ui ? 0 : LH?.pinch && V.handLiftY != null ? clamp((V.handLiftY - JET_DEAD) / JET_FULL, 0, 1) : jumpBtn ? 1 : 0; V.jetT = (V.jetT || 0) + (want - (V.jetT || 0)) * Math.min(1, dt * JET_SMOOTH); inp.jetThrottle = V.jetT; }
+  else { inp.jetThrottle = null; V.jetT = 0; if (jumpBtn || (V.handLift && !V.ui)) keys.add('Space'); }   // A (or lift the pinched left hand): jump / bike jump
+  if (Rp.b) keys.add('KeyR');             // B: reload
   // holsters on your body (hip: pistol, over the right shoulder: rifle, chest: knife): squeeze the grip / close the hand there to draw
   // (squeeze at the hip with a gun out to put it away); anywhere else the right grip is F (interact / talk / get in & out)
-  const grab = !!(btn(Rg, 1) || (RH && handPose(RH.hand) === 'fist')), at = playing && !V.ui ? holsterAt(R) : null; V.nearHolster = at;
+  P.update(ctx, dt);   // the wheel, things in your hand, call buttons, blocking (before the grips turn into keys)
+  const grab = !!(Rp.grip || (RH && handPose(RH.hand) === 'fist')), at = playing && !V.ui && !V.wheelR ? holsterAt(R) : null; V.nearHolster = at;
   if (grab && !V.grabPrev && at) { V.holsterUsed = true; holsterDraw(ctx, at); pulse(R, 0.5, 40); }
   if (!grab) V.holsterUsed = false;
-  if (btn(Rg, 1) && !V.holsterUsed) keys.add('KeyF');
+  // in a vehicle the right grip also takes the wheel: getting out is a 0.4 s hold off the wheel (or the action button)
+  const seated = !!(p?.mounted && !p.mounted.dialog && p.mounted.spec); V.gripT = Rp.grip && !V.wheelR ? (V.gripT || 0) + dt : 0;
+  // one F per squeeze, held until you let go (getting in mustn't turn into getting out when the seat check flips mid-squeeze)
+  if (!Rp.grip) V.gripF = false; else if (!V.gripF && !V.holsterUsed && !V.wheelR && (!seated || V.gripT > GRIP_OUT)) V.gripF = true;
+  if (V.gripF) keys.add('KeyF');
   V.grabPrev = grab;
-  if (btn(Lg, 4)) keys.add('KeyB');             // X: use the last thing you bought (drink, smoke …)
-  if (btn(Lg, 1)) keys.add(p?.mounted && !p.mounted.dialog ? 'KeyQ' : 'KeyI');   // left grip: the bag (in a car: the horn)
-  if (btn(Rg, 3) && !V.quickLatch) { V.quickLatch = true; quick(ctx, !V.quick); } else if (!btn(Rg, 3)) V.quickLatch = false;   // right stick click: quick actions
+  // X: out of the bag into your off hand (bring it to your mouth to drink / smoke / eat it); X again with it in hand: use it now
+  if (Lp.a && !V.xLatch && playing && !V.ui) { V.xLatch = true; P.xButton(ctx); } else if (!Lp.a) V.xLatch = false;
+  // left grip: the horn when driving and not holding the wheel (on foot it grabs: the wheel, the bars, things; the bag is on the tablet)
+  if (Lp.grip && p?.mounted && !p.mounted.dialog && !V.wheelL) keys.add('KeyQ');
+  if (Rp.face && Rp.stickClick && !V.quickLatch) { V.quickLatch = true; quick(ctx, !V.quick); } else if (!Rp.stickClick) V.quickLatch = false;   // right stick click: quick actions
   setKeys(keys);
-  // Y: the pause menu (the Quest's own ≡ button belongs to the system, WebXR never sees it)
-  if (btn(Lg, 5) && !V.menuLatch) { V.menuLatch = true; ctx.setState(ctx.state === 'playing' ? 'paused' : 'playing'); } else if (!btn(Lg, 5)) V.menuLatch = false;
+  // Y: the wrist tablet (pause menu, settings and the rest are on it; the Quest's own ≡ button belongs to the system, WebXR never sees it).
+  // In a menu Y backs out of it
+  const yBtn = Lp.b || tabletClick;
+  if (yBtn && !V.menuLatch) { V.menuLatch = true; if (ctx.state !== 'playing') ctx.setState('playing'); else T.toggle(); } else if (!yBtn) V.menuLatch = false;
   // right stick up: next weapon (fists → the bag's guns → fists)
   if (!V.ui && playing && ry < -0.75 && !V.cycleLatch) { V.cycleLatch = true; cycleWeapon(ctx); } if (ry > -0.3) V.cycleLatch = false;
   // hands-only quick draw: a finger gun brings your gun up, a fist puts it away (fists); a pinch fires
   const gesture = RH && playing && !V.ui && !V.wrist.shown ? handPose(RH.hand) : null, now = V.time || 0;
   if (gesture !== V.pose) { V.pose = gesture; V.poseT = now; } const held = gesture && now - V.poseT > POSE_HOLD;
   if (held && gesture === 'gun' && V.poseDone !== V.poseT) { V.poseDone = V.poseT; drawGun(ctx); pulse(RH, 0.3, 30); }
-  if (held && gesture === 'fist' && V.poseDone !== V.poseT && !V.holsterUsed && ctx.weapons?.currentId !== 'fists' && !ctx.weapons?.spec?.melee) { V.poseDone = V.poseT; ctx.weapons?.fists?.(); }
+  if (held && gesture === 'fist' && V.poseDone !== V.poseT && !V.holsterUsed && !V.wheelR && ctx.weapons?.currentId !== 'fists' && !ctx.weapons?.spec?.melee) { V.poseDone = V.poseT; ctx.weapons?.fists?.(); }
   // never fire while a menu is up, the palm menu is showing (you're about to poke it), your finger is near it, or you're pointing at the action button
-  const guard = V.ui || V.wrist.shown || V.overAction || pokeNear();
-  fire = !guard && (btn(Rg, 0) || !!RH?.pinch);
-  actionButton(ctx, R, !!(btn(Rg, 0) || RH?.pinch));
+  const guard = V.ui || V.tabletBusy || (V.wrist.shown && !!offHand()?.src?.hand) || V.overAction || pokeNear() || V.wheelR;
+  fire = !guard && (Rp.trig || !!RH?.pinch);
+  actionButton(ctx, R, !!(Rp.trig || RH?.pinch));
   // the hands' velocities (in the rig: your own motion, not the train's) for punches
   for (const H of [L, R]) if (H) { const src = H.src?.hand ? H.hand.joints['wrist'] : H.grip; if (src) { _v.copy(src.position); if (dt > 0 && H.seeded === H.src) H.vel.subVectors(_v, H.prev).divideScalar(dt); else H.vel.set(0, 0, 0); H.seeded = H.src; H.prev.copy(_v); } }   // the first sample of a new input has no history: no phantom 20 m/s jab
   // fists: a fast forward jab of either hand lands a punch from that hand
@@ -225,8 +246,9 @@ export function update(dt, ctx) {
   const fists = ctx.weapons?.currentId === 'fists', blade = !fists && !!ctx.weapons?.spec?.melee; let punch = null;
   if (!fists && !blade && ctx.weapons?.currentId) V.lastGun = ctx.weapons.currentId;
   if (!fists && !blade && ctx.weapons?.currentId && !PISTOL.test(ctx.weapons.currentId)) V.lastRifle = ctx.weapons.currentId;
-  if (fists && playing && !V.ui && !V.wrist.shown) for (const H of [L, R]) if (H) { const fwd = _v2.set(-Math.sin(headYaw), 0, -Math.cos(headYaw)); const v = H.vel, along = v.dot(fwd), lim = H.src?.hand ? PUNCH_V_HAND : PUNCH_V;   // tracked hands are smoothed: a real jab reads slower
-    if (along > lim && v.length() > lim && V.time - H.punchT > PUNCH_GAP) { H.punchT = V.time; punch = H; } }
+  // a punch: fast, and going forward (a jab, a cross, a hook coming round) or up (an uppercut); not while blocking. Faster hits harder
+  if (fists && playing && !V.ui && !V.wrist.shown && !P.guard) for (const H of [L, R]) if (H) { const fwd = _v2.set(-Math.sin(headYaw), 0, -Math.cos(headYaw)); const v = H.vel, sp = v.length(), lim = H.src?.hand ? PUNCH_V_HAND : PUNCH_V;   // tracked hands are smoothed: a real jab reads slower
+    if (sp > lim && (v.dot(fwd) > 0.3 * sp || v.y > 0.6 * sp) && V.time - H.punchT > PUNCH_GAP) { H.punchT = V.time; punch = H; ctx.xrPunchK = clamp(sp / lim, 1, 2); } }
   if (blade && playing && !V.ui && R && R.vel.length() > (R.src?.hand ? SLASH_V_HAND : SLASH_V) && V.time - R.punchT > PUNCH_GAP) { R.punchT = V.time; punch = R; }
   V.time = (V.time || 0) + dt;
   // the aim: the gun hand's grip (or the punching hand) as a world pose for weapons.js
@@ -264,6 +286,8 @@ function bodyFrame() {
   const d = wrap(hy - V.bodyYaw); if (Math.abs(d) > BODY_LAG) V.bodyYaw += d - Math.sign(d) * BODY_LAG; else V.bodyYaw += d * 0.02;
   return V.bodyYaw;
 }
+/** the world point you poke with: a tracked index fingertip, or the front tip of a controller (its pointing ray's origin) */
+function tipOf(H, out) { if (!H) return null; const o = H.src?.hand ? H.hand.joints['index-finger-tip'] : H.ray; if (!o) return null; o.updateMatrixWorld(); return out.setFromMatrixPosition(o.matrixWorld); }
 function handPos(H, out) { if (!H) return null; const src = H.src?.hand ? H.hand.joints['wrist'] : H.grip; return src ? out.copy(src.position) : null; }
 function holsterPos(name, out) { const y = V.bodyYaw ?? 0, [rx, dy, bz] = HOLSTERS[name], c = Math.cos(y), sn = Math.sin(y);
   return out.set(V.head.x + c * rx + sn * bz, V.head.y + dy, V.head.z - sn * rx + c * bz); }   // right (cos, 0, −sin) · back (sin, 0, cos)
@@ -356,18 +380,6 @@ function scrollUI(dy) {
   while (el && el !== document.body) { const cs = getComputedStyle(el); if (/auto|scroll/.test(cs.overflowY) && el.scrollHeight > el.clientHeight) { el.scrollTop += dy; V.drawT = 0; return; } el = el.parentElement; }
 }
 
-// ---- the wrist menu (hand tracking: no buttons, so the left palm carries them; poke with the right index finger) -------------
-const WRIST = [['MENU', 'menu'], ['JUMP', 'Space'], ['TALK / F', 'KeyF'], ['BAG', 'KeyI'], ['MORE…', 'quick'], ['⟲ TURN', 'turnL'], ['TURN ⟳', 'turnR'], ['RELOAD', 'KeyR'], ['USE (B)', 'KeyB'], ['WEAPON', 'weapon']];
-const WCOLS = 5, WCELL = 128, WW = 0.2, WH = 0.08;
-function wristMenu() {
-  const cv = document.createElement('canvas'); cv.width = WCOLS * WCELL; cv.height = 2 * WCELL; const g = cv.getContext('2d');
-  const paint = (hot = -1) => { g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = 'rgba(12,14,18,0.86)'; g.fillRect(0, 0, cv.width, cv.height);
-    WRIST.forEach(([t], i) => { const x = (i % WCOLS) * WCELL, y = Math.floor(i / WCOLS) * WCELL; g.fillStyle = i === hot ? '#ffd27a' : '#2a2f38'; g.fillRect(x + 6, y + 6, WCELL - 12, WCELL - 12); g.fillStyle = i === hot ? '#111' : '#ffd27a'; g.font = 'bold 22px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x + WCELL / 2, y + WCELL / 2); }); };
-  paint();
-  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(WW, WH), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })); m.renderOrder = 9992; m.visible = false; m.name = 'xrWrist';
-  return { mesh: m, shown: false, t: 0, hot: -1, paint: (i) => { paint(i); tex.needsUpdate = true; } };
-}
 // the flat game's gloved forearms (baked per weapon into groups named arm_left / arm_right) float beside your real hand in VR: hide
 // them every frame (reload / inspect animations show them again), with the list cached per weapon
 /** the current weapon's right-hand wrist, in the weapon's own space (cached per weapon) */
@@ -381,33 +393,6 @@ function armsOff(ctx, vm) {
   const id = ctx.weapons.currentId; if (V.armsFor !== id || !V.arms) { V.armsFor = id; V.arms = []; vm.traverse((o) => { if (/^arm_/.test(o.name)) V.arms.push(o); }); }
   for (const o of V.arms) o.visible = false;
 }
-function wristUpdate(ctx) {
-  const W = V.wrist, L = offHand(), R = mainHand();   // the menu on the off hand's palm, poked by the main hand
-  const hand = L?.src?.hand ? L.hand : null; if (!hand) { W.mesh.visible = W.shown = false; return; }
-  const wr = hand.joints['wrist'], mid = hand.joints['middle-finger-metacarpal']; if (!wr || !mid) return;
-  if (W.mesh.parent !== wr) wr.add(W.mesh);
-  // just off the palm (a joint's -Y points out of the palm), turned to face your eyes, upright: readable on either hand
-  W.mesh.position.set(0, -0.06, -0.04); W.mesh.lookAt(V.cam.getWorldPosition(_v2));
-  // shown when the palm faces your eyes
-  wr.updateMatrixWorld(); _v.set(0, -1, 0).transformDirection(wr.matrixWorld); _v2.setFromMatrixPosition(wr.matrixWorld); const eye = V.cam.getWorldPosition(new THREE.Vector3()).sub(_v2).normalize();
-  W.shown = _v.dot(eye) > 0.55; W.mesh.visible = W.shown;
-  if (!W.shown || !R?.src?.hand) return;
-  const tip = R.hand.joints['index-finger-tip']; if (!tip) return;
-  W.mesh.updateMatrixWorld(); _v.setFromMatrixPosition(tip.matrixWorld); W.mesh.worldToLocal(_v);
-  // hover: the finger over a button lights it; a poke through the plane presses it once (pull back out to press again)
-  const over = Math.abs(_v.x) < WW / 2 && Math.abs(_v.y) < WH / 2 && _v.z < 0.04 && _v.z > -0.03;
-  const i = over ? Math.floor(_v.y > 0 ? 0 : 1) * WCOLS + clamp(Math.floor((_v.x + WW / 2) / (WW / WCOLS)), 0, WCOLS - 1) : -1;
-  if (i !== W.hot) { W.hot = i; W.paint(i); }
-  const poke = over && _v.z < 0.008;
-  if (poke && !W.down) { W.down = true; pulse(V.hands.left, 0.3, 20); const [, act] = WRIST[i];
-    if (act === 'menu') ctx.setState(ctx.state === 'playing' ? 'paused' : 'playing');
-    else if (act === 'quick') quick(ctx, !V.quick);
-    else if (act === 'weapon') cycleWeapon(ctx);
-    else if (act === 'turnL' || act === 'turnR') V.turn += (act === 'turnL' ? 1 : -1) * prefs.snap * Math.PI / 180;
-    else tap(act);
-  } else if (!poke && _v.z > 0.02) W.down = false;
-}
-
 // ---- performance: the Quest draws every object twice (no multiview in three r186) on a phone-class GPU. The flat game draws
 // ~1300 objects / 6M triangles a frame out to the horizon; at 72 Hz the headset manages a few hundred. Small things far away
 // (cars, people, props, train cars) stop drawing past a distance that grows with their size; buildings, ground, sky stay.
@@ -640,7 +625,7 @@ export function render(ctx) {
     if (R?.grip) for (const c of R.grip.children) if (c !== V.gunMount) c.visible = !V.gunMount.visible;
     const O = offHand(); if (O?.grip) for (const c of O.grip.children) if (c !== V.gunMount) c.visible = true;   // after a gun-hand switch   // the gun replaces the controller model in your hand
   }
-  wristUpdate(ctx);
+  V.tabletBusy = T.update(ctx, ctx.time.realDt); T.tutUpdate(ctx, ctx.time.realDt);
   watch(ctx); sight(ctx); holsterMarks(ctx);
   panel(ctx);
   cull(ctx, ctx.time.realDt);
@@ -757,5 +742,18 @@ function qaHooks() {
     state: () => ({ presenting: V.presenting, ui: V.ui, mode: V.mode, turn: +V.turn.toFixed(3), rigYaw: +V.rigYaw.toFixed(3), head: V.head.toArray().map((v) => +v.toFixed(3)), rig: V.rig.position.toArray().map((v) => +v.toFixed(2)),
       cam: V.ctx.camera.position.toArray().map((v) => +v.toFixed(2)), hands: Object.keys(V.hands), panel: !!V.panel?.visible, mirrorMs: +(V.mirror?.ms || 0).toFixed(1), keys: [...V.keys], aim: V.aim.position.toArray().map((v) => +v.toFixed(2)), wrist: V.wrist.shown, culled: V.culled?.size || 0, inputs: V.session ? V.session.inputSources.length : 0, at: (V.hands.right?.at || []).map(Math.round), click: V.lastClick || null }),
     enter: () => start(), exit: () => V.session?.end(), mirror: () => V.mirror?.canvas.toDataURL('image/png'), prefs,
+    tablet: () => T.qa(), phys: () => P.qa(), tut: () => T.tutStep * (T.tutOn ? 1 : -1) - (T.tutOn ? 0 : 1),
+    // QA: points in the rig (where IWER's controllers live): a tablet button, the steering wheel / bars, an elevator call button, and
+    // the offset from a controller's position to its poking tip
+    tabletRect: (i) => { const w = T.rectWorld(i); return w ? V.rig.worldToLocal(w).toArray() : null; }, tabletTab: (t) => T.rectIndex(t),
+    wheelAt: () => { const S = V.ctx.vehicles?.mounted, o = S?.steerWheel || S?.fork; if (!o) return null; o.updateWorldMatrix(true, false); return V.rig.worldToLocal(o.getWorldPosition(new THREE.Vector3())).toArray(); },
+    /** the wheel's own plane in the rig: its centre, and the directions of its 3 o'clock and 12 o'clock as the driver sees them */
+    wheelFrame: () => { const S = V.ctx.vehicles?.mounted, o = S?.steerWheel; if (!o) return null; o.updateWorldMatrix(true, false);
+      const c = o.getWorldPosition(new THREE.Vector3()), q = o.parent.getWorldQuaternion(new THREE.Quaternion()), rq = V.rig.getWorldQuaternion(new THREE.Quaternion()).invert();
+      const ax = (x, y, z) => new THREE.Vector3(x, y, z).applyQuaternion(q).applyQuaternion(rq).toArray();
+      return { c: V.rig.worldToLocal(c).toArray(), y: ax(0, 1, 0), z: ax(0, 0, 1) }; },
+    buttonAt: (near) => { const B = (P.buttons || []).filter((b) => b.g.visible).sort((a, b) => a.g.position.distanceTo(V.ctx.player.position) - b.g.position.distanceTo(V.ctx.player.position))[0]; return B ? V.rig.worldToLocal(B.g.position.clone()).toArray() : null; },
+    tipOffset: (side) => { const H = V.hands[side]; if (!H) return null; const t = tipOf(H, new THREE.Vector3()); V.rig.worldToLocal(t); const c = H.src?.hand ? null : H.grip.position; return c ? t.sub(H.grip.position).toArray() : null; },
+    rigPos: () => V.rig.position.toArray(),
   };
 }

@@ -453,7 +453,7 @@ function fireShot(w, opts = {}) {
 
   // muzzle world position (visual) — used by light, brass, tracer, smoke
   // fists: the chain (jab → cross → hook) and its damage, before the hit is worked out
-  if (sp.fists) { S.combo = now - (S.comboT ?? -9) < 0.7 ? ((S.combo || 0) + 1) % 3 : 0; S.comboT = now; sp.damage = Math.round(FIST_BASE * FIST_MUL[S.combo]); }
+  if (sp.fists) { S.combo = now - (S.comboT ?? -9) < 0.7 ? ((S.combo || 0) + 1) % 3 : 0; S.comboT = now; sp.damage = Math.round(FIST_BASE * FIST_MUL[S.combo] * (S.ctx.xrPunchK || 1)); }   // VR: a faster real punch hits harder
   const muzzle = w.parts.muzzle.getWorldPosition(new THREE.Vector3());
   if (sp.melee) { S.swing = { t: 0, kind: sp.fists ? 2 + S.combo : (S.swingN = (S.swingN || 0) + 1) % 2 }; if (sp.fists && S.combo === 2) S.ctx.hud?.toast?.('HOOK!', 500);
     const hu = firstHit?.object?.userData; if (hu && (hu.onHit || hu.soldier || hu.remote)) { ctx.ai?.blood?.(firstHit.point.x, firstHit.point.z, 0.35 + rng() * 0.25, firstHit.point.y - 1); S.rpv.z += 6; ctx.bus.emit('meleeHit', { point: firstHit.point.clone() }); }   // it went in: blood on the ground + the hand stops dead
