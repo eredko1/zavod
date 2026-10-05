@@ -22,13 +22,13 @@ const SNAP_DEFAULT = 45, DEAD = 0.18, PINCH_ON = 0.018, PINCH_OFF = 0.032, PUNCH
 // in a car: menus stay at arm's length plus (the laser starts at your hand; reading closer than ~1 m tires the eyes), the HUD comes in
 // over the dashboard
 const SEAT_UI_DIST = 0.95, SEAT_HUD_DIST = 0.65, UI_DIST = 1.2, UI_W = 1.6, HUD_DIST = 2.0, HUD_W = 2.3, HUD_FOLLOW = 22 * Math.PI / 180;
-const UI_HZ = 15, HUD_HZ = 4, GAME_HZ = 24, STAND_H = 1.7, STAND_EYE = 1.6;
+const UI_HZ = 15, HUD_HZ = 4, GAME_HZ = 24, STAND_H = 1.7, EYE_DEFAULT = 2.0;
 const PREF_KEY = 'zavod.vr';
 const SMOOTH_TURN = 2.1;   // rad/s at full stick (~120°/s)
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
-const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, seated: false, ...load() };
+const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, eye: EYE_DEFAULT, ...load() };
 function load() { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch { return {}; } }
 function save() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }
 const mainHand = () => prefs.left ? V.hands.left : V.hands.right, offHand = () => prefs.left ? V.hands.right : V.hands.left;
@@ -99,7 +99,7 @@ async function start() {
 function begin(session) {
   ensurePanel();
   const { ctx } = V; V.presenting = true; ctx.xr.presenting = true; V.headPrev = null; V.wroteYaw = null; V.mode = 'foot';
-  V.turn = ctx.player?.yaw || 0; V.rigYaw = V.turn; V.seatH0 = 0;   // seated height: taken from the first head pose (or the Seated button)
+  V.turn = ctx.player?.yaw || 0; V.rigYaw = V.turn; V.seatH0 = 0;   // your real head height: taken from the first head pose (or Recalibrate)
   try { ctx.renderer.xr.setFoveation(1); } catch {}
   try { session.updateTargetFrameRate?.(72)?.catch?.(() => {}); } catch {}
   // shadows are a whole second scene pass per light, per eye: off in the headset, back on after if they were on
@@ -389,8 +389,9 @@ function placeRig(ctx, ease) {
   V.rigYaw = base + V.turn;
   rig.rotation.set(0, V.rigYaw, 0);
   _v.set(V.head.x, 0, V.head.z).applyAxisAngle(_up, V.rigYaw);
-  // seated play: your real head is ~0.5 m lower than standing; lift the world's floor so your eyes are at the game's standing eye height
-  const lift = prefs.seated ? Math.max(0, STAND_EYE - (V.seatH0 || V.head.y)) : 0;
+  // eye height: whatever your real height (or sitting), the world's floor moves so your eyes start at prefs.eye; ducking and
+  // leaning still move you (the offset is fixed, measured once per session or on Recalibrate)
+  const lift = (prefs.eye || EYE_DEFAULT) - (V.seatH0 || V.head.y);
   if (foot && p) rig.position.set(p.position.x - _v.x, p.position.y + (p.height - STAND_H) + lift, p.position.z - _v.z);
   else {
     const eye = _v2; if (veh) { const sp = veh.spec, fx = -Math.sin(veh.heading), fz = -Math.cos(veh.heading); eye.set(veh.pos.x - fx * (sp.eyeBack || 0) - fz * (sp.eyeSide || 0), veh.pos.y + (sp.eyeH || 1.2), veh.pos.z - fz * (sp.eyeBack || 0) + fx * (sp.eyeSide || 0)); } else eye.copy(cam.position);
@@ -493,12 +494,14 @@ function optionsCard(ctx) {
     + row('HUD', `<span>${pill('hud', 1, 'On')}${pill('hud', 0, 'Off')}</span>`)
     + row('Turning', `<span>${pill('smooth', 0, 'Snap')}${pill('smooth', 1, 'Smooth')}</span>`)
     + row('Gun hand', `<span>${pill('left', 0, 'Right')}${pill('left', 1, 'Left')}</span>`)
-    + row('Playing', `<span>${pill('seated', 0, 'Standing')}${pill('seated', 1, 'Seated')}</span>`)
+    + row('Eye height', `<span>${pill('eye', 1.6, '1.6')}${pill('eye', 1.8, '1.8')}${pill('eye', 2, '2.0 m')}</span>`)
+    + `<button data-k="recal" style="width:100%;margin:4px 0 8px;padding:8px;border-radius:10px;border:0;background:#2a2f38;color:#eee;font:700 14px system-ui;cursor:pointer">Recalibrate height (stand or sit naturally)</button>`
     + `<div style="font:500 12px system-ui;opacity:.75;line-height:1.45;margin:10px 0">Left stick move · click it or hold left trigger to sprint · right stick ←/→ turn, ↑ next weapon, ↓ crouch, click: quick actions (map, grenade, radio, horn …) · trigger fire / click · right grip F · A jump · B reload · X use · left grip bag · Y menu. Hands: pinch left + drag to walk, pinch right to fire, look at your left palm for buttons (MORE… = quick actions). Fists: punch for real. Left-handed: the two hands swap.</div>`
     + `<button data-k="exit" style="width:100%;padding:10px;border-radius:10px;border:0;background:#c0392b;color:#fff;font:800 15px system-ui;cursor:pointer">EXIT VR</button>`;
-  const paint = () => { for (const b of el.querySelectorAll('button[data-v]')) { const on = String(+prefs[b.dataset.k]) === b.dataset.v || (b.dataset.k === 'snap' && +b.dataset.v === prefs.snap); b.style.background = on ? '#ffd27a' : '#2a2f38'; b.style.color = on ? '#111' : '#ddd'; } };
+  const paint = () => { for (const b of el.querySelectorAll('button[data-v]')) { const on = String(+prefs[b.dataset.k]) === b.dataset.v || ((b.dataset.k === 'snap' || b.dataset.k === 'eye') && +b.dataset.v === +prefs[b.dataset.k]); b.style.background = on ? '#ffd27a' : '#2a2f38'; b.style.color = on ? '#111' : '#ddd'; } };
   el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); if (b.dataset.k === 'exit') { V.session?.end(); return; }
-    const k = b.dataset.k, v = +b.dataset.v; prefs[k] = k === 'snap' ? v : !!v; if (k === 'seated' && v) V.seatH0 = V.head.y; save(); paint(); });   // seated: calibrate on your current head height
+    if (b.dataset.k === 'recal') { V.seatH0 = V.head.y; return; }
+    const k = b.dataset.k, v = +b.dataset.v; prefs[k] = k === 'snap' || k === 'eye' ? v : !!v; save(); paint(); });
   document.body.appendChild(el); paint();
   const sync = () => { el.style.display = V.presenting && ctx.state !== 'playing' ? '' : 'none'; }; ctx.bus.on('state', sync); setInterval(sync, 500);
 }
