@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { hangkit as K } from '../hangkit.js';
 import { remoteWrap } from '../outfits.js';
 
+const XR_THRUST_MAX = 0.92, XR_SPOOL = 3;   // VR: a softer top end and slower spool (in a headset every lurch is felt)
 const THRUST = 34, BURN = 14, REFILL = 9, RACK = [[-4.8, 3.6], [-4.8, 4.6], [-4.8, 5.6]];
 let J = null;
 
@@ -56,7 +57,10 @@ function takeOff() { const pk = J.worn; if (!pk) return; J.worn = null; J.ctx.pl
 function update(dt, playing) {
   if (!J.worn) return; const p = J.ctx.player, inp = J.ctx.input;
   const hold = playing && !p.mounted && (inp?.keys?.has?.('Space') || false);
-  J.spool += ((hold && J.fuel > 0 ? 1 : 0) - J.spool) * Math.min(1, dt * (hold ? 5 : 3.5));   // turbines spool up / down, no instant thrust
+  // a throttle (VR: how high you lift the pinched hand, or A ramping) instead of on / off; gentler turbines in a headset
+  const xr = !!J.ctx.xr?.presenting, want = playing && !p.mounted && J.fuel > 0 ? (inp?.jetThrottle != null ? inp.jetThrottle * (xr ? XR_THRUST_MAX : 1) : hold ? 1 : 0) : 0;
+  const rate = xr ? XR_SPOOL : want > J.spool ? 5 : 3.5;
+  J.spool += (want - J.spool) * Math.min(1, dt * rate);   // turbines spool up / down, no instant thrust
   const thrust = THRUST * J.spool * (J.fuel > 0 ? 1 : 0);
   J.fuel = Math.max(0, Math.min(100, J.fuel + (J.spool > 0.2 ? -BURN * J.spool : p.onGround ? REFILL : 0) * dt));
   p.jet = { on: true, thrust };
