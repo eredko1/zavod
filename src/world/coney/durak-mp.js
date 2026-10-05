@@ -11,8 +11,14 @@
 //   move   seated → host { table, seq, m }           m = { who, kind, c?:{r,s}, i? } against state seq (stale → ignored)
 //   nack   host → one   { table, to, seq, why }      illegal move rejected
 //   again  any → host   { table }                    re-deal with the same seats (+ whoever is waiting); stakes re-collected
+//   ask    any → host   { table }                    "I'm missing something": the host re-sends the table now
 //   leave  any → all    { table }                    my seat goes to an AI (or out of the lobby); if I was the host → migration
 //   close  host → all   { table }                    last human left: the table is gone
+// Bad connections (phones on the boardwalk, a locked screen): a move nobody answered is re-sent every RETRY_MS with an `ask` (moves
+// are against a seq, so a repeat of one that already landed is ignored); the host re-sends the table every BEAT_PLAY_MS mid-game.
+// A seat whose turn has waited TURN_MS (or AFK_MS while that player's game is in the background) is played for them, one move at a
+// time, by Sasha. A host who stops sending the table (HOST_STALE_MS) while their game is in the background or gone hands it to the
+// lowest remaining human id; two takeovers at once settle on the lower host id at the same seq, and a higher seq always wins.
 // Stakes: every human pays `stake` when a deal starts (their own wallet, K.pay); the pot is stake × seats (AI seats stake too — from
 // nowhere); the durak gets nothing, everyone else takes pot / (n − 1). A human who walks away mid-game forfeits.
 import * as THREE from 'three';
@@ -21,7 +27,9 @@ import { SUITS, newGame, legalMoves, toAct, apply, aiMove, makeMemory, remember,
 import { openDurak, durakSync, durakOpen, durakMine, closeDurak, potShare } from './durak.js';
 
 const AI_NAMES = ['ARKASHA', 'SASHA', 'McGUINNESS', 'THE ELF'], KINDS = ['play', 'beat', 'take', 'transfer', 'show', 'bito', 'done'];
-const LIVE_MS = 12000, BEAT_MS = 4000, NEAR = 30;
+const LIVE_MS = 12000, BEAT_MS = 4000, BEAT_PLAY_MS = 1500, NEAR = 30;
+const RETRY_MS = 1200, RETRIES = 8, ASK_GAP_MS = 300, AFK_MS = 8000, HOST_STALE_MS = 9000, PEER_FRESH_MS = 3000;
+let TURN_MS = 35000;   // ?dkturn=ms (QA)
 let S = null;
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const myId = () => S?.ctx.net?.id || null;
@@ -30,9 +38,10 @@ const toast = (t, ms = 2200) => { try { K.toast(t, ms); } catch {} };
 
 export function initDurakMP(ctx, { pos } = {}) {
   if (S) { S.ctx = ctx; S.pos = pos || S.pos; return; }
+  TURN_MS = +ctx.qs?.get?.('dkturn') || TURN_MS;
   S = { ctx, pos, T: null, mems: [], rooms: new Map(), gone: new Set(), told: new Set(), paidDeal: null, paid: false, paidOut: null, aiT: 0, aiDelay: 750, beatAt: 0, joining: null, lastNack: null, pendingAt: 0 };
   ctx.bus.on('net:dk', (m) => { try { onMsg(m); } catch (e) { console.warn('[durak-mp]', e); } });
-  setInterval(() => { try { tick(); } catch (e) { console.warn('[durak-mp] tick', e); } }, 500);
+  setInterval(() => { try { tick(); } catch (e) { console.warn('[durak-mp] tick', e); } }, 250);
   if (typeof window !== 'undefined' && window.__game) window.__game.durakMP = durakMPQA;
   easyJoin(ctx);
   ctx.bus.on('durakFriends', () => {   // pause menu → Play durak: to the table, then join / open (online) or talk to Arkasha (offline)
@@ -133,6 +142,7 @@ function onMsg(m) {
   if (m.k === 'nack') { if (m.to === myId()) { S.lastNack = { seq: m.seq, why: str(m.why, 40) }; if (durakMine()) durakSync(`Так нельзя${m.why === 'turn' ? ' — сейчас не твой ход' : ''}.`); } return; }
   if (!host) return;
   if (m.k === 'join') return hostJoin(m.f, str(m.n) || nameOf(m.f));
+  if (m.k === 'ask') { if (performance.now() - S.beatAt > ASK_GAP_MS) broadcast(); return; }
   if (m.k === 'again') { if (T.ph === 'lobby') hostDeal(); else if (T.G?.over) markReady(m.f); return; }   // after a game: everyone taps Ready, then the deal
   if (m.k === 'move') {
     if (m.seq !== T.seq) return;   // stale: they'll get the newer state anyway
@@ -145,14 +155,19 @@ function onState(m) {
   const me = myId();
   S.rooms.set(N.id, { at: performance.now(), host: N.host, hostName: N.seats.find((s) => s.id === N.host)?.n || nameOf(N.host), names: N.seats.map((s) => s.n), humans: N.seats.filter((s) => s.id).length, n: N.seats.length, ph: N.ph, stake: N.stake, wait: N.wait.length });
   const T = S.T;
-  if (T && T.id === N.id) { if (N.seq <= T.seq) return; if (N.host === me && T.host !== me) return; return adopt(N); }   // nobody hands me the host role but me
+  if (T && T.id === N.id) {
+    if (T.host !== me) S.stAt = performance.now();   // the host is alive
+    if (N.seq < T.seq || (N.seq === T.seq && !(N.host !== T.host && N.host < T.host))) return;   // older, or the same (two takeovers at once: the lower host id keeps it)
+    if (N.host === me && T.host !== me) return;   // nobody hands me the host role but me
+    return adopt(N);
+  }
   if (T) return;   // I'm at another table
   const seated = N.seats.some((s) => s.id === me) || N.wait.some((w) => w.id === me);
-  if (S.joining?.id === N.id && seated) { S.joining = null; S.gone.clear(); adopt(N); openUI(); return; }
+  if (S.joining?.id === N.id && seated) { S.joining = null; S.gone.clear(); S.stAt = performance.now(); adopt(N); openUI(); return; }
   if (N.ph === 'lobby' && !S.told.has(N.id)) { S.told.add(N.id); banner(N.id, S.rooms.get(N.id).hostName); } if (false) { toast(`${S.rooms.get(N.id).hostName} открыл общий стол у Аркаши — подходи, F → «Сесть за общий стол»`, 3200); }
 }
 function adopt(N) {
-  S.T = N; const me = myId();
+  S.T = N; const me = myId(); if (N.host !== me) S.stAt = performance.now();
   if (!N.seats.some((s) => s.id === me) && !N.wait.some((w) => w.id === me)) { drop(); toast('Тебя больше нет за столом.'); return; }
   local();
 }
@@ -168,7 +183,7 @@ function local() {
     S.paidOut = T.deal;
     if (T.stake && S.paid) { if (G.result === 'draw') K.earn(T.stake); else if (G.result !== s) K.earn(potShare(T.stake, G.n)); }
   }
-  S.pendingAt = 0;
+  S.pendingAt = 0; S.pending = null;
   if (durakMine()) durakSync(line(prev));
 }
 function line(prev) {
@@ -235,7 +250,7 @@ function becomeHost() {
   const T = S.T, me = myId(), old = T.host; T.host = me;
   const s = seatOf(T, old); if (s >= 0) { if (T.ph === 'lobby') T.seats = makeSeats(humans(T).filter((h) => h.id !== old), T.want); else T.seats[s] = { id: '', n: freeAIName(T) }; }
   T.wait = T.wait.filter((w) => w.id !== old);
-  freshMems(); T.lm = null; toast('Хозяин стола ушёл — теперь стол держишь ты', 2400);
+  freshMems(); T.lm = null; S.pending = null; toast('Хозяин стола ушёл — теперь стол держишь ты', 2400);
   bump(); pump();
 }
 
@@ -247,11 +262,22 @@ function tick() {
   const T = S.T; if (!T || !netUp()) return;
   const net = S.ctx.net, me = net.id, here = new Set([...net.list(), me]), present = (pid) => here.has(pid) && !S.gone.has(pid);
   if (T.host !== me) {
-    if (!present(T.host)) {   // host gone: the lowest remaining seated (or waiting) human id takes over
-      const cand = [...humans(T).map((h) => h.id), ...T.wait.map((w) => w.id)].filter((pid) => pid !== T.host && present(pid)).sort()[0];
-      if (cand === me) becomeHost();
+    // the host is gone, or alive on the net but not running the table (their game is in the background / frozen): the lowest
+    // remaining human id takes over. "Alive on the net" = their player state still reaches us, so a dead connection of OUR own
+    // doesn't make us grab the table
+    // (a host whose game is in the background can still answer an ask from its network thread: AFK that long counts as stale too)
+    const hp = net.peer?.(T.host); S.hostAfkAt = hp?.afk ? S.hostAfkAt || now : 0;
+    const stale = (now - (S.stAt || now) > HOST_STALE_MS && (hp?.afk || now - (hp?.seen ?? 0) < PEER_FRESH_MS)) || (S.hostAfkAt && now - S.hostAfkAt > HOST_STALE_MS);
+    if (!present(T.host) || stale) {
+      const cand = [...humans(T).map((h) => h.id), ...T.wait.map((w) => w.id)].filter((pid) => pid !== T.host && present(pid) && !net.peer?.(pid)?.afk).sort()[0];
+      if (cand === me) { if (stale) S.gone.add(T.host); becomeHost(); return; }
     }
-    if (S.pendingAt && now - S.pendingAt > 5000 && durakMine()) { S.pendingAt = 0; durakSync('Хост молчит… ещё раз.'); }
+    // my move went out and nothing came back: again, and ask for the table
+    const P = S.pending; if (P && T.seq === P.seq && now - P.at > RETRY_MS) {
+      if (++P.tries > RETRIES) { S.pending = null; if (durakMine()) durakSync('Хост молчит… · the host isn\'t answering'); }
+      else { P.at = now; send('move', { seq: P.seq, m: P.m }); send('ask'); }
+    }
+    if (!S.pending && T.ph === 'play' && now - (S.stAt || now) > BEAT_PLAY_MS * 2.5 && now - (S.askAt || 0) > 2000) { S.askAt = now; send('ask'); }   // a heartbeat or two missed
     return;
   }
   for (const h of [...humans(T), ...T.wait]) if (h.id !== me && !present(h.id)) hostLeave(h.id);
@@ -259,7 +285,18 @@ function tick() {
     if (humans(T).length >= 2) { if (!T.autoAt) { T.autoAt = now + 10000; toast('Two at the table: dealing in 10 s · раздача через 10 секунд', 2200); } if (durakMine()) durakSync(); if (now >= T.autoAt) { T.autoAt = 0; hostDeal(); } }
     else T.autoAt = 0;
   }
-  if (S.T && now - S.beatAt > BEAT_MS) broadcast();
+  if (S.T && now - S.beatAt > (T.ph === 'play' && !T.G?.over ? BEAT_PLAY_MS : BEAT_MS)) broadcast();
+  autoPlay(now);
+}
+/** host: a human seat that's been on the move too long (or whose game is in the background) gets one move played for it by Sasha */
+function autoPlay(now) {
+  const T = S.T; if (!T || T.host !== myId() || T.ph !== 'play' || !T.G || T.G.over) { S.turn = null; return; }
+  const s = toAct(T.G); if (s < 0 || !T.seats[s]?.id) { S.turn = null; return; }
+  if (S.turn?.seq !== T.seq || S.turn.s !== s) S.turn = { seq: T.seq, s, at: now };
+  const pid = T.seats[s].id, afk = pid !== myId() && !!S.ctx.net?.peer?.(pid)?.afk, wait = now - S.turn.at;
+  if (wait < (afk ? AFK_MS : TURN_MS)) return;
+  const m = aiMove(T.G, S.mems[s] || (S.mems[s] = makeMemory()), s); if (!m) return;
+  S.turn = null; toast(`SASHA plays for ${T.seats[s].n} · Саша ходит за ${T.seats[s].n}`, 1600); hostMove(s, m);
 }
 function near(r = NEAR) { const p = S.ctx.player?.position, a = S.pos?.(); return !!(p && a && Math.hypot(p.x - a.x, p.z - a.z) < r); }
 
@@ -292,7 +329,7 @@ function move(m) {
   const T = S.T, s = T && seatOf(T); if (!T || s < 0) return false;
   const mv = normMove({ ...m, who: m.who ?? s }); if (!mv) return false;
   if (T.host === myId()) { if (!hostMove(s, mv)) { S.lastNack = { seq: T.seq, why: 'illegal' }; if (durakMine()) durakSync('Так нельзя.'); return false; } return true; }
-  S.pendingAt = performance.now(); send('move', { seq: T.seq, m: mv }); return true;
+  S.pendingAt = performance.now(); S.pending = { seq: T.seq, m: mv, at: S.pendingAt, tries: 0 }; send('move', { seq: T.seq, m: mv }); return true;
 }
 function deal() { const T = S.T; if (!T) return; if (T.host === myId()) { if (T.ph === 'play' && T.G?.over) markReady(myId()); else hostDeal(); } else send('again'); }
 function markReady(pid) { const T = S.T; if (!T || T.host !== myId()) return; T.ready = [...new Set([...(T.ready || []), pid])]; const need = humans(T).filter((h) => !S.gone.has(h.id)).map((h) => h.id); if (need.every((id) => T.ready.includes(id))) hostDeal(); else bump(); }

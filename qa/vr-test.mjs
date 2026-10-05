@@ -299,6 +299,29 @@ const kb = await pg.evaluate(async () => { const i = document.createElement('inp
   const val = i.value; i.remove(); return { shown, val }; });
 ok(kb.shown && kb.val === 'hi', 'focusing a text field brings up the VR keyboard, and it types', JSON.stringify(kb));
 
+// ---- darts in VR: at the oche a dart sits in the right hand; swing it at the board and let go of the trigger ----
+await pg.evaluate(() => { const B = window.__game.tavern.boards[0]; window.__game.teleport(B.oche.x, B.oche.y, B.oche.z, B.yaw, 0); }); await pg.waitForTimeout(1500);
+await dev(() => { window.__iwer.quaternion.set(0, 0, 0, 1); }); await pg.waitForTimeout(300);
+await pg.evaluate(() => { window.__game.darts.open(0); window.__game.darts.vsAI(); }); await pg.waitForTimeout(900);
+let dv = await pg.evaluate(() => ({ ...window.__game.vr.phys(), overlay: getComputedStyle(document.querySelector('.darts')).display, ui: window.__game.vr.state().ui }));
+ok(dv.darts && dv.dartReady && dv.overlay === 'none' && !dv.ui, 'at the oche in VR: no 2D board, a dart in your hand', JSON.stringify(dv));
+const dartGo = await pg.evaluate(async () => {
+  const T = window.__ctx.THREE, rig = window.__ctx.scene.getObjectByName('xrRig'), B = window.__game.tavern.boards[0].hit, c = window.__iwer.controllers.right;
+  const tgt = rig.worldToLocal(B.c.clone()), start = new T.Vector3(0.18, 1.62, 0.05); c.position.set(start.x, start.y, start.z); c.quaternion.set(0, 0, 0, 1);   // IWER's vectors aren't three's
+  await new Promise((r) => setTimeout(r, 300));
+  // a 6 m/s throw at the board, aimed a little high for the drop
+  const dir = tgt.clone().sub(start); const dist = dir.length(); dir.normalize(); dir.y += 0.12 * dist / 2.4; dir.normalize();
+  c.updateButtonValue('trigger', 1); await new Promise((r) => setTimeout(r, 120));
+  let t0 = performance.now(); for (let i = 0; i < 9; i++) { await new Promise((r) => requestAnimationFrame(r)); const now = performance.now(), dt = (now - t0) / 1000; t0 = now; const P = c.position; P.set(P.x + dir.x * 6 * dt, P.y + dir.y * 6 * dt, P.z + dir.z * 6 * dt); }
+  c.updateButtonValue('trigger', 0); await new Promise((r) => setTimeout(r, 900));
+  const t = window.__game.darts.table(0); return { last: window.__game.vr.phys().lastDart, darts: t.darts.map((d) => d.l), turnN: t.turnN, lastBy: t.lastBy };
+});
+ok(!!dartGo.last && (dartGo.darts.length === 1 || dartGo.turnN > 0), 'swing and let go: the dart flies and scores where it meets the board', JSON.stringify(dartGo));
+ok(dartGo.last && Math.hypot(dartGo.last.x, dartGo.last.y) < 1.6, 'a straight 6 m/s throw at the board lands on (or near) it', JSON.stringify(dartGo.last));
+await shot('darts');
+await pg.evaluate(() => window.__game.teleport(206.8, 0, -402.8, 0, 0)); await pg.waitForTimeout(900);
+ok(!(await pg.evaluate(() => !!document.querySelector('.darts'))), 'walking away from the line puts the darts away');
+
 // ---- leave VR ----
 await pg.evaluate(() => window.__game.vr.exit()); await pg.waitForTimeout(800);
 s = await S(); const vmp = await pg.evaluate(() => window.__ctx.weapons.viewmodel.parent === window.__ctx.camera);

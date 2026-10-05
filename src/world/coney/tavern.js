@@ -512,7 +512,12 @@ function leave(how) {
 }
 function boardsWorld() {   // one board (the layout's dartboard): the face, its normal (−y in plan: −z here), where the thrower stands and faces
   const D = LAYOUT.darts, [bx, by, bz] = D.board.center, [sx, sy] = D.oche.thrower_stands_at;
-  return [{ i: 0, face: new THREE.Vector3(lx(bx), ly(bz), lz(by) + TZ.oz), normal: new THREE.Vector3(0, 0, -1), oche: new THREE.Vector3(lx(sx), SW, lz(sy) + TZ.oz), yaw: Math.PI }];
+  // hit: the painted face itself (0.17 ft proud of the wall) and the metres of board radius 1 (the outside of the double ring: the face is
+  // painted 2.5 × the layout radius wide, the board's 225 mm at 98 % of half of that, the double ring at 170 of the 225); right: the
+  // thrower's right in the world (the plan's x runs the other way)
+  const r1 = D.board.radius * 2.5 * FT / 2 * 0.98 * 170 / 225;
+  return [{ i: 0, face: new THREE.Vector3(lx(bx), ly(bz), lz(by) + TZ.oz), normal: new THREE.Vector3(0, 0, -1), oche: new THREE.Vector3(lx(sx), SW, lz(sy) + TZ.oz), yaw: Math.PI,
+    hit: { c: new THREE.Vector3(lx(bx), ly(bz), lz(by - 0.17) + TZ.oz), r1, right: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0, 1, 0) } }];
 }
 export const tavernChalk = (fn) => { if (Z?.chalk) Z.chalk.draw((g, w, h) => drawChalk(g, w, h, fn)); };
 export const tavernZ = () => Z;
