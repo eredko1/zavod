@@ -453,7 +453,7 @@ function drive(c, dt, now) {
   pose(c, dt);
 }
 function laneFreeLeft(c) { for (const o of T.cars) { if (!o.active || o === c) continue; const dx = o.x - c.x, dz = o.z - c.z, f = dx * c.dx + dz * c.dz; if (f < -6 || f > 35) continue; const l = dx * -c.dz + dz * c.dx; if (l < -1 && l > -7) return false; } return true; }
-function boxJammed(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v > 0.6) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 7) return true; } return false; }
+function boxJammed(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v > 0.6 || o.cleared !== n) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 9) return true; } return false; }   // only cars that are in the junction (past their line), not ones waiting at it
 function junctionClear(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v < 0.5) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 11) return false; } return true; }
 /** world pose from the path (+ lateral avoidance shift + crash knock-off) */
 function pose(c, dt) {

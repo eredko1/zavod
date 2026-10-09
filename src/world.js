@@ -85,7 +85,9 @@ export async function init(ctx) {
 
 export function update(dt, ctx) {
   if (!W) return;
-  const P = ctx.prof; if (!P) { for (let i = 0; i < updaters.length; i++) updaters[i](dt, ctx); return; }
+  // each updater on its own: one that throws (and keeps throwing) must not stop the rest — a broken flag animation once took
+  // every prompt on phones with it (no jet pack, no stealing cars). The error is logged once per updater.
+  const P = ctx.prof; if (!P) { for (let i = 0; i < updaters.length; i++) { try { updaters[i](dt, ctx); } catch (e) { const f = updaters[i]; if (!f.__err) { f.__err = 1; console.error('[updater]', e); } } } return; }
   for (let i = 0; i < updaters.length; i++) { const f = updaters[i], t = performance.now(); f(dt, ctx); P.mark('u:' + (f.__src || i), performance.now() - t); }
 }
 
