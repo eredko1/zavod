@@ -1,6 +1,7 @@
 // MAP: CONEY ISLAND — the amusement district, boardwalk and beach, 1:1 from an OSM plan (qa/tools/osm-coney.py) with hand-built
 // landmarks to the reference photos (qa/refs/coney). Levels: streets / amusement area / boardwalk y = 0 · beach sand −1.3 → −2.4
 // at the waterline (stairs every ~95 m) · pier deck 0 · wheel platform +0.6 · ballpark stands to +8. Owned by: CONEY agent.
+import { buildEvents } from '../coney/events.js';
 import { buildAveTraffic } from '../coney/avetraffic.js';
 import { buildShops } from '../coney/shops.js';
 import { buildStreetLife } from '../coney/streetlife.js';
@@ -110,6 +111,7 @@ export function build(world) {
   if (!skip.has('street')) try { buildStreet(world); } catch (e) { console.warn('[coney] street', e); }
   if (!skip.has('life')) try { buildStreetLife(world); } catch (e) { console.warn('[coney] street life', e); }
   if (!skip.has('traffic')) try { buildAveTraffic(world); } catch (e) { console.warn('[coney] 8th Ave traffic', e); }   // cars, cabs, vans and the B70 on 8th Ave by Soc Tav (coney/avetraffic.js)
+  if (!skip.has('events')) try { buildEvents(world); } catch (e) { console.warn('[coney] events', e); }   // muggings, arrests, fights, the ice-cream truck, ambulances (coney/events.js)
   if (!skip.has('shops')) try { buildShops(world); } catch (e) { console.warn('[coney] shops', e); }   // walk-in shops with people (coney/shops.js; rooms carved by fronts.js)   // pigeons, litter, delivery trucks, working bus stops (coney/streetlife.js)   // signals, poles + wires, bins, Surf Ave parking, vendor tables (coney/street.js), after traffic (it reads the signals)   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
 
   W.surfaceAt = (p) => {

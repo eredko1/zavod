@@ -65,6 +65,7 @@ export function buildFolk(world, spots, crowd) {
   ctx.bus.on('npcHurt', (d) => { if (d?.position) onCrime({ kind: d.dead ? 'kill' : 'hit', pos: d.position, name: d.name }); });
   world.updaters.push((dt) => { if (F?.world === world) update(dt); });
   setReporter(phoneCops);
+  W.folkSpotsList = F.spots;   // events.js stages things on these sidewalks
   W.folkObstacles = () => { const out = []; for (const E of F.active) if (!E.dead && (E.mode === 'walk' || E.mode === 'stand') && !E.s.sub) out.push(E.pos); return out; };   // traffic.js brakes for them   // chase.js: unseen crimes need a witness who phones it in
   if (typeof window !== 'undefined' && window.__game) window.__game.folk = folkQA;
   console.log('[folk]', F.spots.length, 'crowd spots can come alive ·', av.length, 'avatars');

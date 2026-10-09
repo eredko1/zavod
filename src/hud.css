@@ -131,7 +131,7 @@
 #hud .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; background: rgba(5,7,10,.35); }
 #hud .lock.on { opacity: 1; visibility: visible; pointer-events: auto; cursor: pointer; transition: opacity .2s, visibility 0s; }
 #hud .lock div { font: 600 calc(22px * var(--hs))/1 var(--fc); letter-spacing: .3em; text-transform: uppercase; padding: calc(14px * var(--hs)) calc(30px * var(--hs)); border: 1px solid rgba(233,236,239,.4); }
-#hud .toast { position: absolute; left: 50%; bottom: calc(var(--safe-y) + 30px * var(--hs)); transform: translateX(-50%); font: 500 var(--s)/1 var(--fb); letter-spacing: .2em; text-transform: uppercase; color: var(--fg); padding: calc(7px * var(--hs)) calc(14px * var(--hs)); background: rgba(5,7,10,.55); border-left: 2px solid var(--acc); opacity: 0; transition: opacity .2s; white-space: nowrap; }
+#hud .toast { position: absolute; left: 50%; bottom: calc(var(--safe-y) + 120px * var(--hs)); transform: translateX(-50%); font: 500 var(--s)/1 var(--fb); letter-spacing: .2em; text-transform: uppercase; color: var(--fg); padding: calc(7px * var(--hs)) calc(14px * var(--hs)); background: rgba(5,7,10,.55); border-left: 2px solid var(--acc); opacity: 0; transition: opacity .2s; white-space: nowrap; }
 #hud .toast.on { opacity: 1; }
 
 /* score popups */
@@ -359,3 +359,13 @@
 #hud .deploybrief .k { font: 700 calc(15px * var(--hs))/1 var(--fc); letter-spacing: .32em; color: var(--acc); text-transform: uppercase; margin-bottom: 8px; }
 #hud .deploybrief .v { font: 400 calc(14px * var(--hs))/1.45 var(--fb); color: var(--fg); text-shadow: 0 1px 8px rgba(0,0,0,.8); }
 @media (max-height: 560px) { #hud .mainmenu .brief { display: none; } }
+
+/* chill mode (GTA): no Wave / Score / Mercs; death is WASTED, an arrest BUSTED — big italic script, the card after the slow-mo */
+#hud.chill .obj { display: none; }
+#hud .dead.gta .stats, #hud .dead.gta .rule, #hud .dead.gta .center > .grid, #hud .dead.gta [class*='stat'] { display: none !important; }
+#hud .dead.gta .kia, #hud .dead.on.gta .kia { font: italic 900 clamp(64px, 13vw, 168px)/1 "Pricedown", "Impact", "Arial Black", sans-serif; letter-spacing: .02em; color: #c0141c; -webkit-text-stroke: 3px #000; text-shadow: 0 4px 0 #000; animation: gtaIn .5s 1.5s both; }
+#hud .dead.gta .sub, #hud .dead.gta .btns { animation: gtaIn .5s 1.9s both; }
+#hud .dead.gta .backdrop { background: rgba(0,0,0,.25); }
+@keyframes gtaIn { from { opacity: 0; transform: scale(1.25); } to { opacity: 1; transform: none; } }
+#gtaBusted { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 60; pointer-events: none; font: italic 900 clamp(64px, 13vw, 168px)/1 "Pricedown", "Impact", "Arial Black", sans-serif; color: #1f5fd8; -webkit-text-stroke: 3px #000; text-shadow: 0 4px 0 #000; }
+#gtaBusted.on { display: flex; animation: gtaIn .5s 1.4s both; }

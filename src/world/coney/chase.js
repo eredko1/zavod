@@ -340,6 +340,7 @@ function brain(u, s, vis) {
 function busted() {
   if (!K) return; K.bustT = 0; const ctx = K.ctx;
   try { ctx.bus.emit('busted', {}); } catch {}
+  try { if (ctx.mode === 'chill') ctx.hud?.busted?.(); } catch {}
   wasted();
 }
 function brainInner(u, s, vis) {
@@ -605,7 +606,7 @@ function updateRemotes(dt) {
 // HUD: wanted stars, top centre-right; flashing while you are out of sight (evading); the crew line under it
 function buildUI() {
   const css = document.createElement('style'); css.textContent = `
-  .chwanted{position:fixed;top:calc(max(10px,env(safe-area-inset-top)) + clamp(40px,6.5vh,56px));left:56%;z-index:41;pointer-events:none;text-align:center;opacity:0;transition:opacity .35s;font-family:'Barlow Condensed',Arial,sans-serif}
+  .chwanted{position:fixed;top:calc(max(10px,env(safe-area-inset-top)) + clamp(78px,11vh,96px));right:calc(max(14px,env(safe-area-inset-right)) + 4px);left:auto;z-index:41;pointer-events:none;text-align:right;opacity:0;transition:opacity .35s;font-family:'Barlow Condensed',Arial,sans-serif}
   .chwanted.on{opacity:1}
   .chwanted .st{font-size:clamp(22px,3.6vw,34px);letter-spacing:.06em;line-height:1;white-space:nowrap}
   .chwanted .st i{font-style:normal;color:rgba(255,255,255,.2);text-shadow:0 1px 2px rgba(0,0,0,.8);-webkit-text-stroke:1px rgba(0,0,0,.55)}

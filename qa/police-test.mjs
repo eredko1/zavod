@@ -33,7 +33,7 @@ await pg.waitForTimeout(7500); s = await S();
 ok(r.callers.length >= 1 && hit && s.stars === 0, 'hit the caller and the call is dropped (no stars)', JSON.stringify({ r, hit, s }));
 // the search circle: reported, then run 250 m away out of sight; the circle shows on the map, the stars clear 8 s outside it
 await N(() => { window.__game.chase.clear?.(); window.__game.chase.report('shot'); }); await pg.waitForTimeout(300);
-await N(() => window.__game.teleport(380, 0.3, -420, 0, 0)); await pg.waitForTimeout(3500);
+await N(() => window.__game.teleport(-330, 0.3, 230, 0, 0)); await pg.waitForTimeout(3500);
 const circle = await N(() => window.__ctx.world.mapSearch?.()); s = await S();
 ok(circle && circle[2] >= 75 && s.stars >= 1 && s.evading, 'lost sight of you: the search circle is on the map, you are outside it', JSON.stringify({ circle, s }));
 await pg.screenshot({ path: `${out}/police-search.png` });

@@ -93,6 +93,7 @@ export async function init(ctx) {
     damageFrom: (v) => damageFrom(H, v),
     killfeed: (text) => killfeed(H, text, false),
     toast: (text, ms = 2200) => toast(H, text, ms),
+    busted: () => bustedCard(H),
     scorePopup: (text, headshot = false) => scorePopup(H, text, headshot),
     wave: (n, total, enemies) => showWave(H, n, total, enemies),
     showMenu: () => ctx.setState('menu'),
@@ -368,6 +369,12 @@ function onState(H, state, prev) {
   H.ui = state === 'menu' ? L.menu : state === 'paused' ? L.pause : state === 'dead' ? L.dead : state === 'victory' ? L.vic : null;
   if (H.ui) select(H, 0);
   if (state === 'dead' || state === 'victory') fillStats(H, L[state === 'dead' ? 'dead' : 'vic']);
+  // chill mode plays like GTA: no Wave / Score / Mercs, and death is WASTED — the picture drains, time crawls for 1.5 s, then the card
+  document.getElementById('hud')?.classList.toggle('chill', H.ctx.mode === 'chill');
+  if (H.ctx.mode === 'chill') { const cv = gameCanvas(H);
+    if (state === 'dead') { if (cv) cv.style.filter = 'grayscale(1) contrast(1.15) brightness(0.8)'; const k = L.dead.querySelector('.kia'); if (k) k.textContent = 'WASTED'; L.dead.classList.add('gta');
+      if (!H.slow) { H.slow = true; H.ctx.time.scale = 0.3; setTimeout(() => { H.ctx.time.scale = 1; H.slow = false; }, 1500); } }
+    else if (cv && !H.bustOn) cv.style.filter = ''; }
   if (state === 'dead') {
     const on = !!H.ctx.net?.connected, r = L.dead.querySelector('[data-act="retry"]'); if (r) r.style.display = on ? 'none' : '';
     const c = L.dead.querySelector('[data-cause]'), dn = H.ctx.deathNote, note = dn && performance.now() - dn.at < 8000 ? dn.text : null;   // say what actually got you
@@ -379,6 +386,16 @@ function onState(H, state, prev) {
   if (state === 'playing' && prev && prev !== 'paused') { H.c.hpOn = null; }
 }
 const root = (H) => H.root;
+/** the 3D view's canvas (the biggest one: the minimap and the HUD have their own) */
+const gameCanvas = (H) => H.ctx.renderer?.domElement || [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+/** BUSTED (chill): the cops got you — the same drained picture, a blue card for three seconds */
+export function bustedCard(H) {
+  const cv = gameCanvas(H); let el = document.getElementById('gtaBusted');
+  if (!el) { el = document.createElement('div'); el.id = 'gtaBusted'; el.textContent = 'BUSTED'; document.body.appendChild(el); }
+  H.bustOn = true; if (cv) cv.style.filter = 'grayscale(1) contrast(1.15) brightness(0.8)'; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  H.ctx.time.scale = 0.3; setTimeout(() => { H.ctx.time.scale = 1; }, 1500);
+  setTimeout(() => { el.classList.remove('on'); H.bustOn = false; if (cv && H.ctx.state !== 'dead') cv.style.filter = ''; }, 3200);
+}
 
 function fillStats(H, layer) {
   const ai = H.ctx.ai || {};
