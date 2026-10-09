@@ -785,7 +785,8 @@ function busStop(c) {
   if (d < 50) c.shiftT = S.shift; else if (!c.avoid) c.shiftT = 0;
   if (d < 0.9 && c.v < 0.8) { c.state = 'dwell'; c.stateT = 0; c.stopI = c.nextStop; c.dwellT = DWELL; c.nextStop = (c.nextStop + 1) % r.stops.length; c.v = 0; if (T.ride?.c === c) { const R = T.ride, tav = T.world.W?.tavern; R.stops = (R.stops || 0) + 1;
       // a few stops in, the bus runs on (via the Belt) to 8 Av: Soccer Tavern — stay on for it, F to get off here
-      if (tav && R.stops >= 3) { T.ride = null; if (T.ctx.player.mounted?.bus) T.ctx.player.mounted = null; tav.arrive('bus'); return null; }
+      const runOn = R.stops >= 3 || (R.stops >= 2 && performance.now() - (R.t0 || 0) > 120000);   // three stops, or two once you've been on two minutes (signals on the avenues make it slow)
+      if (tav && runOn) { T.ride = null; if (T.ctx.player.mounted?.bus) T.ctx.player.mounted = null; tav.arrive('bus'); return null; }
       T.ctx.hud?.toast?.(`This is ${S.name}. ${T.ctx.isTouch ? 'GET OFF' : 'F'} to get off · ${tav ? `${3 - R.stops} more stop${R.stops === 2 ? '' : 's'}, then on to 8 Av · Soccer Tavern` : `next: ${r.stops[c.nextStop].name}`}`, 3600); }
     return null; }
   return d < 70 ? { d: d + S0 - 0.5 } : null;
@@ -836,7 +837,7 @@ function busInteract() {
 function boardBus(c) {
   const p = T.ctx.player; if (T.ride || p.mounted || T.ctx.vehicles?.mounted) return;
   const B = c.B, free = B.seats.filter((s) => s.face && !B.used.includes(s)); const seat = free[(free.length * 0.4) | 0] || B.seats[0];
-  T.ride = { c, seat, head: null }; p.mounted = { bus: true, route: c.route.id };
+  T.ride = { c, seat, head: null, t0: performance.now() }; p.mounted = { bus: true, route: c.route.id };
   T.ctx.hud?.toast?.(`On the ${c.route.id}. Next stop: ${c.route.stops[c.nextStop].name}. ${T.world.W?.tavern ? 'Stay on three stops and it runs on to 8 Av · Soccer Tavern. ' : ''}${T.ctx.isTouch ? 'GET OFF' : 'F'} at a stop to get off.`, 4200);
   T.ctx.bus.emit('busBoard', { route: c.route.id });
 }

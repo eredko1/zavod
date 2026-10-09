@@ -11,6 +11,7 @@
 // Getting here: ride the D past Bay 50 St (→ 62 St, change for the N → 8 Av), or take EXIT 7B off the Belt loop in a car.
 // Getting back: the N at 8 Av (F at the station entrance → Stillwell), drive off either end of 8th Ave (→ the Belt), or T.
 // Interior is lit by baked shading (unlit materials): no runtime lights, identical day and night. CONEY agent (tavern).
+import { extraFronts } from './fronts.js';
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hangkit as K } from '../hangkit.js';
@@ -24,6 +25,8 @@ export const TZ = { x0: -125, x1: 125, z0: -12052, z1: -11948, oz: -12000 };   /
 const SW = 0.15;                                                                // sidewalk / bar floor height
 const ROAD = 6, WALK = 10.5;                                                    // road half-width, building line
 const ST60 = [-30, -18], ST61 = [62, 74];                                        // the cross streets (local x)
+/** 8th Ave's layout for the street kit (coney/street.js avenueKit): the avenue along x at the zone's z, the two cross streets */
+export const AVE8 = { ZC: TZ.oz, HALF: ROAD, SW, CW: 6, X0: -104, X1: 106, cross: [{ x: (ST60[0] + ST60[1]) / 2, name: '60 St' }, { x: (ST61[0] + ST61[1]) / 2, name: '61 St' }] };
 // the room is built from the owner's layout (tavern-layout.json, feet, plan frame: x toward the entrant's right, y toward the
 // back, z up; origin the front-left interior corner). Plan x runs along local −x (walking in you face +z, your right is −x).
 const FT = 0.3048;
@@ -94,7 +97,7 @@ export function buildTavern(world) {
       }
     }
   }
-  const brickTint = [0x9a4a36, 0x8a5a44, 0xb07a5a, 0x7e3f30, 0xa8876a, 0x92523e];
+  const brickTint = [0x9a4a36, 0x8a5a44, 0xb07a5a, 0x7e3f30, 0xa8876a, 0x92523e], walkIns = [];
   for (const B of bld) {
     const w = B.x1 - B.x0, fz = B.sd * WALK, gf = 4.3, h = B.hero === 'tavern' ? 7.6 : gf + (B.floors - 1) * 3.1 + 0.7; B.h = h;
     const depth = B.hero === 'tavern' ? 62 * FT : 16, cx = (B.x0 + B.x1) / 2, back = fz + B.sd * depth;
@@ -106,6 +109,10 @@ export function buildTavern(world) {
       { const c0 = BAR.ceil + 0.06, r = new THREE.BoxGeometry(lx(-0.5) - lx(20), h - c0, depth); r.translate((lx(-0.5) + lx(20)) / 2, (h + c0) / 2, (fz + back) / 2); put(M.side, r); } }
     const colour = brickTint[Math.floor(rnd() * brickTint.length)];
     if (B.hero === 'tavern') { B.job = job(w, h, 64 * D, (g, W2, H2) => drawTavernFacade(g, W2, H2, w, h)); continue; }
+    // a few shops you can walk into (real glass and an open door, built by fronts.js) in place of the painted front
+    if (!B.hero && B.shop && w >= 6 && walkIns.length < (lite ? 2 : 4) && !walkIns.some((q) => Math.abs((q.A[0] + q.B[0]) / 2 - (B.x0 + B.x1) / 2) < 30 && Math.sign(q.A[1] - TZ.oz) === Math.sign(fz)) && rnd() < 0.5) { walkIns.push({ A: [B.sd < 0 ? B.x0 : B.x1, fz + TZ.oz], B: [B.sd < 0 ? B.x1 : B.x0, fz + TZ.oz], poly: [[B.x0, fz + TZ.oz], [B.x1, fz + TZ.oz], [B.x1, back + TZ.oz], [B.x0, back + TZ.oz]],
+        store: { n: B.shop.en, s: B.shop.zh, st: 'box', bg: B.shop.bg, fg: B.shop.fg, aw: B.shop.awn != null ? '#' + B.shop.awn.toString(16).padStart(6, '0') : null, k: /bakery|roast/.test(B.shop.kind) ? 'restaurant' : /travel|tax|driving/.test(B.shop.kind) ? 'bank' : 'convenience' }, enter: true });
+      B.walkIn = true; }
     // upper floors: the shared brick-and-windows material (lit by the sun: it's day or night out here)
     { const g = new THREE.PlaneGeometry(w, h - gf); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / 1.75 + (B.x0 % 1.75) / 1.75, uv.getY(i) * (h - gf) / 3.1 - 0.02);
       if (B.sd > 0) g.rotateY(Math.PI); g.translate(cx, gf + (h - gf) / 2, fz - B.sd * 0.01); setColor(g, colour); put(M.upper, g); }
@@ -113,15 +120,16 @@ export function buildTavern(world) {
     { const g = new THREE.BoxGeometry(w, 0.28, 0.45); g.translate(cx, h - 0.2, fz - B.sd * 0.2); shade(g, B.floors > 2 ? 0x8d877c : 0x5b4a40); put(M.prop, g); }
     { const g = new THREE.BoxGeometry(w, 0.16, 0.25); g.translate(cx, gf, fz - B.sd * 0.1); shade(g, 0x7e7a72); put(M.prop, g); }
     // the storefront (atlas)
-    const pxm = (B.hero ? 48 : 30) * D; B.job = job(w, gf, pxm, (g, W2, H2) => drawStore(g, W2, H2, B.shop, w));
+    const pxm = (B.hero ? 48 : 30) * D; if (!B.walkIn) B.job = job(w, gf, pxm, (g, W2, H2) => drawStore(g, W2, H2, B.shop, w));
     // awning or sign box
-    if (B.shop.awn) { const aw = new THREE.BoxGeometry(w - 0.3, 0.06, 1.3); aw.rotateX(B.sd * -0.32); aw.translate(cx, gf - 0.55, fz - B.sd * 0.62); shade(aw, B.shop.awn); put(M.prop, aw);
+    if (B.shop.awn && !B.walkIn) { const aw = new THREE.BoxGeometry(w - 0.3, 0.06, 1.3); aw.rotateX(B.sd * -0.32); aw.translate(cx, gf - 0.55, fz - B.sd * 0.62); shade(aw, B.shop.awn); put(M.prop, aw);
       const va = new THREE.BoxGeometry(w - 0.3, 0.32, 0.03); va.translate(cx, gf - 0.9, fz - B.sd * 1.22); shade(va, B.shop.awn); put(M.prop, va); }
     // fire escape on the taller ones (not on phones)
     if (!lite && B.floors >= 3 && rnd() < 0.7 && w > 5.5) fireEscape(put, M, cx, fz, B.sd, gf, B.floors, Math.min(4.2, w - 1.2));
     // AC units in a few windows
     if (!lite) for (let f = 1; f < B.floors; f++) if (rnd() < 0.35) { const ax = B.x0 + 0.9 + Math.floor(rnd() * Math.max(1, Math.floor(w / 1.75))) * 1.75; const g = new THREE.BoxGeometry(0.62, 0.42, 0.5); g.translate(Math.min(B.x1 - 0.5, ax), gf + (f - 1) * 3.1 + 1.25, fz - B.sd * 0.24); shade(g, 0xc9c6bf); put(M.prop, g); }
   }
+  try { extraFronts(world, walkIns); } catch (e) { console.warn('[tavern] walk-in shops', e); }
   // far backdrop: the avenue runs on (cheap boxes with the same window material), and the cross streets end in blocks
   { const far = []; for (const sd of [-1, 1]) for (let x = -300; x < 300; x += 7 + rnd() * 3) { if (x > -106 && x < 108) continue; far.push([x, sd, 7 + rnd() * 3, 7 + Math.floor(rnd() * 3) * 3.1]); }
     for (const [a, b] of [ST60, ST61]) for (const sd of [-1, 1]) far.push([(a + b) / 2, sd * 5.5, b - a + 8, 11, true]);
