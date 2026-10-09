@@ -1,7 +1,7 @@
 // MAP: CONEY ISLAND — the amusement district, boardwalk and beach, 1:1 from an OSM plan (qa/tools/osm-coney.py) with hand-built
 // landmarks to the reference photos (qa/refs/coney). Levels: streets / amusement area / boardwalk y = 0 · beach sand −1.3 → −2.4
 // at the waterline (stairs every ~95 m) · pier deck 0 · wheel platform +0.6 · ballpark stands to +8. Owned by: CONEY agent.
-import { buildStreet } from '../coney/street.js';
+import { buildStreet, buildStreetLights } from '../coney/street.js';
 import { buildFronts } from '../coney/fronts.js';
 import * as THREE from 'three';
 import { makeConeyMats } from '../coney/mats.js';
@@ -44,7 +44,8 @@ export function build(world) {
   const M = makeConeyMats(world); world.mats = M;
   addBusLoop(OSM);   // the Stillwell bus loop joins the street network first (city paints it, traffic drives it)
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
-  try { buildFronts(world, M); } catch (e) { console.warn('[coney] fronts', e); }   // real storefronts, walk-up fire escapes + cornices, Surf Ave arches + billboards (coney/fronts.js)
+  try { buildFronts(world, M); } catch (e) { console.warn('[coney] fronts', e); }
+  try { buildStreetLights(world, M); } catch (e) { console.warn('[coney] street lights', e); }   // NYC cobra-heads on every street (before horizon: it lights the lenses at night)   // real storefronts, walk-up fire escapes + cornices, Surf Ave arches + billboards (coney/fronts.js)
   ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
   try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)

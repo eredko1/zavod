@@ -185,13 +185,13 @@ async function prewarm() {
   // phones: the big merged static meshes nobody raycasts (parked cars, Brighton, the backdrop, 8th Ave) are on the GPU now,
   // their JS copies are dead weight (~35 MB): iOS kills the tab near its memory ceiling
   if (ctx.lite) { const rt = new Set(ctx.raycastTargets || []), seen = new Set();
-    scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern):/.test(o.name || '')) return; seen.add(g);
+    scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern|street|fronts):/.test(o.name || '')) return; seen.add(g);
       if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }); }
   // phones: the big static buildings' own geometry (city, landmarks, boardwalk, the viaduct …) was kept in JS only so bullets,
   // sight lines and footsteps could raycast it (~120 MB + its BVH). Those raycasts go to one invisible mesh of the collision
   // boxes instead (the same shapes, a few MB); the originals stay on the GPU and drop their JS copies. Ground meshes stay.
   if (ctx.lite && ctx.colliders?.length) {
-    const heavy = (o) => o.isMesh && !o.isSkinnedMesh && !o.userData.onHit && !o.userData.soldier && /^(city|cityFar|landmarks|luna|viaduct|shore|park|brighton|tavern|stillwell|surfKit):/.test(o.name || '') && !/ground/i.test(o.name) && o.geometry?.attributes?.position?.array;
+    const heavy = (o) => o.isMesh && !o.isSkinnedMesh && !o.userData.onHit && !o.userData.soldier && /^(city|cityFar|landmarks|luna|viaduct|shore|park|brighton|tavern|stillwell|surfKit|streetLights):/.test(o.name || '') && !/ground/i.test(o.name) && o.geometry?.attributes?.position?.array;
     const drop = ctx.raycastTargets.filter(heavy);
     if (drop.length) {
       const pos = [], idx = []; let v = 0;

@@ -94,6 +94,11 @@ function buildGraph(world) {
     n.ctrl = 'signal'; n.sig = { off: (hash(bi, 7) % CYC), grp: new Map(), ax: main.dx, az: main.dz, heads: [] }; nsig++;
     for (const e of n.adj) n.sig.grp.set(e.to, Math.abs(e.dx * main.dx + e.dz * main.dz) > 0.7 ? 0 : 1);
   }
+  // NYC: every avenue crossing is signalised (an avenue ≥ 14 m meeting a street ≥ 9 m), not only the big five
+  nodes.forEach((n, bi) => { if (n.sig || n.adj.length < 3 || n.maxW < 14) return; const main = n.adj.reduce((m, e) => (e.w > m.w ? e : m), n.adj[0]);
+    if (!n.adj.some((e) => Math.abs(e.dx * main.dx + e.dz * main.dz) < 0.5 && e.w >= 9)) return;
+    n.ctrl = 'signal'; n.sig = { off: (hash(bi, 7) % CYC), grp: new Map(), ax: main.dx, az: main.dz, heads: [] }; nsig++;
+    for (const e of n.adj) n.sig.grp.set(e.to, Math.abs(e.dx * main.dx + e.dz * main.dz) > 0.7 ? 0 : 1); });
   console.log('[traffic] road nodes', nodes.filter((n) => n.adj.length).length, '· directed segments', segs.length, '· dropped (blocked)', dropped, '· signals', nsig);
   return { nodes, segs, total, grid };
 }
@@ -232,6 +237,7 @@ export function buildTraffic(world) {
   T.G = buildGraph(world); if (!T.G.segs.length) { console.warn('[traffic] no roads'); return null; }
   // the signalised junctions for the street kit (coney/street.js draws the heads, folk.js crosses on the WALK): where they are, the
   // streets into them, and the phase for traffic heading (hx, hz) into one, on the same wall clock the cars obey
+  W.junctions = T.G.nodes.filter((n) => n.adj.length >= 3).map((n) => ({ x: n.x, z: n.z, ctrl: n.ctrl, maxW: n.maxW, ways: n.adj.map((e) => ({ dx: e.dx, dz: e.dz, w: e.w })) }));   // stop signs + name blades (coney/street.js)
   W.signals = { list: T.G.nodes.filter((n) => n.sig).map((n) => ({ x: n.x, z: n.z, ways: n.adj.map((e) => ({ dx: e.dx, dz: e.dz, w: e.w })), n })),
     state: (j, hx, hz, now = Date.now()) => { const n = j.n, t = ((now / 1000 + n.sig.off) % CYC + CYC) % CYC, g = Math.abs(hx * n.sig.ax + hz * n.sig.az) > 0.7 ? 0 : 1;
       return g === 0 ? (t < 14 ? 'G' : t < 17 ? 'Y' : 'R') : (t >= 18 && t < 30 ? 'G' : t >= 30 && t < 33 ? 'Y' : 'R'); } };
@@ -395,13 +401,16 @@ function drive(c, dt, now) {
     if (d < -0.5) c.cleared = q[2];
     else if (jn.ctrl === 'signal') {
       const st = signalFor(jn, q[1], now);
-      if (st === 'G' || (st === 'Y' && c.v * c.v / (2 * 3.5) > d)) { if (d < 1) c.cleared = q[2]; }
+      const boxed = st === 'G' && d < 3 && c.v < 1 && boxJammed(c, q[2]);   // don't block the box: green, but a stopped car is still in the junction
+      if (boxed) { c.boxT = (c.boxT || 0) + dt; }
+      if ((st === 'G' || (st === 'Y' && c.v * c.v / (2 * 3.5) > d)) && (!boxed || c.boxT > 5)) { if (d < 1) { c.cleared = q[2]; c.boxT = 0; } }
+      else if (boxed) { const ai = idm(c.v, v0, Math.max(0.05, d), c.v, AM); if (ai < a) { a = ai; lim = 'box'; } }
       else { const ai = idm(c.v, v0, d, c.v, AM); if (ai < a) { a = ai; lim = 'signal'; } }
     } else {
       const minor = c.w < jn.maxW || jn.adj.every((e) => e.w === jn.maxW);
       if (!minor) c.cleared = q[2];
       else {
-        if (d < (c.bus ? 4 : 1.6) && c.v < 0.4) c.stopT += dt;   // a bus stops further back from the line
+        if (d < (c.bus ? 6 : 4) && c.v < 0.4) c.stopT += dt;   // stopped at (or a car length short of) the line: a bus stops further back; IDM's standstill gap used to park cars 2 m short and they waited for ever
         if (c.stopT > 0.9 && (junctionClear(c, q[2]) || c.stopT > 6)) c.cleared = q[2];   // six seconds at a stop sign: take your turn
         else { const ai = idm(c.v, v0, Math.max(0.05, d), c.v, AM); if (ai < a) { a = ai; lim = 'stop'; } }
       }
@@ -444,6 +453,7 @@ function drive(c, dt, now) {
   pose(c, dt);
 }
 function laneFreeLeft(c) { for (const o of T.cars) { if (!o.active || o === c) continue; const dx = o.x - c.x, dz = o.z - c.z, f = dx * c.dx + dz * c.dz; if (f < -6 || f > 35) continue; const l = dx * -c.dz + dz * c.dx; if (l < -1 && l > -7) return false; } return true; }
+function boxJammed(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v > 0.6) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 7) return true; } return false; }
 function junctionClear(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v < 0.5) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 11) return false; } return true; }
 /** world pose from the path (+ lateral avoidance shift + crash knock-off) */
 function pose(c, dt) {
@@ -674,7 +684,7 @@ export const trafficQA = {
   toBusDriver(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, BUS.eye.x, -BUS.w / 2 - 0.8, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h - Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
   ride: () => T.ride ? { route: T.ride.c.route.id, bus: T.ride.c.id, x: r2(T.ctx.player.position.x), z: r2(T.ctx.player.position.z) } : null,
   state: () => T && { cars: T.cars.filter((c) => c.active && !c.bus).length, budget: T.budget, ring: T.ring, moving: T.cars.filter((c) => c.active && c.v > 1).length, people: T.people.filter((p) => p.car).length, ...T.stats, jackable: T.jackable ? T.jackable.id : null },
-  cars: () => T ? T.cars.filter((c) => c.active).map((c) => ({ id: c.id, kind: c.kind, x: r2(c.x), z: r2(c.z), v: r2(c.v), h: r2(c.h), state: c.state, driver: c.driver, real: !!c.real, road: r2(roadDist(c.x, c.z)), lane: c.lane })) : [],
+  cars: () => T ? T.cars.filter((c) => c.active).map((c) => ({ lim: c.lim, wait: +(c.waitT || 0).toFixed(1), ghost: +(c.ghostT || 0).toFixed(1), q: c.q?.slice(0, 4), cleared: c.cleared, id: c.id, kind: c.kind, x: r2(c.x), z: r2(c.z), v: r2(c.v), h: r2(c.h), state: c.state, driver: c.driver, real: !!c.real, road: r2(roadDist(c.x, c.z)), lane: c.lane })) : [],
   roadDist,
   /** stand at the driver's door of car id (or the nearest active car) */
   toDoor(id) { const c = id != null ? T.cars[id] : T.cars.filter((c) => c.active).sort((a, b) => Math.hypot(a.x - T.ctx.player.position.x, a.z - T.ctx.player.position.z) - Math.hypot(b.x - T.ctx.player.position.x, b.z - T.ctx.player.position.z))[0]; if (!c?.active) return null; c.v = 0; c.hold = true; doorPos(c, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h - Math.PI / 2, 0); return c.id; },
