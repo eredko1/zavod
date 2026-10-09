@@ -27,7 +27,7 @@ export function createTablet(host) {
   // ---- painting --------------------------------------------------------------------------------------------------------------
   function content(ctx) {
     const K = host.K, st = K.state?.() || {}, W = ctx.weapons, out = [];
-    if (T.tab === 'act') for (const [t, k] of ACTS) out.push({ t, act: () => doAct(ctx, k), on: k === 'crouch' && V.crouch });
+    if (T.tab === 'act') for (const [t, k] of ctx.trainCab ? ACTS.map((a) => (a[1] === 'KeyX' ? ['🔀 YARD SWITCH', 'KeyY'] : a)) : ACTS) out.push({ t, act: () => doAct(ctx, k), on: k === 'crouch' && V.crouch });
     else if (T.tab === 'bag') {
       const inv = st.inv || [], seen = new Map(); for (const it of inv) if (!host.ITEMS[it]?.keep) seen.set(it, (seen.get(it) || 0) + 1);
       for (const [it, n] of seen) { const I = host.ITEMS[it] || {}; out.push({ t: `${I.icon || '•'} ${(I.name || it).split(' (')[0]}`, sub: n > 1 ? `×${n}` : '', act: () => host.P.hold(ctx, it), on: V.held?.item === it }); }
@@ -156,7 +156,7 @@ export function createTablet(host) {
   }
   function laserShow(H, d) { const L = H.laser; if (!L) return; L.line.visible = true; L.line.scale.z = d; L.line.material.color.set(0x7dffb0); L.dot.visible = true; L.dot.position.set(0, 0, -d + 0.002); }
   function hitAt(x, y) { const px = (x / TW + 0.5) * CW, py = (0.5 - y / TH) * CH; return T.rects.findIndex((r) => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h); }
-  function sigOf(ctx) { const st = host.K.state?.() || {}, W = ctx.weapons; return [T.tab, T.page, T.hot, T.help, (st.inv || []).join(), W?.currentId, W?.current?.ammo, (W?.bag || []).join(), V.crouch, V.tabOn, V.held?.item, JSON.stringify(prefs), ctx.net?.scores?.().length].join('|'); }
+  function sigOf(ctx) { const st = host.K.state?.() || {}, W = ctx.weapons; return [T.tab, T.page, T.hot, T.help, (st.inv || []).join(), W?.currentId, W?.current?.ammo, (W?.bag || []).join(), V.crouch, V.tabOn, V.held?.item, !!ctx.trainCab, JSON.stringify(prefs), ctx.net?.scores?.().length].join('|'); }
   function hide() { mesh.visible = T.shown = false; V.wrist.shown = false; T.near = T.over = false; }
 
   // ---- the first-time walk-through --------------------------------------------------------------------------------------------

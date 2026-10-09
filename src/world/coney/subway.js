@@ -12,11 +12,12 @@ import { W8 } from './w8th.js';
 import { hangkit as K } from '../hangkit.js';
 import { makeR160, drawLED, rideAudio, pa } from './r160.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildYard } from './yard.js';
 
 const CAR = 18.4, NCAR = 6, LEN = CAR * NCAR, RAIL = 7.5, FLOOR = 1.1;   // car floor = platform height above top of rail
 const VMAX = 13, ACC = 1.1, DWELL = { STW: 30, W8: 20, NEP: 30, OCP: 25, B50: 25 };
 const STW_X = -54.8, STW_Z0 = -440, STW_ZS = -266;                         // Stillwell track 3 (F): platform north → south end
-const NEP_Z = -492;                                                        // Neptune Av: where the Culver el crosses Neptune Ave
+const NEP_Z = -492, YARD_JZ = -570;   // YARD_JZ: where the yard lead leaves the el                                                        // Neptune Av: where the Culver el crosses Neptune Ave
 // the three lines out of Stillwell, on their real tracks and OSM alignments. Stops past the map edge are `hidden`: the train
 // runs on out of sight and comes back; riders are put off at the last stop in the map (the announcements stay right).
 const LINES_CFG = [
@@ -37,7 +38,7 @@ const LINES_CFG = [
 const NAMES = { STW: ['Coney Island–Stillwell Av', 'Coney Island–Stillwell Avenue'], W8: ['W 8 St–NY Aquarium', 'West 8th Street–New York Aquarium'], NEP: ['Neptune Av', 'Neptune Avenue'],
   OCP: ['Ocean Pkwy', 'Ocean Parkway'], N8: ['8 Av', '8th Avenue, Sunset Park'], BRT: ['Brighton Beach', 'Brighton Beach'], B50: ['Bay 50 St', 'Bay 50th Street'], A25: ['25 Av', '25th Avenue'] };
 const LINES = [], STN = {}, G = { hudT: 0 }; let MAPR = null, MAPS = null;   // G: the shared HUD / clocks / PA state
-let R = null, SKEW = 0;
+let R = null, SKEW = 0, YD = null;   // YD: Coney Island Yard (coney/yard.js)
 const W8U = new THREE.Vector2(W8.P1.x - W8.P0.x, W8.P1.y - W8.P0.y).normalize();   // R: the line being updated (every function below works on R)
 
 export function buildSubway(world) {
@@ -52,6 +53,10 @@ export function buildSubway(world) {
     if (offs.length > 1) console.log(`[subway] ${cfg.id}: ${offs.length} trains, every ~${Math.round(first.cycle / offs.length)} s`);
   }
   if (!LINES.length) return; R = LINES[0];
+  // Coney Island Yard: its lead turns off the West End / Sea Beach el (the D and the N share it here) north of Neptune Ave
+  try { const X = LINES.find((q) => q.id === 'D' && !q.extraOf) || LINES.find((q) => q.id === 'N' && !q.extraOf), i = X ? X.P.findIndex((p) => p.z < YARD_JZ) : -1;
+    if (i > 3 && i < X.P.length - 4) { const J = X.P[i], dir = X.P[i + 3].clone().sub(X.P[i - 3]).setY(0).normalize();
+      YD = buildYard(world, { J, dir, rail: J.y, sources: LINES.filter((q) => !q.extraOf && (q.id === 'F' || q.id === 'Q')).map((q) => q.cars), car: { CAR, NCAR } }); } } catch (e) { console.warn('[subway] yard', e); }
   world.updaters.push((dt) => { for (const L of LINES) { R = L; update(dt); } R = LINES.find((L) => L.aboard) || LINES[0]; const t = now() % R.cycle; hud(t); if ((G.hudT & 7) === 1) stationLife(); });
   addEventListener('keydown', (e) => { const L = LINES.find((q) => q.aboard); if (L && L.canAlight && e.code === 'KeyF' && !e.repeat && ctx.state === 'playing') { e.preventDefault(); e.stopImmediatePropagation(); R = L; alight(); } }, true);   // F at a stop: off (before the weapon's inspect grabs F)
   const offAll = () => { for (const L of LINES) if (L.aboard) { R = L; alight(true); } };
@@ -63,7 +68,7 @@ export function buildSubway(world) {
     local: () => { const L = LINES.find((q) => q.aboard); return L ? [L.li * 10 + L.aboard.c, +L.aboard.lx.toFixed(2), +L.aboard.lz.toFixed(2)] : null; },
     toWorld: (c, lx, lz, out = new THREE.Vector3()) => { const L = LINES[Math.floor(c / 10)], g = L?.cars[c % 10]; if (!g) return null; g.updateMatrixWorld(); return out.set(lx, FLOOR, lz).applyMatrix4(g.matrixWorld); },
     train: () => { const a = F.cars[0].position, b = F.cars[NCAR - 1].position; return [a.x, a.z, b.x, b.z]; },
-    routes: () => MAPR || (MAPR = LINES.filter((L) => !L.extraOf).map((L) => ({ id: L.id, color: L.id === 'D' ? '#c9500f' : L.cfg.color, dash: L.id === 'D', w: L.id === 'Q' ? 3.2 : 2, pts: L.P.filter((p, i) => i % 8 === 0 || i === L.P.length - 1).map((p) => [p.x, p.z]) })).sort((a, b) => b.w - a.w)),
+    routes: () => MAPR || (MAPR = LINES.filter((L) => !L.extraOf).map((L) => ({ id: L.id, color: L.id === 'D' ? '#c9500f' : L.cfg.color, dash: L.id === 'D', w: L.id === 'Q' ? 3.2 : 2, pts: L.P.filter((p, i) => i % 8 === 0 || i === L.P.length - 1).map((p) => [p.x, p.z]) })).concat(YD ? YD.tracks.map((P) => ({ id: 'YARD', color: '#8a8f96', dash: false, w: 1.2, pts: P.filter((p, i) => p.s >= P.branch - 2 && (i % 6 === 0 || i === P.length - 1)).map((p) => [p.x, p.z]) })) : []).sort((a, b) => b.w - a.w)),
     stations: () => MAPS || (MAPS = [{ id: 'STW', x: -47, z: -330, r: 'DFNQ' }, { id: 'W8', x: w8Pt(W8.L / 2, 0, 0).x, z: w8Pt(W8.L / 2, 0, 0).z, r: 'FQ' }, ...[['NEP', 'F'], ['OCP', 'Q'], ['B50', 'D']].filter(([id]) => STN[id]).map(([id, r]) => ({ id, x: STN[id].c.x, z: STN[id].c.z, r }))].map((q) => ({ ...q, name: NAMES[q.id][0] }))),
     trains: () => LINES.map((L) => { const a = L.cars[0].position, b = L.cars[NCAR - 1].position; return { id: L.id, color: L.cfg.color, seg: [a.x, a.z, b.x, b.z] }; }),
   };
@@ -74,7 +79,8 @@ export function buildSubway(world) {
       until: w((id) => { const t = now() % L.cycle; const l = L.legs.find((g) => g.kind === 'dwell' && g.stop.id === id); return l ? ((l.t0 - t) % L.cycle + L.cycle) % L.cycle : null; }),
       debug: w(() => ({ side: L.stops.map((q) => q.sideCache || null), cars: L.cars.map((g) => g.position.toArray().map((v) => +v.toFixed(1))), open: L.lastOpen })),
       nepStairs: () => STN.NEP?.stairs, stnStairs: (id) => STN[id] && { stairs: STN[id].stairs, plat: STN[id].plat }, stnAt: (id, a, o) => { const S = STN[id]; if (!S) return null; const p = S.at(a, o, S.plat); return [p.x, p.y, p.z, S.ang]; }, board: w(() => board()), alight: w(() => alight()), skew: (sec) => { SKEW += sec; },
-      drive: w((dir) => takeControls(dir ?? 1)), driving: w(() => L.drive && { s: +L.drive.s.toFixed(1), v: +L.drive.v.toFixed(2), lever: +L.drive.lever.toFixed(2), doors: +L.drive.doors.toFixed(2), at: L.drive.at?.id || null, tripped: L.drive.tripped, limit: L.drive.limit, dir: L.drive.dir }), stopDrive: w(() => leaveControls()),
+      drive: w((dir) => takeControls(dir ?? 1)), driving: w(() => L.drive && { s: +L.drive.s.toFixed(1), v: +L.drive.v.toFixed(2), lever: +L.drive.lever.toFixed(2), doors: +L.drive.doors.toFixed(2), at: L.drive.at?.id || null, tripped: L.drive.tripped, limit: L.drive.limit, dir: L.drive.dir, yk: L.drive.yk, ysJ: L.drive.ysJ, up: L.drive.yUp, L: +L.L.toFixed(1) }),
+      driveSet: w((sv) => { if (L.drive) { L.drive.s = sv; L.drive.v = 0; } }), yard: () => YD && { free: YD.free(), parked: YD.parked(), J: [YD.J.x, YD.J.y, YD.J.z] }, stopDrive: w(() => leaveControls()),
     }; };
   if (typeof window !== 'undefined' && window.__game) window.__game.subway = { ...api(F), line: (id) => { const L = LINES.find((q) => q.id === id); return L ? api(L) : null; }, lines: () => [...new Set(LINES.map((q) => q.id))], trainsPer: () => Object.fromEntries([...new Set(LINES.map((q) => q.id))].map((id) => [id, LINES.filter((q) => q.id === id).length])) };
 }
@@ -367,9 +373,10 @@ function takeControls(dir) {
   const s0 = headS(), T = thruRoute(); R.base = { P: R.P, L: R.L, stops: R.stops };
   if (T) { R.P = T.P; R.L = T.L; R.stops = T.stops; } R.stopsSorted = null;
   const s = s0 + (T ? T.prefix : 0);
-  R.drive = { s, v: 0, lever: 0, dir, doors: 0, wantDoors: false, tripped: false, at: null, stopped: true, t0: now() };
+  R.drive = { s, v: 0, lever: 0, dir, doors: 0, wantDoors: false, tripped: false, at: null, stopped: true, t0: now(), route0: { P: R.P, L: R.L, stops: R.stops }, shift: 0, yk: null };
+  R.drive.hasYard = !!yardAt(R.P);
   faceTrack(dir);
-  K.toast(`You're driving the ${R.id}. W / S (or the stick): power ↔ brake · SPACE emergency · F: doors at a platform, or get off anywhere · R: change ends${T ? ` · through Stillwell onto the ${T.via}` : ''}`, 5600);
+  K.toast(`You're driving the ${R.id}. W / S (or the stick): power ↔ brake · SPACE emergency · F: doors at a platform, or get off anywhere · R: change ends${T ? ` · through Stillwell onto the ${T.via}` : ''}${R.drive.hasYard ? ' · Y: the switch north of Neptune Ave, main line or Coney Island Yard' : ''}`, 6400);
   driveHud(true);
 }
 /** turn the driver to look down the track out of the cab windshield (the car's local +z points to the head of the train) */
@@ -405,10 +412,42 @@ function thruRoute() {
   console.log(`[subway] ${R.id} through route via the ${Y.id}:`, Math.round(s), 'm ·', stops.map((q) => `${q.id}@${Math.round(q.s)}`).join(' '));
   return R.thru;
 }
+// ---- Coney Island Yard: the throat switch north of Neptune Ave. Y (or the SWITCH button) cycles MAIN → each free yard track → MAIN.
+// The route you drive is cut at the switch and the yard track spliced on in place of the line beyond it (D / N: the end of the
+// route; F / Q through-running: the start, which is the D / N run backwards). Only with the whole train on the Stillwell side.
+/** where the yard switch is on a route: index, s, and whether s grows going north (into the yard) */
+function yardAt(P) {
+  if (!YD) return null; const J = YD.J; let iJ = -1, bd = 3;
+  for (let i = 1; i < P.length - 1; i++) { const d = Math.hypot(P[i].x - J.x, P[i].z - J.z); if (d < bd) { bd = d; iJ = i; } }
+  return iJ < 0 ? null : { iJ, sJ: P[iJ].s, up: P[iJ + 1].z < P[iJ].z };
+}
+function setThroat(k) {
+  const D = R.drive, B = D?.route0, info = B && yardAt(B.P); if (!info) return false;
+  const s0 = D.s - D.shift; if (info.up ? s0 > info.sJ - 1 : s0 - LEN < info.sJ + 1) { K.toast('The train is over the switch: back it off first.', 1800); return false; }
+  let shift = 0;
+  if (k == null) { R.P = B.P; R.L = B.L; R.stops = B.stops; D.ysJ = info.sJ; }
+  else { const Y = YD.tracks[k];
+    const P = info.up ? [...B.P.slice(0, info.iJ + 1), ...Y.slice(1)].map((p) => p.clone()) : [...Y.slice(1).reverse(), ...B.P.slice(info.iJ)].map((p) => p.clone());
+    let s = 0; P.forEach((p, i) => { if (i) s += Math.hypot(p.x - P[i - 1].x, p.z - P[i - 1].z); p.s = s; });
+    const sJ = info.up ? info.sJ : P[Y.length - 1].s; shift = sJ - info.sJ;
+    const stops = B.stops.filter((q) => !q.hidden && (info.up ? q.s < info.sJ - 1 : q.s - LEN > info.sJ + 1)).map((q) => ({ ...q, s: q.s + shift, sideCache: undefined }));
+    stops.push({ id: 'YRD', name: `Coney Island Yard track ${k + 1}`, speak: 'Coney Island Yard', s: info.up ? s - 6 : LEN + 6, hidden: true, yard: true });
+    R.P = P; R.L = s; R.stops = stops; D.ysJ = sJ; }
+  D.s = s0 + shift; D.shift = shift; D.yk = k; D.yUp = info.up; R.stopsSorted = null; R.lastH = null;
+  return true;
+}
+function cycleThroat() {
+  const D = R.drive; if (!D || !YD) return; if (!yardAt(D.route0.P)) { K.toast('No yard switch on this route.', 1500); return; }
+  const free = YD.free(), next = D.yk == null ? free[0] : free.find((k) => k > D.yk);
+  if (D.yk == null && next == null) { K.toast('The yard is full.', 1500); return; }
+  if (setThroat(next ?? null)) K.toast(next == null ? 'Switch: MAIN LINE' : `Switch: CONEY ISLAND YARD, track ${next + 1}`, 1600);
+}
 /** off the train, anywhere: a Stillwell platform if you're in the terminal, otherwise down beside the track */
 function stepOff() {
   const p = R.ctx.player, D = R.drive, was = R.aboard, dir = D?.dir || 1, g = R.cars[dir > 0 ? 0 : NCAR - 1];
   g.updateMatrixWorld(true); _a.set(0, FLOOR, 0).applyMatrix4(g.matrixWorld);
+  const lay = D && D.yk != null && D.v < 0.5 && (D.yUp ? D.s - LEN > D.ysJ + 2 : D.s < D.ysJ - 2) ? D.yk : null;   // wholly in the yard: it stays there
+  if (lay != null && YD.layUp(lay, R.cars)) K.toast(`The ${R.id} is laid up on yard track ${lay + 1}.`, 2400);
   leaveControls(); if (!was) return; R.aboard = null; if (p.mounted?.train) p.mounted = null;
   if (_a.z > STW_Z0 - 10 && _a.z < STW_ZS + 10 && _a.x > -90 && _a.x < -20) {   // in the terminal: onto the nearest island platform
     const isl = STW_ISL.reduce((m, q) => (Math.abs((q[0] + q[1]) / 2 - _a.x) < Math.abs((m[0] + m[1]) / 2 - _a.x) ? q : m), STW_ISL[0]);
@@ -433,6 +472,7 @@ function driveKeys(inp, playing) {
     if (D.stopped && D.at && D.doors > 0.8) { const was = R.aboard; leaveControls(); if (was) alight(); return; }
     if (D.stopped && D.at) { D.wantDoors = true; return; }   // at a platform: the doors first, F again to step out
     stepOff(); return; }   // anywhere else (between stations, at a bumper, moving): off the train
+  if (P.has('KeyY')) { P.delete('KeyY'); cycleThroat(); }
   if (P.has('KeyR')) { P.delete('KeyR'); if (D.stopped && D.doors < 0.05) { D.dir = -D.dir; D.lever = 0; faceTrack(D.dir); K.toast(`Changed ends: now heading ${D.dir > 0 ? R.cfg.bound.out : R.cfg.bound.in}.`, 1800); } else K.toast('Stop with the doors closed to change ends.', 1500); }
 }
 function driveStep(dt) {
@@ -452,7 +492,8 @@ function driveStep(dt) {
   const lo = LEN + 2, hi = R.L - 2; if (D.s < lo || D.s > hi) { if (D.v > 2) { K.toast('*BANG* — into the bumper block.', 2000); ctx.player?.damage?.(Math.min(40, D.v * 3)); } D.s = Math.max(lo, Math.min(hi, D.s)); D.v = 0; }
   // speed limits: slow through stations and sharp curves; over the limit by LIM_TRIP and the train trips (emergency until it stops)
   const nearStn = stopsSorted().some((q) => !q.hidden && Math.abs(q.s - D.s) < 70), curveK = Math.abs(R.curveNow || 0);
-  D.limit = nearStn || curveK > 0.12 ? LIM_SLOW : LIM_LINE;
+  const yard = D.yk != null && (D.yUp ? D.s > D.ysJ - 40 : D.s - LEN < D.ysJ + 40);   // yard speed past the switch
+  D.limit = nearStn || yard || curveK > 0.12 ? LIM_SLOW : LIM_LINE;
   if (!D.tripped && D.v > D.limit + LIM_TRIP) { D.tripped = true; K.toast(`TRIPPED — ${mph(D.v)} mph in a ${mph(D.limit)} zone. Emergency brakes until you stop.`, 3000); }
   if (D.tripped && D.v === 0) D.tripped = false;
   // berthed at a platform: stopped with the train's head on the station mark
@@ -461,17 +502,21 @@ function driveStep(dt) {
   const was = D.at; D.at = D.stopped && berth && !berth.hidden ? berth : null;
   if (D.at && !was) { D.t0 = now(); R.lastAnn = ''; } else if (!D.at && was) D.t0 = now();
   // the N / D off the edge of the map: on to 8th Ave, like riding
-  if ((R.id === 'D' || R.id === 'N') && R.W.tavern && berth?.hidden && D.dir > 0 && D.s > berth.s - BERTH) { leaveControls(); alight(true); R.W.tavern.arrive(R.id === 'N' ? 'Nx' : 'D'); return; }
+  if ((R.id === 'D' || R.id === 'N') && R.W.tavern && berth?.hidden && !berth.yard && D.dir > 0 && D.s > berth.s - BERTH) { leaveControls(); alight(true); R.W.tavern.arrive(R.id === 'N' ? 'Nx' : 'D'); return; }
   driveHud(true);
 }
 function driveHud(on) {
   let el = document.getElementById('trainHud');
-  if (!on) { if (el) el.style.display = 'none'; return; }
+  if (!on) { if (el) el.style.display = 'none'; const yb = document.getElementById('yardBtn'); if (yb) yb.style.display = 'none'; return; }
   if (!el) { el = document.createElement('div'); el.id = 'trainHud'; el.style.cssText = 'position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:45;padding:7px 14px;border-radius:12px;background:rgba(10,12,16,.82);border:1px solid rgba(255,255,255,.18);color:#eee;font:700 15px Barlow Condensed,system-ui;letter-spacing:.04em;min-width:300px;text-align:center;pointer-events:none'; document.body.appendChild(el); }
   const D = R.drive; if (!D) return; el.style.display = 'block';
+  let yb = document.getElementById('yardBtn');
+  if (!yb && D.hasYard) { yb = document.createElement('button'); yb.id = 'yardBtn'; yb.textContent = 'SWITCH (Y)'; yb.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:46;padding:12px 16px;border-radius:12px;background:rgba(10,12,16,.82);border:1px solid #ffd27a;color:#ffd27a;font:700 15px Barlow Condensed,system-ui;letter-spacing:.06em;touch-action:none';
+    const go = (e) => { e.preventDefault(); e.stopPropagation(); R.ctx.input?.pressed?.add('KeyY'); }; yb.addEventListener('touchstart', go, { passive: false }); yb.addEventListener('mousedown', go); document.body.appendChild(yb); }
+  if (yb) yb.style.display = D.hasYard ? 'block' : 'none';
   const nx = nextStop(D.s, D.dir), dist = Math.max(0, Math.round(Math.abs(nx.s - D.s)));
   const lev = D.lever > 0.05 ? `POWER ${Math.round(D.lever * 4)}` : D.lever < -0.05 ? `BRAKE ${Math.round(-D.lever * 4)}` : 'COAST';
-  const html = `<b style="background:${R.cfg.color};color:${R.cfg.fg || '#fff'};border-radius:50%;padding:1px 8px;margin-right:6px">${R.id}</b> <span style="font-size:22px">${mph(D.v)}</span> mph <span style="opacity:.7">/ limit ${mph(D.limit || LIM_LINE)}</span> · ${lev}${D.tripped ? ' · <span style="color:#ff5050">TRIPPED</span>' : ''}<br><span style="opacity:.85">${D.at ? 'AT ' + D.at.name.toUpperCase() : 'NEXT ' + (nx.hidden ? 'END OF LINE' : nx.name.toUpperCase()) + ' · ' + dist + ' m'} · DOORS ${D.doors > 0.8 ? 'OPEN' : D.doors > 0.02 ? 'MOVING' : 'CLOSED'}</span>`;
+  const html = `<b style="background:${R.cfg.color};color:${R.cfg.fg || '#fff'};border-radius:50%;padding:1px 8px;margin-right:6px">${R.id}</b> <span style="font-size:22px">${mph(D.v)}</span> mph <span style="opacity:.7">/ limit ${mph(D.limit || LIM_LINE)}</span> · ${lev}${D.tripped ? ' · <span style="color:#ff5050">TRIPPED</span>' : ''}<br><span style="opacity:.85">${D.at ? 'AT ' + D.at.name.toUpperCase() : 'NEXT ' + (nx.yard || !nx.hidden ? nx.name.toUpperCase() : 'END OF LINE') + ' · ' + dist + ' m'}${D.hasYard ? ` · SWITCH <b style="color:${D.yk == null ? '#9fd39f' : '#ffd27a'}">${D.yk == null ? 'MAIN' : 'YARD ' + (D.yk + 1)}</b> (Y)` : ''} · DOORS ${D.doors > 0.8 ? 'OPEN' : D.doors > 0.02 ? 'MOVING' : 'CLOSED'}</span>`;
   if (html !== el._h) { el._h = html; el.innerHTML = html; }
 }   // m from a door to board: covers the platform across one track
 const mss = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -506,7 +551,7 @@ function hud(t) {
     document.head.appendChild(st); G.el = document.createElement('div'); G.el.className = 'zvsub'; document.body.appendChild(G.el); }
   const p = ctx.player; let html = '';
   const key = ctx.isTouch ? 'tap BOARD' : 'F';
-  if (ctx.state === 'playing' && p && !p.dead) {
+  if (ctx.state === 'playing' && p && !p.dead && !LINES.some((L) => L.drive)) {   // driving: the cab display has it
     if (R.aboard) {
       const l = R.leg, me = { line: R.id, color: R.cfg.color, fg: R.cfg.fg };
       if (R.canAlight) html = `<span class="l">${bul(me)}<span class="now">${l.stop.name}</span> — doors open ${mss(l.t1 - 3 - t)}</span><span class="h">${l.next.hidden ? `last stop in the map: get off here (the ${R.id} runs on to ${l.next.name})` : `${ctx.isTouch ? 'GET OFF' : 'F'} or walk out the open doors to get off · next: ${l.next.name}`}</span>`;
