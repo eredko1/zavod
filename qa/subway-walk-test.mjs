@@ -45,7 +45,7 @@ const S = (pg) => pg.evaluate(() => window.__game.subway.state());
   const legs = [['boardwalk → Stillwell Ave at Surf Ave', [[-87, 40], [-86, -50], [-85, -140]]], ['Surf Ave → the bus loop at the head house', [[-87, -200], [-87, -245], [-56, -250]]],
     ['through the doors + the turnstiles into the concourse', [[-56, -262], [-56, -272]]], ['up the F stairs (3rd bank) to the platform', [[-49.5, -274], [-49.5, -292], [-51.5, -300], [-51.6, -318.2]]]];
   for (const [m, pts] of legs) { const r = await pg.evaluate((p) => window.path(p), pts); const last = r[r.length - 1]; ok(r.every((q) => q.ok), m, JSON.stringify(last.pos));
-    if (m.includes('concourse')) { const h = await pg.evaluate(() => window.hudTxt()); ok(/to Neptune Av/.test(h) && /3rd stairs/.test(h), 'concourse HUD: next F countdown + which stairs', JSON.stringify(h)); } }
+    if (m.includes('concourse')) { const h = await pg.evaluate(() => window.hudTxt()); ok(/to Neptune Av/.test(h) && /F 3rd/.test(h), 'concourse HUD: next F countdown + which stairs', JSON.stringify(h)); } }
   let s = await S(pg); ok(Math.abs(s.pos[1] - 8.6) < 0.2 && s.pos[0] > -53.6 && s.pos[0] < -45.4, 'standing on the F island', JSON.stringify(s.pos));
   const pois = await pg.evaluate(() => window.__ctx.world.mapPOIs.filter((q) => q.kind === 'transit').map((q) => q.name)); ok(pois.length >= 3, 'stations on the map', JSON.stringify(pois));
   await pg.screenshot({ path: `${out}/subw-platform.png` });
@@ -83,9 +83,9 @@ const S = (pg) => pg.evaluate(() => window.__game.subway.state());
 // ---------------------------------------------------------------------------------------------------------------------------
 { const pg = await open('&mode=chill&touch=1', 'touch');
   await pg.evaluate(async () => { const U = window.__game.subway; window.__game.teleport(-51.6, 8.62, -318.2, Math.PI / 2, 0); U.skew(U.until('STW') + 4); await window.sleep(1000); });
-  const bub = await pg.evaluate(() => { const e = document.querySelector('.zvact'); return e ? { on: e.classList.contains('on'), t: e.textContent } : null; });
-  ok(bub?.on && /BOARD THE F/.test(bub.t), 'touch: a BOARD THE F button at the open doors', JSON.stringify(bub));
-  await pg.evaluate(() => document.querySelector('.zvact').dispatchEvent(new Event('touchstart', { cancelable: true }))); await pg.waitForTimeout(500);
+  const bub = await pg.evaluate(() => { const e = document.querySelector('#touch .act'); return { on: e.classList.contains('show'), t: e.textContent }; });   // phones: the action button names it (hangkit → touch.js)
+  ok(bub.on && /BOARD THE F/.test(bub.t), 'touch: a BOARD THE F button at the open doors', JSON.stringify(bub));
+  await pg.evaluate(() => document.querySelector('#touch .act').dispatchEvent(new Event('touchstart', { cancelable: true }))); await pg.waitForTimeout(500);
   let s = await S(pg); ok(s.aboard, 'touch: tap boards', JSON.stringify(s));
   await pg.evaluate(() => { const U = window.__game.subway; U.skew(U.until('W8') - 20); }); await pg.waitForTimeout(600);
   const mid = await pg.evaluate(() => { const e = document.querySelector('#touch .act'); return e.classList.contains('show') ? e.textContent : ''; }); ok(!mid, 'touch: no GET OFF button between stations', mid);
