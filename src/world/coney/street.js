@@ -15,12 +15,63 @@ import { BUS_STOPS, laneOff } from './traffic.js';
 import { streetAt } from './fronts.js';
 import { placeCars } from '../carkit.js';
 import { addFolkSpots } from './folk.js';
+import { STREET_NAMES } from './streetnames.js';
+import { Batch, boxGeo } from '../sbu/geo.js';
 
 const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return Math.hypot(a[0] + t * dx - x, a[1] + t * dz - z); };
 const inRoad = (x, z, pad = 0.3) => OSM.r.some((r) => { for (let i = 0; i + 1 < r.p.length; i++) if (segD(x, z, r.p[i], r.p[i + 1]) < r.w / 2 + pad) return true; return false; });
 /** walk a polyline every `step` m: fn(x, z, ux, uz) */
 function walkLine(p, step, fn, start = step / 2) { let carry = start; for (let i = 0; i + 1 < p.length; i++) { const [ax, az] = p[i], [bx, bz] = p[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 1e-3) continue; const ux = (bx - ax) / L, uz = (bz - az) / L; let d = carry; while (d < L) { fn(ax + ux * d, az + uz * d, ux, uz); d += step; } carry = d - L; } }
 const inMap = (x, z) => x > PLAY.x0 + 3 && x < PLAY.x1 - 3 && z > -556 && z < BW.z0 - 3;
+
+// ---- NYC cobra-head street lights on every street (Surf Ave has its own in city.js): galvanised pole on the kerb, the curved
+// outreach arm over the road, the flat head with its lens; ~30 m apart, staggered sides. Built before horizon.js, which finds
+// the lenses and lights them (glow + a pool on the street) at night.
+export function buildStreetLights(world, M) {
+  const { ctx } = world, lite = !!ctx.lite, K = new Batch(world, M, 'streetLights'); let n = 0;
+  const blocked = (x, z, rad = 0.5) => ctx.colliders.some((b) => x > b.min.x - rad && x < b.max.x + rad && z > b.min.z - rad && z < b.max.z + rad && b.max.y > 0.2 && b.min.y < 2.5);
+  const ends = OSM.r.filter((r) => r.w >= 9).flatMap((r) => [r.p[0], r.p[r.p.length - 1]]), nearJ = (x, z) => ends.some(([a, b]) => Math.hypot(a - x, b - z) < 9);
+  for (const r of OSM.r) {
+    if (r.w < 9 || r.w >= 20 || r.busLoop || !r.p.some(([x, z]) => inMap(x, z))) continue;
+    let k = 0;
+    walkLine(r.p, lite ? 38 : 30, (x, z, ux, uz) => { const sd = k++ % 2 ? 1 : -1, off = r.w / 2 + 0.6, px = x - uz * sd * off, pz = z + ux * sd * off;
+      if (!inMap(px, pz) || nearJ(x, z) || blocked(px, pz, 0.4) || inRoad(px, pz, 0.15)) return;
+      const ax = uz * sd, az = -ux * sd, a = Math.atan2(-az, ax);   // the arm reaches back over the road
+      const pole = new THREE.CylinderGeometry(0.085, 0.14, 9, lite ? 6 : 10); pole.translate(px, 4.5, pz); K.add('galv', pole); K.add('galv', boxGeo([px - 0.2, 0, pz - 0.2], [px + 0.2, 0.45, pz + 0.2]));
+      const arm = (x0, y0, x1, y1, t) => { const L = Math.hypot(x1 - x0, y1 - y0); const g = new THREE.BoxGeometry(L, t, t); g.rotateZ(Math.atan2(y1 - y0, x1 - x0)); g.translate((x0 + x1) / 2, (y0 + y1) / 2, 0); g.rotateY(a); g.translate(px, 0, pz); K.add('galv', g); };
+      arm(0, 8.55, 0.9, 9.05, 0.09); arm(0.85, 9.03, 2.2, 9.28, 0.08); arm(2.15, 9.27, 2.9, 9.32, 0.07);
+      const hd = new THREE.BoxGeometry(0.95, 0.2, 0.38); hd.translate(3.2, 9.3, 0); hd.rotateY(a); hd.translate(px, 0, pz); K.add('galv', hd);
+      const ln = new THREE.BoxGeometry(0.7, 0.04, 0.28); ln.translate(3.22, 9.18, 0); ln.rotateY(a); ln.translate(px, 0, pz); K.add('lampLens', ln, { uv: false });
+      world.box([px - 0.18, 0, pz - 0.18], [px + 0.18, 9, pz + 0.18]); n++; });
+  }
+  K.flush({ shadow: !lite });
+  console.log('[street] street lights', n);
+  return n;
+}
+
+/** the street a junction's arm runs along: the nearest named OSM street pointing the same way */
+function nameAt(x, z, dx, dz) {
+  let best = null, bd = 14;
+  for (const r of STREET_NAMES) for (let i = 0; i + 1 < r.p.length; i++) { const a = r.p[i], b = r.p[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1) continue;
+    if (Math.abs(((b[0] - a[0]) * dx + (b[1] - a[1]) * dz) / L) < 0.8) continue; const d = segD(x, z, a, b); if (d < bd) { bd = d; best = r.n; } }
+  return best;
+}
+/** the green blade: white letters, a thin white border, both sides (one atlas cell per name) */
+function bladeAtlas(names, lite) {
+  const CW = 512, CH = 96, COLS = 4, rows = Math.max(1, Math.ceil(names.length / COLS)), k = lite ? 0.5 : 1;
+  const c = document.createElement('canvas'); c.width = CW * COLS * k; c.height = CH * rows * k; const g = c.getContext('2d'); g.scale(k, k); const uv = new Map();
+  names.forEach((n, i) => { const x = (i % COLS) * CW, y = Math.floor(i / COLS) * CH; g.fillStyle = '#0b6b3a'; g.fillRect(x, y, CW, CH); g.strokeStyle = '#f2f2ea'; g.lineWidth = 5; g.strokeRect(x + 6, y + 6, CW - 12, CH - 12);
+    g.fillStyle = '#f7f7f0'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = 62; g.font = `600 ${fs}px "Highway Gothic", "Helvetica Neue", Arial, sans-serif`; const w = g.measureText(n).width; if (w > CW - 40) { fs *= (CW - 40) / w; g.font = `600 ${fs}px "Helvetica Neue", Arial, sans-serif`; }
+    g.fillText(n, x + CW / 2, y + CH / 2 + 3); uv.set(n, [(x + 2) / (CW * COLS), 1 - (y + CH - 2) / (CH * rows), (CW - 4) / (CW * COLS), (CH - 4) / (CH * rows)]); });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return { t, uv };
+}
+function stopTex() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+  const oct = (cx, cy, r, f) => { g.beginPath(); for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + i * Math.PI / 4; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fillStyle = f; g.fill(); };
+  oct(64, 64, 63, '#f4f4f0'); oct(64, 64, 57, '#c8102e'); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '700 40px "Highway Gothic", Arial, sans-serif'; g.fillText('STOP', 64, 66);
+  g.fillStyle = '#f4f4f0'; g.fillRect(132, 34, 120, 60); g.fillStyle = '#c8102e'; g.fillRect(138, 40, 108, 48); g.fillStyle = '#fff'; g.font = '700 30px Arial, sans-serif'; g.fillText('ALL WAY', 192, 66);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 
 export function buildStreet(world) {
   const { scene, ctx, W } = world, lite = !!ctx.lite; let seed = 77213; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -33,7 +84,7 @@ export function buildStreet(world) {
   const solid = (x, z, r, h) => world.box([x - r, 0, z - r], [x + r, h, z + r]);
 
   // ---- traffic signals ----------------------------------------------------------------------------------------------------
-  const lamps = [], heads = [], crossers = [];   // lamps: { j, hx, hz, kind: 'R'|'Y'|'G'|'hand'|'man', i }
+  const lamps = [], heads = [], crossers = [], cornerBins = [];   // lamps: { j, hx, hz, kind: 'R'|'Y'|'G'|'hand'|'man', i }
   for (const j of W.signals?.list || []) {
     if (!inMap(j.x, j.z)) continue;
     const ways = [];   // one per distinct direction out of the junction
@@ -45,11 +96,12 @@ export function buildStreet(world) {
       if (inRoad(px, pz, 0.2)) continue;
       const ry = Math.atan2(e.dx, e.dz);   // faces back up the street, at the cars coming in
       put(cyl(0.16, 0.12, 6.4, 10), 0x6b6f75, px, 0, pz); put(cyl(0.3, 0.3, 0.45, 10), 0x6b6f75, px, 0, pz); solid(px, pz, 0.25, 6);
+      { const bx = px + e.dx * 1.3, bz = pz + e.dz * 1.3; if (!blocked(bx, bz, 0.3) && !inRoad(bx, bz, 0.1)) { cornerBins.push([bx, bz]); solid(bx, bz, 0.32, 0.9); } }   // the corner basket by the crossing signal
       const reach = Math.min(e.w * 0.62, 9), ax = px - rx * reach, az = pz - rz * reach;
       { const L = reach, g = new THREE.BoxGeometry(0.12, 0.14, L); g.deleteAttribute('uv'); g.rotateY(Math.atan2(-rx, -rz)); g.translate(px - rx * L / 2, 6.1, pz - rz * L / 2); put(g, 0x6b6f75, 0, 0, 0); }
       { const L = 3, g = new THREE.BoxGeometry(0.06, 0.06, Math.hypot(L, 1.4)); g.deleteAttribute('uv'); g.rotateX(Math.atan2(1.4, L)); g.rotateY(Math.atan2(-rx, -rz)); g.translate(px - rx * L / 2, 6.8, pz - rz * L / 2); put(g, 0x6b6f75, 0, 0, 0); }
       // vehicle heads: one on the arm over the lanes, one on the pole for the near side
-      for (const [x, y, z] of [[ax + rx * 0.3, 5.0, az + rz * 0.3], [px + e.dx * 0.25, 2.9, pz + e.dz * 0.25]]) {
+      for (const [x, y, z] of (lite ? [[ax + rx * 0.3, 5.0, az + rz * 0.3]] : [[ax + rx * 0.3, 5.0, az + rz * 0.3], [px + e.dx * 0.25, 2.9, pz + e.dz * 0.25]])) {
         put(boxG(0.42, 1.12, 0.3), 0xd8a81a, x, y, z, ry); heads.push([x, y, z]);
         ['R', 'Y', 'G'].forEach((k, i) => { const ly = y + 0.88 - i * 0.34; put(boxG(0.36, 0.05, 0.22), 0x2a2a20, x + e.dx * 0.2, ly + 0.13, z + e.dz * 0.2, ry); lamps.push({ j, hx, hz, k, x: x + e.dx * 0.16, y: ly, z: z + e.dz * 0.16, ry }); });
         st.heads++;
@@ -65,6 +117,33 @@ export function buildStreet(world) {
       }
     }
   }
+  // ---- stop signs (the minor street's approaches; ALL WAY where equals meet) and green name blades on a corner of every junction ----
+  const stops = [], blades = [];
+  for (const j of W.junctions || []) {
+    if (!inMap(j.x, j.z)) continue;
+    const ways = []; for (const e of j.ways) if (!ways.some((q) => q.dx * e.dx + q.dz * e.dz > 0.9)) ways.push(e);
+    if (j.ctrl === 'stop') { const allWay = ways.every((e) => e.w >= j.maxW - 0.5);
+      for (const e of ways) { if (!allWay && e.w >= j.maxW - 0.5) continue; const hx = -e.dx, hz = -e.dz, rx = -hz, rz = hx, other = Math.max(8, ...ways.filter((q) => Math.abs(q.dx * e.dx + q.dz * e.dz) < 0.5).map((q) => q.w));
+        const px = j.x + e.dx * (other / 2 + 1.2) + rx * (e.w / 2 + 0.7), pz = j.z + e.dz * (other / 2 + 1.2) + rz * (e.w / 2 + 0.7); if (blocked(px, pz, 0.2) || inRoad(px, pz, 0.1)) continue;
+        put(cyl(0.035, 0.035, 2.6, 6), 0x8a8f94, px, 0, pz); solid(px, pz, 0.06, 2.6); stops.push({ x: px, z: pz, ry: Math.atan2(e.dx, e.dz), all: allWay }); } }
+    // the name blades: two perpendicular streets, one corner (the first that's on the pavement)
+    const a = ways[0], b = ways.find((q) => Math.abs(q.dx * a.dx + q.dz * a.dz) < 0.5); if (!a || !b) continue;
+    const na = nameAt(j.x + a.dx * 12, j.z + a.dz * 12, a.dx, a.dz), nb = nameAt(j.x + b.dx * 12, j.z + b.dz * 12, b.dx, b.dz); if (!na && !nb) continue;
+    for (const [sa, sb] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { const px = j.x + a.dx * sa * (b.w / 2 + 1.0) + b.dx * sb * (a.w / 2 + 1.0), pz = j.z + a.dz * sa * (b.w / 2 + 1.0) + b.dz * sb * (a.w / 2 + 1.0);
+      if (blocked(px, pz, 0.2) || inRoad(px, pz, 0.1)) continue;
+      put(cyl(0.05, 0.05, 3.5, 6), 0x5f6468, px, 0, pz); solid(px, pz, 0.07, 3.5);
+      if (na) blades.push({ x: px, z: pz, y: 3.3, ry: Math.atan2(a.dx, a.dz) + Math.PI / 2, n: na }); if (nb) blades.push({ x: px, z: pz, y: 3.02, ry: Math.atan2(b.dx, b.dz) + Math.PI / 2, n: nb }); break; }
+  }
+  if (stops.length) { const t = stopTex(), oct = [], plate = [];
+    for (const q of stops) { const g = new THREE.PlaneGeometry(0.76, 0.76); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setX(i, u.getX(i) * 0.5); g.rotateY(q.ry); g.translate(q.x + Math.sin(q.ry) * 0.05, 2.2, q.z + Math.cos(q.ry) * 0.05); oct.push(g);
+      if (q.all) { const p = new THREE.PlaneGeometry(0.5, 0.25); const v = p.attributes.uv; for (let i = 0; i < v.count; i++) v.setXY(i, 0.5 + v.getX(i) * 0.5, 0.25 + v.getY(i) * 0.5); p.rotateY(q.ry); p.translate(q.x + Math.sin(q.ry) * 0.05, 1.68, q.z + Math.cos(q.ry) * 0.05); plate.push(p); } }
+    const me = new THREE.Mesh(mergeGeometries([...oct, ...plate], false), new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.5, transparent: false, roughness: 0.5, side: THREE.DoubleSide })); me.name = 'street:stops'; scene.add(me); }
+  if (blades.length) { const A = bladeAtlas([...new Set(blades.map((q) => q.n))], lite), gs = [];
+    for (const q of blades) { const [u0, v0, du, dv] = A.uv.get(q.n); for (const side of [0, Math.PI]) { const g = new THREE.PlaneGeometry(1.6, 0.3); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setXY(i, u0 + u.getX(i) * du, v0 + u.getY(i) * dv); g.translate(0, 0, 0.018); g.rotateY(q.ry + side); g.translate(q.x, q.y, q.z); gs.push(g); }
+      put(new THREE.BoxGeometry(1.62, 0.32, 0.03), 0x0b6b3a, q.x, q.y - 0.16, q.z, q.ry); }
+    const me = new THREE.Mesh(mergeGeometries(gs, false), new THREE.MeshStandardMaterial({ map: A.t, roughness: 0.45, metalness: 0.1 })); me.name = 'street:names'; scene.add(me); }
+  st.stops = stops.length; st.blades = blades.length;
+
   // lamp faces: one instanced disc each, colour = lit or dim, updated four times a second from the signal phase
   let lampIM = null;
   if (lamps.length) {
@@ -117,6 +196,7 @@ export function buildStreet(world) {
     list.forEach((p, i) => { im.setMatrixAt(i, m.makeTranslation(p[0], 0, p[1])); if (colorOf) im.setColorAt(i, _c.set(colorOf(p))); }); im.castShadow = !lite; im.receiveShadow = true; scene.add(im); st.bins += list.length; return im; };
   const wireTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.clearRect(0, 0, 64, 64); g.strokeStyle = '#2f4a36'; g.lineWidth = 3;
     for (let i = -64; i < 128; i += 10) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 64, 64); g.stroke(); g.beginPath(); g.moveTo(i + 64, 0); g.lineTo(i, 64); g.stroke(); } const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 2); return t; })();
+  basket.push(...cornerBins);
   inst(new THREE.CylinderGeometry(0.31, 0.27, 0.9, 14, 1, true).translate(0, 0.45, 0), new THREE.MeshStandardMaterial({ map: wireTex, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.4 }), basket);
   inst(new THREE.TorusGeometry(0.31, 0.025, 6, 16).rotateX(Math.PI / 2).translate(0, 0.9, 0), new THREE.MeshStandardMaterial({ color: 0x2f4a36, roughness: 0.5, metalness: 0.5 }), basket);
   inst(new THREE.CylinderGeometry(0.27, 0.25, 0.95, 12).translate(0, 0.475, 0), new THREE.MeshStandardMaterial({ color: 0x8c9196, roughness: 0.45, metalness: 0.6 }), recyc.map((p) => [p[0], p[1]]));
@@ -160,7 +240,7 @@ export function buildStreet(world) {
   if (col.length) { const me = new THREE.Mesh(mergeGeometries(col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.2 })); me.name = 'street:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }
   // the walkers that wait for the WALK and the people behind the tables
   st.crossers = crossers.length; try { addFolkSpots(world, [...crossers, ...sellers]); } catch (e) { console.warn('[street] folk', e); }
-  console.log('[street]', st.heads, 'signal heads ·', st.poles, 'utility poles ·', st.bins, 'bins / planters / bollards / barrels ·', st.cars, 'parked on Surf ·', st.stalls, 'vendor tables ·', st.crossers, 'crosswalk walkers');
+  console.log('[street]', st.stops, 'stop signs ·', st.blades, 'name blades ·', st.heads, 'signal heads ·', st.poles, 'utility poles ·', st.bins, 'bins / planters / bollards / barrels ·', st.cars, 'parked on Surf ·', st.stalls, 'vendor tables ·', st.crossers, 'crosswalk walkers');
   W.street = st;
   if (typeof window !== 'undefined' && window.__game) window.__game.street = { stats: () => ({ ...st }), lamps: () => lamps.map((L) => ({ k: L.k, s: W.signals.state(L.j, L.hx, L.hz) })), heads: () => heads.slice(), stalls: () => stalls.slice() };
   return st;
