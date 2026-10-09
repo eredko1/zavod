@@ -691,13 +691,14 @@ export const trafficQA = {
 // place), ~10 s at every stop with the doors open. F at an open door rides along (F at a stop to get off); F at the driver's
 // window while it's stopped hijacks it.
 const ROUTES = [
-  { id: 'B36', sign: 'B36|SHEEPSHEAD BAY', way: [[-86, -132], [20, -117], [54, -153], [100, -459], [40, -536], [-87, -536], [-87, -290]], n: 2 },
-  { id: 'B68', sign: 'B68|PROSPECT PARK', way: [[-86, -132], [-87, -290], [-87, -536], [40, -536], [100, -459], [54, -153], [20, -117]], n: 2 },
-  { id: 'B74', sign: 'B74|MERMAID AV', way: [[-86, -132], [-230, -142], [-365, -142], [-365, -291], [-230, -291], [-87, -290]], n: 1 },
+  // every route turns round in the Stillwell terminal bus loop, under the el (coney/stillwell.js BUS_LOOP)
+  { id: 'B36', sign: 'B36|SHEEPSHEAD BAY', way: [[-28, -231], [20, -117], [54, -153], [100, -459], [40, -536], [-87, -536], [-87, -290], [-86, -132]], n: 2 },
+  { id: 'B68', sign: 'B68|PROSPECT PARK', way: [[-28, -231], [-86, -132], [-87, -290], [-87, -536], [40, -536], [100, -459], [54, -153], [20, -117]], n: 2 },
+  { id: 'B74', sign: 'B74|MERMAID AV', way: [[-28, -231], [-86, -132], [-230, -142], [-365, -142], [-365, -291], [-230, -291], [-87, -290], [-86, -132]], n: 1 },
 ];
 export const BUS_STOPS = [
   ['Surf Av / W 15 St', -10, -119], ['W 12 St / Luna Park', 68, -250], ['W 12 St / Neptune Av', 94, -430],
-  ['Neptune Av / W 15 St', 20, -536], ['Stillwell Av / Mermaid Av', -87, -330], ['Stillwell Av / Surf Av', -87, -185],
+  ['Neptune Av / W 15 St', 20, -536], ['Stillwell Av Terminal', -32.6, -186], ['Stillwell Av Terminal', -23.4, -186], ['Stillwell Av / Mermaid Av', -87, -330], ['Stillwell Av / Surf Av', -87, -185],
   ['Surf Av / W 17 St', -175, -140], ['Surf Av / W 21 St', -310, -142], ['W 23 St / Mermaid Av', -365, -240], ['Mermaid Av / W 21 St', -300, -291], ['Mermaid Av / W 17 St', -170, -291],
 ];
 const BUS_V = 6.2, DWELL = 10;

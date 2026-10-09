@@ -10,6 +10,14 @@ import { Batch } from '../sbu/geo.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeR160 } from './r160.js';
 
+export const SURF_HH = { x0: -72, x1: -41.5, z: -144 };   // the Surf Ave head house + concourse (x0..x1, from the Surf front at z back to the old head house)
+// the bus loop under the el, east of the head house: in off Surf Ave, round the bays and back out (B36 / B68 / B74 terminate here)
+export const BUS_LOOP = [[-35, -124], [-35, -212], [-33.5, -224], [-28, -231], [-22.5, -224], [-21, -212], [-21, -121]];
+/** OSM blocks the station takes over: the Surf Ave head house and the bus loop (city.js / fronts.js leave them out) */
+export const stationClear = (x, z) => (x > SURF_HH.x0 - 1 && x < SURF_HH.x1 + 1 && z > -200 && z < SURF_HH.z + 1) || (x > -42 && x < -10 && z > -186 && z < -138);
+let loopAdded = false;
+/** put the bus loop in the street network before anything reads it (city.js paints it, traffic.js drives it) */
+export function addBusLoop(OSM) { if (loopAdded || OSM.r.some((r) => r.busLoop)) return; loopAdded = true; OSM.r.push({ p: BUS_LOOP.map((q) => q.slice()), w: 9, busLoop: true }); }
 export const STILLWELL = { x0: -88, x1: -24, zS: -258, zC: -300, zP0: -266, zP1: -440, RAIL: 7.5, DECK_B: 6.8, DECK_T: 7.3, PLAT: 8.6 };
 const ISLANDS = [[-82, -74], [-68, -60], [-53, -46], [-38, -29]];
 const TRACKS = [   // track 2 was an 'F' too: its shuttle train (not rideable) sent players to the wrong island — the rideable F is x −54.8 (coney/subway.js)
@@ -34,6 +42,32 @@ export function buildStillwell(world, M) {
   for (let x = S.x0; x < S.x1; x += 0.4) B.box('bulb', [x, 11.85, fz + 0.38], [x + 0.08, 11.93, fz + 0.46], { collide: false });
   sign(scene, 'CONEY ISLAND · STILLWELL AV', (S.x0 + S.x1) / 2, 10.3, fz + 0.12, 0, 22, 1.1, '#111', '#fff');
   for (const [a, b] of DOORS) sign(scene, 'SUBWAY', (a + b) / 2, 3.65, fz + 0.12, 0, 2.6, 0.45, '#0b3d23', '#fff');
+  // ---- the Surf Ave head house (like the real station: the street front is on Surf, the trains run in over it): a low white
+  // terracotta front with three doorways, the name and arched windows, and a covered concourse under the el back to the doors
+  // above and the fare line; a side door onto the bus loop. Kept under the el's cap girders (6.2 m). city.js leaves the OSM
+  // block here to us and keeps the el columns out of it.
+  { const X0 = SURF_HH.x0, X1 = SURF_HH.x1, HF = SURF_HH.z, H = 6.0, D2 = [[-67, -62], [-58, -53], [-49, -44]];
+    let x = X0; for (const [a, b] of [...D2, [X1, X1]]) { if (a > x) B.box('terracotta', [x, 0, HF - FT], [a, H, HF]); x = b; }
+    for (const [a, b] of D2) { B.box('terracotta', [a, 3.4, HF - FT], [b, H, HF]); B.box('steelDark', [a, 3.3, HF - FT - 0.05], [b, 3.45, HF + 0.05], { collide: false }); sign(scene, 'SUBWAY', (a + b) / 2, 3.85, HF + 0.12, 0, 2.6, 0.42, '#0b3d23', '#fff'); }
+    for (const [a, b] of [[X0 + 1, D2[0][0] - 0.8], [D2[0][1] + 0.8, D2[1][0] - 0.8], [D2[1][1] + 0.8, D2[2][0] - 0.8], [D2[2][1] + 0.8, X1 - 1]]) if (b - a > 1.2) B.box('glassLight', [a, 1.0, HF + 0.01], [b, 3.0, HF + 0.06], { collide: false });
+    B.box('terracotta', [X0 - 0.3, H, HF - 0.3], [X1 + 0.3, H + 0.45, HF + 0.4]);
+    for (let xx = X0; xx < X1; xx += 0.4) B.box('bulb', [xx, H + 0.5, HF + 0.38], [xx + 0.08, H + 0.58, HF + 0.46], { collide: false });
+    sign(scene, 'CONEY ISLAND · STILLWELL AV', (X0 + X1) / 2, 4.75, HF + 0.12, 0, 24, 1.0, '#111', '#fff');
+    // the concourse walls: east solid, west with the bus-loop door; a roof under the el; tiled wainscot, light strips, columns
+    B.box('terracotta', [X1 - 0.6, 0, fz], [X1, H, HF]);
+    B.box('terracotta', [X0, 0, -244], [X0 + 0.6, H, HF]); B.box('terracotta', [X0, 0, fz], [X0 + 0.6, H, -253]); B.box('terracotta', [X0, 3.3, -253], [X0 + 0.6, H, -244]);
+    sign(scene, 'SUBWAY', X0 - 0.05, 3.75, -248.5, -Math.PI / 2, 2.6, 0.42, '#0b3d23', '#fff');
+    B.box('concreteGrey', [X0, H, fz], [X1, H + 0.25, HF]);
+    for (const [a, b] of [[X0 + 0.6, X0 + 0.64], [X1 - 0.64, X1 - 0.6]]) { B.box('ssTile', [a, 0, fz], [b, 2.4, HF - FT], { collide: false }); B.box('ssBlue', [a - 0.005, 2.4, fz], [b + 0.005, 2.55, HF - FT], { collide: false }); }
+    for (let z = HF - 5; z > fz + 3; z -= 7) { B.box('bulb', [-63, H - 0.08, z], [-60, H - 0.02, z + 0.25], { collide: false }); B.box('bulb', [-51, H - 0.08, z], [-48, H - 0.02, z + 0.25], { collide: false }); }
+    for (let z = HF - 14; z > fz + 6; z -= 14) for (const cx of [-62.5, -48.5]) B.box('steelDark', [cx - 0.3, 0, z - 0.3], [cx + 0.3, H, z + 0.3]);
+    SURF_HH.floor = { x0: X0 + 0.6, x1: X1 - 0.6, z0: fz, z1: HF - FT };
+    // the bus bays: a kerbed island between the loop's two lanes, two shelters, the terminal sign
+    B.box('curb', [-30.4, 0, -214], [-25.6, 0.16, -141], { walkable: true });
+    for (const z of [-200, -172]) { B.box('steelDark', [-29.4, 0, z], [-29.25, 2.6, z + 0.15]); B.box('steelDark', [-26.75, 0, z], [-26.6, 2.6, z + 0.15]); B.box('steelDark', [-29.4, 0, z + 7.85], [-29.25, 2.6, z + 8]); B.box('steelDark', [-26.75, 0, z + 7.85], [-26.6, 2.6, z + 8]);
+      B.box('glassLight', [-29.4, 2.6, z], [-26.6, 2.7, z + 8], { collide: false }); B.box('glassLight', [-27.6, 0.3, z], [-27.55, 2.3, z + 8], { collide: false }); B.box('steelDark', [-28.6, 0.42, z + 2], [-28.1, 0.5, z + 6]); }
+    sign(scene, 'BUS · B36 B68 B74', -28, 3.4, -165.9, 0, 4.2, 0.5, '#1f4fa8', '#fff');
+  }
   // side walls (Stillwell Ave entrance on the west), north wall of the concourse
   B.box('terracotta', [S.x0, 0, S.zC], [S.x0 + 0.6, S.DECK_B, -277]); B.box('terracotta', [S.x0, 0, -271], [S.x0 + 0.6, S.DECK_B, fz]); B.box('terracotta', [S.x0, 3.2, -277], [S.x0 + 0.6, S.DECK_B, -271]);
   sign(scene, 'SUBWAY', S.x0 - 0.05, 3.65, -274, -Math.PI / 2, 2.6, 0.45, '#0b3d23', '#fff');
@@ -47,7 +81,8 @@ export function buildStillwell(world, M) {
     g.fillStyle = '#b08a3a'; g.fillRect(0, 0, 256, 3); g.fillRect(0, 0, 3, 256);   // brass strips
     const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
     const fw = S.x1 - S.x0, fd = (fz - FT) - S.zC; t.repeat.set(fw / 1.5, fd / 1.5);
-    const fl = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd), new THREE.MeshStandardMaterial({ map: t, roughness: 0.42, metalness: 0 }));
+    const fm = new THREE.MeshStandardMaterial({ map: t, roughness: 0.42, metalness: 0 }), fl = new THREE.Mesh(new THREE.PlaneGeometry(fw, fd), fm);
+    { const q = SURF_HH.floor, t2 = t.clone(); t2.repeat.set((q.x1 - q.x0) / 1.5, (q.z1 - q.z0) / 1.5); t2.needsUpdate = true; const f2 = new THREE.Mesh(new THREE.PlaneGeometry(q.x1 - q.x0, q.z1 - q.z0), new THREE.MeshStandardMaterial({ map: t2, roughness: 0.42 })); f2.rotation.x = -Math.PI / 2; f2.position.set((q.x0 + q.x1) / 2, 0.026, (q.z0 + q.z1) / 2); f2.receiveShadow = true; f2.userData.surface = 'concrete'; scene.add(f2); }
     fl.rotation.x = -Math.PI / 2; fl.position.set((S.x0 + S.x1) / 2, 0.025, (S.zC + fz - FT) / 2); fl.receiveShadow = true; fl.userData.surface = 'concrete'; scene.add(fl);
   }
   // white subway-tile wainscot on the inside of the concourse walls, with a green cap band
