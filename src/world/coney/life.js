@@ -8,7 +8,8 @@ import { buildCrowd, scatter } from '../crowd.js';
 import { OSM, PLAY } from './osm.js';
 import { BW, sandHeight, waterZ, SAND_TOP } from './shore.js';
 import { bbox } from '../osmkit.js';
-import { buildFolk } from './folk.js';
+import { buildFolk, pickArch } from './folk.js';
+import { streetAt } from './fronts.js';
 
 // the town: people on the sidewalks of every street north of the boardwalk (Surf, Mermaid, Neptune, W 8th, Stillwell, the side
 // streets by the towers): walkers heading along the street, a few standing on their phones. Instanced like the rest (one draw call
@@ -79,6 +80,9 @@ export function buildBeachLife(world, M) {
   crowd.push(...scatter(R, 160, PLAY.x0 + 40, PLAY.x1 - 20, -140, BW.z0 - 2, 0, blocked, { walk: 0.6, bag: 0.05, gap: 3 }).map((c) => ({ ...c, zone: 'park' })));
   for (const r of OSM.rd) { if (!(r.x > PLAY.x0 && r.x < PLAY.x1 && r.z > PLAY.z0 && r.z < BW.z0)) continue; const n = 2 + ((R() * 5) | 0); for (let k = 0; k < n; k++) { const a = R() * 6.3, d = 8 + R() * 3; crowd.push({ x: r.x + Math.cos(a) * d, y: 0, z: r.z + Math.sin(a) * d, ry: Math.atan2(-Math.cos(a), -Math.sin(a)), pose: R() < 0.4 ? 'phone' : 'stand', bag: 0, zone: 'queue' }); } }
   crowd.push(...townCrowd(world, blocked));
+  // who walks where (coney/folk.js pickArch): decided here so the far instanced figure and the live one agree; kids are kid-sized
+  for (const c of crowd) { if (!['town', 'park', 'queue', 'bw'].includes(c.zone)) continue; const st = c.zone === 'bw' ? 'surf' : streetAt(c.x, c.z);
+    const v = Math.sin(c.x * 12.9898 + c.z * 78.233 + 22 * 37.719) * 43758.5453; c.arch = pickArch(st, v - Math.floor(v)) || undefined; if (c.arch === 'kid' || c.arch === 'schoolkid') { c.s = 0.66; c.pose = c.pose === 'phone' ? 'stand' : c.pose; } }
   const cams = Object.values(world.W.poses || {});
   const spots = crowd.filter((c) => !cams.some((p) => Math.hypot(p[0] - c.x, p[2] - c.z) < 3.5));
   const handle = buildCrowd(world, spots);

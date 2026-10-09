@@ -1,0 +1,5365 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-09T13:45:36Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 368047143,
+  "lat": 40.5767475,
+  "lon": -73.9762497,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "2929",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 8th Street",
+    "amenity": "fire_station",
+    "check_date": "2024-06-11",
+    "gnis:feature_id": "2081143;2081265",
+    "name": "New York Engine Company 245;New York Ladder Company 161",
+    "polling_station": "no",
+    "smoking": "no",
+    "source": "USGS Geonames"
+  }
+},
+{
+  "type": "node",
+  "id": 1042045063,
+  "lat": 40.5800793,
+  "lon": -73.9721200,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "499",
+    "addr:postcode": "11224-4003",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "amenity": "pharmacy",
+    "check_date": "2026-04-24",
+    "check_date:opening_hours": "2026-04-24",
+    "dispensing": "yes",
+    "drive_through": "no",
+    "healthcare": "pharmacy",
+    "name": "Warbasse Pharmacy & Surgical Supplies",
+    "opening_hours": "Mo-Fr 08:30-19:30; Sa 09:00-17:00; Su 10:00-16:00",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-449-5177",
+    "website": "http://www.skpharmacy.com/s-k-warbasse-pharmacy-11224/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 2552663368,
+  "lat": 40.5745432,
+  "lon": -73.9885577,
+  "tags": {
+    "addr:housenumber": "2115",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "addr:unit": "6",
+    "atm": "yes",
+    "check_date:opening_hours": "2024-04-28",
+    "name": "Mashalla Deli Corp",
+    "opening_hours:signed": "no",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 2552762147,
+  "lat": 40.5757232,
+  "lon": -73.9794942,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1047",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "brand": "Taco Bell",
+    "brand:wikidata": "Q111972226",
+    "check_date": "2023-12-29",
+    "check_date:opening_hours": "2024-05-31",
+    "cuisine": "tex-mex",
+    "delivery": "yes",
+    "dog": "no",
+    "drive_through": "no",
+    "highchair": "no",
+    "name": "Taco Bell Cantina",
+    "opening_hours": "Mo-Su 09:00-24:00",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-929-481-8601",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "website": "https://locations.tacobell.com/ny/brooklyn/1047-surf-ave.html",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 2552762150,
+  "lat": 40.5757351,
+  "lon": -73.9797920,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1201",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "branch": "Coney Island",
+    "brand": "Tex's Chicken & Burgers",
+    "brand:wikidata": "Q107303396",
+    "check_date": "2025-05-05",
+    "cuisine": "burger;chicken",
+    "delivery": "yes",
+    "diet:halal": "yes",
+    "dog": "no",
+    "drive_through": "no",
+    "highchair": "yes",
+    "name": "Tex's Chicken & Burgers",
+    "opening_hours": "11:00-24:00",
+    "outdoor_seating": "no",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 347-462-2705",
+    "service:electricity": "limited",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://eattexs.com/locations/1201-surf-ave-brooklyn-ny-11224",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 2552762166,
+  "lat": 40.5767585,
+  "lon": -73.9824440,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1428",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand": "Chase",
+    "brand:wikidata": "Q524629",
+    "check_date": "2025-05-15",
+    "drive_through": "no",
+    "level": "0",
+    "name": "Chase",
+    "opening_hours": "Mo-Fr 09:00-17:00; Sa 09:00-14:00",
+    "phone": "+1-718-306-1640",
+    "website": "https://locator.chase.com/ny/brooklyn/1428-mermaid-ave",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 2552762169,
+  "lat": 40.5789693,
+  "lon": -73.9831988,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1502",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "atm": "yes",
+    "drink:beer": "yes",
+    "name": "Neptune Deli",
+    "opening_hours": "24/7",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 2552762193,
+  "lat": 40.5764893,
+  "lon": -73.9848854,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1702",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "check_date": "2022-10-19",
+    "name": "L.Q.A. Grocery II",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:wic": "yes",
+    "phone": "+1 929-417-2422",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 2552762223,
+  "lat": 40.5756371,
+  "lon": -73.9832269,
+  "tags": {
+    "amenity": "restaurant",
+    "bar": "yes",
+    "cuisine": "caribbean",
+    "name": "Footprints",
+    "phone": "+1 718-265-2530"
+  }
+},
+{
+  "type": "node",
+  "id": 4080257005,
+  "lat": 40.5739518,
+  "lon": -73.9757117,
+  "tags": {
+    "name": "Glover's Reef",
+    "tourism": "attraction",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080257006,
+  "lat": 40.5741011,
+  "lon": -73.9754812,
+  "tags": {
+    "name": "Conservation Hall",
+    "tourism": "attraction",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080271225,
+  "lat": 40.5742474,
+  "lon": -73.9758693,
+  "tags": {
+    "amenity": "library",
+    "name": "Wildlife Conservation Library"
+  }
+},
+{
+  "type": "node",
+  "id": 4080272633,
+  "lat": 40.5746144,
+  "lon": -73.9746957,
+  "tags": {
+    "name": "Sharks",
+    "tourism": "attraction",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080306783,
+  "lat": 40.5740414,
+  "lon": -73.9791450,
+  "tags": {
+    "attraction": "big_wheel",
+    "fee": "yes",
+    "height": "46",
+    "name": "Wonder Wheel",
+    "start_date": "1920-05",
+    "tourism": "attraction",
+    "wikidata": "Q1465377",
+    "wikipedia": "en:Wonder Wheel"
+  }
+},
+{
+  "type": "node",
+  "id": 4080306996,
+  "lat": 40.5732784,
+  "lon": -73.9798841,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Riegelmann Boardwalk",
+    "amenity": "fast_food",
+    "brand": "Nathan's",
+    "brand:wikidata": "Q1319505",
+    "check_date": "2022-05-19",
+    "cuisine": "hot_dog",
+    "drive_through": "no",
+    "highchair": "no",
+    "name": "Nathan's",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "source": "local knowledge;survey",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080306997,
+  "lat": 40.5732504,
+  "lon": -73.9801333,
+  "tags": {
+    "amenity": "restaurant",
+    "bar": "yes",
+    "check_date": "2022-05-19",
+    "cuisine": "burger;sandwich;chicken;american;ice_cream;hot_dog",
+    "diet:vegan": "yes",
+    "highchair": "yes",
+    "name": "Ruby's Bar and Grill",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "source": "local knowledge;survey",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080306998,
+  "lat": 40.5732314,
+  "lon": -73.9803013,
+  "tags": {
+    "air_conditioning": "yes",
+    "check_date": "2023-06-01",
+    "name": "Brooklyn Beach Shop",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "gift",
+    "source": "local knowledge;survey",
+    "toilets": "no",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080312804,
+  "lat": 40.5753673,
+  "lon": -73.9809026,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1232",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "brand": "IT'SUGAR",
+    "brand:wikidata": "Q110603409",
+    "check_date": "2025-02-03",
+    "name": "IT'SUGAR",
+    "opening_hours": "Su-Th 11:00-20:00; Fr-Sa 11:00-21:00",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 646-582-8941",
+    "shop": "confectionery",
+    "source": "survey;local knowledge",
+    "stroller": "yes",
+    "website": "https://itsugar.com/locator/coneyisland/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080312832,
+  "lat": 40.5748963,
+  "lon": -73.9804635,
+  "tags": {
+    "addr:housenumber": "1221",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Bowery Street",
+    "amenity": "restaurant",
+    "check_date": "2024-11-24",
+    "contact:phone": "+1 929-254-9072",
+    "contact:website": "https://donazitamex.com/",
+    "cuisine": "mexican",
+    "delivery": "yes",
+    "name": "Doña Zita",
+    "opening_hours": "Tu-Su 12:00-22:00;Mo off",
+    "takeaway": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 4080312833,
+  "lat": 40.5752747,
+  "lon": -73.9797659,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1208",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 12th Street",
+    "name": "Sideshows by the Seashore",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 4813805532,
+  "lat": 40.5749582,
+  "lon": -73.9839665,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1904",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "amenity": "bar",
+    "check_date": "2024-05-31",
+    "name": "The Coney Island Sandbar",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 5035203421,
+  "lat": 40.5764063,
+  "lon": -73.9823799,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2911",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 15th Street",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "check_date": "2025-03-30",
+    "check_date:opening_hours": "2021-03-09",
+    "cocktails": "yes",
+    "cuisine": "italian",
+    "delivery": "yes",
+    "drink:beer": "draught",
+    "drink:liquor": "yes",
+    "drink:wine": "yes",
+    "email": "info@gargiulos.com",
+    "fax": "+1-718-714-5833",
+    "name": "Gargiulo's",
+    "opening_hours": "Mo,We-Th 12:00-21:30; Tu off; Fr-Sa 12:00-22:30; Su 12:00-21:00",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-266-4891",
+    "reservation": "yes",
+    "smoking": "no",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "website": "https://gargiulos.com",
+    "wheelchair": "yes",
+    "wikidata": "Q5523190"
+  }
+},
+{
+  "type": "node",
+  "id": 5093784260,
+  "lat": 40.5800745,
+  "lon": -73.9719557,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "489",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "amenity": "bank",
+    "atm": "yes",
+    "brand": "WebsterBank",
+    "brand:wikidata": "Q7978891",
+    "check_date": "2025-05-29",
+    "check_date:opening_hours": "2025-05-29",
+    "drive_through": "no",
+    "name": "WebsterBank",
+    "opening_hours": "Mo 09:00-18:00; Tu-Fr 09:00-16:00; Sa 09:00-13:00; Su off",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-996-4100",
+    "website": "https://public.websteronline.com/location/489-neptune-ave-brooklyn-ny",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 5152388722,
+  "lat": 40.5768847,
+  "lon": -73.9838725,
+  "tags": {
+    "name": "Henry Liquors",
+    "phone": "+13474923898",
+    "shop": "alcohol"
+  }
+},
+{
+  "type": "node",
+  "id": 5152388823,
+  "lat": 40.5792071,
+  "lon": -73.9847270,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1613",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "check_date:opening_hours": "2024-02-10",
+    "drive_through": "no",
+    "name": "Best Buy Liquors",
+    "opening_hours": "Mo-Th 09:00-21:00; Fr,Sa 09:00-22:00; Su 10:00-19:00",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-265-4350",
+    "shop": "alcohol",
+    "website": "https://bestbuyliquors.com/"
+  }
+},
+{
+  "type": "node",
+  "id": 5332466676,
+  "lat": 40.5758956,
+  "lon": -73.9797642,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1201",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "stripclub",
+    "check_date": "2024-10-14",
+    "check_date:opening_hours": "2021-10-31",
+    "fee": "yes",
+    "level": "2",
+    "min_age": "21",
+    "name": "Foxy Gentlemen’s Club",
+    "opening_hours": "20:00-04:00",
+    "phone": "+1-718-449-1240",
+    "website": "http://foxyclubny.com/"
+  }
+},
+{
+  "type": "node",
+  "id": 5400081982,
+  "lat": 40.5788159,
+  "lon": -73.9751354,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:door": "8",
+    "addr:housenumber": "626",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "amenity": "post_office",
+    "branch": "Neptune Avenue",
+    "check_date": "2025-05-04",
+    "check_date:opening_hours": "2025-05-04",
+    "fax": "+1-718-265-3538",
+    "name": "USPS",
+    "opening_hours": "Mo-Fr 09:00-17:00; Sa,Su off",
+    "operator": "United States Postal Service",
+    "operator:short": "USPS",
+    "operator:type": "public",
+    "operator:website": "https://www.usps.com",
+    "operator:wikidata": "Q668687",
+    "operator:wikipedia": "en:United States Postal Service",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-265-1751",
+    "post_office": "bureau",
+    "short_name": "USPS",
+    "website": "https://tools.usps.com/locations/details/1554796",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 5400243839,
+  "lat": 40.5749078,
+  "lon": -73.9852378,
+  "tags": {
+    "access": "yes",
+    "artist_name": "William Behrends",
+    "artwork_type": "sculpture",
+    "check_date": "2025-03-01",
+    "material": "bronze",
+    "name": "Jackie Robinson and Pee Wee Reese Monument",
+    "ref:hmdb": "61575",
+    "start_date": "2005-11-01",
+    "subject:wikidata": "Q221048; Q182485",
+    "tourism": "artwork",
+    "website": "https://www.nycgovparks.org/parks/coney-island-beach-and-boardwalk/highlights/19689",
+    "wikipedia": "en:Reese_and_Robinson_Monument"
+  }
+},
+{
+  "type": "node",
+  "id": 5571764605,
+  "lat": 40.5803583,
+  "lon": -73.9858743,
+  "tags": {
+    "amenity": "fuel",
+    "brand": "Shell",
+    "brand:wikidata": "Q110716465",
+    "check_date": "2024-07-01",
+    "compressed_air": "yes",
+    "name": "Shell",
+    "opening_hours": "24/7",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "node",
+  "id": 5964505286,
+  "lat": 40.5789525,
+  "lon": -73.9820718,
+  "tags": {
+    "artist_name": "Banksy",
+    "artwork_type": "graffiti",
+    "check_date": "2025-03-22",
+    "name": "Tagging Robot",
+    "note": "The mural is hidden behind a rolled shutter to prevent vandalism.",
+    "start_date": "2013-10",
+    "tourism": "artwork"
+  }
+},
+{
+  "type": "node",
+  "id": 6191501131,
+  "lat": 40.5788677,
+  "lon": -73.9754151,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "626",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "air_conditioning": "yes",
+    "check_date": "2025-11-04",
+    "check_date:opening_hours": "2025-05-04",
+    "name": "DII",
+    "opening_hours": "Mo-Su 09:00-19:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-265-7099",
+    "shop": "department_store",
+    "toilets": "no",
+    "website": "https://diistores.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 6517040643,
+  "lat": 40.5746183,
+  "lon": -73.9882682,
+  "tags": {
+    "addr:housenumber": "2115",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "addr:unit": "1",
+    "amenity": "fast_food",
+    "name": "Surf Pizza & Wings",
+    "opening_hours": "Mo-Su 11:00-23:00",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 6517040644,
+  "lat": 40.5746030,
+  "lon": -73.9883212,
+  "tags": {
+    "addr:housenumber": "2115",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "addr:unit": "2",
+    "amenity": "place_of_worship",
+    "check_date": "2024-04-28",
+    "name": "Chanpions of Christ Worldwide Ministries",
+    "phone": "+1-718-506-4615",
+    "religion": "christian"
+  }
+},
+{
+  "type": "node",
+  "id": 6517040645,
+  "lat": 40.5745904,
+  "lon": -73.9883795,
+  "tags": {
+    "addr:housenumber": "2115",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "addr:unit": "3",
+    "amenity": "place_of_worship",
+    "check_date": "2024-04-28",
+    "name": "Chabad of Coney Island",
+    "phone": "+1-718-598-7283",
+    "religion": "jewish"
+  }
+},
+{
+  "type": "node",
+  "id": 6517040646,
+  "lat": 40.5745768,
+  "lon": -73.9884419,
+  "tags": {
+    "addr:housenumber": "2115",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "addr:unit": "4",
+    "atm": "yes",
+    "check_date:opening_hours": "2024-04-28",
+    "name": "Splish Slash Laundromat",
+    "opening_hours": "Mo-Su 07:00-20:00",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-347-587-7090",
+    "self_service": "yes",
+    "shop": "laundry"
+  }
+},
+{
+  "type": "node",
+  "id": 6868798538,
+  "lat": 40.5795885,
+  "lon": -73.9721443,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "486",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "amenity": "bank",
+    "atm": "yes",
+    "branch": "Neptune Avenue",
+    "brand": "Apple Bank",
+    "brand:wikidata": "Q4781125",
+    "check_date": "2024-11-14",
+    "check_date:opening_hours": "2024-11-14",
+    "drive_through": "no",
+    "name": "Apple Bank",
+    "opening_hours": "Mo-We,Fr 09:00-16:00; Th 09:00-18:00; Sa 09:00-13:00",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-266-8756",
+    "website": "https://www.applebank.com/about/get-in-touch/atm-branch-locations/brooklyn/486-neptune-avenue-(brooklyn)/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 7073996513,
+  "lat": 40.5796015,
+  "lon": -73.9723068,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "532",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2025-05-03",
+    "check_date:opening_hours": "2025-05-03",
+    "contact:facebook": "https://www.facebook.com/BrothersBagelsConeyIsland",
+    "contact:instagram": "https://www.instagram.com/brothers__bagels",
+    "dog": "no",
+    "indoor_seating": "yes",
+    "name": "Brothers Bagels",
+    "nobrand": "yes",
+    "opening_hours": "Mo-Su 06:00-19:00",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-266-2230",
+    "shop": "deli",
+    "website": "https://storefront.getsauce.com/order/brothers-bagels",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 7232137893,
+  "lat": 40.5755699,
+  "lon": -73.9773106,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "825",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "check_date": "2025-11-25",
+    "contact:facebook": "https://www.facebook.com/nylimanrestaurant",
+    "contact:instagram": "https://www.instagram.com/nylimanrestaurant",
+    "cuisine": "turkish;mediterranean",
+    "delivery": "yes",
+    "email": "info@limanrestaurant.com",
+    "level": "1",
+    "name": "Liman",
+    "opening_hours": "Mo-Th,Su 12:00-22:00; Fr-Sa 12:00-22:30",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-769-3322",
+    "reservation": "yes",
+    "takeaway": "no",
+    "website": "https://www.limanrestaurantny.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 7650929751,
+  "lat": 40.5757957,
+  "lon": -73.9702474,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "135",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sea Breeze Avenue",
+    "amenity": "clinic",
+    "healthcare": "clinic",
+    "healthcare:speciality": "general;cardiology;dermatology;gastroenterology;endocrinology",
+    "name": "Seabreeze Medical",
+    "opening_hours": "Tu-Sa 09:00-17:00; Mo 09:00-19:00",
+    "phone": "+1-718-338-0300"
+  }
+},
+{
+  "type": "node",
+  "id": 7836611107,
+  "lat": 40.5790164,
+  "lon": -73.9700452,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "448",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "childcare",
+    "check_date": "2024-05-07",
+    "check_date:opening_hours": "2021-10-17",
+    "email": "help@littlescholarsnyc.com",
+    "max_age": "5",
+    "min_age": "3",
+    "name": "Little Scholars II",
+    "opening_hours": "Mo-Fr 08:00-18:00; Sa-Su off",
+    "operator:type": "private",
+    "payment:cash": "yes",
+    "payment:cheque": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 917-672-6597",
+    "website": "https://littlescholarsnyc.com/locations/little-scholars-2/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 8155803706,
+  "lat": 40.5795989,
+  "lon": -73.9729016,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "532",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "branch": "Neptune Ave",
+    "brand": "NetCost",
+    "check_date": "2025-08-22",
+    "diet:kosher": "yes",
+    "dog": "no",
+    "internet_access": "no",
+    "name": "NetCost Market",
+    "opening_hours": "24/7",
+    "organic": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-946-5400",
+    "self_checkout": "no",
+    "shop": "supermarket",
+    "start_date": "2020-11-23",
+    "stroller": "yes",
+    "toilets": "yes",
+    "website": "https://www.netcostmarket.com/locations/ny/532-neptune-ave-brooklyn/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 8320583558,
+  "lat": 40.5789260,
+  "lon": -73.9757297,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "626",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "check_date": "2025-11-04",
+    "cuisine": "juice",
+    "drive_through": "no",
+    "highchair": "yes",
+    "name": "Baya Bar",
+    "opening_hours": "Mo-Fr 08:30-20:00; Sa-Su 09:00-20:00",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "smoking": "no",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 8320640236,
+  "lat": 40.5796360,
+  "lon": -73.9727798,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "532",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "brand": "CVS Pharmacy",
+    "brand:website": "https://www.cvs.com/",
+    "brand:wikidata": "Q2078880",
+    "check_date": "2025-08-22",
+    "dog": "no",
+    "name": "CVS Pharmacy",
+    "opening_hours": "08:00-21:00",
+    "opening_hours:pharmacy": "Mo-Fr 08:00-21:00; Sa,Su 09:00-18:00",
+    "payment:cash": "yes",
+    "payment:coins": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-996-2233",
+    "self_checkout": "yes",
+    "self_checkout:handheld": "no",
+    "self_checkout:self_scan": "yes",
+    "shop": "chemist",
+    "short_name": "CVS",
+    "website": "https://www.cvs.com/store-locator/brooklyn-ny-pharmacies/532-neptune-avenue-unit-1-brooklyn-ny-11224/storeid=2428",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 8497761668,
+  "lat": 40.5755842,
+  "lon": -73.9774568,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "825",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "addr:unit": "4",
+    "air_conditioning": "yes",
+    "amenity": "cafe",
+    "branch": "Coney Island- Surf Avenue & West 8th",
+    "brand": "Starbucks",
+    "brand:wikidata": "Q37158",
+    "check_date": "2023-06-10",
+    "cuisine": "coffee_shop",
+    "delivery": "yes",
+    "drive_through": "yes",
+    "highchair": "no",
+    "internet_access": "wlan",
+    "internet_access:fee": "no",
+    "level": "0",
+    "name": "Starbucks",
+    "official_name": "Starbucks Coffee",
+    "opening_hours": "Mo-Su 07:00-18:00",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 347-675-1703",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "website": "https://www.starbucks.com/store-locator/store/1025856/coney-island-surf-ave-w-8th-st-825-surf-avenue-brooklyn-ny-112242819-us",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101418,
+  "lat": 40.5732007,
+  "lon": -73.9815988,
+  "tags": {
+    "attraction": "amusement_ride",
+    "fee": "yes",
+    "name": "Endeavor",
+    "tourism": "attraction",
+    "website": "https://lunaparknyc.com/rides/soarin-eagle/"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101455,
+  "lat": 40.5735182,
+  "lon": -73.9787011,
+  "tags": {
+    "attraction": "amusement_ride",
+    "check_date": "2025-03-01",
+    "fee": "yes",
+    "name": "WindstarZ",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101474,
+  "lat": 40.5736750,
+  "lon": -73.9782696,
+  "tags": {
+    "attraction": "amusement_ride",
+    "fee": "yes",
+    "name": "Brooklyn Barge",
+    "tourism": "attraction",
+    "website": "https://lunaparknyc.com/rides/brooklyn-barge/"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101476,
+  "lat": 40.5737473,
+  "lon": -73.9787197,
+  "tags": {
+    "attraction": "amusement_ride",
+    "fee": "yes",
+    "name": "Speed Boat",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101477,
+  "lat": 40.5739383,
+  "lon": -73.9782603,
+  "tags": {
+    "attraction": "swinging_ship",
+    "name": "Coney Clipper",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101478,
+  "lat": 40.5737163,
+  "lon": -73.9784370,
+  "tags": {
+    "attraction": "swinging_ship",
+    "name": "Seaside Swing",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101479,
+  "lat": 40.5738006,
+  "lon": -73.9782744,
+  "tags": {
+    "attraction": "amusement_ride",
+    "fee": "yes",
+    "name": "Magic Bikes",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101481,
+  "lat": 40.5741411,
+  "lon": -73.9784437,
+  "tags": {
+    "name": "Coney Island Hang Glider",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101484,
+  "lat": 40.5733380,
+  "lon": -73.9794300,
+  "tags": {
+    "attraction": "amusement_ride",
+    "fee": "yes",
+    "name": "Happy Fishing",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101486,
+  "lat": 40.5734261,
+  "lon": -73.9792099,
+  "tags": {
+    "attraction": "amusement_ride",
+    "check_date": "2025-03-01",
+    "name": "Samba Balloon Ride",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101497,
+  "lat": 40.5738612,
+  "lon": -73.9794487,
+  "tags": {
+    "name": "Big Foot",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101498,
+  "lat": 40.5738815,
+  "lon": -73.9792674,
+  "tags": {
+    "name": "Dizzy Dragons",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101500,
+  "lat": 40.5737572,
+  "lon": -73.9793788,
+  "tags": {
+    "check_date": "2024-04-17",
+    "name": "Pepsi Pit Stop",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101533,
+  "lat": 40.5737639,
+  "lon": -73.9790837,
+  "tags": {
+    "attraction": "roller_coaster",
+    "name": "Sea Serpent",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101534,
+  "lat": 40.5735454,
+  "lon": -73.9792040,
+  "tags": {
+    "attraction": "amusement_ride",
+    "name": "Jump Around Dune Buggy",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8816101535,
+  "lat": 40.5746072,
+  "lon": -73.9790490,
+  "tags": {
+    "name": "Thunder Bolt",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "node",
+  "id": 8851473272,
+  "lat": 40.5796164,
+  "lon": -73.9725110,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "532",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2024-12-31",
+    "check_date:opening_hours": "2024-11-14",
+    "dog": "no",
+    "name": "Kartina TV",
+    "opening_hours": "Mo-Fr 09:30-18:30; Sa 11:00-16:00",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:qr_code": "no",
+    "phone": "+1-888-827-0606",
+    "shop": "electronics",
+    "website": "https://www.kartina.tv/ny-brooklyn",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 8931103808,
+  "lat": 40.5796047,
+  "lon": -73.9723498,
+  "tags": {
+    "addr:housenumber": "530",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "check_date": "2025-03-14",
+    "cuisine": "turkish",
+    "delivery": "yes",
+    "dog": "no",
+    "highchair": "no",
+    "kids_area": "no",
+    "name": "Sahara Turkish Grill",
+    "opening_hours": "11:00-22:00",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-333-0384",
+    "reservation": "yes",
+    "smoking": "no",
+    "start_date": "2022-11-22",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "toilets:wheelchair": "yes",
+    "website": "https://www.saharaturkishgrillbk.com/",
+    "website:menu": "https://order.chownow.com/order/39090/locations/59449",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9051228617,
+  "lat": 40.5760866,
+  "lon": -73.9715426,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "271",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sea Breeze Avenue",
+    "air_conditioning": "yes",
+    "amenity": "cafe",
+    "brand": "Pep",
+    "check_date": "2025-03-28",
+    "cuisine": "coffee_shop;sandwich;french",
+    "delivery": "yes",
+    "drive_through": "no",
+    "email": "info@pepbakery.com",
+    "highchair": "yes",
+    "name": "Pep Bakehouse and Coffee Shop",
+    "opening_hours": "Mo-Fr 07:00-20:00; Sa 08:00-20:00; Su 09:00-19:00",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:qr_code": "no",
+    "phone": "+1 929 397 0094",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://pepbakery.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9173605507,
+  "lat": 40.5753800,
+  "lon": -73.9803156,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1220",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "amenity": "fast_food",
+    "brand": "Popeyes",
+    "brand:wikidata": "Q1330910",
+    "check_date": "2025-02-03",
+    "cuisine": "chicken",
+    "delivery": "yes",
+    "drive_through": "no",
+    "highchair": "no",
+    "indoor_seating": "yes",
+    "name": "Popeyes",
+    "official_name": "Popeyes Louisiana Kitchen",
+    "opening_hours": "Mo 09:00-00:00; Tu-Su 10:00-00:00",
+    "outdoor_seating": "no",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-676-9535",
+    "service:electricity": "no",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://locations.popeyes.com/ny/brooklyn/11278/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9191994147,
+  "lat": 40.5761008,
+  "lon": -73.9716899,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "271",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sea Breeze Avenue",
+    "amenity": "kindergarten",
+    "check_date": "2024-09-10",
+    "education": "kindergarten",
+    "name": "Basin Prep 2",
+    "phone": "+1-646-829-7969",
+    "preschool": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9212756290,
+  "lat": 40.5757418,
+  "lon": -73.9803192,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1217",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "check_date": "2023-06-10",
+    "cuisine": "seafood;cajun",
+    "delivery": "yes",
+    "name": "Hook and Reel",
+    "opening_hours": "Mo-Th 12:00-22:30; Fr-Sa 12:00-23:30; Su 12:00-23:00",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-684-5533",
+    "reservation": "yes",
+    "smoking": "no",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "toilets:wheelchair": "yes",
+    "website": "https://hookreel.com/location/coneyisland/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9236338742,
+  "lat": 40.5792569,
+  "lon": -73.9722409,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "532",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "addr:unit": "5A",
+    "air_conditioning": "yes",
+    "check_date": "2025-01-25",
+    "check_date:opening_hours": "2023-06-23",
+    "email": "healthymedicaldme@gmail.com",
+    "name": "Heathy Medical DME",
+    "opening_hours": "Mo-Fr 09:00-17:00",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 929-219-1000",
+    "shop": "medical_supply",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9307172184,
+  "lat": 40.5767550,
+  "lon": -73.9824709,
+  "tags": {
+    "amenity": "atm",
+    "brand": "Chase",
+    "brand:wikidata": "Q524629",
+    "cash_in": "yes",
+    "check_date": "2025-05-15",
+    "covered": "yes",
+    "drive_through": "no",
+    "indoor": "yes",
+    "name": "Chase",
+    "opening_hours": "24/7",
+    "operator": "Chase",
+    "operator:wikidata": "Q524629",
+    "operator:wikipedia": "en:Chase Bank",
+    "website": "https://locator.chase.com/ny/brooklyn/1428-mermaid-ave-ATM-NY2165",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9307806674,
+  "lat": 40.5785302,
+  "lon": -73.9860455,
+  "tags": {
+    "amenity": "car_wash",
+    "automated": "yes",
+    "check_date": "2024-09-18",
+    "name": "Bolla Wash",
+    "opening_hours": "24/7",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "self_service": "no",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9356401211,
+  "lat": 40.5752667,
+  "lon": -73.9859521,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "1909",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "alt_name": "Lone Star Gourmet Market",
+    "amenity": "supermarket",
+    "check_date": "2024-08-23",
+    "name": "Shop Fair Supermarkets",
+    "organic": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "supermarket",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9356401212,
+  "lat": 40.5751998,
+  "lon": -73.9862344,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "1919",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "beauty": "supplies",
+    "check_date": "2025-03-30",
+    "name": "Beauty Supply",
+    "opening_hours": "Mo-Th,Su 08:00-21:00; Fr-Sa 08:00-22:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "beauty",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9384326221,
+  "lat": 40.5749291,
+  "lon": -73.9767714,
+  "tags": {
+    "artist_name": "Frank Stella",
+    "artwork_type": "sculpture",
+    "description": "Carbon fiber and mirror polished aluminum. Dimensions approximately 19'1.5\" x 21' x 22'3.5\"",
+    "material": "aluminium;carbon_fiber",
+    "name": "K. 159",
+    "source": "survey",
+    "start_date": "2019",
+    "tourism": "artwork"
+  }
+},
+{
+  "type": "node",
+  "id": 9384326224,
+  "lat": 40.5741213,
+  "lon": -73.9759083,
+  "tags": {
+    "name": "New York City Aquarium",
+    "shop": "ticket"
+  }
+},
+{
+  "type": "node",
+  "id": 9384326226,
+  "lat": 40.5740517,
+  "lon": -73.9758714,
+  "tags": {
+    "name": "New York City Aquarium",
+    "shop": "ticket"
+  }
+},
+{
+  "type": "node",
+  "id": 9386929427,
+  "lat": 40.5730357,
+  "lon": -73.9821062,
+  "tags": {
+    "name": "Thunderbolt",
+    "shop": "ticket"
+  }
+},
+{
+  "type": "node",
+  "id": 9386929428,
+  "lat": 40.5730315,
+  "lon": -73.9821511,
+  "tags": {
+    "name": "Thunderbolt",
+    "shop": "gift"
+  }
+},
+{
+  "type": "node",
+  "id": 9403680927,
+  "lat": 40.5789689,
+  "lon": -73.9802547,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1212",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "level": "0",
+    "name": "Anfex Medical Supply",
+    "opening_hours": "Mo-Fr 09:00-17:00; Sa,Su off",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-891-6666",
+    "shop": "medical_supply"
+  }
+},
+{
+  "type": "node",
+  "id": 9403680928,
+  "lat": 40.5789593,
+  "lon": -73.9803383,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1216",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2024-11-14",
+    "check_date:opening_hours": "2024-11-14",
+    "delivery": "yes",
+    "level": "0",
+    "name": "A&G Pharmacy",
+    "opening_hours": "Mo-Fr 09:00-19:00; Sa 10:00-16:00; Su off",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-996-2277",
+    "shop": "chemist",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9403680929,
+  "lat": 40.5789798,
+  "lon": -73.9801604,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "1208",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "no",
+    "amenity": "fast_food",
+    "brand": "Domino's",
+    "brand:wikidata": "Q839466",
+    "check_date": "2025-02-15",
+    "cuisine": "pizza",
+    "delivery": "yes",
+    "dog": "no",
+    "drive_through": "no",
+    "highchair": "no",
+    "internet_access": "no",
+    "level": "0",
+    "name": "Domino's",
+    "opening_hours": "Mo-Th 10:30-01:00; Fr-Sa 10:30-02:00; Su 10:30-00:00;PH open",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:qr_code": "no",
+    "phone": "+1 718-265-5600",
+    "ref": "3649",
+    "service:electricity": "no",
+    "smoking": "no",
+    "takeaway": "only",
+    "website": "https://pizza.dominos.com/new-york/brooklyn/1208-neptune-ave",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "node",
+  "id": 9403680930,
+  "lat": 40.5790040,
+  "lon": -73.9799506,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "1206",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "level": "0",
+    "name": "Interior Decor NY",
+    "phone": "+1-347-462-9042",
+    "shop": "interior_decoration"
+  }
+},
+{
+  "type": "node",
+  "id": 9403680931,
+  "lat": 40.5790156,
+  "lon": -73.9798506,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "1204",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2025-02-15",
+    "level": "0",
+    "name": "Neptune Deli & Grocery",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-265-5247",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9403680932,
+  "lat": 40.5789966,
+  "lon": -73.9800150,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "1208",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "brand": "Benjamin Moore",
+    "brand:wikidata": "Q4889038",
+    "check_date": "2025-02-15",
+    "level": "0",
+    "name": "Benjamin Moore",
+    "opening_hours": "Mo-Fr 07:00-17:00; Sa,Su 08:00-15:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "paint",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9422433239,
+  "lat": 40.5786422,
+  "lon": -73.9855251,
+  "tags": {
+    "amenity": "fuel",
+    "brand": "Mobil",
+    "brand:wikidata": "Q109676002",
+    "compressed_air": "yes",
+    "name": "Mobil",
+    "opening_hours": "24/7",
+    "self_service": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9422433240,
+  "lat": 40.5786148,
+  "lon": -73.9846588,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1620",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "brand": "Speedway",
+    "brand:wikidata": "Q7575683",
+    "name": "Speedway",
+    "opening_hours": "24/7",
+    "ref": "7829",
+    "shop": "convenience",
+    "website": "https://www.speedway.com/locations/NY/Brooklyn/1620-Neptune-Ave",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9422433241,
+  "lat": 40.5787283,
+  "lon": -73.9849082,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1620",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "fuel",
+    "brand": "Speedway",
+    "brand:wikidata": "Q7575683",
+    "compressed_air": "yes",
+    "name": "Speedway",
+    "opening_hours": "24/7",
+    "ref": "7829",
+    "self_service": "yes",
+    "website": "https://www.speedway.com/locations/NY/Brooklyn/1620-Neptune-Ave",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9675290378,
+  "lat": 40.5792070,
+  "lon": -73.9722554,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2860B",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 5th Street",
+    "amenity": "bar",
+    "brewery": "yes",
+    "check_date": "2025-01-25",
+    "check_date:opening_hours": "2023-07-23",
+    "drive_through": "no",
+    "level": "0",
+    "name": "Beerland",
+    "opening_hours": "Mo-Th,Su 11:00-23:00; Fr-Sa 12:00-24:00",
+    "outdoor_seating": "yes",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:qr_code": "no",
+    "phone": "+1 718-483-8182",
+    "smoking": "no",
+    "source": "survey",
+    "sport": "soccer;basketball;baseball;american_football",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9736192080,
+  "lat": 40.5789819,
+  "lon": -73.9760312,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "626",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "air_conditioning": "yes",
+    "amenity": "cafe",
+    "bar": "no",
+    "changing_table": "no",
+    "check_date": "2025-05-04",
+    "check_date:diet:kosher": "2025-05-04",
+    "check_date:opening_hours": "2025-05-04",
+    "check_date:smoking": "2025-05-04",
+    "cuisine": "georgian",
+    "delivery": "yes",
+    "diet:kosher": "no",
+    "diet:vegan": "yes",
+    "drive_through": "no",
+    "email": "georgiancorner2022@gmail.com",
+    "highchair": "yes",
+    "indoor_seating": "yes",
+    "name": "Georgian Corner",
+    "opening_hours": "Mo-Sa 09:00-21:00; Su 10:00-20:00",
+    "outdoor_seating": "pedestrian_zone",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 347-240-0940",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://order.online/store/georgian-corner-brooklyn-24418165/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9736192081,
+  "lat": 40.5789092,
+  "lon": -73.9756391,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "626",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "air_conditioning": "yes",
+    "check_date": "2025-11-04",
+    "check_date:opening_hours": "2024-11-08",
+    "drive_through": "no",
+    "name": "I&M Liquor",
+    "opening_hours": "09:00-22:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-266-2834",
+    "shop": "alcohol",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9755461306,
+  "lat": 40.5732608,
+  "lon": -73.9800409,
+  "tags": {
+    "check_date": "2022-05-19",
+    "name": "Lola Star Gift Shop",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "gift",
+    "website": "https://www.lolastar.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9755513710,
+  "lat": 40.5733740,
+  "lon": -73.9789979,
+  "tags": {
+    "addr:postcode": "11224",
+    "amenity": "fast_food",
+    "check_date": "2024-12-31",
+    "cuisine": "pizza;ice_cream;hot_dog;chicken",
+    "drive_through": "no",
+    "name": "Famiglia Pizzeria",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "source": "survey;local knowledge",
+    "takeaway": "only",
+    "website": "https://famousfamiglia.com",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9755743328,
+  "lat": 40.5807759,
+  "lon": -73.9849281,
+  "tags": {
+    "addr:housenumber": "1626",
+    "addr:street": "Hart Place",
+    "air_conditioning": "yes",
+    "brand": "AutoZone",
+    "brand:wikidata": "Q4826087",
+    "check_date": "2023-04-16",
+    "name": "AutoZone",
+    "opening_hours": "Su 08:00-21:00; Mo-Sa 07:00-22:00",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-266-3037",
+    "ref": "4709",
+    "shop": "car_parts",
+    "website": "https://www.autozone.com/locations/ny/brooklyn/1626-hart-pl.html",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9811490178,
+  "lat": 40.5757368,
+  "lon": -73.9799289,
+  "tags": {
+    "addr:housenumber": "1205",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "bar",
+    "brewery": "yes",
+    "check_date": "2025-05-05",
+    "contact:facebook": "https://www.facebook.com/thereddoorsbg/",
+    "contact:instagram": "https://www.instagram.com/thereddoorsbg",
+    "email": "thereddoorsbar1205@gmail.com",
+    "name": "The Red Doors Bar & Grill",
+    "outdoor_seating": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-872-7177",
+    "smoking": "outside",
+    "source": "survey;local knowledge",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9811490179,
+  "lat": 40.5757436,
+  "lon": -73.9804567,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:floor": "2",
+    "addr:housenumber": "1223",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "check_date": "2025-05-15",
+    "cuisine": "seafood",
+    "delivery": "yes",
+    "level": "1",
+    "name": "Crab House Brooklyn",
+    "opening_hours": "Mo-Th 16:00-21:30; Fr 16:00-22:00; Sa 12:30-22:00; Su 12:30-21:30",
+    "outdoor_seating": "no",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 347-462-1934",
+    "reservation": "yes",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "website": "https://crabhousebk.com/"
+  }
+},
+{
+  "type": "node",
+  "id": 9811490180,
+  "lat": 40.5753652,
+  "lon": -73.9797964,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1208",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "bar",
+    "check_date": "2025-02-10",
+    "min_age": "21",
+    "name": "The Freak Bar",
+    "outdoor_seating": "no",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "source": "survey;local knowledge"
+  }
+},
+{
+  "type": "node",
+  "id": 9811576285,
+  "lat": 40.5753310,
+  "lon": -73.9820617,
+  "tags": {
+    "air_conditioning": "no",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "brewery": "yes",
+    "check_date": "2022-06-11",
+    "cuisine": "seafood",
+    "diet:meat": "yes",
+    "highchair": "no",
+    "name": "Pete's Clam Stop",
+    "outdoor_seating": "yes",
+    "reservation": "no",
+    "source": "survey;local knowledge",
+    "start_date": "1975",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9811756181,
+  "lat": 40.5756557,
+  "lon": -73.9783751,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1015",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "check_date": "2025-03-22",
+    "name": "Home Decor On The Surf",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "furniture",
+    "source": "survey;local knowledge",
+    "stroller": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9811756182,
+  "lat": 40.5756425,
+  "lon": -73.9781561,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1005",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "check_date": "2025-08-22",
+    "contact:facebook": "https://www.facebook.com/RARE-Italy-Restaurant-Lobster-Steak-61574680933695/",
+    "cuisine": "seafood;italian;mexican;european;burger",
+    "delivery": "yes",
+    "email": "Restarauntsophia62@gmail.com",
+    "name": "Rare",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-917-924-1818",
+    "reservation": "yes",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "start_date": "2025",
+    "takeaway": "yes",
+    "toilets": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9811756183,
+  "lat": 40.5756330,
+  "lon": -73.9780300,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1003",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "catering": "yes",
+    "cuisine": "chinese;sushi",
+    "delivery": "yes",
+    "email": "taoxitaoxi2025@gmail.com",
+    "level": "0",
+    "name": "TaoXi",
+    "opening_hours": "Mo-Th 11:30-15:30, 17:00-21:30; Fr-Sa 11:30-22:30; Su 12:00-21:30",
+    "outdoor_seating": "no",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-975-0400",
+    "smoking": "no",
+    "start_date": "2025",
+    "takeaway": "yes",
+    "website": "https://www.taoxiasianrestaurant.com/",
+    "website:menu": "https://pos.chowbus.com/online-ordering/store/Taoxi/22111"
+  }
+},
+{
+  "type": "node",
+  "id": 9811756184,
+  "lat": 40.5756234,
+  "lon": -73.9778390,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "837",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "check_date": "2024-07-21",
+    "cuisine": "pizza",
+    "delivery": "yes",
+    "drive_through": "no",
+    "highchair": "no",
+    "name": "Surf City Pizzaria",
+    "outdoor_seating": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9811756185,
+  "lat": 40.5755539,
+  "lon": -73.9771470,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "825",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "events_venue",
+    "check_date": "2025-11-25",
+    "contact:instagram": "https://www.instagram.com/kidsclubbrooklyn",
+    "name": "Fun Island",
+    "phone": "+1 347-985-4374",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "website": "https://funislandplay.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9884107163,
+  "lat": 40.5795907,
+  "lon": -73.9721797,
+  "tags": {
+    "addr:housenumber": "486",
+    "addr:street": "Neptune Avenue",
+    "amenity": "atm",
+    "brand": "Apple Bank",
+    "brand:wikidata": "Q4781125",
+    "cash_in": "yes",
+    "check_date": "2024-06-27",
+    "covered": "yes",
+    "currency:USD": "yes",
+    "drive_through": "no",
+    "indoor": "yes",
+    "lit": "yes",
+    "name": "Apple Bank",
+    "opening_hours": "24/7",
+    "operator": "Apple Bank",
+    "operator:wikidata": "Q4781125",
+    "website": "https://www.applebank.com/about/get-in-touch/atm-branch-locations/brooklyn/486-neptune-avenue-(brooklyn)",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9896090690,
+  "lat": 40.5751246,
+  "lon": -73.9809084,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3015",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Stillwell Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "brand": "White Castle",
+    "brand:wikidata": "Q1244034",
+    "check_date": "2025-02-03",
+    "cuisine": "burger",
+    "delivery": "yes",
+    "drive_through": "no",
+    "highchair": "yes",
+    "name": "White Castle",
+    "opening_hours": "Mo-We 09:00-05:00; Th 09:00-24:00; Fr-Su 00:00-24:00",
+    "outdoor_seating": "no",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-576-2518",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://www.whitecastle.com/locations/1219",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 9981910111,
+  "lat": 40.5802820,
+  "lon": -73.9853421,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3081",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Cropsey Avenue",
+    "check_date": "2024-07-01",
+    "name": "Pal's Hero Shop",
+    "not:brand:wikidata": "Q7126094",
+    "phone": "+1 718-265-0200",
+    "shop": "deli",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10003178768,
+  "lat": 40.5738485,
+  "lon": -73.9756205,
+  "tags": {
+    "name": "New York Aquarium Gift Shop",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "gift"
+  }
+},
+{
+  "type": "node",
+  "id": 10003178777,
+  "lat": 40.5739182,
+  "lon": -73.9751090,
+  "tags": {
+    "name": "Sea Cliffs",
+    "tourism": "attraction",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10114799620,
+  "lat": 40.5760590,
+  "lon": -73.9888777,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2128",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "check_date": "2022-10-19",
+    "drive_through": "no",
+    "name": "Mermaid Discount Wine & Liquors",
+    "opening_hours": "Mo-Th 08:00-22:45; Fr-Sa 08:00-23:45; Su 12:00-21:00",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-996-1150",
+    "shop": "alcohol",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10114799621,
+  "lat": 40.5760712,
+  "lon": -73.9887781,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2126",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "name": "MixMax Convenience",
+    "shop": "convenience",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "node",
+  "id": 10114814516,
+  "lat": 40.5761765,
+  "lon": -73.9878098,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2028",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "check_date": "2022-10-19",
+    "name": "Stop and Go",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:ebt": "yes",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10114830136,
+  "lat": 40.5764175,
+  "lon": -73.9877660,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2027",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "check_date": "2022-10-19",
+    "name": "21st Smoke Shop",
+    "shop": "cannabis"
+  }
+},
+{
+  "type": "node",
+  "id": 10114830137,
+  "lat": 40.5764259,
+  "lon": -73.9876976,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2025",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "check_date": "2022-10-19",
+    "name": "5 Borough Pawn Shop",
+    "opening_hours": "10:00-16:00",
+    "phone": "+1-800-794-5901",
+    "shop": "pawnbroker",
+    "website": "https://www.5boroughpawn.com",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10114837803,
+  "lat": 40.5764709,
+  "lon": -73.9850292,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1706",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "air_conditioning": "yes",
+    "check_date": "2022-10-19",
+    "name": "Arch Auto Parts",
+    "opening_hours": "Mo-Sa 08:00-18:00; Su off",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-801-8395",
+    "shop": "car_parts",
+    "website": "https://archautoparts.com",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10114844863,
+  "lat": 40.5762182,
+  "lon": -73.9873712,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2014",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "place_of_worship",
+    "check_date": "2022-10-19",
+    "name": "Beulah Church Of Christ",
+    "phone": "+1 347-763-5068",
+    "religion": "christian",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "node",
+  "id": 10114844864,
+  "lat": 40.5762549,
+  "lon": -73.9870878,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2004",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "dentist",
+    "check_date": "2022-10-19",
+    "fax": "+1-646-817-3226",
+    "healthcare": "dentist",
+    "name": "Coney Island Dental Arts",
+    "phone": "+1-718-715-0305",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10780489355,
+  "lat": 40.5786613,
+  "lon": -73.9891743,
+  "tags": {
+    "addr:housenumber": "2127",
+    "addr:street": "Neptune Avenue",
+    "amenity": "restaurant",
+    "check_date": "2023-04-02",
+    "cuisine": "turkish",
+    "name": "Anchor Cafe",
+    "phone": "+1 718-756-4500"
+  }
+},
+{
+  "type": "node",
+  "id": 10780493365,
+  "lat": 40.5786769,
+  "lon": -73.9892936,
+  "tags": {
+    "addr:housenumber": "2127",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2023-04-02",
+    "name": "Kings Auto Collision & Repair",
+    "phone": "+1 347-492-6677",
+    "service:vehicle:air_conditioning": "yes",
+    "service:vehicle:batteries": "yes",
+    "service:vehicle:brakes": "yes",
+    "service:vehicle:car_parts": "yes",
+    "service:vehicle:car_repair": "yes",
+    "service:vehicle:diagnostics": "yes",
+    "service:vehicle:electrical": "yes",
+    "service:vehicle:inspection": "yes",
+    "service:vehicle:oil_change": "yes",
+    "service:vehicle:repairs": "yes",
+    "service:vehicle:tyres": "yes",
+    "shop": "car_repair",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10935388065,
+  "lat": 40.5757405,
+  "lon": -73.9802188,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1217",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "check_date": "2023-06-10",
+    "contact:facebook": "kpotbbqandhotpot",
+    "contact:instagram": "kpotbbqandhotpot",
+    "cuisine": "barbecue;korean",
+    "delivery": "yes",
+    "email": "info@thekpot.com",
+    "name": "Kpot Korean BBQ & Hot Pot",
+    "opening_hours": "Mo-Th 12:30-23:00; Fr-Su 12:30-24:00",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-684-5533",
+    "reservation": "yes",
+    "smoking": "no",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "toilets:wheelchair": "yes",
+    "website": "https://thekpot.com/location/coney-island-surf-ave/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10968385354,
+  "lat": 40.5763472,
+  "lon": -73.9708390,
+  "tags": {
+    "addr:housenumber": "66",
+    "addr:street": "West Brighton Avenue",
+    "air_conditioning": "yes",
+    "beauty": "hair;skin_care;spa;waxing;hair_removal;cosmetics;aesthetic",
+    "check_date": "2024-10-24",
+    "check_date:opening_hours": "2024-10-24",
+    "name": "Laser By Jana Bay",
+    "opening_hours:signed": "no",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 929-218-5888",
+    "shop": "beauty",
+    "website": "https://www.laserbyjanabay.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 10972297741,
+  "lat": 40.5756952,
+  "lon": -73.9790297,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1019",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "brand": "IHOP",
+    "brand:wikidata": "Q1185675",
+    "check_date": "2025-08-22",
+    "cuisine": "breakfast;pancake",
+    "delivery": "yes",
+    "dog": "no",
+    "highchair": "no",
+    "name": "IHOP",
+    "opening_hours": "Mo-Sa 07:00-22:00",
+    "outdoor_seating": "yes",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:ebt": "yes",
+    "payment:qr_code": "no",
+    "phone": "+1-718-676-7220",
+    "reservation": "yes",
+    "smoking": "no",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "toilets:wheelchair": "yes",
+    "website": "https://www.ihop.com/en/restaurants-brooklyn-ny/1019-surf-ave-2132",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11017606262,
+  "lat": 40.5785600,
+  "lon": -73.9761181,
+  "tags": {
+    "addr:housenumber": "2847",
+    "addr:street": "West 8th Street",
+    "air_conditioning": "yes",
+    "branch": "Coney Island",
+    "brand": "Dollar Tree",
+    "brand:wikidata": "Q5289230",
+    "check_date": "2025-03-18",
+    "check_date:opening_hours": "2024-07-11",
+    "level": "0",
+    "name": "Dollar Tree",
+    "opening_hours": "Mo-Sa 08:00-22:00; Su 08:00-21:00",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:ebt": "yes",
+    "phone": "+1 718-306-5357",
+    "ref": "5072",
+    "shop": "variety_store",
+    "stroller": "yes",
+    "website": "https://www.dollartree.com/locations/ny/brooklyn/5072/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11030368694,
+  "lat": 40.5769318,
+  "lon": -73.9801202,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2896",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 12th Street",
+    "amenity": "cafe",
+    "check_date": "2023-07-06",
+    "cuisine": "ukrainian;russian",
+    "delivery": "yes",
+    "name": "Café Dacha",
+    "opening_hours": "Mo-Fr 12:15-21:00; Sa-Su 10:15-21:00",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-347-240-7362"
+  }
+},
+{
+  "type": "node",
+  "id": 11076597940,
+  "lat": 40.5735381,
+  "lon": -73.9902179,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2316",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "amenity": "social_facility",
+    "check_date": "2024-05-31",
+    "description": "Help individuals with Substance Use Disorder.",
+    "name": "Surfpoint Recovery",
+    "opening_hours": "24/7",
+    "operator:type": "private",
+    "phone": "+1 347-727-4800",
+    "social_facility": "outreach",
+    "social_facility:for": "drug_addicted",
+    "website": "https://www.surfpointrecovery.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11145364681,
+  "lat": 40.5777022,
+  "lon": -73.9761807,
+  "tags": {
+    "addr:housenumber": "2875",
+    "addr:street": "West 8th Street",
+    "check_date": "2025-12-22",
+    "name": "MV Quick Food",
+    "opening_hours": "Mo-Su 05:00-24:00",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-946-3807",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11162290915,
+  "lat": 40.5762840,
+  "lon": -73.9700358,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "40",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West Brighton Avenue",
+    "addr:unit": "103",
+    "amenity": "doctors",
+    "branch": "South Brooklyn",
+    "check_date:opening_hours": "2024-10-24",
+    "fax": "+1-718-996-1123",
+    "healthcare": "doctor",
+    "healthcare:speciality": "otolaryngology",
+    "name": "Boris Bentsianov",
+    "opening_hours": "Mo-Tu 09:00-17:00; We 09:00-19:00; Th-Fr 09:00-17:00",
+    "phone": "+1-718-996-2260",
+    "website": "https://www.brooklynentdoc.com/"
+  }
+},
+{
+  "type": "node",
+  "id": 11238499446,
+  "lat": 40.5763852,
+  "lon": -73.9711440,
+  "tags": {
+    "addr:housenumber": "70",
+    "addr:street": "West Brighton Avenue",
+    "air_conditioning": "yes",
+    "amenity": "clinic",
+    "branch": "Brighton Beach",
+    "check_date": "2024-10-24",
+    "check_date:opening_hours": "2024-10-24",
+    "contact:facebook": "https://www.facebook.com/bakerhealth1",
+    "contact:instagram": "https://www.instagram.com/bakerhealth_",
+    "fax": "+1-347-333-7007",
+    "healthcare": "clinic",
+    "name": "Baker Health",
+    "opening_hours:signed": "no",
+    "operator:type": "private",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 347-333-7008",
+    "website": "https://www.baker-health.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11238499447,
+  "lat": 40.5764097,
+  "lon": -73.9714257,
+  "tags": {
+    "addr:housenumber": "80",
+    "addr:street": "West Brighton Avenue",
+    "check_date": "2025-02-14",
+    "name": "Cibo Market",
+    "opening_hours": "24/7",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11593160325,
+  "lat": 40.5780716,
+  "lon": -73.9761279,
+  "tags": {
+    "addr:housenumber": "2875",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 8th Street",
+    "amenity": "fast_food",
+    "brand:wikidata": "Q131378216",
+    "check_date": "2025-03-18",
+    "cuisine": "wings",
+    "delivery": "yes",
+    "diet:halal": "yes",
+    "dog": "no",
+    "drive_through": "no",
+    "highchair": "no",
+    "internet_access": "no",
+    "name": "Hangry Joe's Hot Chicken and Wings",
+    "opening_hours": "11:00-21:00",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 347-374-5384",
+    "service:electricity": "no",
+    "smoking": "no",
+    "takeaway": "only",
+    "website": "https://www.hangryjoes.com",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "node",
+  "id": 11608651873,
+  "lat": 40.5763788,
+  "lon": -73.9713399,
+  "tags": {
+    "addr:housenumber": "76",
+    "addr:postcode": "11224",
+    "addr:street": "West Brighton Avenue",
+    "addr:unit": "202;203;204",
+    "amenity": "social_facility",
+    "level": "1",
+    "name": "Fiesta Golden Age Adult Day Care",
+    "phone": "+1-718-996-0456",
+    "social_facility": "day_care",
+    "social_facility:for": "senior",
+    "website": "https://goldenageadc.com"
+  }
+},
+{
+  "type": "node",
+  "id": 11608651876,
+  "lat": 40.5763418,
+  "lon": -73.9712571,
+  "tags": {
+    "addr:housenumber": "76",
+    "addr:postcode": "11224",
+    "addr:street": "West Brighton Avenue",
+    "addr:unit": "209;210",
+    "level": "1",
+    "name": "Beauty Garden by Tatiana",
+    "phone": "+1-917-420-1580",
+    "shop": "beauty"
+  }
+},
+{
+  "type": "node",
+  "id": 11608651877,
+  "lat": 40.5762524,
+  "lon": -73.9700411,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "40",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West Brighton Avenue",
+    "amenity": "doctors",
+    "fax": "+1-718-627-8302",
+    "healthcare": "doctor",
+    "healthcare:speciality": "gastroenterology",
+    "name": "Irina Berlin, M.D.",
+    "phone": "+1-718-627-8300"
+  }
+},
+{
+  "type": "node",
+  "id": 11608651879,
+  "lat": 40.5763456,
+  "lon": -73.9713011,
+  "tags": {
+    "addr:housenumber": "76",
+    "addr:postcode": "11224",
+    "addr:street": "West Brighton Avenue",
+    "addr:unit": "208",
+    "alt_name": "Brows by Darya Vagner NY",
+    "beauty": "eyebrows",
+    "level": "1",
+    "name": "Browsbydasha",
+    "shop": "beauty"
+  }
+},
+{
+  "type": "node",
+  "id": 11759154599,
+  "lat": 40.5756663,
+  "lon": -73.9785503,
+  "tags": {
+    "addr:housenumber": "1039",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "bar",
+    "check_date": "2025-10-26",
+    "contact:instagram": "https://www.instagram.com/buck_itbar",
+    "email": "Buckitbar@gmail.com",
+    "indoor_seating": "yes",
+    "name": "Buck-!t Sports Bar & Latin Grill",
+    "outdoor_seating": "sidewalk",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 347-374-2157",
+    "smoking": "outside",
+    "website": "https://buck-it-bar.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 11920904264,
+  "lat": 40.5760767,
+  "lon": -73.9887089,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2124",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "branch": "Coney Island",
+    "brand": "Papa John's",
+    "brand:wikidata": "Q2759586",
+    "cuisine": "pizza",
+    "delivery": "yes",
+    "drive_through": "no",
+    "name": "Papa John's",
+    "opening_hours": "11:00-11:55",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-265-7272",
+    "ref": "4943",
+    "takeaway": "only",
+    "website": "https://www.papajohns.com/",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "node",
+  "id": 11973741102,
+  "lat": 40.5778494,
+  "lon": -73.9761879,
+  "tags": {
+    "check_date": "2024-06-11",
+    "name": "Luna Park Pharmacy",
+    "opening_hours": "Mo-Th 09:00-18:00; Fr 09:00-15:00; Sa off; Su 10:00-13:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-946-5444",
+    "shop": "chemist",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "node",
+  "id": 11973753437,
+  "lat": 40.5783974,
+  "lon": -73.9761269,
+  "tags": {
+    "addr:housenumber": "2867",
+    "addr:street": "West 8th Street",
+    "air_conditioning": "yes",
+    "amenity": "clinic",
+    "branch": "West Brighton",
+    "check_date": "2025-05-03",
+    "check_date:opening_hours": "2025-05-03",
+    "healthcare": "clinic",
+    "name": "NYU Langone Medical Associates",
+    "opening_hours": "Mo-We,Fr,Sa 08:30-17:00; Th 08:30-19:00",
+    "operator": "NYU Langone Health",
+    "operator:type": "private",
+    "operator:wikidata": "Q6956114",
+    "phone": "+1-929-455-3060",
+    "website": "https://nyulangone.org/locations/nyu-langone-medical-associates-west-brighton"
+  }
+},
+{
+  "type": "node",
+  "id": 12015685436,
+  "lat": 40.5808503,
+  "lon": -73.9712438,
+  "tags": {
+    "addr:housenumber": "2791",
+    "addr:postcode": "11224",
+    "addr:street": "West 5th Street",
+    "amenity": "dentist",
+    "check_date": "2024-06-27",
+    "contact:facebook": "https://www.facebook.com/VKDDS/",
+    "contact:instagram": "https://www.instagram.com/vkdds",
+    "contact:tiktok": "https://www.tiktok.com/@https:",
+    "email": "info@vkdds.com",
+    "healthcare": "dentist",
+    "level": "0",
+    "name": "Bright Smile Dental",
+    "opening_hours": "Mo 09:00-17:00; Tu-We 09:00-20:00; Th-Fr 09:00-18:00; Sa 09:00-16:00; Su off",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:insurance": "yes",
+    "phone": "+1 718-449-5559",
+    "source": "survey",
+    "website": "https://vkdds.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12185259307,
+  "lat": 40.5786125,
+  "lon": -73.9859078,
+  "tags": {
+    "addr:housenumber": "1702",
+    "addr:postcode": "11224",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "brand": "Burger King",
+    "brand:wikidata": "Q177054",
+    "check_date": "2024-09-18",
+    "cuisine": "burger",
+    "delivery": "yes",
+    "drive_through": "no",
+    "highchair": "no",
+    "name": "Burger King",
+    "opening_hours": "24/7",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-265-3636",
+    "smoking": "no",
+    "takeaway": "only",
+    "website": "https://www.bk.com/store-locator/store/restaurant_65903",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12230147499,
+  "lat": 40.5744838,
+  "lon": -73.9874058,
+  "tags": {
+    "addr:floor": "G",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "check_date": "2024-10-06",
+    "cuisine": "bagel",
+    "delivery": "yes",
+    "drive_through": "no",
+    "highchair": "no",
+    "level": "0",
+    "name": "Cyclone Bagels",
+    "opening_hours": "07:00-15:00",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "smoking": "no",
+    "source": "survey",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12316009956,
+  "lat": 40.5761210,
+  "lon": -73.9905233,
+  "tags": {
+    "addr:housenumber": "2311",
+    "addr:street": "Mermaid Avenue",
+    "air_conditioning": "yes",
+    "alt_name": "MetroPCS",
+    "brand": "Metro by T-Mobile",
+    "brand:wikidata": "Q1925685",
+    "check_date": "2024-11-05",
+    "name": "Metro by T-Mobile",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "mobile_phone",
+    "toilets": "no",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "node",
+  "id": 12316019720,
+  "lat": 40.5763988,
+  "lon": -73.9856830,
+  "tags": {
+    "addr:housenumber": "1728",
+    "addr:street": "Mermaid Avenue",
+    "beauty": "nails",
+    "check_date": "2024-11-18",
+    "name": "C&T Nail Salon",
+    "opening_hours": "Mo,We-Sa 10:00-19:00; Tu off; Su 11:00-17:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-373-3147",
+    "shop": "beauty",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "node",
+  "id": 12323922997,
+  "lat": 40.5755296,
+  "lon": -73.9841615,
+  "tags": {
+    "addr:housenumber": "1633",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "check_date": "2025-11-15",
+    "fax": "+1-948-223-1002",
+    "name": "Health Choice Pharmacy II & Medical Supply",
+    "opening_hours": "Mo-Fr 09:00-19:00; Sa 09:00-17:00; Su off",
+    "operator": "Kaberx Inc.",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 948-223-1001",
+    "shop": "chemist",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12708633193,
+  "lat": 40.5759430,
+  "lon": -73.9708613,
+  "tags": {
+    "addr:floor": "G",
+    "addr:housenumber": "205",
+    "addr:postcode": "11224",
+    "addr:street": "Sea Breeze Avenue",
+    "check_date": "2025-03-28",
+    "level": "0",
+    "name": "Medical & Surgical Supply",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-408-0070",
+    "shop": "medical_supply",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12714539738,
+  "lat": 40.5754978,
+  "lon": -73.9843065,
+  "tags": {
+    "addr:housenumber": "1649",
+    "addr:street": "Surf Avenue",
+    "amenity": "clinic",
+    "check_date": "2025-11-21",
+    "healthcare": "clinic",
+    "name": "Ida G Israel Community Health Center",
+    "opening_hours": "Mo-Th 08:00-18:00; Fr-Sa 08:00-16:00; Su off",
+    "operator": "NYC Health+Hospitals",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12793376874,
+  "lat": 40.5756722,
+  "lon": -73.9786486,
+  "tags": {
+    "addr:housenumber": "1029",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "check_date": "2025-10-26",
+    "email": "20HighTidez@HighTidezCI.com",
+    "name": "High Tidez",
+    "opening_hours": "Mo-Th 11:00-22:00; Fr-Su 11:00-23:00",
+    "phone": "+1 718-701-6634",
+    "shop": "cannabis",
+    "website": "https://hightidezci.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12805222685,
+  "lat": 40.5788986,
+  "lon": -73.9837560,
+  "tags": {
+    "check_date": "2025-05-02",
+    "name": "G3T FAD3D",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "hairdresser"
+  }
+},
+{
+  "type": "node",
+  "id": 12805230312,
+  "lat": 40.5793094,
+  "lon": -73.9834899,
+  "tags": {
+    "addr:housenumber": "1505",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2025-05-02",
+    "name": "2 Brothers Tire Shop",
+    "opening_hours": "07:00-23:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "tyres"
+  }
+},
+{
+  "type": "node",
+  "id": 12805230313,
+  "lat": 40.5793293,
+  "lon": -73.9832746,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1501",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "check_date": "2025-05-02",
+    "name": "Laundromat",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "self_service": "yes",
+    "shop": "laundry",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12810649259,
+  "lat": 40.5789637,
+  "lon": -73.9759335,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "check_date": "2025-11-04",
+    "name": "Krupa",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12824966677,
+  "lat": 40.5757514,
+  "lon": -73.9810660,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1243",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "alt_name": "Dunkin' Donuts",
+    "amenity": "fast_food",
+    "branch": "Stillwell Avenue Coney Island",
+    "brand": "Dunkin'",
+    "brand:wikidata": "Q847743",
+    "check_date": "2025-05-09",
+    "cuisine": "donut;coffee_shop",
+    "delivery": "yes",
+    "diet:vegetarian": "yes",
+    "dog": "no",
+    "drive_through": "no",
+    "internet_access": "wlan",
+    "internet_access:fee": "no",
+    "level": "0",
+    "name": "Dunkin'",
+    "opening_hours": "03:00-02:00",
+    "outdoor_seating": "no",
+    "payment:cards": "no",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-265-0102",
+    "ref": "344821",
+    "service:electricity": "no",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://locations.dunkindonuts.com/en/ny/brooklyn/1243-surf-ave/344821",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12840845803,
+  "lat": 40.5757524,
+  "lon": -73.9807012,
+  "tags": {
+    "addr:housenumber": "1223",
+    "addr:street": "Surf Avenue",
+    "check_date": "2025-05-15",
+    "name": "Eat In Deli",
+    "phone": "+1 347-374-2838",
+    "shop": "convenience"
+  }
+},
+{
+  "type": "node",
+  "id": 12871054971,
+  "lat": 40.5767842,
+  "lon": -73.9845882,
+  "tags": {
+    "addr:housenumber": "1627A",
+    "addr:postcode": "11224",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "fast_food",
+    "check_date": "2025-10-26",
+    "cuisine": "chinese",
+    "delivery": "yes",
+    "drive_through": "no",
+    "name": "Leanly Chinese Food",
+    "opening_hours": "Mo-Sa 11:00-23:00; Su 12:00-23:00",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-266-1823; +1 718-266-1606",
+    "smoking": "no",
+    "takeaway": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 12871054972,
+  "lat": 40.5757557,
+  "lon": -73.9913742,
+  "tags": {
+    "addr:housenumber": "2406",
+    "addr:postcode": "11224",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "fast_food",
+    "branch": "2406",
+    "craft": "caterer",
+    "cuisine": "chinese",
+    "delivery": "yes",
+    "name": "Leanly",
+    "opening_hours": "Mo-Th 11:00-22:00, Fr-Sa 11:00-23:00, Su 12:00-22:00",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-266-3129",
+    "takeaway": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 13048512556,
+  "lat": 40.5783208,
+  "lon": -73.9838781,
+  "tags": {
+    "amenity": "social_facility",
+    "name": "Deaf Wellness & Recreation Center",
+    "phone": "+1-347-662-3295",
+    "social_facility": "outreach",
+    "social_facility:for": "deaf"
+  }
+},
+{
+  "type": "node",
+  "id": 13048512557,
+  "lat": 40.5782908,
+  "lon": -73.9838726,
+  "tags": {
+    "amenity": "social_facility",
+    "name": "Golden Fleece Social Daycare Center",
+    "phone": "+1-347-492-5380",
+    "social_facility": "day_care",
+    "social_facility:for": "senior"
+  }
+},
+{
+  "type": "node",
+  "id": 13281770266,
+  "lat": 40.5788455,
+  "lon": -73.9752954,
+  "tags": {
+    "check_date": "2025-11-04",
+    "name": "Grab N Go",
+    "opening_hours": "24/7",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 13281770267,
+  "lat": 40.5788331,
+  "lon": -73.9752291,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "626",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sheepshead Bay Road",
+    "air_conditioning": "yes",
+    "amenity": "clinic",
+    "branch": "Coney Island",
+    "check_date": "2025-11-04",
+    "emergency": "no",
+    "health_amenity:type": "x_ray",
+    "healthcare": "clinic",
+    "healthcare:speciality": "general;urgent",
+    "insurance:health": "private;public",
+    "name": "Centers Urgent Care",
+    "opening_hours": "Mo-Fr 08:00-20:00; Sa-Su 09:00-21:00",
+    "operator": "Centers Urgent Care",
+    "operator:type": "private",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:insurance": "yes",
+    "phone": "+1-718-215-7340",
+    "website": "https://centersurgentcare.net/centers-urgent-care-of-coney-island/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 13306536456,
+  "lat": 40.5757159,
+  "lon": -73.9827732,
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1507",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "amenity": "dancing_school",
+    "check_date": "2025-11-15",
+    "contact:facebook": "https://www.facebook.com/www.ahsny.org/",
+    "contact:instagram": "https://www.instagram.com/artshouseschools",
+    "dance:teaching": "yes",
+    "education": "dancing_school",
+    "leisure": "dance",
+    "name": "Art's House Schools",
+    "operator:type": "private",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-996-2000",
+    "website": "https://artshouseschools.org/",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "node",
+  "id": 13306603141,
+  "lat": 40.5757087,
+  "lon": -73.9825937,
+  "tags": {
+    "addr:housenumber": "1515",
+    "addr:street": "Surf Avenue",
+    "amenity": "cafe",
+    "check_date": "2026-03-06",
+    "name": "Milk+Honey Coffee+Kitchen",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 13306628980,
+  "lat": 40.5757427,
+  "lon": -73.9805638,
+  "tags": {
+    "addr:housenumber": "1223",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "branch": "Coney Island",
+    "check_date": "2025-11-22",
+    "cuisine": "asian;italian;mexican;thai;japanese;sandwich;burger;chinese;salad;chicken;seafood;middle_eastern;regional;noodle",
+    "delivery": "yes",
+    "drive_through": "no",
+    "highchair": "no",
+    "name": "Wonder",
+    "opening_hours": "Mo-We,Fr-Su 10:30-23:30; Th off",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 424-320-0944",
+    "smoking": "no",
+    "takeaway": "only",
+    "toilets": "yes",
+    "website": "https://www.wonder.com/food-delivery-locations/coney-island",
+    "website:menu": "https://www.wonder.com/order/coney-island",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 13326793783,
+  "lat": 40.5756231,
+  "lon": -73.9909432,
+  "tags": {
+    "addr:housenumber": "2326",
+    "addr:street": "West 24th Street",
+    "check_date": "2025-11-23",
+    "name": "Quick Convenience Store",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "node",
+  "id": 13990801159,
+  "lat": 40.5794916,
+  "lon": -73.9745587,
+  "tags": {
+    "addr:housenumber": "2865",
+    "addr:postcode": "11224",
+    "addr:street": "West 6th Street",
+    "air_conditioning": "yes",
+    "check_date": "2026-07-05",
+    "name": "Flowers Heaven NYC",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 929-812-8080",
+    "shop": "florist",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 13990801160,
+  "lat": 40.5793694,
+  "lon": -73.9745728,
+  "tags": {
+    "addr:housenumber": "2865",
+    "addr:postcode": "11224",
+    "addr:street": "West 6th Street",
+    "air_conditioning": "yes",
+    "check_date": "2026-07-05",
+    "hairdresser": "barber",
+    "name": "Sky Cuts Unisex Barbershop",
+    "opening_hours": "Mo-Sa 09:00-19:00; Su 10:00-17:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-301-0777",
+    "shop": "hairdresser",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "node",
+  "id": 14185033256,
+  "lat": 40.5756537,
+  "lon": -73.9946961,
+  "tags": {
+    "amenity": "fast_food",
+    "cuisine": "chinese",
+    "name": "Panda Restaurant",
+    "opening_hours": "Mo-Th 11:00-22:30, Fr-Sa 11:00-23:30",
+    "takeaway": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 118767087,
+  "center": {
+    "lat": 40.5743657,
+    "lon": -73.9754126
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "fee": "yes",
+    "name": "New York Aquarium",
+    "opening_hours": "May 25-Sep 02 10:00-17:00; Sep 03-Nov 02 10:00-16:00; Nov 03-Mar 28 10:00-15:30; Mar 29-May 24 10:00-16:00",
+    "operator": "Wildlife Conservation Society",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "tourism": "aquarium",
+    "website": "https://nyaquarium.com/",
+    "wheelchair": "yes",
+    "wikidata": "Q1060884",
+    "wikipedia": "en:New York Aquarium"
+  }
+},
+{
+  "type": "way",
+  "id": 230060366,
+  "center": {
+    "lat": 40.5740157,
+    "lon": -73.9791910
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3059",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 12th Street",
+    "check_date": "2025-02-03",
+    "name": "Deno's Wonder Wheel Amusement Park",
+    "phone": "+1-718-372-2592",
+    "tourism": "theme_park",
+    "website": "https://www.denoswonderwheel.com/",
+    "wikidata": "Q5259266",
+    "wikipedia": "en:Deno's Wonder Wheel Amusement Park"
+  }
+},
+{
+  "type": "way",
+  "id": 241818760,
+  "center": {
+    "lat": 40.5802195,
+    "lon": -73.9724249
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "505",
+    "addr:postcode": "11224-4003",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "branch": "Neptune Avenue",
+    "brand": "Key Food",
+    "brand:wikidata": "Q6398037",
+    "building": "retail",
+    "building:levels": "1",
+    "building:material": "brick",
+    "check_date": "2025-05-29",
+    "check_date:diet:gluten_free": "2025-05-29",
+    "check_date:opening_hours": "2025-05-29",
+    "diet:gluten_free": "yes",
+    "diet:kosher": "yes",
+    "dog": "no",
+    "height": "5.6",
+    "internet_access": "no",
+    "name": "Key Food",
+    "nycdoitt:bin": "3257104",
+    "opening_hours": "Mo-Su 07:30-21:00",
+    "organic": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-714-6049",
+    "ref": "1280",
+    "roof:colour": "#5b5f5a",
+    "roof:shape": "flat",
+    "self_checkout": "no",
+    "shop": "supermarket",
+    "website": "https://www.keyfood.com/store/store/1280",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248467310,
+  "center": {
+    "lat": 40.5752729,
+    "lon": -73.9948115
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2816",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2024-05-31",
+    "denomination": "catholic",
+    "email": "contact@coneyislandcathedral.com",
+    "fax": "+1-718-395-4932",
+    "height": "6.5",
+    "name": "Coney Island Cathedral",
+    "nycdoitt:bin": "3189528",
+    "phone": "+1-718-841-7377",
+    "religion": "christian"
+  }
+},
+{
+  "type": "way",
+  "id": 248467613,
+  "center": {
+    "lat": 40.5753336,
+    "lon": -73.9944144
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2802",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "check_date": "2024-05-31",
+    "denomination": "evangelical",
+    "height": "8.2",
+    "name": "New Hope Family Worship Center",
+    "nycdoitt:bin": "3189531",
+    "phone": "+1-718-342-0172",
+    "religion": "christian"
+  }
+},
+{
+  "type": "way",
+  "id": 248470037,
+  "center": {
+    "lat": 40.5777693,
+    "lon": -73.9929950
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2510",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "fire_station",
+    "building": "yes",
+    "check_date": "2024-04-17",
+    "height": "10.1",
+    "name": "FDNY Engine 318/Ladder 166",
+    "nycdoitt:bin": "3188880",
+    "operator": "New York City Fire Department",
+    "operator:wikidata": "Q283207",
+    "operator:wikipedia": "en:New York City Fire Department"
+  }
+},
+{
+  "type": "way",
+  "id": 248470244,
+  "center": {
+    "lat": 40.5777902,
+    "lon": -73.9927949
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2502",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "denomination": "african_methodist_episcopal_zion",
+    "height": "7.7",
+    "name": "Naomi A.M.E Zion Church",
+    "nycdoitt:bin": "3188881",
+    "phone": "+1-718-266-1303",
+    "religion": "christian",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "way",
+  "id": 248470246,
+  "center": {
+    "lat": 40.5759552,
+    "lon": -73.9940210
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2727",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "post_office",
+    "building": "yes",
+    "height": "5.6",
+    "name": "Coney Island Station",
+    "nycdoitt:bin": "3188878",
+    "opening_hours": "Mo-Fr 09:00-17:00; Sa 08:00-13:00; Su off",
+    "operator": "United States Postal Service",
+    "operator:short": "USPS",
+    "operator:type": "public",
+    "operator:website": "https://www.usps.com",
+    "operator:wikidata": "Q668687",
+    "operator:wikipedia": "en:United States Postal Service"
+  }
+},
+{
+  "type": "way",
+  "id": 248474691,
+  "center": {
+    "lat": 40.5753148,
+    "lon": -73.9819084
+  },
+  "tags": {
+    "addr:housenumber": "1318",
+    "addr:postcode": "11224",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "building": "yes",
+    "building:levels": "1",
+    "check_date": "2022-06-11",
+    "height": "3.9",
+    "name": "Williams Candy Shop",
+    "nycdoitt:bin": "3329351",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-372-0302",
+    "shop": "confectionery",
+    "source": "survey;local knowledge",
+    "stroller": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248474699,
+  "center": {
+    "lat": 40.5724371,
+    "lon": -73.9932489
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2720",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "amenity": "social_facility",
+    "building": "yes",
+    "check_date": "2024-05-31",
+    "height": "31.6",
+    "name": "Saints Joachim & Anne Nursing & Rehabilitation Center",
+    "nycdoitt:bin": "3336552",
+    "social_facility": "nursing_home",
+    "social_facility:for": "senior",
+    "website": "https://ssjoachim.org/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248474709,
+  "center": {
+    "lat": 40.5724012,
+    "lon": -73.9942357
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3015",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 29th Street",
+    "amenity": "social_facility",
+    "building": "hospital",
+    "building:levels": "8",
+    "check_date": "2024-06-18",
+    "height": "30.9",
+    "layer": "1",
+    "name": "Seagate Nursing & Rehabilitation Center",
+    "nycdoitt:bin": "3256861",
+    "roof:shape": "flat",
+    "social_facility:for": "senior",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248474734,
+  "center": {
+    "lat": 40.5722572,
+    "lon": -73.9898996
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3035",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 24th Street",
+    "amenity": "social_facility",
+    "building": "yes",
+    "check_date": "2025-11-04",
+    "healthcare": "rehabilitation",
+    "height": "17.9",
+    "name": "Sea Crest Nursing And Rehabilitation Center",
+    "nycdoitt:bin": "3189635",
+    "phone": "+1-718-372-4500",
+    "social_facility": "nursing_home",
+    "social_facility:for": "senior",
+    "website": "https://scrnrc.com",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248474744,
+  "center": {
+    "lat": 40.5752844,
+    "lon": -73.9814687
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1310",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "no",
+    "amenity": "fast_food",
+    "brand": "Nathan's",
+    "brand:wikidata": "Q1319505",
+    "building": "retail",
+    "check_date": "2023-06-04",
+    "cuisine": "hot_dog",
+    "delivery": "yes",
+    "drive_through": "no",
+    "height": "8.3",
+    "highchair": "no",
+    "name": "Nathan's",
+    "nycdoitt:bin": "3189660",
+    "opening_hours": "Mo-Th 10:00-09:45; Fr-Sa 10:00-23:45; Su 10:00-22:45",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-333-2202",
+    "smoking": "no",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "website": "https://nathansfamous.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248474770,
+  "center": {
+    "lat": 40.5749220,
+    "lon": -73.9814065
+  },
+  "tags": {
+    "building": "yes",
+    "check_date": "2025-05-15",
+    "height": "4.6",
+    "name": "Coney Island Beach Shop",
+    "nycdoitt:bin": "3385307",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "shop": "gift",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248474785,
+  "center": {
+    "lat": 40.5746961,
+    "lon": -73.9798116
+  },
+  "tags": {
+    "amenity": "restaurant",
+    "building": "yes",
+    "building:levels": "1",
+    "check_date": "2025-02-10",
+    "height": "3.0",
+    "name": "Tropical Shack",
+    "nycdoitt:bin": "3245143"
+  }
+},
+{
+  "type": "way",
+  "id": 248474804,
+  "center": {
+    "lat": 40.5733443,
+    "lon": -73.9805781
+  },
+  "tags": {
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "brewery": "yes",
+    "building": "yes",
+    "check_date": "2023-06-01",
+    "height": "12.2",
+    "highchair": "yes",
+    "internet_access": "no",
+    "name": "Tom's Coney Island",
+    "nycdoitt:bin": "3245149",
+    "outdoor_seating": "yes",
+    "payment:account_cards": "yes",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "toilets": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248478024,
+  "center": {
+    "lat": 40.5762715,
+    "lon": -73.9903743
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2860",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 23rd Street",
+    "amenity": "police",
+    "building": "yes",
+    "check_date": "2024-04-28",
+    "height": "14.9",
+    "name": "NYC Housing PD Service Area 1",
+    "nycdoitt:bin": "3397616",
+    "opening_hours": "24/7; PH 00:00-00:00",
+    "operator": "New York Police Department",
+    "operator:official": "City of New York Police Department",
+    "operator:short": "NYPD",
+    "operator:wikidata": "Q328473",
+    "operator:wikipedia": "en:New York City Police Department",
+    "phone": "+1-718-265-7300",
+    "website": "https://www1.nyc.gov/site/nypd/bureaus/transit-housing/police-service-area-1.page"
+  }
+},
+{
+  "type": "way",
+  "id": 248478050,
+  "center": {
+    "lat": 40.5757119,
+    "lon": -73.9901591
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2908",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 23rd Street",
+    "building": "retail",
+    "building:levels": "1",
+    "building:material": "plaster",
+    "check_date": "2022-10-19",
+    "height": "4.4",
+    "male": "yes",
+    "name": "Faderz Kutz Wit Skillz",
+    "nycdoitt:bin": "3412535",
+    "phone": "+1 718-372-3128",
+    "roof:shape": "flat",
+    "shop": "hairdresser",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "way",
+  "id": 248479065,
+  "center": {
+    "lat": 40.5765948,
+    "lon": -73.9872098
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2009",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "building": "yes",
+    "check_date": "2022-10-19",
+    "height": "5.9",
+    "name": "Coney Island Memorial Chapel",
+    "nycdoitt:bin": "3393791",
+    "phone": "+1-718-373-0880",
+    "shop": "funeral_directors",
+    "website": "https://www.coneyislandmemorialchapel.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 248479087,
+  "center": {
+    "lat": 40.5760391,
+    "lon": -73.9884203
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2114",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "check_date": "2022-10-19",
+    "height": "9.7",
+    "name": "Coney Island Lighthouse Mission",
+    "nycdoitt:bin": "3189549",
+    "religion": "christian",
+    "website": "http://www.actsnyc.org/financial.aspx",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248479195,
+  "center": {
+    "lat": 40.5760509,
+    "lon": -73.9880619
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2102",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "check_date": "2022-10-19",
+    "denomination": "pentecostal",
+    "height": "11.4",
+    "name": "Pentecostal Church Of Jesus Christ",
+    "name:en": "Pentecostal Church Of Jesus Christ",
+    "name:es": "Iglesia Pentecostal De Jesucristo",
+    "nycdoitt:bin": "3189550",
+    "phone": "+1 718-946-8564",
+    "religion": "christian",
+    "start_date": "1959",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248495797,
+  "center": {
+    "lat": 40.5758284,
+    "lon": -73.9800879
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1215",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "air_conditioning": "yes",
+    "amenity": "restaurant",
+    "bar": "yes",
+    "building": "retail",
+    "building:levels": "1",
+    "check_date": "2025-11-15",
+    "contact:facebook": "https://www.facebook.com/100091208118170",
+    "contact:instagram": "https://www.instagram.com/teuranyc",
+    "cuisine": "italian",
+    "delivery": "yes",
+    "email": "info@teuranyc.com",
+    "height": "5.1",
+    "highchair": "no",
+    "name": "Teura Il Ponte",
+    "nycdoitt:bin": "3196561",
+    "opening_hours": "11:30-23:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 347-312-7772",
+    "reservation": "yes",
+    "roof:shape": "flat",
+    "smoking": "no",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "toilets:wheelchair": "yes",
+    "website": "https://teuranyc.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248495834,
+  "center": {
+    "lat": 40.5788331,
+    "lon": -73.9834901
+  },
+  "tags": {
+    "addr:housenumber": "1510",
+    "addr:postcode": "11224",
+    "addr:street": "Neptune Avenue",
+    "building": "yes",
+    "check_date:opening_hours": "2024-04-17",
+    "drink:beer": "yes",
+    "height": "4.6",
+    "name": "Boardwalk Liquids",
+    "nycdoitt:bin": "3189091",
+    "opening_hours:signed": "no",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-718-333-2387",
+    "shop": "beverages",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "way",
+  "id": 248495853,
+  "center": {
+    "lat": 40.5788006,
+    "lon": -73.9838055
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1524",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "restaurant",
+    "building": "yes",
+    "check_date": "2023-03-22",
+    "cuisine": "pizza",
+    "dog": "no",
+    "height": "3.7",
+    "name": "Totonno's Pizzeria Napolitana",
+    "nycdoitt:bin": "3189087",
+    "opening_hours": "Mo-We off; Th-Su 12:00-19:30",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-372-8606",
+    "smoking": "no",
+    "takeaway": "only",
+    "toilets": "no",
+    "website": "https://www.totonnosconeyisland.com",
+    "wikidata": "Q7828399",
+    "wikipedia": "en:Totonno's"
+  }
+},
+{
+  "type": "way",
+  "id": 248495882,
+  "center": {
+    "lat": 40.5767560,
+    "lon": -73.9861140
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1901",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "air_conditioning": "yes",
+    "amenity": "library",
+    "branch": "Coney Island",
+    "building": "yes",
+    "height": "8.1",
+    "internet_access": "wlan",
+    "internet_access:fee": "no",
+    "internet_access:ssid": "BPLUNWIRED",
+    "name": "Coney Island Library",
+    "nycdoitt:bin": "3189001",
+    "opening_hours": "Mo-Fr 10:00-18:00; We 13:00-20:00; Th 10:00-20:00; Sa 10:00-17:00",
+    "operator": "Brooklyn Public Library",
+    "operator:short": "BPL",
+    "operator:type": "public",
+    "operator:wikidata": "Q1198796",
+    "phone": "+1-718-265-3220",
+    "website": "https://www.bklynlibrary.org/locations/coney-island",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248496106,
+  "center": {
+    "lat": 40.5782180,
+    "lon": -73.9836409
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2829",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 16th Street",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "denomination": "jehovahs_witness",
+    "height": "5.1",
+    "name": "Kingdom Hall of Jehovah's Witnesses",
+    "nycdoitt:bin": "3189103",
+    "religion": "christian"
+  }
+},
+{
+  "type": "way",
+  "id": 248496250,
+  "center": {
+    "lat": 40.5775590,
+    "lon": -73.9824765
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2867",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 15th Street",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "check_date": "2026-07-19",
+    "denomination": "evangelical",
+    "email": "comfortingchurchofchrist@yahoo.com",
+    "height": "4.7",
+    "name": "The Comforting Church of Christ",
+    "nycdoitt:bin": "3189123",
+    "phone": "+1-718-372-4491",
+    "religion": "christian",
+    "website": "https://www.comfortingchurch.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 248496300,
+  "center": {
+    "lat": 40.5768076,
+    "lon": -73.9852114
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2890",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 17th Street",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "check_date": "2024-05-13",
+    "denomination": "roman_catholic",
+    "height": "18.7",
+    "name": "Our Lady of Solace Roman Catholic Church",
+    "nycdoitt:bin": "3329328",
+    "phone": "+1-718-266-1612",
+    "religion": "christian",
+    "website": "https://olsbrooklyn.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 248496380,
+  "center": {
+    "lat": 40.5792136,
+    "lon": -73.9849709
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1617",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "car_wash",
+    "automated": "yes",
+    "building": "industrial",
+    "check_date": "2025-10-26",
+    "height": "4.1",
+    "name": "Coney Island Car Spa",
+    "nycdoitt:bin": "3188435",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "self_service": "no",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "way",
+  "id": 248496414,
+  "center": {
+    "lat": 40.5755900,
+    "lon": -73.9865050
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2929",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 20th Street",
+    "amenity": "place_of_worship",
+    "building": "yes",
+    "check_date": "2024-04-28",
+    "denomination": "baptist",
+    "height": "7.9",
+    "name": "Fellowship Baptist Church Of Coney Island",
+    "nycdoitt:bin": "3189566",
+    "religion": "christian",
+    "website": "https://www.coneyfbc.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 248496439,
+  "center": {
+    "lat": 40.5785176,
+    "lon": -73.9863960
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1902",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "building": "industrial",
+    "building:levels": "1",
+    "check_date": "2024-06-07",
+    "height": "7.0",
+    "name": "Carousel Auto Body",
+    "nycdoitt:bin": "3188989",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 718-373-3131",
+    "roof:levels": "0",
+    "roof:shape": "flat",
+    "service:vehicle:car_repair": "yes",
+    "shop": "car_repair",
+    "source": "survey",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248496447,
+  "center": {
+    "lat": 40.5734801,
+    "lon": -73.9783845
+  },
+  "tags": {
+    "amenity": "restaurant",
+    "bar": "yes",
+    "building": "retail",
+    "check_date": "2022-05-19",
+    "cuisine": "pizza;burger;sandwich;american;seafood;ice_cream;hot_dog;dessert",
+    "height": "7.2",
+    "name": "Paul's Daughter",
+    "nycdoitt:bin": "3000000",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248496458,
+  "center": {
+    "lat": 40.5734499,
+    "lon": -73.9788899
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1023",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Riegelmann Boardwalk",
+    "amenity": "ice_cream",
+    "building": "retail",
+    "check_date": "2022-05-19",
+    "drive_through": "no",
+    "height": "7.4",
+    "name": "Coney's Cones",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1-718-373-5862",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "website": "http://coneyscones.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248496464,
+  "center": {
+    "lat": 40.5772119,
+    "lon": -73.9818230
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1401",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "fast_food",
+    "brand": "McDonald's",
+    "brand:wikidata": "Q38076",
+    "building": "retail",
+    "building:levels": "1",
+    "cuisine": "burger",
+    "delivery": "yes",
+    "dog": "no",
+    "drive_through": "no",
+    "height": "5.2",
+    "internet_access": "wlan",
+    "internet_access:fee": "no",
+    "name": "McDonald's",
+    "nycdoitt:bin": "3331518",
+    "opening_hours": "24/7",
+    "outdoor_seating": "no",
+    "payment:cards": "yes",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "payment:qr_code": "no",
+    "phone": "+1 718-372-2859",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://www.mcdonalds.com/us/en-us/location/33375.html",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248496472,
+  "center": {
+    "lat": 40.5767505,
+    "lon": -73.9822415
+  },
+  "tags": {
+    "addr:housenumber": "1418",
+    "addr:postcode": "11224",
+    "addr:street": "Mermaid Avenue",
+    "amenity": "restaurant",
+    "building": "retail",
+    "building:levels": "1",
+    "check_date": "2025-05-15",
+    "cuisine": "asian;vietnamese;chinese;bubble_tea",
+    "delivery": "yes",
+    "height": "3.9",
+    "highchair": "no",
+    "name": "Chow Time",
+    "nycdoitt:bin": "3189615",
+    "opening_hours": "Mo-Sa 10:45-20:45; Su off",
+    "outdoor_seating": "no",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "phone": "+1 347-713-1560",
+    "reservation": "no",
+    "roof:levels": "0",
+    "roof:shape": "flat",
+    "smoking": "no",
+    "takeaway": "yes",
+    "website": "https://www.newchowtime.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248496521,
+  "center": {
+    "lat": 40.5751869,
+    "lon": -73.9781572
+  },
+  "tags": {
+    "amenity": "fast_food",
+    "building": "yes",
+    "height": "7.8",
+    "name": "Cyclone Cafe",
+    "nycdoitt:bin": "3000000"
+  }
+},
+{
+  "type": "way",
+  "id": 248496570,
+  "center": {
+    "lat": 40.5785990,
+    "lon": -73.9859632
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2801",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 19th Street",
+    "building": "retail",
+    "building:levels": "1",
+    "check_date": "2024-11-07",
+    "height": "7.3",
+    "name": "Bolla Market",
+    "nycdoitt:bin": "3329327",
+    "opening_hours": "24/7",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "shop": "convenience",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248499634,
+  "center": {
+    "lat": 40.5795762,
+    "lon": -73.9751012
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "606",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "amenity": "fast_food",
+    "branch": "Neptune Avenue",
+    "brand": "McDonald's",
+    "brand:wikidata": "Q38076",
+    "building": "retail",
+    "building:levels": "1",
+    "check_date": "2026-06-07",
+    "check_date:diet:halal": "2025-05-04",
+    "check_date:diet:kosher": "2025-05-04",
+    "cuisine": "burger",
+    "delivery": "yes",
+    "diet:halal": "no",
+    "diet:kosher": "no",
+    "diet:sugar_free": "limited",
+    "dog": "no",
+    "drive_through": "yes",
+    "height": "6.0",
+    "highchair": "yes",
+    "indoor_seating": "yes",
+    "internet_access": "wlan",
+    "internet_access:fee": "no",
+    "internet_access:ssid": "McDonalds Free WiFi",
+    "kids_area": "no",
+    "name": "McDonald's",
+    "nycdoitt:bin": "3336563",
+    "opening_hours": "Mo-Su 06:00-24:00",
+    "opening_hours:drive_through": "24/7",
+    "outdoor_seating": "pedestrian_zone",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-996-1029",
+    "reservation": "no",
+    "roof:shape": "flat",
+    "service:electricity": "no",
+    "smoking": "no",
+    "stroller": "yes",
+    "takeaway": "yes",
+    "toilets": "yes",
+    "toilets:access": "customers",
+    "toilets:disposal": "flush",
+    "toilets:fee": "no",
+    "toilets:handwashing": "yes",
+    "toilets:wheelchair": "yes",
+    "website": "https://www.mcdonalds.com/us/en-us/location/4345.html",
+    "website:menu": "https://www.mcdonalds.com/us/en-us/full-menu.html",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248499637,
+  "center": {
+    "lat": 40.5795283,
+    "lon": -73.9758780
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "2801",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "place_of_worship",
+    "building": "church",
+    "building:colour": "brown",
+    "check_date": "2024-07-18",
+    "contact:facebook": "https://www.facebook.com/St-Pauls-Evangelical-Lutheran-Church-of-Coney-Island-114843061868995",
+    "denomination": "lutheran",
+    "gnis:feature_id": "2094671",
+    "height": "10.1",
+    "name": "Saint Paul's Evangelical Lutheran Church",
+    "nycdoitt:bin": "3196574",
+    "opening_hours": "Tu,Su 10:00-17:00; We 15:00-21:30",
+    "phone": "+1 718-266-1831",
+    "religion": "christian",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248500396,
+  "center": {
+    "lat": 40.5761785,
+    "lon": -73.9718247
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "301",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sea Breeze Avenue",
+    "amenity": "place_of_worship",
+    "building": "synagogue",
+    "check_date": "2026-10-08",
+    "denomination": "jewish",
+    "height": "6.9",
+    "name": "Temple Beth Abraham",
+    "nycdoitt:bin": "3196592",
+    "polling_station": "yes",
+    "religion": "jewish",
+    "roof:shape": "flat"
+  }
+},
+{
+  "type": "way",
+  "id": 248500399,
+  "center": {
+    "lat": 40.5762359,
+    "lon": -73.9721837
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "311",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Sea Breeze Avenue",
+    "amenity": "place_of_worship",
+    "building": "synagogue",
+    "check_date": "2025-02-14",
+    "denomination": "jewish",
+    "height": "7.8",
+    "name": "Sea Breeze Jewish Center",
+    "nycdoitt:bin": "3334678",
+    "phone": "+1-718-996-7351",
+    "religion": "jewish",
+    "roof:shape": "flat"
+  }
+},
+{
+  "type": "way",
+  "id": 248502538,
+  "center": {
+    "lat": 40.5765408,
+    "lon": -73.9761004
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2951",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 8th Street",
+    "amenity": "police",
+    "building": "public",
+    "building:levels": "3",
+    "check_date": "2024-06-05",
+    "height": "16.0",
+    "name": "NYPD 60th Precinct",
+    "nycdoitt:bin": "3196591",
+    "opening_hours": "24/7",
+    "operator": "New York Police Department",
+    "operator:official": "City of New York Police Department",
+    "operator:short": "NYPD",
+    "operator:wikidata": "Q328473",
+    "operator:wikipedia": "en:New York City Police Department",
+    "phone": "+1-718-946-3311",
+    "website": "https://www1.nyc.gov/site/nypd/bureaus/patrol/precincts/60th-precinct.page",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248841415,
+  "center": {
+    "lat": 40.5816884,
+    "lon": -73.9887724
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:country": "US",
+    "addr:housenumber": "2970",
+    "addr:postcode": "11214",
+    "addr:state": "NY",
+    "addr:street": "Cropsey Avenue",
+    "air_conditioning": "yes",
+    "alt_name": "Home Depot",
+    "branch": "Cropsey",
+    "brand": "The Home Depot",
+    "brand:wikidata": "Q864407",
+    "building": "retail",
+    "building:levels": "1",
+    "check_date": "2024-11-08",
+    "check_date:opening_hours": "2024-06-14",
+    "height": "9.2",
+    "internet_access": "no",
+    "name": "The Home Depot",
+    "nycdoitt:bin": "3348838",
+    "opening_hours": "Mo-Sa 06:00-22:00; Su 07:00-20:00",
+    "payment:cash": "yes",
+    "payment:contactless": "no",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 718-333-9850",
+    "ref": "1256",
+    "roof:shape": "flat",
+    "shop": "doityourself",
+    "website": "https://www.homedepot.com/l/Cropsey/NY/Brooklyn/11214/1256",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 248841443,
+  "center": {
+    "lat": 40.5803009,
+    "lon": -73.9882392
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2990",
+    "addr:postcode": "11214",
+    "addr:state": "NY",
+    "addr:street": "Cropsey Avenue",
+    "brand": "CubeSmart",
+    "brand:wikidata": "Q5192200",
+    "building": "commercial",
+    "building:levels": "5",
+    "check_date": "2024-11-08",
+    "height": "16.7",
+    "name": "CubeSmart",
+    "nycdoitt:bin": "3395243",
+    "opening_hours": "Mo-Sa 09:00-19:00; Su 09:00-13:00",
+    "operator": "CubeSmart",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "roof:shape": "flat",
+    "shop": "storage_rental",
+    "website": "https://www.cubesmart.com/new-york-self-storage/brooklyn-self-storage/2443.html",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 265959872,
+  "center": {
+    "lat": 40.5776991,
+    "lon": -73.9699062
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3000",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 1st Street",
+    "amenity": "school",
+    "check_date": "2025-10-21",
+    "description": "K370 is a District 75 school for children with special needs.",
+    "fax": "+1-718-449-4082",
+    "grades": "0-12,SE",
+    "name": "P370K Main Site - The Jim Thorpe School",
+    "operator": "New York City Department of Education",
+    "operator:short": "NYC Public Schools",
+    "operator:type": "public",
+    "operator:wikidata": "Q408230",
+    "phone": "+1-718-372-3777",
+    "religion": "none",
+    "short_name": "K370",
+    "website": "https://370k.org/",
+    "wheelchair": "limited"
+  }
+},
+{
+  "type": "way",
+  "id": 265976508,
+  "center": {
+    "lat": 40.5775634,
+    "lon": -73.9708319
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2951",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 3rd Street",
+    "alt_name": "The Coney Island School",
+    "amenity": "school",
+    "check_date": "2025-09-25",
+    "education": "school",
+    "name": "P.S. 100 - The Coney Island School",
+    "operator:type": "public"
+  }
+},
+{
+  "type": "way",
+  "id": 355345360,
+  "center": {
+    "lat": 40.5739726,
+    "lon": -73.9785457
+  },
+  "tags": {
+    "area": "yes",
+    "attraction": "amusement_ride",
+    "fee": "yes",
+    "name": "Lynn's Trapeze",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "way",
+  "id": 355345472,
+  "center": {
+    "lat": 40.5736142,
+    "lon": -73.9790229
+  },
+  "tags": {
+    "area": "yes",
+    "attraction": "amusement_ride",
+    "name": "Tilt-A-Whirl",
+    "tourism": "attraction"
+  }
+},
+{
+  "type": "way",
+  "id": 405891521,
+  "center": {
+    "lat": 40.5744992,
+    "lon": -73.9777165
+  },
+  "tags": {
+    "attraction": "roller_coaster",
+    "check_date": "2025-03-01",
+    "fee": "yes",
+    "heritage": "2",
+    "heritage:operator": "nrhp",
+    "historic": "yes",
+    "name": "Coney Island Cyclone",
+    "ref:nrhp": "91000907",
+    "start_date": "1927-06-26",
+    "tourism": "attraction",
+    "wikidata": "Q677558",
+    "wikipedia": "en:Coney Island Cyclone"
+  }
+},
+{
+  "type": "way",
+  "id": 405891524,
+  "center": {
+    "lat": 40.5731778,
+    "lon": -73.9811317
+  },
+  "tags": {
+    "amenity": "restaurant",
+    "bar": "yes",
+    "building": "commercial",
+    "check_date": "2025-03-01",
+    "cuisine": "burger;chicken;american;ice_cream;hot_dog;seafood;sandwich;dessert;steak_house",
+    "highchair": "no",
+    "name": "Salt & Sizzle",
+    "outdoor_seating": "yes",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "source": "survey;local knowledge",
+    "takeaway": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 405892188,
+  "center": {
+    "lat": 40.5753180,
+    "lon": -73.9804008
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1224",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "amenity": "ice_cream",
+    "building": "yes",
+    "name": "Lunatics Ice Cream"
+  }
+},
+{
+  "type": "way",
+  "id": 405892196,
+  "center": {
+    "lat": 40.5748659,
+    "lon": -73.9790989
+  },
+  "tags": {
+    "amenity": "restaurant",
+    "building": "yes",
+    "check_date": "2025-03-01",
+    "name": "Margarita Island"
+  }
+},
+{
+  "type": "way",
+  "id": 467109266,
+  "center": {
+    "lat": 40.5806952,
+    "lon": -73.9767039
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2964",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Shell Road",
+    "brand": "CubeSmart",
+    "brand:wikidata": "Q5192200",
+    "building": "commercial",
+    "building:colour": "blue",
+    "building:levels": "8",
+    "building:material": "metal",
+    "check_date": "2025-05-29",
+    "check_date:opening_hours": "2025-05-29",
+    "name": "CubeSmart",
+    "opening_hours": "Mo-Sa 07:00-21:00",
+    "operator": "CubeSmart",
+    "payment:cash": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1-844-630-2981; +1-855-480-1513",
+    "roof:colour": "#E3DED5",
+    "roof:shape": "flat",
+    "shop": "storage_rental",
+    "website": "https://www.cubesmart.com/new-york-self-storage/brooklyn-self-storage/3243.html",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 507796308,
+  "center": {
+    "lat": 40.5767484,
+    "lon": -73.9761379
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2929",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 8th Street",
+    "amenity": "fire_station",
+    "building": "fire_station",
+    "check_date": "2024-06-11",
+    "name": "FDNY Battalion 43, Engine 245 & Ladder 161",
+    "operator": "New York City Fire Department",
+    "operator:wikidata": "Q283207",
+    "operator:wikipedia": "en:New York City Fire Department",
+    "polling_station": "no",
+    "smoking": "no"
+  }
+},
+{
+  "type": "way",
+  "id": 518329921,
+  "center": {
+    "lat": 40.5727457,
+    "lon": -73.9882820
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3051",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 21st Street",
+    "amenity": "events_venue",
+    "building": "civic",
+    "building:levels": "1",
+    "check_date": "2025-03-01",
+    "name": "Ford Amphitheatre at Coney Island Boardwalk",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "roof:shape": "dome",
+    "website": "https://fordamphitheaterconeyisland.com/",
+    "wheelchair": "yes",
+    "wikidata": "Q27988183",
+    "wikipedia": "en:Ford Amphitheater at Coney Island"
+  }
+},
+{
+  "type": "way",
+  "id": 559947525,
+  "center": {
+    "lat": 40.5802555,
+    "lon": -73.9864817
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3068",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Cropsey Avenue",
+    "air_conditioning": "yes",
+    "brand": "CubeSmart",
+    "brand:wikidata": "Q5192200",
+    "building": "commercial",
+    "building:levels": "6",
+    "check_date": "2022-05-19",
+    "name": "CubeSmart",
+    "opening_hours": "09:00-17:00",
+    "operator": "CubeSmart",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "roof:shape": "flat",
+    "shop": "storage_rental",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 604729335,
+  "center": {
+    "lat": 40.5740227,
+    "lon": -73.9739914
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "building": "yes",
+    "fee": "yes",
+    "name": "Ocean Wonders: Sharks!",
+    "tourism": "aquarium"
+  }
+},
+{
+  "type": "way",
+  "id": 631706787,
+  "center": {
+    "lat": 40.5748472,
+    "lon": -73.9786613
+  },
+  "tags": {
+    "attraction": "roller_coaster",
+    "fee": "yes",
+    "name": "The Tickler",
+    "tourism": "attraction",
+    "website": "https://lunaparknyc.com/rides/the-tickler/"
+  }
+},
+{
+  "type": "way",
+  "id": 651794533,
+  "center": {
+    "lat": 40.5743736,
+    "lon": -73.9815866
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "3050",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Stillwell Avenue",
+    "check_date": "2025-03-30",
+    "fee": "no",
+    "name": "Coney Art Walls",
+    "tourism": "gallery",
+    "website": "https://www.coneyartwalls.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 854305050,
+  "center": {
+    "lat": 40.5739188,
+    "lon": -73.9765603
+  },
+  "tags": {
+    "amenity": "cinema",
+    "building": "yes",
+    "check_date": "2025-05-29",
+    "name": "4D Theater"
+  }
+},
+{
+  "type": "way",
+  "id": 860677673,
+  "center": {
+    "lat": 40.5789343,
+    "lon": -73.9876386
+  },
+  "tags": {
+    "addr:postcode": "11224",
+    "amenity": "fuel",
+    "check_date": "2024-04-28",
+    "compressed_air": "yes",
+    "fuel:diesel": "yes",
+    "fuel:gasoline": "yes",
+    "name": "Allegiance",
+    "opening_hours": "05:00-21:00",
+    "payment:cash": "yes",
+    "payment:credit_cards": "yes",
+    "self_service": "yes",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 906961886,
+  "center": {
+    "lat": 40.5786636,
+    "lon": -73.9924291
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2401",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "amenity": "school",
+    "check_date": "2024-04-17",
+    "education": "school",
+    "name": "I.S. 239 - Mark Twain Intermediate School",
+    "phone": "+1 718 266 0814",
+    "school:gender": "mixed",
+    "website": "https://twain239.com/"
+  }
+},
+{
+  "type": "way",
+  "id": 952516015,
+  "center": {
+    "lat": 40.5739104,
+    "lon": -73.9788227
+  },
+  "tags": {
+    "area": "yes",
+    "attraction": "roller_coaster",
+    "fee": "yes",
+    "name": "Circus Coaster",
+    "tourism": "attraction",
+    "website": "https://lunaparknyc.com/rides/circus-coaster/"
+  }
+},
+{
+  "type": "way",
+  "id": 992379444,
+  "center": {
+    "lat": 40.5800900,
+    "lon": -73.9769357
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "809",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Neptune Avenue",
+    "air_conditioning": "yes",
+    "brand": "Jaguar;Land Rover",
+    "brand:wikidata": "Q21170490;Q26777551",
+    "building": "commercial",
+    "building:levels": "3",
+    "building:material": "glass",
+    "check_date": "2025-05-29",
+    "check_date:opening_hours": "2025-05-29",
+    "name": "Jaguar & Land Rover Brooklyn",
+    "opening_hours": "Mo-Sa 09:00-18:00; Su closed",
+    "opening_hours:workshop": "Mo-Fr 08:00-18:00; Sa-Su closed",
+    "payment:cash": "yes",
+    "payment:cheque": "yes",
+    "payment:contactless": "yes",
+    "payment:credit_cards": "yes",
+    "payment:debit_cards": "yes",
+    "phone": "+1 929-583-6400",
+    "roof:colour": "grey",
+    "roof:material": "concrete",
+    "roof:shape": "flat",
+    "second_hand": "yes",
+    "shop": "car",
+    "start_date": "2023-01-30",
+    "website": "https://www.jlrbrooklyn.com/",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1017417534,
+  "center": {
+    "lat": 40.5747274,
+    "lon": -73.9800122
+  },
+  "tags": {
+    "amenity": "restaurant",
+    "building": "yes",
+    "name": "El Carrito RoJo"
+  }
+},
+{
+  "type": "way",
+  "id": 1017878720,
+  "center": {
+    "lat": 40.5737959,
+    "lon": -73.9749724
+  },
+  "tags": {
+    "architect": "Goldstone & Hinz",
+    "artist_name": "Toshio Sasaki",
+    "artwork_type": "mural",
+    "check_date": "2024-04-17",
+    "level": "0",
+    "material": "concrete",
+    "name": "First Symphony of the Sea",
+    "tourism": "artwork",
+    "website": "https://www.nycgovparks.org/parks/coney-island-beach-and-boardwalk/monuments"
+  }
+},
+{
+  "type": "way",
+  "id": 1175238670,
+  "center": {
+    "lat": 40.5734094,
+    "lon": -73.9758961
+  },
+  "tags": {
+    "addr:country": "US",
+    "addr:housenumber": "426-830",
+    "addr:state": "NY",
+    "addr:street": "Riegelmann Boardwalk",
+    "amenity": "toilets",
+    "building": "toilets",
+    "fee": "no",
+    "layer": "1",
+    "name": "Riegelmann Boardwalk Restroom",
+    "toilets:access": "public",
+    "toilets:unisex": "no",
+    "toilets:wheelchair": "limited",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1254319843,
+  "center": {
+    "lat": 40.5808057,
+    "lon": -73.9889908
+  },
+  "tags": {
+    "name": "Home Depot",
+    "shop": "garden_centre"
+  }
+},
+{
+  "type": "way",
+  "id": 1549247116,
+  "center": {
+    "lat": 40.5782075,
+    "lon": -73.9801525
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2840",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 12th Street",
+    "amenity": "school",
+    "education": "school",
+    "name": "P.S. 90 - Edna Cohen School",
+    "website": "https://www.ps90coneyisland.org/"
+  }
+},
+{
+  "type": "way",
+  "id": 1549247550,
+  "center": {
+    "lat": 40.5742614,
+    "lon": -73.9924318
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "2950",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "West 25th Street",
+    "amenity": "school",
+    "education": "school",
+    "name": "P.S. 288 - The Shirley Tanyhill School"
+  }
+},
+{
+  "type": "relation",
+  "id": 13621663,
+  "center": {
+    "lat": 40.5741821,
+    "lon": -73.9803055
+  },
+  "tags": {
+    "addr:city": "Brooklyn",
+    "addr:housenumber": "1000",
+    "addr:postcode": "11224",
+    "addr:state": "NY",
+    "addr:street": "Surf Avenue",
+    "alt_name": "Coney Island luna park",
+    "email": "info@lunaparknyc.com",
+    "name": "Luna Park",
+    "phone": "+1-718-373-5862",
+    "tourism": "theme_park",
+    "type": "multipolygon",
+    "website": "https://lunaparknyc.com/",
+    "wikidata": "Q19864620",
+    "wikipedia": "en:Luna Park (Coney Island, 2010)"
+  }
+}
+
+  ]
+}
