@@ -73,7 +73,7 @@ export function buildSubway(world) {
       stops: w(() => L.stops.map((q) => ({ id: q.id, s: +q.s.toFixed(1), hidden: !!q.hidden, at: ptAt(q.s - LEN / 2).toArray().map((v) => +v.toFixed(1)) }))),
       until: w((id) => { const t = now() % L.cycle; const l = L.legs.find((g) => g.kind === 'dwell' && g.stop.id === id); return l ? ((l.t0 - t) % L.cycle + L.cycle) % L.cycle : null; }),
       debug: w(() => ({ side: L.stops.map((q) => q.sideCache || null), cars: L.cars.map((g) => g.position.toArray().map((v) => +v.toFixed(1))), open: L.lastOpen })),
-      nepStairs: () => STN.NEP?.stairs, board: w(() => board()), alight: w(() => alight()), skew: (sec) => { SKEW += sec; },
+      nepStairs: () => STN.NEP?.stairs, stnStairs: (id) => STN[id] && { stairs: STN[id].stairs, plat: STN[id].plat }, stnAt: (id, a, o) => { const S = STN[id]; if (!S) return null; const p = S.at(a, o, S.plat); return [p.x, p.y, p.z, S.ang]; }, board: w(() => board()), alight: w(() => alight()), skew: (sec) => { SKEW += sec; },
       drive: w((dir) => takeControls(dir ?? 1)), driving: w(() => L.drive && { s: +L.drive.s.toFixed(1), v: +L.drive.v.toFixed(2), lever: +L.drive.lever.toFixed(2), doors: +L.drive.doors.toFixed(2), at: L.drive.at?.id || null, tripped: L.drive.tripped, limit: L.drive.limit, dir: L.drive.dir }), stopDrive: w(() => leaveControls()),
     }; };
   if (typeof window !== 'undefined' && window.__game) window.__game.subway = { ...api(F), line: (id) => { const L = LINES.find((q) => q.id === id); return L ? api(L) : null; }, lines: () => [...new Set(LINES.map((q) => q.id))], trainsPer: () => Object.fromEntries([...new Set(LINES.map((q) => q.id))].map((id) => [id, LINES.filter((q) => q.id === id).length])) };
@@ -126,11 +126,11 @@ function buildLine() {
     const rt = runT(b.s - a.s); R.legs.push({ kind: 'run', t0: T, t1: T + rt, a, b }); T += rt; }
   R.cycle = T;
   R.cars = buildTrain(world.scene);
+  R.sideSign = sideSignFor(cfg);   // which side the track back to Stillwell is on (the el and the stations are built for both)
   buildEl(world, P);
   if (cfg.id === 'F') buildElStation(world, stops[2].s, { id: 'NEP', name: 'Neptune Av', zone: 'NEPTUNE AV · SHELL RD', hint: 'the F back to Coney', cross: NEP_Z, street: true });
   if (cfg.id === 'Q') buildElStation(world, stops[2].s, { id: 'OCP', name: 'Ocean Pkwy', zone: 'OCEAN PKWY · BRIGHTON BEACH AV', hint: 'the Q back to Coney', street: !world.W.brighton });   // coney/brighton.js builds the streets round it when it's there
   if (cfg.id === 'D') buildElStation(world, stops[1].s, { id: 'B50', name: 'Bay 50 St', zone: 'BAY 50 ST', hint: 'the D back to Coney', street: false });
-  R.sideSign = sideSignFor(cfg);
   boardingSpot();
   console.log(`[subway] ${cfg.id} route`, Math.round(R.L), 'm ·', stops.map((q) => `${q.id}@${Math.round(q.s)}`).join(' '), '· cycle', Math.round(R.cycle), 's');
   return true;
@@ -154,7 +154,7 @@ function sideSignFor(cfg) {
 /** how far over (m) a train is at timetable time t: on the other track while it heads back towards Stillwell */
 function lateralAt(t) {
   const l = R.legs.find((g) => t >= g.t0 && t < g.t1) || R.legs[0], S = stopsSorted(), lo = S[0].s, hi = S[S.length - 1].s;
-  const ends = R.stops.filter((q) => q.s === lo || q.s === hi || q.both).map((q) => q.s);
+  const ends = R.stops.filter((q) => q.s === lo || q.s === hi).map((q) => q.s);   // ease across only at the ends of the line (every station out there has both tracks)
   const fade = (sv) => { const d = Math.min(...ends.map((e) => Math.abs(sv - e))); const k = Math.max(0, Math.min(1, d / SIDE_FADE)); return k * k * (3 - 2 * k); };
   if (l.kind === 'dwell') return l.next.s < l.stop.s ? TRACK_GAP * fade(l.stop.s) : 0;
   if (l.b.s >= l.a.s) return 0;
@@ -569,7 +569,9 @@ function stationLife() {
 }
 /** which side the platform is on at a stop (+1 = the car's right / −1 left, 2 = both) — measured, not assumed */
 function sideAt(stop) {
-  if (stop.both) return 2;
+  // the two-track stations out on the line: a side platform beside each track. A car's local +x is the right of the way out, the
+  // line's own platform is on the side away from the other track (+sideSign), the other track's on the far side (−sideSign)
+  if (stop.both) { const t = now() % R.cycle; return R.drive ? R.sideSign || 1 : lateralAt(t) > 2 ? -(R.sideSign || 1) : R.sideSign || 1; }
   if (stop.sideCache) return stop.sideCache;
   const g = R.cars[2]; g.updateMatrixWorld(true);
   const probe = (sx) => { _a.set(sx * 2.4, FLOOR + 0.5, 0).applyMatrix4(g.matrixWorld); const ray = new THREE.Raycaster(new THREE.Vector3(_a.x, _a.y + 1, _a.z), new THREE.Vector3(0, -1, 0), 0, 3); const fy = _a.y - 0.5; return ray.intersectObjects(R.ctx.raycastTargets.filter((o) => o.isMesh && !o.isInstancedMesh), false).filter((h) => Math.abs(h.point.y - fy) < 0.35).length; };   // only a floor at door-sill height counts (a passing Stillwell shuttle flipped the side)
@@ -659,9 +661,12 @@ function buildEl(world, P) {
   for (let i = 0; i < P.length - 1; i += 6) {
     const a = P[i], b = P[Math.min(P.length - 1, i + 6)]; if (skip(a)) continue;
     const ang = Math.atan2(b.x - a.x, b.z - a.z), L = Math.hypot(b.x - a.x, b.z - a.z);
-    for (const o of [-2.4, 2.4]) { const gd = new THREE.BoxGeometry(0.5, 0.9, L); gd.rotateY(ang); gd.translate((a.x + b.x) / 2 + Math.cos(ang) * o, a.y - 0.8, (a.z + b.z) / 2 - Math.sin(ang) * o); gs.push(gd); }
-    const td = new THREE.BoxGeometry(5.6, 0.25, L); td.rotateY(ang); td.translate((a.x + b.x) / 2, a.y - 0.2, (a.z + b.z) / 2); ts.push(td);
-    if ((i / 6) % 2 === 0) for (const o of [-3.2, 3.2]) { const c = new THREE.BoxGeometry(0.6, a.y - 1.2, 0.6); c.translate(a.x + Math.cos(ang) * o, (a.y - 1.2) / 2, a.z - Math.sin(ang) * o); gs.push(c); }
+    // two tracks: the line's own and, TRACK_GAP to the side the trains back to Stillwell keep to, theirs (the deck spans both). The
+    // offset is along the left normal of the way out: (-cos ang, sin ang) in x / z, times sideSign
+    const mo = -(R.sideSign || 1) * TRACK_GAP / 2, cx = (a.x + b.x) / 2 + Math.cos(ang) * mo, cz = (a.z + b.z) / 2 - Math.sin(ang) * mo, half = 2.4 + TRACK_GAP / 2;
+    for (const o of [-half, half]) { const gd = new THREE.BoxGeometry(0.5, 0.9, L); gd.rotateY(ang); gd.translate(cx + Math.cos(ang) * o, a.y - 0.8, cz - Math.sin(ang) * o); gs.push(gd); }
+    const td = new THREE.BoxGeometry(5.6 + TRACK_GAP, 0.25, L); td.rotateY(ang); td.translate(cx, a.y - 0.2, cz); ts.push(td);
+    if ((i / 6) % 2 === 0) for (const o of [-(half + 0.8), half + 0.8]) { const c = new THREE.BoxGeometry(0.6, a.y - 1.2, 0.6); c.translate(a.x + Math.cos(ang) * (mo + o), (a.y - 1.2) / 2, a.z - Math.sin(ang) * (mo + o)); gs.push(c); }
   }
   const merge = (list, m) => { if (!list.length) return; const g = mergeAll(list); const me = new THREE.Mesh(g, m); me.castShadow = true; me.receiveShadow = true; scene.add(me); };
   merge(gs, green); merge(ts, ties);
@@ -686,8 +691,8 @@ function buildElStation(world, sHead, opt) {
   const S = (c, r = 0.8, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
   const conc = S(0xa9a59c, 0.9), edge = S(0xf2c418, 0.7), steel = S(0x3f5a47, 0.6, 0.4), roofM = S(0x5b6168, 0.5, 0.6), asph = S(0x39393b, 0.95), walk = S(0x9d998f, 0.9);
   // a rotated box: merged geometry + collider cells (0.5 m) so the rotated floors stay walkable and the gaps stay open
-  const GM = new Map();
-  const rbox = (m, a0, a1, o0, o1, y0, y1, { collide = true, walkable = false, coarse = false } = {}) => {
+  const GM = new Map(); let OSH = 0;   // OSH: the side being built is shifted this far across (the far platform sits past the second track)
+  const rbox = (m, a0, a1, o0, o1, y0, y1, { collide = true, walkable = false, coarse = false } = {}) => { o0 += OSH; o1 += OSH;
     const g = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0).toNonIndexed(); g.rotateY(ang); const c = at((a0 + a1) / 2, (o0 + o1) / 2, (y0 + y1) / 2); g.translate(c.x, c.y, c.z); (GM.get(m) || GM.set(m, []).get(m)).push(g);   // merged per material below
     const me = null; if (!collide) return me;
     if (coarse) { const cs = [at(a0, o0, 0), at(a1, o0, 0), at(a0, o1, 0), at(a1, o1, 0)]; world.box([Math.min(...cs.map((q) => q.x)), y0, Math.min(...cs.map((q) => q.z))], [Math.max(...cs.map((q) => q.x)), y1, Math.max(...cs.map((q) => q.z))]); return me; }   // buildings: one box, nobody walks inside
@@ -695,8 +700,12 @@ function buildElStation(world, sHead, opt) {
     for (let i = 0; i < na; i++) for (let j = 0; j < no; j++) { const pa = at(a0 + (i + 0.5) * (a1 - a0) / na, o0 + (j + 0.5) * (o1 - o0) / no, 0), h = 0.36; const mn = [pa.x - h, y0, pa.z - h], mx = [pa.x + h, y1, pa.z + h]; walkable ? world.walkable(mn, mx) : world.box(mn, mx); }
     return me;
   };
-  const feet = [], stairs = []; if (opt.id === 'NEP') W.neptunePlat = { at, plat, a0: -PL / 2 + 6, a1: PL / 2 - 12, o0: O0 + 0.9, o1: O1 - 0.9 };   // riders waiting on the platforms (coney/folk.js)
+  const feet = [], stairs = []; if (opt.id === 'NEP') W.neptunePlat = { at, plat, a0: -PL / 2 + 6, a1: PL / 2 - 12, o0: O0 + 0.9 + ((R.sideSign || 1) > 0 ? TRACK_GAP : 0), o1: O1 - 0.9 + ((R.sideSign || 1) > 0 ? TRACK_GAP : 0) };   // riders waiting on the platforms (coney/folk.js)
+  // two tracks: the line's own at o = 0, the one back to Stillwell at sideSign × TRACK_GAP, a side platform outside each
+  const sh = (s) => (s === (R.sideSign || 1) ? s * TRACK_GAP : 0);
+  const atBase = at;
   for (const s of [-1, 1]) {
+    const k = sh(s), at = (a, o, yy) => atBase(a, o + k, yy); OSH = k;   // this side's platform, stairs, signs: out past its track
     const o0 = s > 0 ? O0 : -O1, o1 = s > 0 ? O1 : -O0;
     rbox(conc, -PL / 2, PL / 2, o0, o1, plat - 0.35, plat, { walkable: true });
     rbox(edge, -PL / 2, PL / 2, s > 0 ? O0 : -O0 - 0.5, s > 0 ? O0 + 0.5 : -O0, plat, plat + 0.01, { collide: false });
@@ -712,6 +721,7 @@ function buildElStation(world, sHead, opt) {
     rbox(steel, aS - 1 - nSt * tread, aS - 1, oS + s * 1.15 - 0.05, oS + s * 1.15 + 0.05, 0, plat + 1.0, { collide: true });   // outer railing
     { const f = at(aS - 1 - nSt * tread - 1.6, oS + s * 1.8, 0); feet.push([f.x, f.z]); stairs.push([at(aS + 0.3, s * (O0 + O1) / 2, plat), at(aS + 0.3, oS, plat), at(aS - 1 - nSt * tread - 1.2, oS, 0)].map((q) => [+q.x.toFixed(2), +q.z.toFixed(2)])); }   // the globe lamp at the stair foot (buildEntrances)
   }
+  OSH = 0;
   // street: Shell Rd under the el, Neptune Ave across, sidewalks, a row of storefronts / walk-ups each side
   const plane = (m, a0, a1, o0, o1, yy) => { const g = new THREE.PlaneGeometry(o1 - o0, a1 - a0); g.rotateX(-Math.PI / 2); const me = new THREE.Mesh(g, m); me.position.copy(at((a0 + a1) / 2, (o0 + o1) / 2, yy)); me.rotation.y = ang; me.receiveShadow = true; scene.add(me); };
   if (opt.street) plane(asph, -260, 260, -10, 10, 0.03); if (opt.street) { plane(walk, -260, 260, -14, -10, 0.05); plane(walk, -260, 260, 10, 14, 0.05);
@@ -721,7 +731,8 @@ function buildElStation(world, sHead, opt) {
   }
   for (const [m, list] of GM) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = true; me.receiveShadow = true; scene.add(me); }
   // arrival: coming up the stairs at street level shows the POI; a subtle lamp at each stair foot
-  STN[opt.id] = { at, plat, O0, O1, c: c0, feet, stairs, ang };   // stairs: [platform, landing, street] per side (QA walks them)
+  STN[opt.id] = { at, plat, O0, O1, c: c0, feet, stairs, ang };
+  (W.mapPOIs || (W.mapPOIs = [])).push({ name: opt.name.toUpperCase() + ' STATION', x: c0.x, z: c0.z, kind: 'transit' });   // stairs: [platform, landing, street] per side (QA walks them)
 }
 // ---------------------------------------------------------------------------------------------------------------------------
 // street-level signposting: the green globe lamps (lit, so they read at night too) with an F bullet at every entrance —
