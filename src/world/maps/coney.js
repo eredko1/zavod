@@ -19,6 +19,7 @@ import { buildBeachLife } from '../coney/life.js';
 import { buildPark } from '../coney/park.js';
 import { buildHangout, hangoutQA } from '../coney/hangout.js';
 import { buildChase } from '../coney/chase.js';
+import { buildAirSupport } from '../coney/airsupport.js';
 import { buildBelt } from '../coney/belt.js';
 import { buildSubway } from '../coney/subway.js';
 import { buildGreens } from '../coney/greens.js';
@@ -53,6 +54,7 @@ export function build(world) {
   ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
   try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)
+  try { buildAirSupport(world); } catch (e) { console.warn('[coney] air support', e); }   // 2 stars: the NYPD chopper, 3: a tank (coney/airsupport.js)
   ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   const skip = new Set(String(ctx.qs?.get?.('skip') || '').split(','));   // ?skip=horizon,belt,subway,greens,crowds,traffic (and tavern, brighton in hangout.js)
   if (!skip.has('horizon')) try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)

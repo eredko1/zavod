@@ -651,4 +651,10 @@ export const chaseQA = {
   spawn: (kind = 'cop', dmin = 12, dmax = 20) => { const at = spawnPoint(K.ctx.player.position, dmin, dmax, null); return at ? !!spawnUnit(kind, at) : false; },
   zones: () => K.zones.map((z) => ({ c: [+z.c.x.toFixed(1), +z.c.z.toFixed(1)], ha: +z.ha.toFixed(1), hc: +z.hc.toFixed(1), doors: z.doors.map((d) => [+d.x.toFixed(1), +d.z.toFixed(1)]) })),
   noGo: (x, z, y = 0) => noGo(x, z, y),
+  // coney/airsupport.js: the chopper drops its cops, stolen police hardware is three stars on the spot
+  starsNow: () => (K ? K.stars : 0),
+  seenAgo: () => (K ? K.t - K.seenT : 1e9), lastKnown: () => K?.lastKnown || null,
+  spotted: (pos) => { if (K && K.stars) { K.seenT = K.t; K.lastKnown.copy(pos); } },   // the chopper picked you up
+  spawnCopAt: (at) => (K ? spawnUnit('cop', at) : null),
+  raise: (n, pos) => { if (!K || K.stars >= n) return; K.stars = Math.min(5, n); K.seenT = K.t; K.lastKnown.copy(pos || K.ctx.player.position); K.carT = Math.min(K.carT, 1); renderUI(); },
 };
