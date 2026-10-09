@@ -324,7 +324,7 @@ export function carInterior(kind = 'sedan', geos = null) {
   for (const sz of [1, -1]) { const zc = sz * (HW - 0.09);
     add(new THREE.BoxGeometry(1.9, 0.55, 0.05), I.door, eye.x - 0.35, K.clr + 0.55, zc);
     add(new THREE.BoxGeometry(0.55, 0.06, 0.1), I.trim, eye.x - 0.05, K.clr + 0.66, zc - sz * 0.05);
-    add(new THREE.BoxGeometry(0.02, 0.16, 0.36), I.visor, wsTop - 0.12, K.roof - 0.09, sz * 0.42, 0, 0, 0.35); }
+    add(new THREE.BoxGeometry(0.16, 0.02, 0.36), I.visor, wsTop - 0.14, K.roof - 0.035, sz * 0.42); }   // visors folded up flat to the roof
   add(new THREE.CylinderGeometry(0.015, 0.02, 0.18, 8), I.trim, eye.x + 0.15, K.clr + 0.55, 0);
   add(new THREE.SphereGeometry(0.035, 10, 8), I.chrome, eye.x + 0.15, K.clr + 0.65, 0);
   for (const dz of [-0.06, 0.06]) add(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12), I.dash, eye.x - 0.1, K.clr + 0.47, dz);

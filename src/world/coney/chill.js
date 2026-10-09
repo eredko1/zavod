@@ -156,7 +156,8 @@ function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.rando
   if (!base) return [];
   const used = new Set(), out = [], lk = Math.floor(Math.random() * 5);   // each member gets his own line
   for (let i = 0; i < n; i++) {
-    let at = base.clone(); if (i) { const q = nav?.nearestFree?.(base.x + (Math.random() - 0.5) * 5, base.z + (Math.random() - 0.5) * 5, 3, base.y); if (q) at = new THREE.Vector3(q.x, q.y, q.z); }
+    let at = base.clone(); if (i) { const a = i * 2.4 + Math.random() * 0.5, ox = base.x + Math.cos(a) * 1.2 * Math.ceil(i / 2), oz = base.z + Math.sin(a) * 1.2 * Math.ceil(i / 2), q = nav?.nearestFree?.(ox, oz, 3, base.y);
+      at = q && out.every((o) => Math.hypot(o.pos.x - q.x, o.pos.z - q.z) > 0.9) ? new THREE.Vector3(q.x, q.y, q.z) : new THREE.Vector3(ox, base.y, oz); }   // spread round base, not stacked on one nav cell
     let name = opts.name; if (!name) { do { name = T.names[Math.floor(Math.random() * T.names.length)]; } while (used.has(name) && used.size < T.names.length); } used.add(name);
     const id = C.nextId++; const m = thugModel(name, id, type); m.f.group.position.copy(at); world.scene.add(m.f.group);
     const t = { id, name, type, intent, m, pos: at, yaw: 0, st: 'walk', hp: HP, cash: 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.6 * i, said: false, talkT: 0, lk: lk + i, blade: !!m.blade };
@@ -309,7 +310,7 @@ function update(dt, playing) {
     } else { t.st = 'rob'; t.punchT -= dt; if (t.punchT <= 0) { t.punchT = 1.2; rob(t); } }   // up close: shake you down
     if (goal && speed > 0) {
       // follow the nav path (re-planned every 1.5 s), straight line if there's none
-      if (!t.path || now - t.pathT > 1500) { t.pathT = now; try { t.path = ctx.ai?.nav?.findPath?.(t.pos, goal instanceof THREE.Vector3 ? goal : new THREE.Vector3(goal.x, goal.y, goal.z), { maxExpand: 6000 }) || null; } catch { t.path = null; } t.pi = 0; }
+      if (!t.path || now - t.pathT > 1500) { t.pathT = now; try { t.path = ctx.ai?.nav?.findPath?.(t.pos, goal instanceof THREE.Vector3 ? goal : new THREE.Vector3(goal.x, goal.y, goal.z), { maxExpand: 6000 }) || null; } catch { t.path = null; } if (t.path && t.path.length < 2) t.path = null; t.pi = 0; }
       let w = goal; if (t.path && t.path.length) { while (t.pi < t.path.length - 1 && Math.hypot(t.path[t.pi].x - t.pos.x, t.path[t.pi].z - t.pos.z) < 0.6) t.pi++; w = t.path[Math.min(t.pi, t.path.length - 1)]; }
       const wx = w.x - t.pos.x, wz = w.z - t.pos.z, wl = Math.hypot(wx, wz) || 1; t.pos.x += wx / wl * Math.min(wl, speed * dt); t.pos.z += wz / wl * Math.min(wl, speed * dt); if (Number.isFinite(w.y)) t.pos.y += (w.y - t.pos.y) * Math.min(1, dt * 6);
       const want = Math.atan2(wx, wz); t.yaw += Math.atan2(Math.sin(want - t.yaw), Math.cos(want - t.yaw)) * Math.min(1, dt * 8);
