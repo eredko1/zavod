@@ -31,6 +31,10 @@ const SHOPS = [
 ];
 
 let B = null;
+/** the shop kind for coney/shops.js's interiors, from a sign's English line */
+const brKind = (sub) => /DUMPLING|RESTAURANT|CAFE|TEA|BAKERY|CHEBUREKI/.test(sub) ? 'food' : /CANDY/.test(sub) ? 'candy' : /BEER/.test(sub) ? 'bar' : /EXCHANGE|PAWN|JEWELRY|TRAVEL|SALON|EYEGLASSES|MEDICAL|FURS/.test(sub) ? 'service' : 'grocery';
+/** the avenue's layout, for the street kit (coney/street.js brightonKit) */
+export const BRI = { X0, X1, ZC, HALF, SWK, SW, CW, CROSS: CROSS.map((c) => ({ ...c })), STN_X };
 
 export function buildBrighton(world) {
   const { ctx, W, scene } = world; const lite = !!ctx.lite, rnd = mulberry(1622);
@@ -76,15 +80,24 @@ export function buildBrighton(world) {
   // ---- buildings: walk-ups with a shop on the ground floor facing the avenue; apartment blocks behind the south row ----
   const brick = [0x9a5a44, 0x8a4a3a, 0xb07a5a, 0xa8876a, 0x7e4a3a, 0xc2a07a, 0x6f5a4a];
   let si = 0;
+  const units = W.shopUnits || (W.shopUnits = []); let enterN = 0; const ENTER_MAX = lite ? 4 : 10;
   const walkup = (x0, x1, zFace, sd, depth, floors) => {   // sd: which way the building runs back from its face (-1: the north row, +1: the south row); the street is at -sd
     const h = 4.2 + (floors - 1) * 3.1, zb = zFace + sd * depth, col = brick[Math.floor(rnd() * brick.length)];
     const g = new THREE.BoxGeometry(x1 - x0, h, depth); g.translate((x0 + x1) / 2, SW + h / 2, (zFace + zb) / 2); boxUV(g, x1 - x0, h, depth); tint(g, col); put(M.walls, g);
-    wbox(x0, 0, zFace, x1, SW + h, zb);
+    // a shop you can walk into (every few doors): the room is left out of the building's collider, the doorway open
+    const S = SHOPS[si % SHOPS.length], enter = enterN < ENTER_MAX && x1 - x0 >= 7 && si % 6 === 2, dmid = (x0 + x1) / 2, H = 3.3, rd = Math.min(9, depth - 1.5);
+    if (enter) { const zr = zFace + sd * rd;
+      wbox(x0, 0, zFace, x0 + 0.4, SW + h, zb); wbox(x1 - 0.4, 0, zFace, x1, SW + h, zb); wbox(x0 + 0.4, 0, zr, x1 - 0.4, SW + h, zb); wbox(x0 + 0.4, SW + H, zFace, x1 - 0.4, SW + h, zr);
+      wbox(x0 + 0.4, 0, zFace, dmid - 0.8, SW + H, zFace + sd * 0.25); wbox(dmid + 0.8, 0, zFace, x1 - 0.4, SW + H, zFace + sd * 0.25);
+      const n = new THREE.Vector3(0, 0, -sd), t = new THREE.Vector3(sd < 0 ? 1 : -1, 0, 0), m = new THREE.Matrix4().makeBasis(t, new THREE.Vector3(0, 1, 0), n).setPosition(sd < 0 ? x0 : x1, SW, zFace);
+      units.push({ m: m.elements.slice(), flip: false, L: x1 - x0, u0: 0, u1: x1 - x0, dx: (x1 - x0) / 2 - 0.8, dw: 1.6, rd, H, kind: brKind(S[1]), name: S[1], c: [dmid, SW, zFace + sd * rd / 2], y0: SW }); enterN++;
+    } else wbox(x0, 0, zFace, x1, SW + h, zb);
     // cornice, the shop: dark glass, a door, the sign band (atlas), an awning on some
     box(M.trim, x0, SW + h - 0.1, zFace - sd * 0.35, x1, SW + h + 0.25, zFace, 0x8d877c);
     const fz = zFace - sd * 0.04, ry = sd > 0 ? Math.PI : 0;
-    box(M.glass, x0 + 0.4, SW + 0.3, fz, x1 - 0.4, SW + 2.9, fz - sd * 0.02);
-    box(M.trim, (x0 + x1) / 2 - 0.55, SW, fz - sd * 0.03, (x0 + x1) / 2 + 0.55, SW + 2.4, fz - sd * 0.06, 0x2a2622);
+    if (enter) { box(M.glass, x0 + 0.4, SW + 0.3, fz, dmid - 0.8, SW + 2.9, fz - sd * 0.02); box(M.glass, dmid + 0.8, SW + 0.3, fz, x1 - 0.4, SW + 2.9, fz - sd * 0.02); box(M.trim, dmid - 0.85, SW, fz - sd * 0.03, dmid - 0.8, SW + 2.9, fz - sd * 0.08, 0x2a2622); box(M.trim, dmid + 0.8, SW, fz - sd * 0.03, dmid + 0.85, SW + 2.9, fz - sd * 0.08, 0x2a2622); }
+    else { box(M.glass, x0 + 0.4, SW + 0.3, fz, x1 - 0.4, SW + 2.9, fz - sd * 0.02);
+      box(M.trim, (x0 + x1) / 2 - 0.55, SW, fz - sd * 0.03, (x0 + x1) / 2 + 0.55, SW + 2.4, fz - sd * 0.06, 0x2a2622); }
     signQuad(cells[si++ % SHOPS.length], Math.min(x1 - x0 - 0.6, 9), 1.1, (x0 + x1) / 2, SW + 3.55, fz - sd * 0.05, ry);
     if (rnd() < 0.45) { const aw = new THREE.BoxGeometry(x1 - x0 - 0.6, 0.06, 1.4); aw.rotateX(-sd * 0.3); aw.translate((x0 + x1) / 2, SW + 3.0, zFace - sd * 0.7); tint(aw, [0xb3121e, 0x1f4a2e, 0x1b3f9a, 0xd9a400][Math.floor(rnd() * 4)]); put(M.trim, aw); }
   };
