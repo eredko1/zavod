@@ -151,6 +151,7 @@ export function update(dt, ctx) {
   let ix = 0, iy = 0, sprintIn = false, crouchIn = false, jumpHeld = false, jumpPress = input.consume('Space');
   if (input.forward) iy += 1; if (input.back) iy -= 1; if (input.right) ix += 1; if (input.left) ix -= 1;
   sprintIn = input.sprint; crouchIn = input.crouch; jumpHeld = input.jump;
+  if (p.knockT > 0) { p.knockT -= dt; ix = iy = 0; sprintIn = false; crouchIn = true; jumpHeld = false; jumpPress = false; }   // knocked down (a fist fight in chill): on the ground for a moment
   if (input.xrMove) { ix = input.xrMove.x; iy = input.xrMove.y; }   // VR thumbstick / hand pinch-drag: analog
   if (S.qa) {
     const Q = S.qa, q = Q.segs[Q.i]; Q.elapsed += dt;
