@@ -24,7 +24,7 @@ import { buildGreens } from '../coney/greens.js';
 import { buildRadio } from '../coney/radio.js';
 import { buildTraffic } from '../coney/traffic.js';
 import { OSM, PLAY } from '../coney/osm.js';
-import { addBusLoop } from '../coney/stillwell.js';
+import { addBusLoop, moveStillwellAve } from '../coney/stillwell.js';
 import { bbox, segDist, pip } from '../osmkit.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
 
@@ -45,7 +45,7 @@ export function build(world) {
   };
   ctx.progress(0.13, 'coney: sky'); buildSky(world, { shadowHalf: 130, center: [0, 0, 0] });
   const M = makeConeyMats(world); world.mats = M;
-  addBusLoop(OSM);   // the Stillwell bus loop joins the street network first (city paints it, traffic drives it)
+  moveStillwellAve(OSM); addBusLoop(OSM);   // the Stillwell bus loop joins the street network first (city paints it, traffic drives it)
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
   try { buildFronts(world, M); } catch (e) { console.warn('[coney] fronts', e); }
   try { buildStreetLights(world, M); } catch (e) { console.warn('[coney] street lights', e); }   // NYC cobra-heads on every street (before horizon: it lights the lenses at night)   // real storefronts, walk-up fire escapes + cornices, Surf Ave arches + billboards (coney/fronts.js)

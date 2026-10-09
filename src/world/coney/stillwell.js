@@ -17,6 +17,15 @@ export const BUS_LOOP = [[-35, -124], [-35, -212], [-33.5, -224], [-28, -231], [
 export const stationClear = (x, z) => (x > SURF_HH.x0 - 1 && x < SURF_HH.x1 + 1 && z > -200 && z < SURF_HH.z + 1) || (x > -42 && x < -10 && z > -186 && z < -138);
 let loopAdded = false;
 /** put the bus loop in the street network before anything reads it (city.js paints it, traffic.js drives it) */
+/** Stillwell Ave north of the head house: OSM puts its centreline at x −87, a metre inside the terminal's west wall (x −88), so
+ *  half the avenue (and the Mermaid Ave junction) ran inside the station. It runs beside it instead: centred at x −95.5, 11 m
+ *  wide, a sidewalk on both kerbs, clear of the blocks to the west (x ≤ −102). Vertices of any road that end on it move too. */
+let aveMoved = false;
+export function moveStillwellAve(OSM) {
+  if (aveMoved) return; aveMoved = true;
+  for (const r of OSM.r) { let moved = 0; for (const p of r.p) if (Math.abs(p[0] + 87) < 4 && p[1] < -228) { p[0] = -95.5; moved++; }
+    if (moved >= 2 && r.p.every((p) => Math.abs(p[0] + 95.5) < 0.01 || p[1] > -235)) r.w = Math.min(r.w, 11); }
+}
 export function addBusLoop(OSM) { if (loopAdded || OSM.r.some((r) => r.busLoop)) return; loopAdded = true; OSM.r.push({ p: BUS_LOOP.map((q) => q.slice()), w: 9, busLoop: true }); }
 export const STILLWELL = { x0: -88, x1: -24, zS: -258, zC: -300, zP0: -266, zP1: -440, RAIL: 7.5, DECK_B: 6.8, DECK_T: 7.3, PLAT: 8.6 };
 const ISLANDS = [[-82, -74], [-68, -60], [-53, -46], [-38, -29]];
@@ -28,6 +37,11 @@ const STAIR = { z0: -276, run: 13.4, w: 3.0 }, CAR = 18.4, NCAR = 8;
 export function buildStillwell(world, M) {
   const { scene, ctx, W } = world; const S = STILLWELL, B = new Batch(world, M, 'stillwell');
   // matte platform concrete + brushed turnstile steel (the shared greys are glossy: SSR mirrored the solar roof in them)
+  if (!M.stwTile) {   // glazed white 3 x 6 subway tile with grey grout, a brick bond (the concourse walls; ssTile is the sideshow's clay roof)
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#9a9a94'; g.fillRect(0, 0, 256, 256);
+    for (let r = 0; r < 16; r++) for (let k = -1; k < 9; k++) { const x = k * 32 + (r % 2 ? 16 : 0), y = r * 16, v = 236 + Math.random() * 12 | 0; g.fillStyle = `rgb(${v},${v},${v - 4})`; g.fillRect(x + 1, y + 1, 30, 14); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 2, y + 2, 26, 3); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    M.stwTile = new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, metalness: 0 }); M.surface.stwTile = 'concrete'; if (M.uvScale) M.uvScale.stwTile = 1 / 1.2; }
   if (!M.edgeYellow) { M.edgeYellow = new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.7 }); M.surface.edgeYellow = 'concrete'; }
   if (!M.stwCeil) { M.stwCeil = new THREE.MeshStandardMaterial({ color: 0x5d6b62, roughness: 0.8, metalness: 0.2, emissive: 0x1a221d, emissiveIntensity: 1 }); M.surface.stwCeil = 'metal'; }   // plain painted deck underside (the tie texture moiréd)
   if (!M.stwPlat) { M.stwPlat = new THREE.MeshStandardMaterial({ color: 0xa3a39c, roughness: 0.93, metalness: 0 }); M.surface.stwPlat = 'concrete'; M.stwTurn = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.35, metalness: 0.9 }); M.surface.stwTurn = 'metal'; }
@@ -58,7 +72,7 @@ export function buildStillwell(world, M) {
     B.box('terracotta', [X0, 0, -244], [X0 + 0.6, H, HF]); B.box('terracotta', [X0, 0, fz], [X0 + 0.6, H, -253]); B.box('terracotta', [X0, 3.3, -253], [X0 + 0.6, H, -244]);
     sign(scene, 'SUBWAY', X0 - 0.05, 3.75, -248.5, -Math.PI / 2, 2.6, 0.42, '#0b3d23', '#fff');
     B.box('concreteGrey', [X0, H, fz], [X1, H + 0.25, HF]);
-    for (const [a, b] of [[X0 + 0.6, X0 + 0.64], [X1 - 0.64, X1 - 0.6]]) { B.box('ssTile', [a, 0, fz], [b, 2.4, HF - FT], { collide: false }); B.box('ssBlue', [a - 0.005, 2.4, fz], [b + 0.005, 2.55, HF - FT], { collide: false }); }
+    for (const [a, b] of [[X0 + 0.6, X0 + 0.64], [X1 - 0.64, X1 - 0.6]]) { B.box('stwTile', [a, 0, fz], [b, 2.4, HF - FT], { collide: false }); B.box('ssBlue', [a - 0.005, 2.4, fz], [b + 0.005, 2.55, HF - FT], { collide: false }); }
     for (let z = HF - 5; z > fz + 3; z -= 7) { B.box('bulb', [-63, H - 0.08, z], [-60, H - 0.02, z + 0.25], { collide: false }); B.box('bulb', [-51, H - 0.08, z], [-48, H - 0.02, z + 0.25], { collide: false }); }
     for (let z = HF - 14; z > fz + 6; z -= 14) for (const cx of [-62.5, -48.5]) B.box('steelDark', [cx - 0.3, 0, z - 0.3], [cx + 0.3, H, z + 0.3]);
     SURF_HH.floor = { x0: X0 + 0.6, x1: X1 - 0.6, z0: fz, z1: HF - FT };
@@ -72,7 +86,7 @@ export function buildStillwell(world, M) {
   B.box('terracotta', [S.x0, 0, S.zC], [S.x0 + 0.6, S.DECK_B, -277]); B.box('terracotta', [S.x0, 0, -271], [S.x0 + 0.6, S.DECK_B, fz]); B.box('terracotta', [S.x0, 3.2, -277], [S.x0 + 0.6, S.DECK_B, -271]);
   sign(scene, 'SUBWAY', S.x0 - 0.05, 3.65, -274, -Math.PI / 2, 2.6, 0.45, '#0b3d23', '#fff');
   B.box('terracotta', [S.x1 - 0.6, 0, S.zC], [S.x1, S.DECK_B, fz]);
-  B.box('ssTile', [S.x0, 0, S.zC - 0.6], [S.x1, S.DECK_B, S.zC]);
+  B.box('stwTile', [S.x0, 0, S.zC - 0.6], [S.x1, S.DECK_B, S.zC]);
   // concourse: terrazzo floor, ceiling (the deck underside) with light strips
   { // terrazzo: warm grey chips in a cement matrix, brass divider strips every 1.5 m (one plane, tiled texture)
     const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
@@ -87,7 +101,7 @@ export function buildStillwell(world, M) {
   }
   // white subway-tile wainscot on the inside of the concourse walls, with a green cap band
   for (const [x0, x1, z0, z1] of [[S.x0 + 0.6, S.x0 + 0.64, S.zC, fz - FT], [S.x1 - 0.64, S.x1 - 0.6, S.zC, fz - FT], [S.x0 + 0.6, S.x1 - 0.6, fz - FT - 0.04, fz - FT]]) {
-    B.box('ssTile', [x0, 0, z0], [x1, 2.4, z1], { collide: false }); B.box('ssBlue', [x0 - 0.005, 2.4, z0], [x1 + 0.005, 2.55, z1], { collide: false }); }
+    B.box('stwTile', [x0, 0, z0], [x1, 2.4, z1], { collide: false }); B.box('ssBlue', [x0 - 0.005, 2.4, z0], [x1 + 0.005, 2.55, z1], { collide: false }); }
   for (let z = fz - 4; z > S.zC + 2; z -= 6) for (let x = S.x0 + 6; x < S.x1 - 4; x += 10) B.box('bulb', [x, S.DECK_B - 0.08, z], [x + 3.2, S.DECK_B - 0.02, z + 0.25], { collide: false });
   // fare line at z −270: a fare wall with turnstile gaps (walk through, like the real ones) between x −66 and −42
   { const Z0 = -270.4, Z1 = -269.6; let x = S.x0 + 0.6;
@@ -104,7 +118,7 @@ export function buildStillwell(world, M) {
   // ---- stairs: one bank per island, from the concourse (z −276) north up to the platform (8.6 m) -----------------------------
   for (const cx of cxs) {
     B.stairs('concreteGrey', { x: cx, z: STAIR.z0, y0: 0, rise: S.PLAT, run: STAIR.run, width: STAIR.w, axis: 'z', dir: -1, n: 46, walkable: true, base: 0 });
-    for (const s of [-1, 1]) { const x = cx + s * (STAIR.w / 2 + 0.12); B.box('ssTile', [x - 0.12, 0, sTop], [x + 0.12, S.PLAT + 1.05, STAIR.z0]); }   // stair walls, up through the platform as a railing
+    for (const s of [-1, 1]) { const x = cx + s * (STAIR.w / 2 + 0.12); B.box('stwTile', [x - 0.12, 0, sTop], [x + 0.12, S.PLAT + 1.05, STAIR.z0]); }   // stair walls, up through the platform as a railing
     B.box('railSteel', [cx - STAIR.w / 2 - 0.25, S.PLAT, STAIR.z0 - 0.12], [cx + STAIR.w / 2 + 0.25, S.PLAT + 1.05, STAIR.z0 + 0.12]);   // end railing at the top of the well
   }
   // ---- deck (trackbed) + island platforms, with the stair wells cut out --------------------------------------------------------

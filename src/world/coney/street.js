@@ -251,10 +251,10 @@ export function buildStreet(world) {
 
   // ---- the vendor tables under the el at Stillwell & Mermaid ------------------------------------------------------------------
   const stalls = [], sellers = [];
-  { const sv = OSM.r.filter((r) => r.w >= 9 && streetAt(r.p[0][0], r.p[0][1]) === 'stillwell').flatMap((r) => r.p).filter(([x, z]) => z < -240 && z > -320);
+  { const sv = OSM.r.filter((r) => r.w >= 9 && streetAt(r.p[0][0], r.p[0][1]) === 'stillwell').flatMap((r) => r.p).filter(([x, z]) => z < -230 && z > -340);
     const sw = OSM.r.find((r) => r.w >= 9 && streetAt(r.p[0][0], r.p[0][1]) === 'stillwell')?.w || 14;
     if (sv.length) { const x = sv.reduce((a, p) => a + p[0], 0) / sv.length + sw / 2 + 2.6;
-      for (let z = -300; z < -248; z += 6.5) { if (blocked(x, z, 1.2) || inRoad(x, z, 0.4) || R() < 0.15) continue; stalls.push([x, z]); } } }
+      for (let z = -330; z < -240; z += 6.5) { if (blocked(x, z, 1.2) || inRoad(x, z, 0.4) || R() < 0.15) continue; stalls.push([x, z]); } } }
   const goods = [0xff4fa0, 0x2fb0ff, 0xffd23a, 0x6ad06a, 0xff7a1a, 0xffffff, 0x9a5ae0, 0xe82a2a];
   for (const [x, z] of stalls) {
     put(boxG(2.2, 0.06, 0.9, 0.78), 0xe8e4da, x, 0, z); for (const [dx, dz] of [[-1, -0.38], [1, -0.38], [-1, 0.38], [1, 0.38]]) put(boxG(0.05, 0.78, 0.05), 0x777b80, x + dx, 0, z + dz);
