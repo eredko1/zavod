@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hangkit as K } from '../hangkit.js';
 import { chaseQA as CH } from './chase.js';
+import { heliModel, tankModel, tankRunningGear } from './airmodels.js';
 
 const HELI = { hp: 700, orbitR: 34, orbitY: 26, speed: 30, landAfter: 22, landedFor: 45, burstEvery: 3.4, burst: 10, rof: 11, hitDmg: 7, spotR: 42, onStation: 100 };
 const HELI_PILOT = { acc: 16, drag: 0.9, vmax: 34, climb: 9, yawRate: 1.6, rof: 12, dmg: 24, range: 260, exitAlt: 3.2, radius: 3.4 };
@@ -105,7 +106,7 @@ function update(dt) {
 
 // ---- the chopper ----------------------------------------------------------------------------------------------------------
 function spawnHeli() {
-  const p = A.ctx.player.position, a = Math.random() * Math.PI * 2, m = heliModel();
+  const p = A.ctx.player.position, a = Math.random() * Math.PI * 2, m = heliModel(!!A.ctx.lite);
   const c = { kind: 'heli', ...m, pos: new THREE.Vector3(p.x + Math.cos(a) * 240, 60, p.z + Math.sin(a) * 240), vel: new THREE.Vector3(), heading: 0, pitch: 0, roll: 0, hp: HELI.hp, st: 'inbound', t: 0, orbitA: a, landT: HELI.landAfter, burstT: 2, rounds: 0, roundT: 0, rotor: 1, reach: 5.5, crew: 2 };
   c.pos.x = Math.min(A.box.x1, Math.max(A.box.x0, c.pos.x)); c.pos.z = Math.min(A.box.z1, Math.max(A.box.z0, c.pos.z));
   A.world.scene.add(c.group); hitboxes(c); A.ctx.hud?.toast?.('NYPD AVIATION — a chopper is on you', 2400);
@@ -171,7 +172,7 @@ function gunner(c, dt, stars) {
   try { A.ctx.audio?.play?.('enemy_shot', { position: o, volume: 0.9 }); } catch {}
   if (hit) p.damage(HELI.hitDmg * (A.ctx.mode === 'chill' ? 1 : 1.2), o);
 }
-function gunMuzzle(c, side) { const o = new THREE.Vector3(side ? 1.75 : -1.75, 0.95, -1.45); c.group.updateMatrixWorld(); return o.applyMatrix4(c.group.matrixWorld); }
+function gunMuzzle(c, side) { const o = new THREE.Vector3(side ? 1.62 : -1.62, 0.84, -1.45); c.group.updateMatrixWorld(); return o.applyMatrix4(c.group.matrixWorld); }
 function crash(c, dt) {
   c.vel.y -= 9.8 * dt; c.heading += dt * 4; c.pos.addScaledVector(c.vel, dt); const floor = collide(c, 2.5);
   if (c.pos.y <= floor) { c.pos.y = floor; if (!c.wreck) { c.wreck = true; boom(c.pos.clone().setY(floor + 1), 9, 120, c.killedByPlayer); charred(c); c.wreckT = 60; } c.vel.set(0, 0, 0); c.rotor = 0; }
@@ -184,7 +185,7 @@ function spawnTank(d0 = null) {
   for (let k = 0; k < 20 && !at; k++) { const a = Math.random() * Math.PI * 2, d = d0 ?? (90 + Math.random() * 50); const q = nav?.nearestFree?.(p.x + Math.cos(a) * d, p.z + Math.sin(a) * d, 8, 0);
     if (q && Math.abs(q.y - ground(q.x, q.z)) < 1 && q.x > A.box.x0 + 10 && q.x < A.box.x1 - 10 && q.z > A.box.z0 + 10 && q.z < A.box.z1 - 10) at = q; }
   if (!at) return null;
-  const m = tankModel(); const c = { kind: 'tank', ...m, pos: new THREE.Vector3(at.x, ground(at.x, at.z), at.z), vel: new THREE.Vector3(), heading: Math.atan2(at.x - p.x, at.z - p.z), turret: 0, gunPitch: 0, hp: TANK.hp, st: 'hunt', t: 0, fireT: TANK.fireEvery * 0.6, path: null, pathT: -9, pi: 0, reach: 4.6, rotor: 0, speed: 0 };
+  const m = tankModel(!!A.ctx.lite); const c = { kind: 'tank', ...m, pos: new THREE.Vector3(at.x, ground(at.x, at.z), at.z), vel: new THREE.Vector3(), heading: Math.atan2(at.x - p.x, at.z - p.z), turret: 0, gunPitch: 0, hp: TANK.hp, st: 'hunt', t: 0, fireT: TANK.fireEvery * 0.6, path: null, pathT: -9, pi: 0, reach: 4.6, rotor: 0, speed: 0 };
   A.world.scene.add(c.group); hitboxes(c); A.ctx.hud?.toast?.('They sent a TANK.', 2400);
   return c;
 }
@@ -365,57 +366,12 @@ function hitboxes(c) {
 }
 function visuals(c, dt) {
   if (c.kind === 'heli') { c.rotorG.rotation.y += dt * 28 * c.rotor; c.tailG.rotation.x += dt * 40 * c.rotor; c.blur.material.opacity = 0.22 * Math.max(0, c.rotor - 0.5) * 2; c.blades.visible = c.rotor < 0.85;
-    c.group.position.copy(c.pos); c.group.rotation.set(c.pitch, c.heading, c.roll, 'YXZ');
+    c.group.position.copy(c.pos); c.group.rotation.set(c.pitch, c.heading, c.roll, 'YXZ'); c.beacon.material.emissiveIntensity = (A.t * 1.3) % 1 < 0.12 ? 4 : 0.2;
     if (c.light) { c.light.visible = !!A.W.night && !c.dead && c.st !== 'parked' && c.st !== 'landed'; if (c.light.visible) { c.light.target.position.copy(A.ctx.player.position); c.light.target.updateMatrixWorld(); } } }
   else { c.group.position.copy(c.pos); c.group.rotation.set(0, c.heading, 0); c.turretG.rotation.y = c.turret; c.barrel.rotation.x = c.gunPitch || 0;
-    c.recoil = Math.max(0, (c.recoil || 0) - dt * 3); c.barrel.position.z = -1.7 + c.recoil * 0.5; c.treadT = (c.treadT || 0) + Math.abs(c.speed) * dt; }
+    c.recoil = Math.max(0, (c.recoil || 0) - dt * 3); c.barrel.position.z = c.barrelZ + c.recoil * 0.5; c.treadT = (c.treadT || 0) + c.speed * dt; tankRunningGear(c); }
   if (c.flashT > 0) { c.flashT -= dt; }
 }
 function charred(c) { const m = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 }); c.group.traverse((o) => { if (o.isMesh && o.material?.visible !== false && !o.material?.transparent) o.material = m; }); }
 function dispose(c) { A.world.scene.remove(c.group); for (const m of c.hits || []) { const i = A.ctx.raycastTargets.indexOf(m); if (i > -1) A.ctx.raycastTargets.splice(i, 1); } unpark(c); c.group.traverse((o) => { if (o.isMesh && o.geometry !== SHELL_GEO) o.geometry.dispose?.(); }); }
 
-// ---- models (facing -z, like the cars) --------------------------------------------------------------------------------------
-let HM = null;
-function heliMats() { if (HM) return HM; const S = (c, r = 0.45, m = 0.2) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
-  return (HM = { white: S(0xf2f3f5, 0.35, 0.25), blue: S(0x1b3c94, 0.4, 0.3), glass: S(0x0d1622, 0.08, 0.6), dark: S(0x2a2c30, 0.5, 0.7), blur: new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide }), decal: decalMat() }); }
-function decalMat() { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const g = cv.getContext('2d'); g.fillStyle = '#1b3c94'; g.font = '900 52px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('NYPD', 128, 34);
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.4, polygonOffset: true, polygonOffsetFactor: -2 }); }
-function heliModel() {
-  const M = heliMats(), lite = !!A.ctx.lite, group = new THREE.Group(), G = new Map(), put = (m, g, x, y, z, rx = 0, ry = 0, rz = 0) => { g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); (G.get(m) || G.set(m, []).get(m)).push(g.index ? g.toNonIndexed() : g); };
-  { const g = new THREE.SphereGeometry(1.25, 16, 12); g.scale(1.05, 1.0, 1.85); put(M.white, g, 0, 1.6, 0); }
-  { const g = new THREE.SphereGeometry(1.2, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42); g.scale(1.02, 0.95, 1.2); put(M.glass, g, 0, 1.55, -0.95, -Math.PI / 2 + 0.35); }
-  put(M.blue, new THREE.BoxGeometry(2.66, 0.32, 3.4), 0, 1.25, 0.1);
-  put(M.white, new THREE.CylinderGeometry(0.2, 0.42, 5.4, 10), 0, 1.85, 4.1, Math.PI / 2);
-  put(M.blue, new THREE.BoxGeometry(0.12, 1.5, 0.9), 0, 2.5, 6.55, 0.25); put(M.blue, new THREE.BoxGeometry(1.7, 0.08, 0.45), 0, 1.9, 5.7);
-  put(M.white, new THREE.BoxGeometry(1.0, 0.55, 1.8), 0, 2.72, 0.45); put(M.dark, new THREE.CylinderGeometry(0.1, 0.12, 0.6, 8), 0, 3.1, 0);
-  for (const s of [-1, 1]) { put(M.dark, new THREE.CylinderGeometry(0.06, 0.06, 3.8, 6), s * 0.95, 0.08, 0, Math.PI / 2); for (const z of [-0.8, 0.8]) put(M.dark, new THREE.BoxGeometry(0.07, 0.95, 0.07), s * 0.9, 0.52, z, 0, 0, s * 0.18);
-    put(M.dark, new THREE.BoxGeometry(0.9, 0.1, 0.3), s * 1.3, 1.0, -0.2); put(M.dark, new THREE.BoxGeometry(0.28, 0.28, 0.8), s * 1.75, 0.95, -0.3);
-    for (const k of [-0.06, 0.06]) put(M.dark, new THREE.CylinderGeometry(0.045, 0.045, 1.3, 6), s * 1.75 + k, 0.95, -1.1, Math.PI / 2); }
-  for (const [m, list] of G) { const mesh = new THREE.Mesh(mergeGeometries(list, false), m); mesh.castShadow = !lite; group.add(mesh); }
-  for (const s of [-1, 1]) { const d = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.38), M.decal); d.position.set(s * 1.33, 1.62, 0.35); d.rotation.y = s * Math.PI / 2; group.add(d); }
-  const rotorG = new THREE.Group(); rotorG.position.set(0, 3.38, 0); group.add(rotorG);
-  const blades = new THREE.Mesh(mergeGeometries([new THREE.BoxGeometry(10.6, 0.05, 0.3), new THREE.BoxGeometry(0.3, 0.05, 10.6)], false), M.dark); rotorG.add(blades);
-  const blur = new THREE.Mesh(new THREE.CircleGeometry(5.3, 28).rotateX(-Math.PI / 2), M.blur.clone()); rotorG.add(blur);
-  const tailG = new THREE.Group(); tailG.position.set(0.18, 2.55, 6.6); group.add(tailG); tailG.add(new THREE.Mesh(mergeGeometries([new THREE.BoxGeometry(0.04, 1.5, 0.14), new THREE.BoxGeometry(0.04, 0.14, 1.5)], false), M.dark));
-  let light = null; if (!lite) { light = new THREE.SpotLight(0xf4f7ff, 900, 120, 0.22, 0.5, 1.2); light.position.set(0, 0.8, -2); light.visible = false; group.add(light); group.add(light.target); }
-  return { group, rotorG, tailG, blades, blur, light };
-}
-function tankModel() {
-  const lite = !!A.ctx.lite, S = (c, r = 0.75, m = 0.25) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
-  const M = { olive: S(0x4f5532), dark: S(0x1f201c, 0.9, 0.2), steel: S(0x3a3d35, 0.6, 0.5) };
-  const group = new THREE.Group(), G = new Map(), put = (m, g, x, y, z, rx = 0, ry = 0, rz = 0) => { g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); (G.get(m) || G.set(m, []).get(m)).push(g.index ? g.toNonIndexed() : g); };
-  put(M.olive, new THREE.BoxGeometry(3.5, 1.0, 6.9), 0, 1.15, 0.2); put(M.olive, new THREE.BoxGeometry(3.5, 0.8, 1.4), 0, 1.25, -3.55, -0.55);
-  for (const s of [-1, 1]) { put(M.dark, new THREE.BoxGeometry(0.75, 1.1, 7.6), s * 2.0, 0.6, 0); put(M.olive, new THREE.BoxGeometry(0.1, 0.65, 7.0), s * 2.42, 1.05, 0);
-    for (let i = 0; i < 7; i++) put(M.steel, new THREE.CylinderGeometry(0.36, 0.36, 0.2, 10), s * 2.4, 0.45, -3 + i, 0, 0, Math.PI / 2); }
-  for (const [m, list] of G) { const mesh = new THREE.Mesh(mergeGeometries(list, false), m); mesh.castShadow = !lite; mesh.receiveShadow = true; group.add(mesh); }
-  const turretG = new THREE.Group(); turretG.position.set(0, 1.65, 0.4); group.add(turretG);
-  const T = new Map(), tput = (m, g, x, y, z, rx = 0, ry = 0) => { g.rotateX(rx); g.rotateY(ry); g.translate(x, y, z); (T.get(m) || T.set(m, []).get(m)).push(g.index ? g.toNonIndexed() : g); };
-  tput(M.olive, new THREE.BoxGeometry(2.8, 0.8, 3.4), 0, 0.4, 0.3); tput(M.olive, new THREE.BoxGeometry(2.4, 0.7, 1.0), 0, 0.38, -1.6, 0.3);
-  tput(M.steel, new THREE.CylinderGeometry(0.42, 0.42, 0.25, 12), 0.6, 0.92, 0.6); tput(M.steel, new THREE.BoxGeometry(0.5, 0.4, 0.8), -0.85, 0.95, 1.2);
-  for (const [m, list] of T) { const mesh = new THREE.Mesh(mergeGeometries(list, false), m); mesh.castShadow = !lite; turretG.add(mesh); }
-  const barrel = new THREE.Group(); barrel.position.set(0, 0.45, -1.7); turretG.add(barrel);
-  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 5.2, 10).rotateX(Math.PI / 2).translate(0, 0, -2.6), M.steel); tube.castShadow = !lite; barrel.add(tube);
-  const mant = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.5), M.olive); barrel.add(mant);
-  const gunTip = new THREE.Object3D(); gunTip.position.set(0, 0, -5.4); barrel.add(gunTip);
-  return { group, turretG, barrel, gunTip };
-}
