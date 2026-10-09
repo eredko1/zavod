@@ -12,6 +12,7 @@ import { W8 } from './w8th.js';
 import { hangkit as K } from '../hangkit.js';
 import { makeR160, drawLED, rideAudio, pa } from './r160.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Batch } from '../sbu/geo.js';
 import { buildYard } from './yard.js';
 
 const CAR = 18.4, NCAR = 6, LEN = CAR * NCAR, RAIL = 7.5, FLOOR = 1.1;   // car floor = platform height above top of rail
@@ -734,22 +735,43 @@ function chime() {   // the R160 "ding-dong" (two falling sine tones)
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // el structure where coney/city.js doesn't build one (east of the play area): bents every 12 m, girders, ties
+/** the el out on the line, NYC style: a steel tie deck over both tracks on plate girders (outer pair + a shared centre girder),
+ *  stringers under the rails, running rails; a bent every 12 m (two columns, cap girder, knee braces), no columns in the
+ *  street (the girders span it). Lines that share an alignment (the D and the N) build it once. */
+const EL_SEEN = new Set();
 function buildEl(world, P) {
-  const { scene } = world; const green = new THREE.MeshStandardMaterial({ color: 0x3f5a47, roughness: 0.7, metalness: 0.35 }), ties = new THREE.MeshStandardMaterial({ color: 0x4a3b2e, roughness: 0.95 });
-  const gs = [], ts = [];
+  const M = world.mats, lite = !!R.ctx.lite; if (!M?.elGirder) return;
+  const B = new Batch(world, M, 'viaductLine'), sg = R.sideSign || 1, G2 = TRACK_GAP / 2;
   const skip = (p) => (p.x < 300 && p.z > -672 && Math.abs(p.y - RAIL) < 0.3) || (Math.abs(p.x - 365) < 110 && p.z > -175 && p.z < -90);   // city.js covers the west at rail height (the ramps up to W 8 St's upper level are ours); W 8 St builds its own
-  for (let i = 0; i < P.length - 1; i += 6) {
-    const a = P[i], b = P[Math.min(P.length - 1, i + 6)]; if (skip(a)) continue;
-    const ang = Math.atan2(b.x - a.x, b.z - a.z), L = Math.hypot(b.x - a.x, b.z - a.z);
-    // two tracks: the line's own and, TRACK_GAP to the side the trains back to Stillwell keep to, theirs (the deck spans both). The
-    // offset is along the left normal of the way out: (-cos ang, sin ang) in x / z, times sideSign
-    const mo = -(R.sideSign || 1) * TRACK_GAP / 2, cx = (a.x + b.x) / 2 + Math.cos(ang) * mo, cz = (a.z + b.z) / 2 - Math.sin(ang) * mo, half = 2.4 + TRACK_GAP / 2;
-    for (const o of [-half, half]) { const gd = new THREE.BoxGeometry(0.5, 0.9, L); gd.rotateY(ang); gd.translate(cx + Math.cos(ang) * o, a.y - 0.8, cz - Math.sin(ang) * o); gs.push(gd); }
-    const td = new THREE.BoxGeometry(5.6 + TRACK_GAP, 0.25, L); td.rotateY(ang); td.translate(cx, a.y - 0.2, cz); ts.push(td);
-    if ((i / 6) % 2 === 0) for (const o of [-(half + 0.8), half + 0.8]) { const c = new THREE.BoxGeometry(0.6, a.y - 1.2, 0.6); c.translate(a.x + Math.cos(ang) * (mo + o), (a.y - 1.2) / 2, a.z - Math.sin(ang) * (mo + o)); gs.push(c); }
+  const segD2 = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2; };
+  const inRoad = (x, z) => OSM.r.some((r) => { const h = r.w / 2; for (let i = 0; i + 1 < r.p.length; i++) if (segD2(x, z, r.p[i], r.p[i + 1]) < h * h) return true; return false; });
+  let k = 0;
+  for (let i = 0; i + 3 < P.length; i += 3, k++) {
+    const a = P[i], b = P[i + 3]; if (skip(a) || skip(b)) continue;
+    const key = `${Math.round((a.x + b.x) / 5)},${Math.round((a.z + b.z) / 5)},${Math.round((a.y + b.y))}`; if (EL_SEEN.has(key)) continue; EL_SEEN.add(key);
+    const ang = Math.atan2(b.x - a.x, b.z - a.z), L = Math.hypot(b.x - a.x, b.z - a.z), Y = (a.y + b.y) / 2, pitch = -Math.atan2(b.y - a.y, L);
+    const ox = Math.cos(ang), oz = -Math.sin(ang), mo = -sg * G2, cx = (a.x + b.x) / 2 + ox * mo, cz = (a.z + b.z) / 2 + oz * mo;   // centre of the two-track pair
+    const seg = (u0, u1, y0, y1, key, tie = false) => { const g = new THREE.BoxGeometry(u1 - u0, y1 - y0, L + 0.06);
+      if (tie) { const uv = g.attributes.uv, pp = g.attributes.position; for (let q = 0; q < uv.count; q++) uv.setXY(q, (pp.getX(q) + (u1 - u0) / 2) / 5, pp.getZ(q) / 2.4); }
+      g.translate((u0 + u1) / 2, (y0 + y1) / 2 - Y, 0); g.rotateX(pitch); g.rotateY(ang); g.translate(cx, Y, cz); B.add(key, g, tie ? { uv: false } : {}); };
+    const W = G2 + 2.1;
+    for (const u of [-W, W]) seg(u - 0.16, u + 0.16, Y - 1.55, Y - 0.15, 'elGirder');                    // outer plate girders
+    seg(-0.14, 0.14, Y - 1.55, Y - 0.2, 'elGirder');                                                      // the shared centre girder
+    seg(-W - 0.35, -W + 0.35, Y - 1.62, Y - 1.5, 'elGirder'); seg(W - 0.35, W + 0.35, Y - 1.62, Y - 1.5, 'elGirder');   // bottom flanges
+    if (!lite) for (const t of [-G2, G2]) for (const r of [-0.75, 0.75]) seg(t + r - 0.12, t + r + 0.12, Y - 0.72, Y - 0.25, 'elGirder');   // stringers
+    seg(-W - 0.2, W + 0.2, Y - 0.25, Y - 0.1, 'elSoffit', true);                                         // the tie deck
+    if (!lite) for (const t of [-G2, G2]) for (const r of [-0.72, 0.72]) seg(t + r - 0.04, t + r + 0.04, Y - 0.1, Y + 0.02, 'steel');   // running rails
+    // a bent every 12 m: two columns (not in the street), the cap girder, knee braces
+    if (k % 2 === 0) {
+      const ys = Y - 1.62; seg(-W - 0.5, W + 0.5, ys - 0.5, ys, 'elGirder');
+      for (const u of [-(W + 0.3), W + 0.3]) { const px = cx + ox * u, pz = cz + oz * u; if (inRoad(px, pz)) continue;
+        const c = new THREE.BoxGeometry(0.5, ys - 0.5, 0.5); c.translate(px, (ys - 0.5) / 2, pz); B.add('elGirder', c);
+        const pl = new THREE.BoxGeometry(0.9, 0.12, 0.9); pl.translate(px, 0.06, pz); B.add('elGirder', pl);
+        if (!lite) { const kb = new THREE.BoxGeometry(0.14, 2.0, 0.18); kb.rotateZ(Math.sign(u) * 0.75); kb.translate(u - Math.sign(u) * 0.6, ys - 1.1 - Y, 0); kb.rotateY(ang); kb.translate(cx, Y, cz); B.add('elGirder', kb); }
+        if (px > -460 && px < 460 && pz > -560 && pz < 160) world.box([px - 0.3, 0, pz - 0.3], [px + 0.3, ys - 0.4, pz + 0.3]); }
+    }
   }
-  const merge = (list, m) => { if (!list.length) return; const g = mergeAll(list); const me = new THREE.Mesh(g, m); me.castShadow = true; me.receiveShadow = true; scene.add(me); };
-  merge(gs, green); merge(ts, ties);
+  B.flush({ shadow: !lite });
 }
 function mergeAll(list) {   // tiny merge (positions + normals) so we don't need the addon here
   let n = 0; for (const g of list) n += (g.index ? g.index.count : g.attributes.position.count);
