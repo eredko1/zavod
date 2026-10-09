@@ -279,11 +279,13 @@ function update(dt) {
   // doors: open 2 s into a dwell, close (chime) 4 s before it ends
   const open = R.drive ? R.drive.doors : l.kind === 'dwell' && !l.stop.hidden ? Math.max(0, Math.min(1, (t - l.t0 - 1.5) / 1.2, (l.t1 - 3 - t) / 1.2)) : 0;
   const dwellSide = l.kind === 'dwell' && !l.stop.hidden ? sideAt(l.stop) : 0; R.lastOpen = [+open.toFixed(2), dwellSide];
-  const cam = ctx.camera.position, far = ctx.lite ? 320 : 900, lat = R.drive ? 0 : lateralAt(t);
+  const cam = ctx.camera.position, far = ctx.lite ? 320 : 900, lat0 = R.drive ? 0 : lateralAt(t) * R.sideSign;
+  if (!R.drive) holdForDriver(dt);
   R.cars.forEach((g, c) => {
     const sm = h - (c + 0.5) * CAR; ptAt(sm + CAR / 2 - 2.6, _a); ptAt(sm - CAR / 2 + 2.6, _b);   // the two trucks sit on the rails; the body hangs between them
     g.position.copy(_a).add(_b).multiplyScalar(0.5); const dx = _a.x - _b.x, dz = _a.z - _b.z, dy = _a.y - _b.y;
-    if (lat) { const hl = Math.hypot(dx, dz) || 1; g.position.x += -dz / hl * lat * R.sideSign; g.position.z += dx / hl * lat * R.sideSign; }   // on the other track, heading back
+    const lat = R.drive ? driveLatAt(sm) : lat0;
+    if (lat) { const hl = Math.hypot(dx, dz) || 1; g.position.x += -dz / hl * lat; g.position.z += dx / hl * lat; }   // on the other track, heading back (driving: whichever is on your right)
     g.rotation.set(0, Math.atan2(dx, dz), 0); g.rotateX(-Math.atan2(dy, Math.hypot(dx, dz)));
     const sway = Math.sin(now() * 2.1 + c * 1.7) * 0.004 * Math.min(1, speed / 6) + Math.sin(now() * 0.9 + c) * 0.0015 * Math.min(1, speed / 6) + curve * 0.01; g.rotateZ(sway);   // a little roll: more at speed, leaning out on the curves
     // rail joints every 11.9 m (39 ft rails): each truck dips as its wheels cross one (visual only; riders feel it through the camera)
@@ -367,14 +369,14 @@ const BOARD_REACH = 9;
 // leaves the shared timetable on your screen only (everyone else keeps seeing the scheduled one).
 // the operator's cab: the right-hand side of the very end of the lead car, facing down the track
 const CAB_Z = CAR / 2 - 0.85, CAB_X = 0.95, CAB_REACH = CAR / 2 - 3.6;
-const D_ACC = 1.2, D_BRK = 1.4, D_EMERG = 2.7, D_DRAG = 0.04, LIM_LINE = 18, LIM_SLOW = 6.7, LIM_TRIP = 2.2, LEVER_RATE = 1.6, BERTH = 5;
+const D_ACC = 1.2, D_BRK = 1.6, D_EMERG = 2.7, D_DRAG = 0.04, LIM_LINE = 22, LIM_SLOW = 11, LIM_YARD = 8, LIM_TRIP = 4.5, TRIP_HOLD = 1.0, LEVER_RATE = 1.6, BERTH = 5;   // 50 mph line, 25 through stations and curves, 18 in the yard; trips only after 1 s at 10 mph over
 const mph = (v) => Math.round(v * 2.237);
 function takeControls(dir) {
   const s0 = headS(), T = thruRoute(); R.base = { P: R.P, L: R.L, stops: R.stops };
   if (T) { R.P = T.P; R.L = T.L; R.stops = T.stops; } R.stopsSorted = null;
   const s = s0 + (T ? T.prefix : 0);
   R.drive = { s, v: 0, lever: 0, dir, doors: 0, wantDoors: false, tripped: false, at: null, stopped: true, t0: now(), route0: { P: R.P, L: R.L, stops: R.stops }, shift: 0, yk: null };
-  R.drive.hasYard = !!yardAt(R.P);
+  R.drive.hasYard = !!yardAt(R.P); R.drive.sB = T ? T.prefix : null; R.drive.sP = T ? (LINES.find((q) => q.id === T.via)?.sideSign || 1) : 1; R.drive.dirSm = dir;
   faceTrack(dir);
   K.toast(`You're driving the ${R.id}. W / S (or the stick): power ↔ brake · SPACE emergency · F: doors at a platform, or get off anywhere · R: change ends${T ? ` · through Stillwell onto the ${T.via}` : ''}${R.drive.hasYard ? ' · Y: the switch north of Neptune Ave, main line or Coney Island Yard' : ''}`, 6400);
   driveHud(true);
@@ -475,8 +477,37 @@ function driveKeys(inp, playing) {
   if (P.has('KeyY')) { P.delete('KeyY'); cycleThroat(); }
   if (P.has('KeyR')) { P.delete('KeyR'); if (D.stopped && D.doors < 0.05) { D.dir = -D.dir; D.lever = 0; faceTrack(D.dir); K.toast(`Changed ends: now heading ${D.dir > 0 ? R.cfg.bound.out : R.cfg.bound.in}.`, 1800); } else K.toast('Stop with the doors closed to change ends.', 1500); }
 }
+// ---- keep right: on every two-track stretch your train runs on the track to the right of the way it's heading (the line's own
+// track out, the other one back; through-running, the partner's the other way round), easing across over ~2 s when you change
+// ends, and on the single track through Stillwell, at the ends of the route and in the yard
+function driveLatAt(s) {
+  const D = R.drive; if (!D) return 0;
+  const sB = D.sB != null ? D.sB + (D.yk != null && !D.yUp ? D.shift : 0) : -Infinity, back = Math.max(0, -D.dirSm), fwd = Math.max(0, D.dirSm);
+  const side = s >= sB ? back * (R.sideSign || 1) : fwd * -(D.sP || 1); if (!side) return 0;
+  let d = Math.min(s, R.L - s); if (D.sB != null) d = Math.min(d, Math.abs(s - sB));
+  for (const q of R.stops) if (q.id === 'STW') d = Math.min(d, Math.abs(s - q.s));
+  if (D.yk != null) { if (D.yUp ? s > D.ysJ : s < D.ysJ) return 0; d = Math.min(d, Math.abs(s - D.ysJ)); }
+  const k = Math.max(0, Math.min(1, d / SIDE_FADE)); return TRACK_GAP * side * k * k * (3 - 2 * k);
+}
+/** car-centre positions of every other train, for the driver's buffers and the timetabled trains' holds */
+function nearTrain(g, list, ahead) {
+  // the closest other car on the same track (|offset across| < 2.5 m) within `ahead` m along g's axis (signed)
+  const e = g.matrixWorld.elements, fx = e[8], fz = e[10], fl = Math.hypot(fx, fz) || 1, ux = fx / fl, uz = fz / fl; let best = null;
+  for (const L of LINES) { if (L === R || !list(L)) continue; for (const o of L.cars) { if (!o.visible && !R.aboard) continue;
+    const dx = o.position.x - g.position.x, dz = o.position.z - g.position.z, along = dx * ux + dz * uz, across = Math.abs(-dx * uz + dz * ux);
+    if (across < 2.5 && Math.abs(o.position.y - g.position.y) < 3 && Math.abs(along) < ahead && (!best || Math.abs(along) < Math.abs(best.along))) best = { along, L }; } }
+  return best;
+}
+/** a timetabled train that would run into the one you're driving waits (its clock stops) until the way is clear */
+function holdForDriver(dt) {
+  if (!LINES.some((L) => L.drive)) { R.lastGap = null; return; }
+  let gap = 1e9; for (const g of R.cars) { const q = nearTrain(g, (L) => L.drive, CAR + 14); if (q) gap = Math.min(gap, Math.abs(q.along)); }
+  const closing = R.lastGap != null && gap < R.lastGap - 0.01; R.lastGap = gap;
+  if (gap < CAR + 12 && (closing || R.held)) { R.off -= dt; R.held = gap < CAR + 12; } else R.held = false;
+}
 function driveStep(dt) {
   const D = R.drive, ctx = R.ctx, inp = ctx.input; ctx.trainCab = true; if (!dt) return;
+  D.dirSm += Math.max(-dt * 0.5, Math.min(dt * 0.5, D.dir - D.dirSm));
   // the lever: W / S nudge it, a stick sets it directly (up = power, down = brake)
   const ay = inp?.touch?.axis?.y || 0;
   if (Math.abs(ay) > 0.15) D.lever = Math.max(-1, Math.min(1, -ay)); else { if (inp?.forward) D.lever = Math.min(1, D.lever + LEVER_RATE * dt); if (inp?.back) D.lever = Math.max(-1, D.lever - LEVER_RATE * dt); }
@@ -487,14 +518,18 @@ function driveStep(dt) {
   // traction / braking
   let a = 0;
   if (emerg) a = -D_EMERG; else if (D.lever > 0.05) a = D.doors > 0.02 ? 0 : D.lever * D_ACC * Math.max(0, 1 - D.v / (LIM_LINE * 1.25)); else if (D.lever < -0.05) a = D.lever * D_BRK; else a = -D_DRAG;
-  D.v = Math.max(0, D.v + a * dt); D.s += D.dir * D.v * dt;
+  D.v = Math.max(0, D.v + a * dt); const s0 = D.s; D.s += D.dir * D.v * dt;
+  { const lead = R.cars[D.dir > 0 ? 0 : NCAR - 1]; lead.updateMatrixWorld(); const q = nearTrain(lead, (L) => L !== R, CAR + 4);   // another train dead ahead on your track
+    const ahead = q && (D.dir > 0 ? q.along > 0 : q.along < 0) && Math.abs(q.along) < CAR + 2;
+    if (ahead && D.v > 0.05) { if (D.v > 3) { K.toast(`*CLANG* — into the back of the ${q.L.id}.`, 1800); ctx.player?.damage?.(Math.min(30, D.v * 2)); } D.s = s0; D.v = 0; } }
   // bumper blocks: the ends of the track
   const lo = LEN + 2, hi = R.L - 2; if (D.s < lo || D.s > hi) { if (D.v > 2) { K.toast('*BANG* — into the bumper block.', 2000); ctx.player?.damage?.(Math.min(40, D.v * 3)); } D.s = Math.max(lo, Math.min(hi, D.s)); D.v = 0; }
   // speed limits: slow through stations and sharp curves; over the limit by LIM_TRIP and the train trips (emergency until it stops)
-  const nearStn = stopsSorted().some((q) => !q.hidden && Math.abs(q.s - D.s) < 70), curveK = Math.abs(R.curveNow || 0);
+  const nearStn = stopsSorted().some((q) => !q.hidden && Math.abs(q.s - D.s) < 45), curveK = Math.abs(R.curveNow || 0);
   const yard = D.yk != null && (D.yUp ? D.s > D.ysJ - 40 : D.s - LEN < D.ysJ + 40);   // yard speed past the switch
-  D.limit = nearStn || yard || curveK > 0.12 ? LIM_SLOW : LIM_LINE;
-  if (!D.tripped && D.v > D.limit + LIM_TRIP) { D.tripped = true; K.toast(`TRIPPED — ${mph(D.v)} mph in a ${mph(D.limit)} zone. Emergency brakes until you stop.`, 3000); }
+  D.limit = yard ? LIM_YARD : nearStn || curveK > 0.2 ? LIM_SLOW : LIM_LINE;
+  D.overT = D.v > D.limit + LIM_TRIP ? (D.overT || 0) + dt : 0;
+  if (!D.tripped && D.overT > TRIP_HOLD) { D.tripped = true; K.toast(`TRIPPED — ${mph(D.v)} mph in a ${mph(D.limit)} zone. Emergency brakes until you stop.`, 3000); }
   if (D.tripped && D.v === 0) D.tripped = false;
   // berthed at a platform: stopped with the train's head on the station mark
   D.stopped = D.v < 0.05;
@@ -566,7 +601,7 @@ function hud(t) {
         const brd = LINES.find((L) => L.boardable);
         let h = '';
         if (brd) h = `${key} to board the ${brd.id} — or just walk in through the open doors`;
-        else if (st.id === 'STW') h = st.plat ? (st.isl === '-' ? 'parked trains only — D: 2nd island · F: 3rd · Q: 4th from Stillwell Ave' : `the ${st.isl} boards here`) : 'through the turnstiles → stairs from Stillwell Ave: D 2nd bank · F 3rd · Q 4th';
+        else if (st.id === 'STW') h = st.plat ? (st.isl === '-' ? 'parked trains only — D: 2nd island · F: 3rd · Q: 4th from Stillwell Ave' : (st.isl ? `the ${st.isl} boards here` : 'D 2nd island · F 3rd · Q 4th from Stillwell Ave')) : 'through the turnstiles → stairs from Stillwell Ave: D 2nd bank · F 3rd · Q 4th';
         else if (st.id === 'W8') h = w8Hint(p);
         else h = st.plat ? `${deps[0]?.line || ''} back to Coney Island stops here` : 'stairs at the end of the platforms';
         html = lines + `<span class="h">${h}</span>`;
@@ -702,7 +737,7 @@ function chime() {   // the R160 "ding-dong" (two falling sine tones)
 function buildEl(world, P) {
   const { scene } = world; const green = new THREE.MeshStandardMaterial({ color: 0x3f5a47, roughness: 0.7, metalness: 0.35 }), ties = new THREE.MeshStandardMaterial({ color: 0x4a3b2e, roughness: 0.95 });
   const gs = [], ts = [];
-  const skip = (p) => (p.x < 300 && p.z > -672) || (Math.abs(p.x - 365) < 110 && p.z > -175 && p.z < -90);   // city.js covers the west; W 8 St builds its own
+  const skip = (p) => (p.x < 300 && p.z > -672 && Math.abs(p.y - RAIL) < 0.3) || (Math.abs(p.x - 365) < 110 && p.z > -175 && p.z < -90);   // city.js covers the west at rail height (the ramps up to W 8 St's upper level are ours); W 8 St builds its own
   for (let i = 0; i < P.length - 1; i += 6) {
     const a = P[i], b = P[Math.min(P.length - 1, i + 6)]; if (skip(a)) continue;
     const ang = Math.atan2(b.x - a.x, b.z - a.z), L = Math.hypot(b.x - a.x, b.z - a.z);
