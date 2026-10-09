@@ -592,6 +592,7 @@ function buildLights(world, R, sprawl, sky) {
   const sceneLamps = []; for (const [x, y, z, n] of cl.values()) sceneLamps.push([x / n, y / n - 0.2, z / n]);
   const lampDedup = []; for (const p of sceneLamps) if (!lampDedup.some((q) => Math.abs(q[0] - p[0]) < 1 && Math.abs(q[2] - p[2]) < 1 && Math.abs(q[1] - p[1]) < 1.5)) lampDedup.push(p);
   // the Luna towers' entrance canopies (downlights under the steel canopy, a pool on the path)
+  for (const [x, y, z] of world.W.extraLamps || []) lampDedup.push([x, y - 0.2, z]);   // Brighton Beach Av's lamps (its own materials)
   for (const t of world.lunaTowers || []) for (const d of t.lobby.doors) { const o = d.outside.clone().sub(d.plane).setY(0).normalize(); lampDedup.push([d.plane.x + o.x * 3.2, 2.9, d.plane.z + o.z * 3.2]); }
   out.push(points(world, [...lamps, ...lampDedup.map(([x, y, z]) => [x, y, z, [1, 0.82, 0.55], 1.2, -1])], { name: 'lamps', size: 1.6, min: 1.5, I: 1.2 }));
   // light pools on the ground under the scene's lamps (additive discs)
@@ -788,7 +789,7 @@ function buildCycle(world, fw) {
     // shared shader uniforms
     U.uSunDir.value.copy(dir); U.uSunCol.value.copy(K.keyC).multiplyScalar(K.key);
     U.uAmbSky.value.copy(K.hS).multiplyScalar(K.hI * 3.14159 + K.env * 1.2); U.uAmbGnd.value.copy(K.hG).multiplyScalar(K.hI * 3.14159 + K.env * 0.6);
-    U.uFogCol.value.copy(K.fog); U.uFogD.value = K.fogD; U.uNight.value = K.night; U.uLamp.value = K.lamp;
+    U.uFogCol.value.copy(K.fog); U.uFogD.value = K.fogD; U.uNight.value = K.night; U.uLamp.value = K.lamp; world.W.night = K.night; world.W.lampK = K.lamp;
     ctx.renderer.getDrawingBufferSize(size); U.uPx.value = size.y / (2 * Math.tan((ctx.camera.fov || 70) * D2R / 2));
     // sky dome + ocean
     sky.u.uSky.value.copy(K.zen); sky.u.uHorizon.value.copy(K.hor); sky.u.uGlow.value.copy(K.glow).multiplyScalar(Math.max(0, 1 - Math.max(0, s - 0.55) * 3)); sky.u.uDisc.value.copy(K.disc).multiplyScalar(8);
@@ -800,6 +801,7 @@ function buildCycle(world, fw) {
     // night emissives
     if (Math.abs(s - last) > 0.002) { last = s;
       for (const b of boost) b.m.emissiveIntensity = b.e0 * (1 + b.f * K.lamp);
+      for (const g of world.W.nightGlow || []) g.m.emissiveIntensity = g.e0 * (1 + g.f * K.lamp);   // shop signs, windows, billboards (fronts.js, brighton.js …)
       for (const m of nightWin) m.emissiveIntensity = 0.9 * K.night;
       for (const f of foam) f.m.color.copy(f.c0).multiplyScalar(1 - 0.88 * K.night).lerp(K.hor, 0.15);
     }

@@ -75,6 +75,7 @@ export function buildBrighton(world) {
   SHOPS.forEach((s, i) => { const x = (i % 4) * cw, y = Math.floor(i / 4) * ch; drawSign(cg, x, y, cw, ch, s); cells.push({ u0: x / CAN.width, u1: (x + cw) / CAN.width, v0: 1 - (y + ch) / CAN.height, v1: 1 - y / CAN.height }); });
   { const i = SHOPS.length, x = (i % 4) * cw, y = Math.floor(i / 4) * ch; drawStation(cg, x, y, cw, ch); cells.push({ u0: x / CAN.width, u1: (x + cw) / CAN.width, v0: 1 - (y + ch) / CAN.height, v1: 1 - y / CAN.height }); }
   const atlas = new THREE.CanvasTexture(CAN); atlas.colorSpace = THREE.SRGBColorSpace; atlas.anisotropy = 4; M.sign.map = atlas; M.sign.emissiveMap = atlas; M.sign.needsUpdate = true;
+  if (M.sign?.emissive) (W.nightGlow || (W.nightGlow = [])).push({ m: M.sign, e0: M.sign.emissiveIntensity, f: 6 });   // the shop signs light up after dark (horizon.js)
   const signQuad = (cell, w, h, x, y, z, ry) => { const g = new THREE.PlaneGeometry(w, h), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, cell.u0 + uv.getX(i) * (cell.u1 - cell.u0), cell.v0 + uv.getY(i) * (cell.v1 - cell.v0)); g.rotateY(ry); g.translate(x, y, z); return put(M.sign, g); };
 
   // ---- buildings: walk-ups with a shop on the ground floor facing the avenue; apartment blocks behind the south row ----
@@ -98,6 +99,10 @@ export function buildBrighton(world) {
     if (enter) { box(M.glass, x0 + 0.4, SW + 0.3, fz, dmid - 0.8, SW + 2.9, fz - sd * 0.02); box(M.glass, dmid + 0.8, SW + 0.3, fz, x1 - 0.4, SW + 2.9, fz - sd * 0.02); box(M.trim, dmid - 0.85, SW, fz - sd * 0.03, dmid - 0.8, SW + 2.9, fz - sd * 0.08, 0x2a2622); box(M.trim, dmid + 0.8, SW, fz - sd * 0.03, dmid + 0.85, SW + 2.9, fz - sd * 0.08, 0x2a2622); }
     else { box(M.glass, x0 + 0.4, SW + 0.3, fz, x1 - 0.4, SW + 2.9, fz - sd * 0.02);
       box(M.trim, (x0 + x1) / 2 - 0.55, SW, fz - sd * 0.03, (x0 + x1) / 2 + 0.55, SW + 2.4, fz - sd * 0.06, 0x2a2622); }
+    if (/ТАТЬЯНА|КАФЕ|ПИВО|ЛОМБАРД|ПЕЛЬМЕН|КОСМЕТИКА/.test(S[0]) && (W.brNeon || []).length < 6) { const col = [0xff3fa0, 0x3fd0ff, 0xffe04a, 0x7a5aff][(W.brNeon || []).length % 4], nm = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.4 }), sw2 = Math.min(x1 - x0 - 0.6, 9) / 2 + 0.12, zc = fz - sd * 0.12, y0 = SW + 2.92, y1 = SW + 4.18, gs = [];
+      for (const [a, b, c2, d2] of [[-sw2, y0, sw2, y0 + 0.06], [-sw2, y1 - 0.06, sw2, y1], [-sw2, y0, -sw2 + 0.06, y1], [sw2 - 0.06, y0, sw2, y1]]) { const g = new THREE.BoxGeometry(c2 - a, d2 - b, 0.05); g.translate((x0 + x1) / 2 + (a + c2) / 2, (b + d2) / 2, zc); gs.push(g); }
+      const nmesh = new THREE.Mesh(mergeGeometries(gs, false), nm); nmesh.name = 'brighton:neon'; scene.add(nmesh); (W.brNeon || (W.brNeon = [])).push({ m: nm, next: 3 + Math.random() * 6, off: 0 });
+      if (/ТАТЬЯНА|КАФЕ/.test(S[0])) for (let k = 0; k < 3; k++) (W.nightSpots || (W.nightSpots = [])).push({ x: (x0 + x1) / 2 + (k - 1) * 1.6, y: SW, z: zFace - sd * (2.4 + (k % 2) * 0.8), ry: sd > 0 ? 0 : Math.PI, pose: k === 1 ? 'phone' : 'stand', zone: 'nightlife' }); }
     signQuad(cells[si++ % SHOPS.length], Math.min(x1 - x0 - 0.6, 9), 1.1, (x0 + x1) / 2, SW + 3.55, fz - sd * 0.05, ry);
     if (rnd() < 0.45) { const aw = new THREE.BoxGeometry(x1 - x0 - 0.6, 0.06, 1.4); aw.rotateX(-sd * 0.3); aw.translate((x0 + x1) / 2, SW + 3.0, zFace - sd * 0.7); tint(aw, [0xb3121e, 0x1f4a2e, 0x1b3f9a, 0xd9a400][Math.floor(rnd() * 4)]); put(M.trim, aw); }
   };
@@ -133,7 +138,7 @@ export function buildBrighton(world) {
   }
 
   // ---- lamps, trees, hydrants on the avenue; parked cars along both kerbs ----
-  for (let x = 910; x < X1; x += 32) for (const sd of [-1, 1]) { const z = ZC + sd * (HALF + 0.6); box(M.steel, x - 0.07, 0, z - 0.07, x + 0.07, 8.2, z + 0.07, 0x2a2c2e); box(M.lamp, x - 0.2, 8.0, z - sd * 1.8 - 0.35, x + 0.2, 8.14, z - sd * 1.8 + 0.35); box(M.steel, x - 0.05, 8.1, z - sd * 1.8, x + 0.05, 8.2, z, 0x2a2c2e); wbox(x - 0.15, 0, z - 0.15, x + 0.15, 4, z + 0.15); }
+  for (let x = 910; x < X1; x += 32) for (const sd of [-1, 1]) { const z = ZC + sd * (HALF + 0.6); box(M.steel, x - 0.07, 0, z - 0.07, x + 0.07, 8.2, z + 0.07, 0x2a2c2e); box(M.lamp, x - 0.2, 8.0, z - sd * 1.8 - 0.35, x + 0.2, 8.14, z - sd * 1.8 + 0.35); (W.extraLamps || (W.extraLamps = [])).push([x, 8.0, z - sd * 1.8]); box(M.steel, x - 0.05, 8.1, z - sd * 1.8, x + 0.05, 8.2, z, 0x2a2c2e); wbox(x - 0.15, 0, z - 0.15, x + 0.15, 4, z + 0.15); }
   { const leaf = new THREE.IcosahedronGeometry(2.1, lite ? 0 : 1); const trees = []; for (const c of CROSS) for (let z = ZC + HALF + 30; z < BW.z0 - 10; z += 18) for (const sd of [-1, 1]) if (rnd() < 0.7) trees.push([c.x + sd * (CW + 1.3), z]);
     for (const [x, z] of trees) { box(M.bark, x - 0.14, 0, z - 0.14, x + 0.14, 3.4, z + 0.14, 0x6a5a44); wbox(x - 0.2, 0, z - 0.2, x + 0.2, 3, z + 0.2); }
     const im = new THREE.InstancedMesh(leaf, M.leaf, trees.length), o = new THREE.Object3D(), c = new THREE.Color(); trees.forEach(([x, z], i) => { o.position.set(x, 4.6, z); o.scale.set(1.2, 1, 1.2); o.rotation.y = rnd() * 6; o.updateMatrix(); im.setMatrixAt(i, o.matrix); c.setHSL(0.26 + rnd() * 0.05, 0.4, 0.2 + rnd() * 0.06); im.setColorAt(i, c); });
@@ -167,6 +172,8 @@ export function buildBrighton(world) {
       const onBench = i < n * 0.6, x = onBench ? 810 + 21 * Math.floor(2 + rnd() * 60) : 1010 + rnd() * (X1 - 1030), z = onBench ? BW.z0 + 1.55 : ZC + (rnd() < 0.5 ? -1 : 1) * (HALF + 2.5);
       const f = buildPerson({ avatar: onBench ? 'f09' : undefined, seed: 900 + i, pose: onBench ? 'sit' : undefined }); if (!f) continue;
       f.group.position.set(x, onBench ? 0.05 : SW, z); f.group.rotation.y = onBench ? 0 : rnd() * 6.28; scene.add(f.group); B.figs.push(f); } catch (e) { console.warn('[brighton] person', e); break; } } }
+  // the neon: on with the lamps, a flicker every few seconds
+  world.updaters.push((dt) => { const k = W.lampK ?? 0; for (const n of W.brNeon || []) { n.next -= dt; if (n.next <= 0) { n.off = 0.08 + Math.random() * 0.25; n.next = 3 + Math.random() * 6; } n.off -= dt; n.m.emissiveIntensity = (0.4 + 3.2 * k) * (n.off > 0 ? 0.15 + Math.random() * 0.3 : 1); } });
   world.updaters.push((dt) => { const p = ctx.player?.position; if (!p) return; const near = p.x > 700; for (const f of B.figs) { f.group.visible = near; if (near && Math.abs(f.group.position.x - p.x) < 60) f.update(dt, 0); }
     if (p.x > 900 && !B.hint) { B.hint = 1; ctx.hud?.toast?.('BRIGHTON BEACH — Little Odessa. Brighton Beach Ave under the el, the boardwalk to the south. West for Coney.', 4200); } if (p.x < 700) B.hint = 0; });
   if (typeof window !== 'undefined' && window.__game) window.__game.brighton = { zone: BR, ave: { x0: X0, x1: X1, z: ZC }, station: STN_X, cross: CROSS.map((c) => c.x), gh: (x, z) => W.groundHeight(x, z) };

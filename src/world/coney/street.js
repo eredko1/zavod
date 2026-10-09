@@ -278,7 +278,7 @@ export function buildStreet(world) {
 
   if (col.length) { const me = new THREE.Mesh(mergeGeometries(col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.2 })); me.name = 'street:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }
   // the walkers that wait for the WALK and the people behind the tables
-  st.crossers = crossers.length; try { addFolkSpots(world, [...crossers, ...sellers, ...(W.schoolKids || []), ...brSpots]); } catch (e) { console.warn('[street] folk', e); }
+  st.crossers = crossers.length; try { addFolkSpots(world, [...crossers, ...sellers, ...(W.schoolKids || []), ...brSpots, ...(W.nightSpots || [])]); } catch (e) { console.warn('[street] folk', e); }
   console.log('[street]', st.stops, 'stop signs ·', st.blades, 'name blades ·', st.heads, 'signal heads ·', st.poles, 'utility poles ·', st.bins, 'bins / planters / bollards / barrels ·', st.cars, 'parked on Surf ·', st.stalls, 'vendor tables ·', st.crossers, 'crosswalk walkers');
   W.street = st;
   if (typeof window !== 'undefined' && window.__game) window.__game.street = { stats: () => ({ ...st }), lamps: () => lamps.map((L) => ({ k: L.k, s: sigState(L), br: !!L.j.br })), heads: () => heads.slice(), stalls: () => stalls.slice() };
