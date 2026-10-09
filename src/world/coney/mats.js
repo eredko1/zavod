@@ -53,12 +53,21 @@ export function makeConeyMats(world) {
 
   // ---- far housing-tower facade: brick with a punched-window grid (4 bays x 4 floors per tile = 11.6 x 11.2 m), used on
   // plain blocks for everything outside the playable area (the full per-bay facade cost ~2M triangles for the backdrop)
-  for (const [key, base, mortar] of [['towerFarBrown', '#7a4a36', '#5e3a2c'], ['towerFarRed', '#8e4a38', '#6a372a'], ['towerFarTan', '#b89a7a', '#8e765e']]) {
+  // the near towers' walls (coney/city.js towerWall): buff and rust brick from the shared brick scans, white painted concrete
+  reg('brickBuff', Object.assign(M.brickStaller.clone(), { name: 'brickBuff' }), 'concrete', 1 / 1.6); M.brickBuff.color.set(0xe0c9a2);
+  reg('brickRust', Object.assign(M.brickRed.clone(), { name: 'brickRust' }), 'concrete', 1 / 1.6); M.brickRust.color.set(0xa8604a);
+  reg('concreteWhite', Object.assign(M.concrete.clone(), { name: 'concreteWhite' }), 'concrete', 1 / 2.5); M.concreteWhite.color.set(0xf1efe9);
+  for (const [key, base, mortar] of [['towerFarBrown', '#8a5a42', '#6a4432'], ['towerFarRed', '#874a3a', '#653629'], ['towerFarTan', '#b89a7a', '#8e765e'], ['towerFarBuff', '#cdb48e', '#a58e6c']]) {
     const [c, g] = canvas(512, 512); g.fillStyle = base; g.fillRect(0, 0, 512, 512);
     for (let i = 0; i < 1600; i++) { g.fillStyle = `rgba(${R() < 0.5 ? '40,24,18' : '200,160,130'},${R() * 0.1})`; g.fillRect(R() * 512, R() * 512, 6 + R() * 10, 3); }
     for (let f = 0; f < 4; f++) { g.fillStyle = mortar; g.fillRect(0, f * 128 + 118, 512, 6); for (let b = 0; b < 4; b++) { const lit = R() < 0.12; g.fillStyle = lit ? '#e8d4a0' : (R() < 0.5 ? '#2a3238' : '#3a444c'); g.fillRect(b * 128 + 30, f * 128 + 30, 68, 70); g.fillStyle = 'rgba(230,230,225,0.8)'; g.fillRect(b * 128 + 26, f * 128 + 100, 76, 5); g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(b * 128 + 62, f * 128 + 30, 3, 70); } }
     reg(key, std({ map: tex(c), roughness: 0.9, metalness: 0 }), 'concrete', 1 / 11.6);
   }
+  { const [c, g] = canvas(512, 512); g.fillStyle = '#ecebe6'; g.fillRect(0, 0, 512, 512);   // far white high-rise: a slab edge per floor, the recessed balcony strip with glass behind it
+    for (let f = 0; f < 4; f++) { const y = f * 128; g.fillStyle = '#f6f5f1'; g.fillRect(0, y + 100, 512, 22); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, y + 122, 512, 5);
+      g.fillStyle = '#4a5560'; g.fillRect(0, y + 30, 512, 66); for (let b = 0; b < 8; b++) { g.fillStyle = R() < 0.1 ? '#e8d4a0' : (R() < 0.5 ? '#3a4652' : '#56626c'); g.fillRect(b * 64 + 6, y + 36, 52, 58); }
+      g.fillStyle = 'rgba(235,235,230,0.9)'; for (let x = 0; x < 512; x += 8) g.fillRect(x, y + 84, 2, 16); g.fillRect(0, y + 82, 512, 3); }
+    reg('towerFarWhite', std({ map: tex(c), roughness: 0.85, metalness: 0 }), 'concrete', 1 / 11.6); }
   // ---- storefront fascia colours for the shop rows ------------------------------------------------------------------
   const fas = [0xc8201e, 0xf2c418, 0x1f5fb0, 0x2f9a4a, 0xe8661e, 0xf4f0e6, 0x7a2a8a, 0x1c1c1c];
   fas.forEach((c, i) => reg('fascia' + i, std({ color: c, roughness: 0.6, metalness: 0.1 }), 'metal', 1));
