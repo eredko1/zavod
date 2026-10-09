@@ -78,11 +78,20 @@ function ribbonOffset(pts, off, w, y) { // thin ribbon offset sideways from a po
 }
 
 const STYLE = {
-  tower: { wall: 'brickBrown', pier: 'brickBrown', storey: 2.8, band: 1.35, inset: 0.3, pitch: 2.9, pierW: 0.8, parapet: 1.2, floorBand: true, lit: 0.12 },
+  tower: { wall: 'brickBrown', pier: 'brickBrown', storey: 2.8, band: 1.6, inset: 0.3, pitch: 2.9, pierW: 1.45, parapet: 1.2, floorBand: true, lit: 0.12 },   // punched windows in a lot of brick, like the real Coney towers
   apart: { wall: 'brickRed', pier: 'brickRed', storey: 3.0, band: 1.5, inset: 0.3, pitch: 2.8, pierW: 0.9, parapet: 0.9, floorBand: true, lit: 0.15 },
   civic: { wall: 'precast', storey: 3.8, band: 1.4, inset: 0.5, pitch: 3.4, pierW: 0.5, parapet: 0.9 },
 };
 
+// the tall towers round Luna Park, by where they stand (Coney Island / Gravesend Houses and Surfside west of Stillwell are buff
+// and red-brown brick; east toward Brighton the Trump Village / Brightwater / Oceana high-rises add white concrete with balcony
+// bands). Picked per building from its position, so it never changes between loads. far: the cheap backdrop tile that matches
+const TOWER_LOOK = { brickBuff: 'towerFarBuff', brickRust: 'towerFarRed', brickStaller: 'towerFarBrown', concreteWhite: 'towerFarWhite' };
+function towerWall(x, z) {
+  const k = ((Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1 + 1) % 1;
+  const mix = x > 380 ? [['concreteWhite', 0.45], ['brickRust', 0.3], ['brickBuff', 0.25]] : x < -100 ? [['brickBuff', 0.45], ['brickRust', 0.35], ['concreteWhite', 0.2]] : [['brickBuff', 0.4], ['brickRust', 0.35], ['concreteWhite', 0.25]];
+  let acc = 0; for (const [key, p] of mix) { acc += p; if (k < acc) return key; } return mix[0][0];
+}
 function building(T, world, M, b) {
   const R = world.R; const h = Math.max(3, b.h); const s = b.s;
   // local (footprint-aligned) frame -> world, the same transform osmkit.footprint applies to rotated footprints
@@ -99,11 +108,12 @@ function building(T, world, M, b) {
   if (shopLike && b.play && h >= 3.5) { sideshow = rs.some((r) => fronts((r.x0 + r.x1) / 2, r.z0, 0, -1) || fronts((r.x0 + r.x1) / 2, r.z1, 0, 1) || fronts(r.x0, (r.z0 + r.z1) / 2, -1, 0) || fronts(r.x1, (r.z0 + r.z1) / 2, 1, 0)) && R() < 0.55; }
   footprint(T, world, M, b.p, (B, r) => {
     const w = r.x1 - r.x0, d = r.z1 - r.z0;
-    if (w < 3 || d < 3) { block(B, s === 'tower' ? 'brickBrown' : 'brickRed', r.x0, r.z0, r.x1, r.z1, h, { hvac: 0 }); return; }
-    if (!b.play && (s === 'tower' || s === 'apart' || s === 'rowhouse')) { block(B, s === 'tower' ? (R() < 0.6 ? 'towerFarBrown' : 'towerFarTan') : 'towerFarRed', r.x0, r.z0, r.x1, r.z1, h, { hvac: s === 'tower' ? 1 : 0 }); return; }
+    const tw = s === 'tower' || (s === 'apart' && h > 25) ? towerWall(ox, oz) : null;   // the tall ones: the Luna Park palette
+    if (w < 3 || d < 3) { block(B, tw || 'brickRed', r.x0, r.z0, r.x1, r.z1, h, { hvac: 0 }); return; }
+    if (!b.play && (s === 'tower' || s === 'apart' || s === 'rowhouse')) { block(B, tw ? TOWER_LOOK[tw] : 'towerFarRed', r.x0, r.z0, r.x1, r.z1, h, { hvac: s === 'tower' ? 1 : 0 }); return; }
     if (s === 'tower' || s === 'apart' || s === 'civic') {
       const st = STYLE[s]; const floors = Math.max(1, Math.round(h / st.storey));
-      facade(B, { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, floors, ...st, hvac: s === 'tower' ? 2 : 1, mullionPitch: s === 'civic' ? undefined : 0 });
+      facade(B, { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, floors, ...st, ...(tw ? { wall: tw, pier: tw } : {}), hvac: s === 'tower' ? 2 : 1, mullionPitch: s === 'civic' ? undefined : 0 });
       return;
     }
     if (s === 'rowhouse') { // 2–3 storey attached houses: brick or siding, punched windows, stoop-less (Coney bungalows/rowhouses)
