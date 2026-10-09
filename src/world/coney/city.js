@@ -10,7 +10,8 @@ import { BW } from './shore.js';
 import { ribbon, walk, footprint, footprintAngle, decompose, segDist, segDist1, bbox, cen, pip } from '../osmkit.js';
 import { placeCars } from '../carkit.js';
 import { BUS_STOPS } from './traffic.js';
-import { SURF_HH, stationClear } from './stillwell.js';   // no parking at the bus stops
+import { SURF_HH, stationClear } from './stillwell.js';
+import { isSchool, buildSchool } from './school.js';   // no parking at the bus stops
 
 
 export function buildCity(world, M) {
@@ -49,7 +50,7 @@ export function buildCity(world, M) {
   for (const b of OSM.b) {
     // Luna Park Houses (the five ~21-storey towers north of the avenue) are built by coney/housing.js — skip them here
     if (b.s === 'tower' && b.h > 50) { const [lx, lz] = cen(b.p); if (lx > 60 && lx < 380 && lz > -520 && lz < -110) continue; }
-    { const [lx, lz] = cen(b.p); if (stationClear(lx, lz)) continue; }   // the Stillwell Ave station's Surf Ave head house + bus loop: stillwell.js
+    { const [lx, lz] = cen(b.p); if (stationClear(lx, lz)) continue; if (isSchool(lx, lz)) { try { buildSchool(S, world, M); } catch (e) { console.warn('[coney] P.S. 90', e); } continue; } }   // P.S. 90 on W 12th: school.js   // the Stillwell Ave station's Surf Ave head house + bus loop: stillwell.js
     const T = inPlay(b) ? S : F;
     try { building(T, world, M, b); } catch (e) { console.warn('[coney] building', e); }
   }

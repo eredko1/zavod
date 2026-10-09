@@ -15,6 +15,7 @@ import { OSM, PLAY } from './osm.js';
 import { STORES } from './stores.js';
 import { BW } from './shore.js';
 import { stationClear } from './stillwell.js';
+import { isSchool } from './school.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const SIGN_Y0 = 3.3, SIGN_Y1 = 4.5;                          // the sign band over the shop (city.js keeps its own boards at 3.36-4.44)
@@ -56,7 +57,7 @@ function faces() {
     const p = b.p.length > 3 && b.p[0][0] === b.p[b.p.length - 1][0] && b.p[0][1] === b.p[b.p.length - 1][1] ? b.p.slice(0, -1) : b.p;
     let cx = 0, cz = 0; for (const [x, z] of p) { cx += x; cz += z; } cx /= p.length; cz /= p.length;
     if (b.s === 'tower' && b.h > 50 && cx > 60 && cx < 380 && cz > -520 && cz < -110) return;   // Luna Park Houses: housing.js
-    if (stationClear(cx, cz)) return;   // the Stillwell head house + bus loop
+    if (stationClear(cx, cz) || isSchool(cx, cz)) return;   // the Stillwell head house + bus loop; P.S. 90 (school.js)
     for (let i = 0; i < p.length; i++) {
       const A = p[i], B = p[(i + 1) % p.length], L = Math.hypot(B[0] - A[0], B[1] - A[1]); if (L < 3) continue;
       const tx = (B[0] - A[0]) / L, tz = (B[1] - A[1]) / L; let nx = tz, nz = -tx; const mx = (A[0] + B[0]) / 2, mz = (A[1] + B[1]) / 2;
