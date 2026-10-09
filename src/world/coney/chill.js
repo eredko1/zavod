@@ -178,7 +178,8 @@ function removeThug(t, map = C.thugs) {
 }
 function hurt(t, dmg, dir, by = null, hs = false) {   // by: the friend's net id when their hit killed him (else it was you)
   if (t.st === 'dead') return;
-  const { ctx } = C; t.hp -= dmg;
+  const { ctx } = C; if (!by && performance.now() < (C.counterUntil || 0)) { dmg *= 2; C.counterUntil = 0; K.toast('COUNTER', 700); }   // the hit after a parry lands double
+  t.hp -= dmg;
   if (dir) { t.pos.x += dir.x * 0.45; t.pos.z += dir.z * 0.45; }   // rocked back by the blow
   ctx.ai?.blood?.(t.pos.x, t.pos.z, 0.3 + Math.random() * 0.2, t.pos.y + 0.5);
   if (t.hp <= 0) {
@@ -234,6 +235,10 @@ function onRemoteThug(m) {
 // ---------------------------------------------------------------------------------------------------------------------------
 function update(dt, playing) {
   const { ctx } = C; const me = ctx.player; const now = performance.now();
+  // block / lock-on: hold right mouse with fists or the knife out; the block's first moment is the parry window
+  { const b = playing && blocking(); if (b && !C.blocking) C.blockAt = now; C.blocking = b;
+    if (b && me) { let best = null, bd = 4; for (const t of C.thugs.values()) { if (t.st === 'dead' || t.intent !== 'fight') continue; const d = me.position.distanceTo(t.pos); if (d < bd) { bd = d; best = t; } }
+      if (best) { const want = Math.atan2(-(best.pos.x - me.position.x), -(best.pos.z - me.position.z)); let dy = want - me.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); me.yaw += Math.max(-8 * dt, Math.min(8 * dt, dy)); } } }
   const alive = [...C.thugs.values()].filter((t) => t.st !== 'dead').length, cap = C.chill ? 5 : 3;
   // chill: a lone robber every 90–150 s; both modes: a crew now and then (chill 3–5 min, otherwise 4–6 min)
   if (C.chill) { C.spawnT -= dt; if (playing && C.spawnT <= 0 && alive < cap) { C.spawnT = 90 + Math.random() * 60; spawnGang(undefined, 'rob', 1); } }
@@ -274,9 +279,13 @@ function update(dt, playing) {
       else {
         if (d > 1.3) { speed = d > 6 ? 4.4 : 2.2; goal = me.position; } else t.yaw = Math.atan2(dx, dz);
         t.punchT -= dt;
-        if (d < 1.9 && t.punchT <= 0) { t.punchT = (t.blade ? 1.1 : 0.75) + Math.random() * 0.6; t.m.f.play('punch'); t.hitAt = 0.14; }
+        if (t.stagger > 0) { t.stagger -= dt; t.punchT = Math.max(t.punchT, 0.3); }   // parried: reeling
+        if (d < 1.9 && t.punchT <= 0 && t.wind == null) { t.wind = 0.35; t.m.f.guard = true; }   // the windup you can read: guard up, a beat, then the swing
+        if (t.wind != null && (t.wind -= dt) <= 0) { t.wind = null; t.punchT = (t.blade ? 1.1 : 0.75) + Math.random() * 0.6; t.m.f.play('punch'); t.hitAt = 0.14; }
         if (t.hitAt != null && (t.hitAt -= dt) <= 0) { t.hitAt = null;
-          if (d < 2.0) { const dmg = t.blade ? 16 + Math.random() * 6 : 7 + Math.random() * 5;
+          if (d < 2.0) { let dmg = t.blade ? 16 + Math.random() * 6 : 7 + Math.random() * 5;
+            const blk = blocking(); if (blk) { if (performance.now() - C.blockAt < 250) { t.stagger = 0.8; t.m.f.play('hit'); C.counterUntil = performance.now() + 1500; K.toast('PARRY — hit back!', 900); dmg = 0; } else dmg *= 0.3; }   // block: 70% off; a block in the last 0.25 s: parried
+            if (!t.blade && ctx.mode === 'chill' && (me.health ?? 100) - dmg < 25) { knockedDown(t); continue; }   // fists don't kill in chill: you go down, they walk
             ctx.deathNote = { text: t.blade ? `stabbed by ${t.name}` : `beaten down by ${t.name}'s crew`, at: performance.now() };
             me.damage?.(dmg, t.pos.clone()); ctx.bus.emit('meleeHit', { point: me.position.clone().setY(me.position.y + 1.4) });
             if (t.blade) ctx.ai?.blood?.(me.position.x, me.position.z, 0.4, me.position.y); } }
@@ -349,6 +358,14 @@ function mugDialog(t) {
   choices.push({ label: 'Tell him to get lost', go: () => fight() });
   K.openDialog(t.name, { text: `${t.name}: "${n || inv.length ? pick(MUG.ask) : pick(MUG.broke)}"`, choices });
   C.mugT = t;
+}
+/** holding a block: fists or the knife out, right mouse (or the aim button) down */
+function blocking() { const ctx = C.ctx, w = ctx.weapons, melee = w?.current?.mode === 'MELEE'; if (!melee) return false; return !!((ctx.input?.mouse?.buttons ?? 0) & 4) || (w.ads ?? 0) > 0.5; }
+/** a fist fight that would have finished you: down for 2 s, they walk off laughing (nothing taken) */
+function knockedDown(t) {
+  const { ctx } = C, me = ctx.player; me.knockT = 2; me.pitch = -0.6; K.toast(`${t.name}: "Stay down."`, 2000);
+  for (const q of C.thugs.values()) if (q.intent === 'fight' && !q.dead) { q.intent = 'talk'; q.st = 'leave'; q.t = 0; q.m.f.guard = false; }
+  try { ctx.bus.emit('playerDamaged', { amount: 1, from: t.pos.clone() }); } catch {}
 }
 function rob(t) {
   const { ctx } = C; const me = ctx.player, T = CREWS[t.type] || CREWS.ru;
