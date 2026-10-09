@@ -269,9 +269,9 @@ export function buildStreet(world) {
   // ---- cars parked along both kerbs of Surf Ave -----------------------------------------------------------------------------
   const cars = [], KINDS = ['sedan', 'sedan', 'suv', 'suv', 'hatch', 'van', 'coupe', 'muscle'], off = Math.min(laneOff(22, 1) + 3.5, 8.8);
   const mouths = OSM.r.filter((r) => r.w >= 6 && r.w < 20).flatMap((r) => [r.p[0], r.p[r.p.length - 1]]);
-  for (const r of OSM.r) { if (r.w < 20) continue;
+  for (const r of OSM.r) { const nep = r.w >= 14 && r.w < 20 && streetAt(r.p[0][0], r.p[0][1]) === 'neptune'; if (r.w < 20 && !nep) continue; const o = nep ? r.w / 2 - 1.3 : off;   // Surf Ave and Neptune Ave
     walkLine(r.p, 6.4, (x, z, ux, uz) => { for (const s of [1, -1]) {
-      if (R() < 0.38) continue; const cx = x - uz * s * off, cz = z + ux * s * off;
+      if (R() < (nep ? 0.2 : 0.38)) continue; const cx = x - uz * s * o, cz = z + ux * s * o;
       if (!inMap(cx, cz) || corners(cx, cz) || mouths.some(([mx, mz]) => Math.hypot(mx - cx, mz - cz) < 15) || BUS_STOPS.some((b) => Math.hypot(b[1] - cx, b[2] - cz) < 20) || blocked(cx, cz, 1.2)) continue;
       cars.push({ x: cx, z: cz, ry: Math.atan2(ux, uz) - Math.PI / 2 + (s > 0 ? Math.PI : 0), kind: KINDS[(R() * KINDS.length) | 0] }); } }, 4); }
   if (cars.length) { placeCars(world, cars, { raycast: false }); for (const c of cars) c.box = world.box([c.x - 1.6, 0, c.z - 1.6], [c.x + 1.6, 1.5, c.z + 1.6]); st.cars = cars.length; }
