@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const errs = [];
 const p = await b.newPage({ viewport: { width: 960, height: 540 } }); p.on('pageerror', (e) => errs.push(e.message));
-await p.goto(`http://localhost:8790/?qa=1&map=coney&ai=0${mode}`, { timeout: 200000 }); await p.waitForFunction(() => window.__game?.ready, null, { timeout: 200000 });
+await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0${mode}`, { timeout: 200000 }); await p.waitForFunction(() => window.__game?.ready, null, { timeout: 200000 });
 await p.evaluate(() => window.__game.teleport(-130, 0, -150, -Math.PI / 2, 0)); await p.waitForTimeout(3000);
 const s1 = await p.evaluate(() => window.__game.traffic.cars());
 ok(s1.length >= 8, 'traffic spawned around you', `${s1.length} cars`);

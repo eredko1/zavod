@@ -4,7 +4,7 @@ const room = 'fn' + Math.random().toString(36).slice(2, 6);
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const errs = [];
-const mk = async (n) => { const p = await b.newPage({ viewport: { width: 900, height: 500 } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message)); await p.goto(`http://localhost:8790/?qa=1&room=${room}&map=coney&ai=0&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
+const mk = async (n) => { const p = await b.newPage({ viewport: { width: 900, height: 500 } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message)); await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&room=${room}&map=coney&ai=0&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
 const A = await mk('ALPHA'), B = await mk('BRAVO');
 await A.waitForFunction(() => window.__ctx.net.peers === 1, null, { timeout: 30000 }).catch(() => {});
 // nitro: two 3.5 s runs down Surf Ave-ish open road from the same spot, plain vs Shift

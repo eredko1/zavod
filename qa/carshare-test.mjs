@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const errs = [];
 const mk = async (n) => { const p = await b.newPage({ viewport: { width: 640, height: 360 } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message));
-  await p.goto(`http://localhost:8790/?qa=1&mp=1&room=${room}&map=coney&ai=0&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&mp=1&room=${room}&map=coney&ai=0&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
 const A = await mk('DRIVER'), B = await mk('RIDER'); await A.waitForTimeout(3000);
 ok(await A.evaluate(() => window.__game.hangout.steal()), 'driver steals a car'); await A.waitForTimeout(1500);
 const cp = await A.evaluate(() => window.__ctx.vehicles.mounted.pos.toArray());

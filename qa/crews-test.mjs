@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 1100, height: 620 } }); const errs = []; pg.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); });
 const toasts = []; await pg.exposeFunction('__t', (t) => toasts.push(t));
-await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.crews, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.crews, null, { timeout: 150000 });
 await pg.evaluate(() => { const h = window.__ctx.hud; const o = h.toast; h.toast = function (t, ms) { if (typeof t === 'string' && /"/.test(t)) window.__t(t); return o.call(this, t, ms); }; });
 const o = await pg.evaluate(() => window.__ctx.world.onlineStart);
 const dist = (p) => Math.hypot(p[0] - o[0], p[2] - o[2]);

@@ -102,6 +102,9 @@ export function makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite, route = { id: '
     body: new THREE.MeshStandardMaterial({ map: body.map, normalMap: body.nm, normalScale: new THREE.Vector2(0.3, 0.3), roughness: 0.34, metalness: 0.88 }),
     trim: new THREE.MeshStandardMaterial({ map: trim.map, roughnessMap: trim.mr, metalnessMap: trim.mr, roughness: 1, metalness: 1 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x9fb4bd, roughness: 0.04, metalness: 0.3, transparent: true, opacity: 0.26, depthWrite: false, side: THREE.DoubleSide }),
+    // the cab's windshield and storm window: what the driver looks through from a hand's width away, so barely there (the side
+    // windows' reflective glass read as a milky sheet over the whole view)
+    cabGlass: new THREE.MeshStandardMaterial({ color: 0x1c2a30, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 0.15 }),
     int: new THREE.MeshStandardMaterial({ map: SHARED.int || (SHARED.int = intAtlas(lite)), roughness: 0.62, metalness: 0.02 }),
     floor: new THREE.MeshStandardMaterial({ map: SHARED.floor || (SHARED.floor = floorTex()), roughness: 0.92 }),
     lamp: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xf2f6ff, emissiveIntensity: 1.5 }),
@@ -174,14 +177,18 @@ export function makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite, route = { id: '
       const isCab = cab && Math.sign(zz) === cabE, s = Math.sign(zz);
       // outer end: fluted below, steel above, gangway door window or the cab windshield
       bodyBox(W, 1.37, 0.08, 0, F + 0.95 / 2 - 0.42 / 2, zz, { sh: true });
-      T(TRIM.steel, W, H - 1.88 + 0.44, 0.08, 0, F + 1.88 + (H - 1.88) / 2 - 0.22, zz + s * 0.001, { sh: true });
+      // the steel above the fluting: on a cab end it's cut round the windshield and the storm window (a solid slab here covered the
+      // top two thirds of the driver's view)
+      const winCab = [[-0.72 * s - 0.475, -0.72 * s + 0.475, F + 1.26, F + 1.98], [0.05 * s - 0.25, 0.05 * s + 0.25, F + 1.045, F + 1.995]];
+      if (isCab) { for (const [x0, x1, y0, y1] of frameAround(-W / 2, W / 2, F + 1.44, F + H, winCab)) T(TRIM.steel, x1 - x0, y1 - y0, 0.08, (x0 + x1) / 2, (y0 + y1) / 2, zz + s * 0.001, { sh: true }); }
+      else T(TRIM.steel, W, H - 1.88 + 0.44, 0.08, 0, F + 1.88 + (H - 1.88) / 2 - 0.22, zz + s * 0.001, { sh: true });
       if (isCab) {
         // the operator's windshield is on the right-hand side looking out of either end (x mirrors with the end), the storm door
         // window by the middle. Both are real glass: the black mask and the inside end wall are frames around them, so the driver
         // (coney/subway.js puts you in the cab) sees the track ahead
         const wx = -0.72 * s, win = [[wx - 0.475, wx + 0.475, F + 1.26, F + 1.98], [0.05 * s - 0.25, 0.05 * s + 0.25, F + 1.045, F + 1.995]];
         for (const [x0, x1, y0, y1] of frameAround(-(W - 0.35) / 2, (W - 0.35) / 2, F + 1.095, F + 2.345, win)) T(TRIM.black, x1 - x0, y1 - y0, 0.04, (x0 + x1) / 2, (y0 + y1) / 2, zz + s * 0.05);   // the black cab mask
-        for (const [x0, x1, y0, y1] of win) add(box(x1 - x0, y1 - y0, 0.02), M.glass, (x0 + x1) / 2, (y0 + y1) / 2, zz + s * 0.075);
+        for (const [x0, x1, y0, y1] of win) add(box(x1 - x0, y1 - y0, 0.02), M.cabGlass, (x0 + x1) / 2, (y0 + y1) / 2, zz + s * 0.075);
         add(rowUV(new THREE.PlaneGeometry(1.0, 0.16), 0, 0.12, 1), M.led, 0.62 * s, F + 2.18, zz + s * 0.08, { ry: s > 0 ? 0 : Math.PI });
         add(cellUV(new THREE.PlaneGeometry(0.3, 0.3), TRIM.bullet), M.trim, 0.62 * s, F + 1.82, zz + s * 0.08, { ry: s > 0 ? 0 : Math.PI });
         add(cellUV(new THREE.PlaneGeometry(0.46, 0.12), TRIM.num0 + (c >> 1), 4, [0, (c & 1) ? 0 : 0.5, 1, (c & 1) ? 0.5 : 1], 0.02), M.trim, -0.72 * s, F + 1.1, zz + s * 0.08, { ry: s > 0 ? 0 : Math.PI });
@@ -201,7 +208,7 @@ export function makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite, route = { id: '
       for (const x of [-0.95, 0.95]) for (const [x0, x1, y0, y1] of frameAround(x - 0.5, x + 0.5, F, F + H - 0.9, cut)) I(INT.wall, x1 - x0, y1 - y0, 0.04, (x0 + x1) / 2, (y0 + y1) / 2, zz - s * 0.06);
       I(INT.wall, 0.9, 0.5, 0.04, 0, F + 2.15, zz - s * 0.06); I(INT.wall, 0.9, 1.1, 0.04, 0, F + 0.55, zz - s * 0.065);
       add(rowUV(new THREE.PlaneGeometry(1.3, 0.16), 2), M.led, 0, F + 2.3, zz - s * 0.09, { ry: s > 0 ? Math.PI : 0 });
-      if (!lite) add(intUV(new THREE.PlaneGeometry(0.22, 0.22), INT.emerg), M.int, 0.95, F + 1.6, zz - s * 0.085, { ry: s > 0 ? Math.PI : 0 });
+      if (!lite) add(intUV(new THREE.PlaneGeometry(0.22, 0.22), INT.emerg), M.int, 0.95 * s, F + 1.6, zz - s * 0.085, { ry: s > 0 ? Math.PI : 0 });   // on the side away from the windshield (which mirrors with the end)
     }
     // under the car: trucks (side frames, wheels, motors, third-rail shoe beams), equipment boxes between them
     for (const tz of [-(CAR / 2 - 2.6), CAR / 2 - 2.6]) {

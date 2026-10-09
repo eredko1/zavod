@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Headless player-controller test. Node 20. Usage: node qa/player-test.mjs [--url http://localhost:8790/?qa=1] [--shot qa/shots/player-sprint.png]
+// Headless player-controller test. Node 20. Usage: node qa/player-test.mjs [--url http://localhost:${process.env.PORT || 8790}/?qa=1] [--shot qa/shots/player-sprint.png]
 import { chromium } from 'playwright-core';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i > -1 ? args[i + 1] : d; };
-const URL = opt('url', 'http://localhost:8790/?qa=1&seed=7');
+const URL = opt('url', `http://localhost:${process.env.PORT || 8790}/?qa=1&seed=7`);
 const SHOT = opt('shot', 'qa/shots/player-sprint.png');
 
 const browser = await chromium.launch({

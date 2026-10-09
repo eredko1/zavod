@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 800, height: 450 } }); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&mode=chill&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.crews, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&mode=chill&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.crews, null, { timeout: 150000 });
 await pg.evaluate(() => { window.__game.setState('playing'); window.__game.hangout.give(400); window.__game.crews.calm(1e9); });
 await pg.waitForTimeout(1500);
 // Igor: F → 4 (Need a piece) → 3 (AK)

@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const errs = [];
 const mk = async (n) => { const p = await b.newPage({ viewport: { width: 700, height: 400 } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message));
-  await p.goto(`http://localhost:8790/?qa=1&mp=1&room=${room}&map=coney&mode=chill&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected && window.__game.crews, null, { timeout: 150000 }); return p; };
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&mp=1&room=${room}&map=coney&mode=chill&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected && window.__game.crews, null, { timeout: 150000 }); return p; };
 const A = await mk('ALPHA'), B = await mk('BRAVO'); await A.waitForTimeout(2500);
 for (const p of [A, B]) await p.evaluate(() => { window.__game.setState('playing'); window.__game.hangout.give(200); window.__game.crews.calm(1e9); });
 await A.evaluate(() => { window.__game.crews.gang('ru', 'talk', 3); window.__game.hangout.drop(40); });

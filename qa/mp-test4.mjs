@@ -11,7 +11,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true, args:
 const t0 = Date.now(); const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...a);
 let fails = 0; const check = (ok, what, extra = '') => { console.log(ok ? 'PASS' : 'FAIL', what, extra); if (!ok) fails++; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const url = (name, extra = '') => `http://localhost:8790/?qa=1&room=${room}&map=${map}&ai=0&name=${name}${extra}`;
+const url = (name, extra = '') => `http://localhost:${process.env.PORT || 8790}/?qa=1&room=${room}&map=${map}&ai=0&name=${name}${extra}`;
 const ready = (p) => p.waitForFunction(() => window.__game?.ready && window.__ctx?.net?.connected, null, { timeout: 150000 });
 const mk = async (tag, name, { touch = false } = {}) => {
   const p = await browser.newPage({ viewport: touch ? { width: 844, height: 390 } : { width: 640, height: 360 }, hasTouch: touch, isMobile: false });

@@ -1,7 +1,7 @@
-// Character picker (pause menu → Character, or first time in chill mode): play as one of Arkasha's crew or REDKO. One player
+// Character picker (pause menu → Character, or first time in chill mode): play as one of Arkasha's crew or RED. One player
 // per character: a pick is broadcast ('look', re-sent every 8 s) and the picker greys out what friends hold (same pick at
-// once: the lower id keeps it). Picking spawns you at Arkasha's table and that character's NPC there stands down. FELIKS
-// comes with mushrooms, and anyone who walks up to a Feliks player can buy some. Owned by: main.
+// once: the lower id keeps it). Picking spawns you at Arkasha's table and that character's NPC there stands down. FELIP
+// comes with mushrooms, and anyone who walks up to a Felip player can buy some. Owned by: main.
 import * as THREE from 'three';
 import { CHARS, setRemoteChar, looks } from './outfits.js';
 import { hangkit as K } from './hangkit.js';
@@ -33,11 +33,11 @@ export function mountCharSelect(ctx) {
 
 /** per-kit hooks (the kit is rebuilt with the map, so these are re-registered on every mount) */
 function hookKit(ctx) {
-  // a Feliks player hands out mushrooms and weed, free (once a minute per person)
+  // a Felip player hands out mushrooms and weed, free (once a minute per person)
   let lastGift = -Infinity;
-  K.spot?.({ pos: S.felPos, r: 4, when: () => !!S.felId, prompt: () => (performance.now() - lastGift < 60000 ? 'FELIKS: "Pace yourself, man."' : 'F — FELIKS: FREE MUSHROOMS + WEED'), act: () => {
+  K.spot?.({ pos: S.felPos, r: 4, when: () => !!S.felId, prompt: () => (performance.now() - lastGift < 60000 ? 'FELIP: "Pace yourself, man."' : 'F — FELIP: FREE MUSHROOMS + WEED'), act: () => {
     if (performance.now() - lastGift < 60000) return; if (K.full?.()) return ctx.hud?.toast?.('Pockets full', 1400);
-    lastGift = performance.now(); K.give('shrooms'); K.give('weed'); ctx.net?.send?.('shroompaid', { to: S.felId }); ctx.hud?.toast?.('FELIKS: "On the house. Two minutes, full send. B to use."', 2400); } });
+    lastGift = performance.now(); K.give('shrooms'); K.give('weed'); ctx.net?.send?.('shroompaid', { to: S.felId }); ctx.hud?.toast?.('FELIP: "On the house. Two minutes, full send. B to use."', 2400); } });
   // an Elf player pours shots for everyone round him (once a minute each)
   let lastShot = -Infinity; S.elfPos = S.elfPos || new THREE.Vector3();
   K.spot?.({ pos: S.elfPos, r: 4, when: () => !!S.elfId, prompt: () => (performance.now() - lastShot < 60000 ? 'THE ELF: "Pace yourself."' : 'F — THE ELF POURS YOU A SHOT'), act: () => {

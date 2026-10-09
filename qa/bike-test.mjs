@@ -2,7 +2,7 @@
 // Vehicles QA: spawn a bike, mount, drive, assert movement/bounds/no-penetration, dismount standing. Usage: node qa/bike-test.mjs [map] [outPrefix]
 import { chromium } from 'playwright-core';
 const map = process.argv[2] || 'zavod', prefix = process.argv[3] || `qa/shots/bike-${map}`;
-const url = `http://localhost:8790/?qa=1&map=${map}&ai=0`;
+const url = `http://localhost:${process.env.PORT || 8790}/?qa=1&map=${map}&ai=0`;
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu-rasterization', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu', '--disable-gpu-vsync', '--autoplay-policy=no-user-gesture-required', '--mute-audio', '--hide-scrollbars'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
 const errors = [];

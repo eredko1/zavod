@@ -13,7 +13,7 @@ for (const [dev, engine, extra] of PROFILES) {
     pg.on('pageerror', (e) => errs.push(e.message.slice(0, 140))); pg.on('response', (r) => { if (r.status() >= 400) bad.add(r.url().split('/').slice(-2).join('/')); });
     const t0 = Date.now(); let ok = false, info = null;
     try {
-      await pg.goto(`http://localhost:8790/?qa=1&map=${map}${q}${extra}&touch=1`, { timeout: 120000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 200000 }); ok = true;
+      await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=${map}${q}${extra}&touch=1`, { timeout: 120000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 200000 }); ok = true;
       await pg.evaluate(() => window.__game.setState('playing')); await pg.waitForTimeout(2500);
       info = await pg.evaluate(() => { let tex = 0; const seen = new Set(); window.__ctx.scene.traverse((o) => { const ms = o.material ? [].concat(o.material) : []; for (const m of ms) for (const k of ['map', 'normalMap', 'roughnessMap', 'aoMap', 'emissiveMap', 'metalnessMap']) { const t = m[k]; if (!t || seen.has(t)) continue; seen.add(t); const im = t.image; tex += (im?.width || 0) * (im?.height || 0) * 5.3; } });
         return { boot: window.__ctx.bootErrors || [], texMB: Math.round(tex / 1048576), q: window.__ctx.settings.quality, calls: window.__game.stats?.().drawCalls }; });

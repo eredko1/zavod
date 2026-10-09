@@ -1,4 +1,4 @@
-// Outfits (world/outfits.js): McGUINNESS (m12 + afro), THE ELF (1.70 m, three-stripe track suit), and two online players who
+// Outfits (world/outfits.js): MAC (m12 + afro), THE ELF (1.70 m, three-stripe track suit), and two online players who
 // see each other as the hero (m20, 1.83 m, jeans + a different SOAD-style tee each), plus the durak MP seat swatches.
 // node qa/outfits-test.mjs [outdir]
 import { chromium } from 'playwright-core';
@@ -24,16 +24,16 @@ const HELP = () => {
 
 // ---------------------------------------------------------------------------------------------------------- NPCs at the table
 {
-  const P = await mk('solo', `http://localhost:8790/?qa=1&map=coney&ai=0&time=day`);
+  const P = await mk('solo', `http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`);
   await P.waitForFunction(() => window.__game?.ready && window.__game.hangout?.arkady(), null, { timeout: 150000 });
   await P.evaluate(async () => { window.__THREE = await import('three'); window.__game.setState('playing'); });
   const info = await P.evaluate(`(() => { const H = (${HELP})();
     const vend = window.__game.hangout.vendors(); const v = (n) => vend.find((x) => x.name === n);
     const mcg = H.persons.find((g) => H.has(g, (o) => o.name === 'afro')), elf = H.persons.find((g) => H.has(g, (o) => /_track$/.test(o.material?.name || '')));
-    return { mcg: v('McGUINNESS')?.pos, elf: v('THE ELF')?.pos, mcgH: mcg && H.measure(mcg), elfH: elf && H.measure(elf), mcgAv: !!mcg, elfAv: !!elf, rest: window.__outfitsRest?.() };
+    return { mcg: v('MAC')?.pos, elf: v('THE ELF')?.pos, mcgH: mcg && H.measure(mcg), elfH: elf && H.measure(elf), mcgAv: !!mcg, elfAv: !!elf, rest: window.__outfitsRest?.() };
   })()`);
   console.log('npc', JSON.stringify(info));
-  ok(info.mcgAv, 'McGUINNESS has an afro');
+  ok(info.mcgAv, 'MAC has an afro');
   ok(info.elfAv, 'THE ELF wears the baked track suit');
   ok(info.elfH && Math.abs(info.elfH - 1.70) < 0.05, 'THE ELF stands ~1.70 m', info.elfH);
   const look = async (pos, name, dist = 2.1, ang = 0, dy = 0) => {

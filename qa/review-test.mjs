@@ -10,7 +10,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) console.log('HTTP ' + r.status() + ' ' + r.url()); });
-  await page.goto('http://localhost:8790/?qa=1&map=coney&ai=0&touch=1&audiotest=1&quality=low', { timeout: 150000 });
+  await page.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&touch=1&audiotest=1&quality=low`, { timeout: 150000 });
   await page.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
   console.log('Game ready; checking review regressions');
   const checks = await page.evaluate(async () => {
