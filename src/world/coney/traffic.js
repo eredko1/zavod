@@ -84,7 +84,8 @@ function buildGraph(world) {
   for (let i = 0; i < nodes.length; i++) if (comp[i] !== best) nodes[i].adj.length = 0;
   // directed segments for spawning (weighted by street width: the avenues get most of the cars)
   const segs = []; let total = 0;
-  for (let a = 0; a < nodes.length; a++) for (const e of nodes[a].adj) { const wt = e.len * (e.w >= 20 ? 3 : e.w >= 14 ? 1.8 : 1); segs.push({ a, b: e.to, w: e.w, len: e.len, wt }); total += wt; }
+  const corridor = (a, b) => { const mx = (nodes[a].x + nodes[b].x) / 2; return (mx > -105 && mx < -75) || (mx > 335 && mx < 395); };   // Stillwell, W 8th (Surf is the w ≥ 20 one)
+  for (let a = 0; a < nodes.length; a++) for (const e of nodes[a].adj) { const wt = e.len * (e.w >= 20 ? 3 : corridor(a, e.to) ? 2.6 : e.w >= 14 ? 1.8 : 1); segs.push({ a, b: e.to, w: e.w, len: e.len, wt }); total += wt; }
   // junction control: signals on the listed junctions, stop signs where a smaller street meets a bigger one (all-way for equals)
   for (const n of nodes) { if (n.adj.length < 3) continue; n.maxW = Math.max(...n.adj.map((e) => e.w)); n.ctrl = 'stop'; }
   let nsig = 0;
@@ -302,7 +303,8 @@ function spawn(c, boot) {
     const s = rng() * seg.len, A = G.nodes[seg.a], B = G.nodes[seg.b], x = A.x + (B.x - A.x) * s / seg.len, z = A.z + (B.z - A.z) * s / seg.len;
     const d = Math.hypot(x - P.x, z - P.z);
     if (d > ring - 10 || d < (boot ? 14 : 55)) continue;
-    if (!boot && d < 140 && inView(x, 0, z, 4)) continue;
+    if (!boot && d < 100 && inView(x, 0, z, 4)) continue;
+    if (!boot && k < 12 && !(d < 200 && inView(x, 0, z, 4))) continue;   // first try for one you'll see, 100-200 m up the road
     if (d > 60 && rng() < (d - 60) / ring * 0.8) continue;   // denser near you
     if (T.cars.some((o) => o.active && Math.hypot(o.x - x, o.z - z) < 13)) continue;
     c.rng = rng; c.lane = seg.w >= 20 && rng() < 0.45 ? 1 : 0;
@@ -370,6 +372,7 @@ function gatherObstacles() {
     else if (!p.mounted?.bus) O.push({ x: p.position.x, z: p.position.z, vx: p.velocity?.x || 0, vz: p.velocity?.z || 0, hl: 0.35, hw: 0.35, me: true, foot: true });
   }
   for (const v of ctx.vehicles?.list || []) { if (v === mv || !v.parked || !v.spec?.car) continue; if (Math.abs(v.pos.x - p.position.x) > 120 || Math.abs(v.pos.z - p.position.z) > 120) continue; O.push({ x: v.pos.x, z: v.pos.z, vx: 0, vz: 0, hl: v.spec.hz, hw: v.spec.hx, veh: v }); }
+  for (const q of T.W.folkObstacles?.() || []) if (Math.abs(q.x - p.position.x) < 120 && Math.abs(q.z - p.position.z) < 120 && roadDist(q.x, q.z) < -0.3) O.push({ x: q.x, z: q.z, vx: 0, vz: 0, hl: 0.35, hw: 0.35, foot: true, ped: true });   // people in the road (crossing on the WALK, diving clear …)
   const net = ctx.net; if (net?.list && net.peer) { try { for (const id of net.list()) { const q = net.peer(id); if (!q?.pos || q.dead) continue; O.push({ x: q.pos.x, z: q.pos.z, vx: 0, vz: 0, hl: q.veh ? 2.3 : 0.35, hw: q.veh ? 1 : 0.35, peer: id }); } } catch {} }
 }
 function drive(c, dt, now) {
@@ -442,6 +445,7 @@ function drive(c, dt, now) {
   if (lim === 'obst' && c.blockT > 3.2 && !c.avoid && !c.bus) { const dx = obst.x - c.x, dz = obst.z - c.z, l = dx * rx + dz * rz; const tgt = l - (c.hw + Math.max(obst.hw, 0.35) + 0.8); if (tgt > -5 && laneFreeLeft(c)) { c.avoid = obst.veh || (obst.foot ? 'me' : obst.peer) || 'x'; c.shiftT = tgt; c.avoidT = 7; } }
   if (c.avoid) { c.avoidT -= dt; if (c.avoidT <= 0 || (!obst && c.v > 3 && c.blockT === 0 && c.avoidT < 4)) { c.avoid = null; c.shiftT = 0; } }
   // stuck behind a car that is itself stuck (a gridlocked junction): after a while, nudge through
+  if (lim === 'obst' && obst?.ped && c.v < 0.5) { c.pedT = (c.pedT || 0) + dt; if (c.pedT > 3 && c.hornT <= 0) { honk(c); c.hornT = 3 + c.rng() * 3; } } else c.pedT = 0;   // held up by someone in the road: lean on the horn
   if (lim === 'car' && c.v < 0.1) { c.waitT += dt; if (c.waitT > 9) { c.ghostT = 2.5; c.waitT = 0; } } else if (c.v > 1) c.waitT = 0;
   c.lim = lim;
   // integrate

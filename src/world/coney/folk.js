@@ -64,7 +64,8 @@ export function buildFolk(world, spots, crowd) {
   ctx.bus.on('worldReset', () => { for (const s of F.spots) if (s.gone) { s.gone = 0; if (!s.E) crowd.hide(s, false); } F.mugT = 90; });
   ctx.bus.on('npcHurt', (d) => { if (d?.position) onCrime({ kind: d.dead ? 'kill' : 'hit', pos: d.position, name: d.name }); });
   world.updaters.push((dt) => { if (F?.world === world) update(dt); });
-  setReporter(phoneCops);   // chase.js: unseen crimes need a witness who phones it in
+  setReporter(phoneCops);
+  W.folkObstacles = () => { const out = []; for (const E of F.active) if (!E.dead && (E.mode === 'walk' || E.mode === 'stand') && !E.s.sub) out.push(E.pos); return out; };   // traffic.js brakes for them   // chase.js: unseen crimes need a witness who phones it in
   if (typeof window !== 'undefined' && window.__game) window.__game.folk = folkQA;
   console.log('[folk]', F.spots.length, 'crowd spots can come alive ·', av.length, 'avatars');
 }
@@ -319,8 +320,20 @@ function update(dt) {
   F.pspeed = F.pspeed * 0.8 + (Math.hypot(P.x - F.lastP.x, P.z - F.lastP.z) / Math.max(dt, 1e-3)) * 0.2; F.lastP.copy(P);
   F.tickT -= dt; if (F.tickT <= 0) { F.tickT = 0.25; tick(); }
   const cam = ctx.camera; if (F.frame % 8 === 0) { _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm); for (const E of F.active) E.inView = _fr.intersectsSphere(_sp.set(_v.set(E.pos.x, E.pos.y + 0.9, E.pos.z), 1.6)); }
+  const veh = ctx.vehicles?.mounted, car = veh?.spec?.car && veh.pos ? veh : null, cv = car ? Math.hypot(car.vel?.x || 0, car.vel?.z || 0) : 0, cfx = cv > 0.5 ? car.vel.x / cv : 0, cfz = cv > 0.5 ? car.vel.z / cv : 0;
   for (const E of F.active) {
     let speed = 0;
+    if (car && cv > 6 && !E.dead && !E.dive && E.mode !== 'lie' && E.mode !== 'sit') {   // the car you're driving: dive clear, or get hit
+      const rx = E.pos.x - car.pos.x, rz = E.pos.z - car.pos.z, along = rx * cfx + rz * cfz, lat = rx * cfz - rz * cfx;
+      if (along > -1 && along < 2.4 && Math.abs(lat) < 1.1 && !E.s.sub) { const t = promote(E, 'hit'); if (t) folkHurt(t, cv * 6, new THREE.Vector3(cfx, 0.3, cfz), false); continue; }
+      if (cv > 8 && along > 0 && along < 7 && Math.abs(lat) < 1.6 && along / cv < 0.9) { const sd = lat >= 0 ? 1 : -1; E.dive = { t: 0, x: cfz * sd, z: -cfx * sd }; }
+    }
+    if (E.dive) {   // the dive: 2.5 m sideways in 0.35 s, down on the ground for 1.2 s, back up swearing
+      E.dive.t += dt; const d = E.dive;
+      if (d.t < 0.35) { E.pos.x += d.x * 2.5 / 0.35 * dt; E.pos.z += d.z * 2.5 / 0.35 * dt; E.fig.group.rotation.x = -Math.min(1.35, d.t / 0.35 * 1.35); }
+      else if (d.t > 1.55) { E.fig.group.rotation.x = 0; E.dive = null; say(E, pick(BARK.bump)); if (E.p.temper === 'soft') { E.panic = 6; E.panicYaw = Math.atan2(E.pos.x - P.x, E.pos.z - P.z); } }
+      E.holder.position.copy(E.pos); continue;
+    }
     if (E.s.train) { trainPose(E.s); E.pos.set(E.s.x, E.s.y, E.s.z); E.yaw = E.s.ry; }   // riding the F: stuck to the seat as the car moves
     if (E.dead) { E.deadT += dt; if (E.deadT > 20) { deactivate(E, false); continue; } E.holder.position.copy(E.pos); E.holder.rotation.y = E.yaw; continue; }
     if (E.angry > 0) { E.angry -= dt; E.strikeT -= dt; if (E.strikeT <= 0 && Math.hypot(P.x - E.pos.x, P.z - E.pos.z) < 2.1) strike(E); }
