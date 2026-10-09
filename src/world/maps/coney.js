@@ -1,6 +1,7 @@
 // MAP: CONEY ISLAND — the amusement district, boardwalk and beach, 1:1 from an OSM plan (qa/tools/osm-coney.py) with hand-built
 // landmarks to the reference photos (qa/refs/coney). Levels: streets / amusement area / boardwalk y = 0 · beach sand −1.3 → −2.4
 // at the waterline (stairs every ~95 m) · pier deck 0 · wheel platform +0.6 · ballpark stands to +8. Owned by: CONEY agent.
+import { buildShops } from '../coney/shops.js';
 import { buildStreetLife } from '../coney/streetlife.js';
 import { buildStreet, buildStreetLights } from '../coney/street.js';
 import { buildFronts } from '../coney/fronts.js';
@@ -106,7 +107,8 @@ export function build(world) {
   ctx.progress(0.25, 'coney: spawns + bikes'); placeSpawnsBikesCover(world, M, piers);   // after every collider exists (city, housing, park, shore, life)
   if (!skip.has('traffic')) try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }
   if (!skip.has('street')) try { buildStreet(world); } catch (e) { console.warn('[coney] street', e); }
-  if (!skip.has('life')) try { buildStreetLife(world); } catch (e) { console.warn('[coney] street life', e); }   // pigeons, litter, delivery trucks, working bus stops (coney/streetlife.js)   // signals, poles + wires, bins, Surf Ave parking, vendor tables (coney/street.js), after traffic (it reads the signals)   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
+  if (!skip.has('life')) try { buildStreetLife(world); } catch (e) { console.warn('[coney] street life', e); }
+  if (!skip.has('shops')) try { buildShops(world); } catch (e) { console.warn('[coney] shops', e); }   // walk-in shops with people (coney/shops.js; rooms carved by fronts.js)   // pigeons, litter, delivery trucks, working bus stops (coney/streetlife.js)   // signals, poles + wires, bins, Surf Ave parking, vendor tables (coney/street.js), after traffic (it reads the signals)   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
 
   W.surfaceAt = (p) => {
     if (p.z > BW.z1 && p.y < -0.5) return 'ground';

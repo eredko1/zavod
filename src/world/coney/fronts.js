@@ -15,6 +15,7 @@ import { OSM, PLAY } from './osm.js';
 import { STORES } from './stores.js';
 import { BW } from './shore.js';
 import { stationClear } from './stillwell.js';
+import { pip } from '../osmkit.js';
 import { isSchool } from './school.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -135,15 +136,45 @@ function atlasOf(signs, lite) {
 function shopUnit(K, F, u, w, s, signs, o = {}) {
   const u0 = u - w / 2, u1 = u + w / 2, pil = 0.32, frameC = o.frame || 0x2a2c30, sy0 = o.sy0 ?? SIGN_Y0, sy1 = o.sy1 ?? SIGN_Y1;
   K.box(F, u0, u0 + pil, 0, sy1 + 0.1, 0, 0.26, o.pier || 0x8f877c); K.box(F, u1 - pil, u1, 0, sy1 + 0.1, 0, 0.26, o.pier || 0x8f877c);           // pilasters
-  K.box(F, u0 + pil, u1 - pil, 0, 0.5, 0, 0.22, shade(s.bg, 0.55));                                                                                // bulkhead
-  K.quad(F, K.glass, u0 + pil, u1 - pil, 0.5, sy0 - 0.35, 0.17);                                                                                 // glass
+  const dw = Math.min(o.enter ? 1.6 : 1.1, (w - 2 * pil) * (o.enter ? 0.4 : 0.3)), dx = u0 + pil + (o.doorLeft ? 0.3 : (w - 2 * pil) - dw - 0.3);   // the door
+  if (o.enter) {   // a shop you can walk into: glass and bulkhead either side of an open doorway, the door swung back inside
+    for (const [a, b] of [[u0 + pil, dx], [dx + dw, u1 - pil]]) if (b - a > 0.05) { K.box(F, a, b, 0, 0.5, 0, 0.22, shade(s.bg, 0.55)); K.quad(F, K.glass, a, b, 0.5, sy0 - 0.35, 0.17); }
+    K.box(F, dx - 0.06, dx, 0, sy0 - 0.35, 0, 0.22, frameC); K.box(F, dx + dw, dx + dw + 0.06, 0, sy0 - 0.35, 0, 0.22, frameC); K.box(F, dx, dx + 0.05, 0.02, 2.4, -dw + 0.05, 0, 0x1c1e22);
+  } else {
+    K.box(F, u0 + pil, u1 - pil, 0, 0.5, 0, 0.22, shade(s.bg, 0.55));                                                                                // bulkhead
+    K.quad(F, K.glass, u0 + pil, u1 - pil, 0.5, sy0 - 0.35, 0.17);                                                                                 // glass
+  }
   K.box(F, u0 + pil, u1 - pil, sy0 - 0.35, sy0 - 0.2, 0, 0.22, frameC);                                                                            // transom rail
   const nm = Math.max(1, Math.round((w - 2 * pil) / 1.7)); for (let k = 1; k < nm; k++) { const x = u0 + pil + (w - 2 * pil) * k / nm; K.box(F, x - 0.04, x + 0.04, 0.5, sy0 - 0.35, 0.15, 0.21, frameC); }
-  const dw = Math.min(1.1, (w - 2 * pil) * 0.3), dx = u0 + pil + (o.doorLeft ? 0.3 : (w - 2 * pil) - dw - 0.3);                                  // the door: darker, with a push bar
-  K.box(F, dx, dx + dw, 0.02, 2.3, 0.15, 0.2, 0x1c1e22); K.box(F, dx + 0.1, dx + dw - 0.1, 1.0, 1.06, 0.2, 0.26, 0xb8bcc2);
+  if (!o.enter) { K.box(F, dx, dx + dw, 0.02, 2.3, 0.15, 0.2, 0x1c1e22); K.box(F, dx + 0.1, dx + dw - 0.1, 1.0, 1.06, 0.2, 0.26, 0xb8bcc2); }   // a closed door with a push bar
   K.box(F, u0 - 0.05, u1 + 0.05, sy0 - 0.08, sy1 + 0.08, 0.1, 0.3, 0x18191c);                                                                     // sign backing
   const sg = { ...s, aspect: w / (sy1 - sy0) }; signs.push(sg); sg.place = () => K.quad(F, K.sign, u0, u1, sy0, sy1, 0.305, sg.uv);
   if (s.aw) awning(K, F, u0 + 0.1, u1 - 0.1, sy0 - 0.12, s.aw, o.stripe);
+  return { u0, u1, dx, dw, sy0 };
+}
+// ---- enterable shops: the room behind the storefront is carved out of the building's colliders (AABBs, so square-on faces
+// only), a front wall either side of the doorway; coney/shops.js builds the interior when you come near and puts people in it
+const KIND = (k) => /restaurant|fast_food|cafe|pizza/.test(k) ? 'food' : /ice_cream|confectionery/.test(k) ? 'candy' : /bar|pub/.test(k) ? 'bar' : /bank|beauty|hairdresser|laundry|clinic|dancing|nail/.test(k) ? 'service' : 'grocery';
+function depthBehind(f, u) { const px = f.A[0] + f.tx * u, pz = f.A[1] + f.tz * u; let d = 0.5; while (d < 14 && pip(px - f.nx * d, pz - f.nz * d, f.b.p)) d += 0.5; return d - 0.5; }
+function carve(ctx, box) {
+  const out = []; for (const C of ctx.colliders) {
+    if (!(C.max.x > box.min.x && C.min.x < box.max.x && C.max.z > box.min.z && C.min.z < box.max.z && C.max.y > box.min.y && C.min.y < box.max.y)) { out.push(C); continue; }
+    const P = (ax, ay, az, bx, by, bz) => { if (bx - ax > 0.01 && by - ay > 0.01 && bz - az > 0.01) out.push(new THREE.Box3(new THREE.Vector3(ax, ay, az), new THREE.Vector3(bx, by, bz))); };
+    const x0 = Math.max(C.min.x, box.min.x), x1 = Math.min(C.max.x, box.max.x), z0 = Math.max(C.min.z, box.min.z), z1 = Math.min(C.max.z, box.max.z);
+    P(C.min.x, C.min.y, C.min.z, box.min.x, C.max.y, C.max.z); P(box.max.x, C.min.y, C.min.z, C.max.x, C.max.y, C.max.z);
+    P(x0, C.min.y, C.min.z, x1, C.max.y, box.min.z); P(x0, C.min.y, box.max.z, x1, C.max.y, C.max.z);
+    P(x0, box.max.y, z0, x1, C.max.y, z1); P(x0, C.min.y, z0, x1, box.min.y, z1);
+  }
+  ctx.colliders.length = 0; ctx.colliders.push(...out);
+}
+function makeEnterable(world, K, f, F, unit, s) {
+  const rd = Math.min(9, depthBehind(f, (unit.u0 + unit.u1) / 2) - 0.6); if (rd < 4.5) return null;
+  const toW = (u, y, w) => new THREE.Vector3(K.U(F, u), y, w).applyMatrix4(F.m), H = 3.3;
+  const corners = [toW(unit.u0 + 0.35, 0.05, -rd), toW(unit.u1 - 0.35, H, 0.45)], box = new THREE.Box3().setFromPoints(corners);
+  carve(world.ctx, box);
+  for (const [a, b] of [[unit.u0, unit.dx], [unit.dx + unit.dw, unit.u1]]) { if (b - a < 0.05) continue; const p = toW(a, 0, -0.2), q = toW(b, H, 0.05);   // the front wall either side of the doorway
+    world.box([Math.min(p.x, q.x), 0, Math.min(p.z, q.z)], [Math.max(p.x, q.x), H, Math.max(p.z, q.z)]); }
+  return { m: F.m.elements.slice(), flip: F.flip, L: F.L, u0: unit.u0, u1: unit.u1, dx: unit.dx, dw: unit.dw, rd, H, kind: KIND(s.k || ''), name: s.n, bg: s.bg, fg: s.fg, c: toW((unit.u0 + unit.u1) / 2, 0, -rd / 2).toArray() };
 }
 /** awning: 1.5 m out, 0.55 m fall, a 0.3 m valance; striped = alternating with white every 0.35 m */
 function awning(K, F, u0, u1, yTop, color, stripe = false) {
@@ -269,6 +300,7 @@ export function buildFronts(world, M) {
   const mats = [];
   // 1) the mapped businesses: the street face of their building nearest the point, the unit centred on the point
   const NORM = STORES.find((s) => s.st === 'landmark');
+  const ENTER_MAX = lite ? 6 : 14, shopUnits = []; let enterN = 0;
   for (const s of STORES) {
     if (s === NORM) continue;
     let best = null, bd = 18;
@@ -280,7 +312,9 @@ export function buildFronts(world, M) {
     for (const [a, b] of best.used) { if (u + w / 2 > a && u - w / 2 < b) { u = u < (a + b) / 2 ? a - w / 2 - 0.1 : b + w / 2 + 0.1; } }
     if (u - w / 2 < 0.1 || u + w / 2 > best.L - 0.1 || best.used.some(([a, b]) => u + w / 2 > a && u - w / 2 < b)) continue;
     best.used.push([u - w / 2, u + w / 2]); best.store = true;
-    shopUnit(K, K.frame(best), u, w, s, signs, big ? { sy1: SIGN_Y1 + 0.5 } : {}); st.stores++;
+    const square = Math.abs(best.tx) > 0.995 || Math.abs(best.tz) > 0.995, F = K.frame(best), enter = square && enterN < ENTER_MAX && !big && w >= 4.5;
+    const unit = shopUnit(K, F, u, w, s, signs, { ...(big ? { sy1: SIGN_Y1 + 0.5 } : {}), enter }); st.stores++;
+    if (enter) { const e = makeEnterable(world, K, best, F, unit, s); if (e) { shopUnits.push(e); enterN++; } }
   }
   // NORMAN'S: every street face of its building
   if (NORM) { let b = null, bd = 25; for (const f of all) { if (!f.street) continue; const d = segD(NORM.x, NORM.z, f.A, f.B); if (d < bd) { bd = d; b = f.b; } }
@@ -317,6 +351,7 @@ export function buildFronts(world, M) {
   if (boards.length) { const tex = adsTex(lite), list = []; for (const b of boards) { const i = ADS.indexOf(b.ad); list.push(K.quad(b.F, [], b.u0, b.u1, b.y0, b.y1, b.w, [(i % 2) / 2, 1 - (Math.floor(i / 2) + 1) / 2, 0.5, 0.5])); }
     const me = new THREE.Mesh(mergeGeometries(list, false), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 })); me.name = 'fronts:billboards'; scene.add(me); }
   console.log('[fronts]', st.stores, 'mapped stores ·', st.generic, 'procedural shops ·', st.walkups, 'walk-up faces ·', st.arches, 'arched upper storeys ·', st.boards, 'billboards');
+  st.enterable = shopUnits.length; world.W.shopUnits = shopUnits;
   world.W.fronts = { stats: st, faces: all.filter((f) => f.store).length };
   return st;
 }

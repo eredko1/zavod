@@ -193,6 +193,7 @@ function deactivate(E, keep = true) {
 function planLeg(E) {
   const s = E.s; let yaw = s.ry || 0;
   if (s.cross) { E.leg = { ...s.cross.leg }; E.atEnd = true; return; }
+  if (s.leg) { E.leg = { ...s.leg }; return; }   // a set path: in and out of a shop door, up an aisle
   if (s.zone === 'water' || s.zone === 'bw') yaw = Math.sin(yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
   if (s.zone === 'subway') yaw = 0;   // pace along the platform (they face the tracks: walking that way took them off the edge)
   const fx = Math.sin(yaw), fz = Math.cos(yaw), cols = F.ctx.colliders, L = 7 + hash(s.x, s.z, 40) * 7;

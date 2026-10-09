@@ -54,7 +54,7 @@ export function buildSchool(B, world, M) {
   let flag = null;
   { const tex = canvasTex(380, 200, (g, W, H) => { for (let i = 0; i < 13; i++) { g.fillStyle = i % 2 ? '#fff' : '#b22234'; g.fillRect(0, i * H / 13, W, H / 13 + 1); } g.fillStyle = '#3c3b6e'; g.fillRect(0, 0, W * 0.4, H * 7 / 13); g.fillStyle = '#fff';
       for (let r = 0; r < 9; r++) for (let c = 0; c < (r % 2 ? 5 : 6); c++) { g.beginPath(); g.arc(12 + c * 25 + (r % 2 ? 12 : 0), 10 + r * 11.5, 3.2, 0, 7); g.fill(); } });
-    const g = new THREE.PlaneGeometry(2.4, 1.3, lite ? 6 : 14, 2); g.translate(1.2, 0, 0); flag = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.85 })); flag.position.set(flagX, 9.7, flagZ); flag.castShadow = !lite; flag.name = 'school:flag'; scene.add(flag);
+    const g = new THREE.PlaneGeometry(2.4, 1.3, lite ? 6 : 14, 2); g.translate(1.2, 0, 0); flag = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.85 })); flag.position.set(flagX, 9.7, flagZ); flag.castShadow = !lite; flag.name = 'schoolFlag'; scene.add(flag);
     const base = Float32Array.from(g.attributes.position.array);
     world.updaters.push((dt) => { if (!flag.visible) return; const cam = ctx.camera.position; if (Math.abs(cam.x - flagX) > 160 || Math.abs(cam.z - flagZ) > 160) return; const t = performance.now() / 1000, p = g.attributes.position;
       for (let i = 0; i < p.count; i++) { const x = base[i * 3], k = x / 2.4; p.setZ(i, Math.sin(t * 3.2 - x * 2.4) * 0.22 * k + Math.sin(t * 1.3) * 0.05 * k); p.setY(i, base[i * 3 + 1] - 0.08 * k * k); } p.needsUpdate = true; g.computeVertexNormals(); });
