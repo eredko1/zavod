@@ -293,6 +293,25 @@ function adsTex(lite) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
+/** storefronts on faces given from outside (8th Ave by Soc Tav: its painted fronts have no real doors). items:
+ *  [{ A: [x, z], B: [x, z], poly: [[x, z] …] (the building, for the room depth), store: {n, s, st, bg, fg, aw, k}, enter }]; the
+ *  outward normal is taken to point away from the polygon's centre. Returns the walk-in units (pushed to W.shopUnits). */
+export function extraFronts(world, items) {
+  const { scene } = world, lite = !!world.ctx.lite, K = new Kit(), signs = [], out = [];
+  for (const it of items) {
+    const [ax, az] = it.A, [bx, bz] = it.B, L = Math.hypot(bx - ax, bz - az), tx = (bx - ax) / L, tz = (bz - az) / L; let nx = tz, nz = -tx;
+    const cx = it.poly.reduce((a, p) => a + p[0], 0) / it.poly.length, cz = it.poly.reduce((a, p) => a + p[1], 0) / it.poly.length; if (nx * ((ax + bx) / 2 - cx) + nz * ((az + bz) / 2 - cz) < 0) { nx = -nx; nz = -nz; }
+    const f = { A: it.A, B: it.B, L, tx, tz, nx, nz, b: { p: it.poly } }, F = K.frame(f), w = Math.min(L - 0.4, 7.5), u = L / 2;
+    const unit = shopUnit(K, F, u, w, it.store, signs, { enter: it.enter });
+    if (it.enter) { const e = makeEnterable(world, K, f, F, unit, it.store); if (e) out.push(e); }
+  }
+  if (signs.length) { const tex = atlasOf(signs, lite); for (const sg of signs) sg.place(); const me = new THREE.Mesh(mergeGeometries(K.sign, false), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3 })); me.name = 'fronts:extraSigns'; scene.add(me); }
+  if (K.col.length) { const me = new THREE.Mesh(mergeGeometries(K.col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.15 })); me.name = 'fronts:extraKit'; me.receiveShadow = true; scene.add(me); }
+  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), new THREE.MeshStandardMaterial({ color: 0x24303c, roughness: 0.08, metalness: 0.75, emissive: 0x3a2e1c, emissiveIntensity: 0.35 })); me.name = 'fronts:extraGlass'; scene.add(me); }
+  (world.W.shopUnits || (world.W.shopUnits = [])).push(...out);
+  return out;
+}
+
 export function buildFronts(world, M) {
   const { scene, ctx } = world, lite = !!ctx.lite; let seed = 41851; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);   // own sequence: world.R stays as it was
   const all = faces(), inMap = (f) => f.mx > PLAY.x0 - 10 && f.mx < PLAY.x1 + 10 && f.mz > -560 && f.mz < BW.z0;

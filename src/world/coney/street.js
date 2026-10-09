@@ -18,6 +18,7 @@ import { addFolkSpots } from './folk.js';
 import { STREET_NAMES } from './streetnames.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
 import { BRI } from './brighton.js';
+import { AVE8 } from './tavern.js';
 
 const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return Math.hypot(a[0] + t * dx - x, a[1] + t * dz - z); };
 const inRoad = (x, z, pad = 0.3) => OSM.r.some((r) => { for (let i = 0; i + 1 < r.p.length; i++) if (segD(x, z, r.p[i], r.p[i + 1]) < r.w / 2 + pad) return true; return false; });
@@ -79,29 +80,33 @@ function stopTex() {
 /** the phase a lamp shows: the traffic system's signals, or Brighton's own (same 34 s cycle: the avenue, then the cross street) */
 const sigState = (L, now = Date.now()) => { if (!L.j.br) return L.j.n && globalThis.__zvSignals ? globalThis.__zvSignals.state(L.j, L.hx, L.hz, now) : 'R';
   const t = ((now / 1000 + L.j.off) % 34 + 34) % 34, g = Math.abs(L.hx) > 0.7 ? 0 : 1; return g === 0 ? (t < 14 ? 'G' : t < 17 ? 'Y' : 'R') : (t >= 18 && t < 30 ? 'G' : t >= 30 && t < 33 ? 'Y' : 'R'); };
-function brightonKit(world, put, solid, lamps, blades, basket) {
-  const { W, ctx } = world, B = BRI, lite = !!ctx.lite; if (!W.brighton) return [];
-  let seed = 31337; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const zN = B.ZC - B.HALF - 0.9, zS = B.ZC + B.HALF + 0.9, y = B.SW;
+function avenueKit(world, A, put, solid, lamps, blades, basket) {
+  const { W, ctx } = world, lite = !!ctx.lite;
+  let seed = A.seed || 31337; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const zN = A.ZC - A.HALF - 0.9, zS = A.ZC + A.HALF + 0.9, y = A.SW;
   const cyl = (r0, r1, h) => new THREE.CylinderGeometry(r1, r0, h, 8).translate(0, h / 2, 0);
   const head = (x, hy, z, ry, j, hx, hz) => { put(new THREE.BoxGeometry(0.42, 1.12, 0.3).translate(0, 0.56, 0), 0xd8a81a, x, hy, z, ry); ['R', 'Y', 'G'].forEach((k, i) => lamps.push({ j, hx, hz, k, x: x + Math.sin(ry) * 0.16, y: hy + 0.88 - i * 0.34, z: z + Math.cos(ry) * 0.16, ry })); };
-  for (const c of B.CROSS) {
-    const j = { x: c.x, z: B.ZC, br: true, off: (c.n * 7.3) % 34 };
-    for (const [px, pz] of [[c.x - B.CW - 1.2, zS], [c.x + B.CW + 1.2, zS], [c.x + B.CW + 1.2, zN]]) { put(cyl(0.16, 0.12, 6.0), 0x6b6f75, px, y, pz); solid(px, pz, 0.25, 6); basket.push([px + (px > c.x ? 1.3 : -1.3), pz]); }
-    head(c.x + B.CW + 1.2, y + 4.6, zN - 0.3, Math.PI / 2, j, -1, 0);   // westbound on the avenue (they keep right: the north kerb) — faces east
-    head(c.x - B.CW - 1.2, y + 4.6, zS + 0.3, -Math.PI / 2, j, 1, 0);   // eastbound — faces west
-    head(c.x + B.CW + 1.2, y + 2.9, zS + 0.3, 0, j, 0, -1);             // up the cross street from the boardwalk — faces south
-    for (const [px, pz, ry, hx, hz] of [[c.x - B.CW - 1.2, zS, Math.PI / 2, 0, 1], [c.x + B.CW + 1.2, zS, -Math.PI / 2, 0, 1], [c.x + B.CW + 1.2, zN, Math.PI, 1, 0]]) {
-      put(new THREE.BoxGeometry(0.4, 0.75, 0.3).translate(0, 0.37, 0), 0xd8a81a, px, y + 2.0, pz, ry);
-      lamps.push({ j, hx, hz, k: 'hand', x: px + Math.sin(ry) * 0.16, y: y + 2.55, z: pz + Math.cos(ry) * 0.16, ry }, { j, hx, hz, k: 'man', x: px + Math.sin(ry) * 0.16, y: y + 2.2, z: pz + Math.cos(ry) * 0.16, ry }); }
-    const bx = c.x + B.CW + 1.2, bz = zN; blades.push({ x: bx, z: bz, y: y + 3.6, ry: Math.PI / 2 + Math.PI / 2, n: 'Brighton Beach Av' }, { x: bx, z: bz, y: y + 3.32, ry: Math.PI / 2, n: `Brighton ${c.n} St` });
+  const ped = (px, pz, ry, j, hx, hz) => { put(new THREE.BoxGeometry(0.4, 0.75, 0.3).translate(0, 0.37, 0), 0xd8a81a, px, y + 2.0, pz, ry);
+    lamps.push({ j, hx, hz, k: 'hand', x: px + Math.sin(ry) * 0.16, y: y + 2.55, z: pz + Math.cos(ry) * 0.16, ry }, { j, hx, hz, k: 'man', x: px + Math.sin(ry) * 0.16, y: y + 2.2, z: pz + Math.cos(ry) * 0.16, ry }); };
+  for (const [ci, c] of A.cross.entries()) {
+    const j = { x: c.x, z: A.ZC, br: true, off: ((ci + 1) * 7.3 + (A.seed || 0)) % 34 }, xw = c.x - A.CW - 1.2, xe = c.x + A.CW + 1.2;
+    const corners = A.fourWay ? [[xw, zN], [xe, zN], [xw, zS], [xe, zS]] : [[xw, zS], [xe, zS], [xe, zN]];
+    for (const [px, pz] of corners) { put(cyl(0.16, 0.12, 6.0), 0x6b6f75, px, y, pz); solid(px, pz, 0.25, 6); basket.push([px + (px > c.x ? 1.3 : -1.3), pz]); ped(px, pz, px > c.x ? -Math.PI / 2 : Math.PI / 2, j, 0, 1); }
+    head(xe, y + 4.6, zN - 0.3, Math.PI / 2, j, -1, 0);    // westbound (the north kerb) — faces east
+    head(xw, y + 4.6, zS + 0.3, -Math.PI / 2, j, 1, 0);    // eastbound — faces west
+    head(xe, y + 2.9, zS + 0.3, 0, j, 0, -1);              // up the cross street from the south — faces south
+    if (A.fourWay) head(xw, y + 2.9, zN - 0.3, Math.PI, j, 0, 1);   // down it from the north — faces north
+    blades.push({ x: xe, z: zN, y: y + 3.6, ry: Math.PI, n: A.ave }, { x: xe, z: zN, y: y + 3.32, ry: Math.PI / 2, n: c.name });
   }
-  // litter along both kerbs
-  const lit = []; for (let k = 0; k < (lite ? 90 : 220); k++) { const x = B.X0 + R() * (B.X1 - B.X0), z = R() < 0.5 ? B.ZC - B.HALF + 0.3 + R() * 0.4 : B.ZC + B.HALF - 0.3 - R() * 0.4; lit.push([x, z, R() * 6.28, 0.2 + R() * 0.25, (R() * 4) | 0]); }
-  W.brightonLitter = lit;
-  // people on the sidewalks: babushkas and dedushkas, families, the odd tourist
-  const spots = []; for (let x = B.X0 + 20; x < B.X1 - 20; x += lite ? 22 : 9) for (const z of [B.ZC - B.HALF - 2.6, B.ZC + B.HALF + 2.6]) { if (R() < 0.45) continue; if (B.CROSS.some((c) => Math.abs(c.x - x) < B.CW + 2 && z > B.ZC)) continue;
-    const r = R(), walk = R() < 0.65; spots.push({ x: x + (R() - 0.5) * 4, y, z: z + (R() - 0.5) * 1.6, ry: walk ? (R() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : R() * 6.28, pose: walk ? 'walk' : R() < 0.5 ? 'phone' : 'stand', zone: 'town', arch: r < 0.35 ? 'elder' : r < 0.45 ? 'tourist' : r < 0.52 ? 'kid' : undefined, s: r >= 0.45 && r < 0.52 ? 0.66 : undefined }); }
+  for (let k = 0; k < (lite ? A.litter / 2.5 : A.litter); k++) { const x = A.X0 + R() * (A.X1 - A.X0), z = R() < 0.5 ? A.ZC - A.HALF + 0.3 + R() * 0.4 : A.ZC + A.HALF - 0.3 - R() * 0.4; (W.extraLitter || (W.extraLitter = [])).push([x, z, R() * 6.28, 0.2 + R() * 0.25, (R() * 4) | 0]); }
+  const spots = []; for (let x = A.X0 + 6; x < A.X1 - 6; x += lite ? 22 : A.step) for (const z of [A.ZC - A.HALF - 2.6, A.ZC + A.HALF + 2.6]) { if (R() < 0.45) continue; if (A.cross.some((c) => Math.abs(c.x - x) < A.CW + 2 && (A.fourWay || z > A.ZC))) continue;
+    const r = R(), walk = R() < 0.65; spots.push({ x: x + (R() - 0.5) * 4, y, z: z + (R() - 0.5) * 1.6, ry: walk ? (R() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : R() * 6.28, pose: walk ? 'walk' : R() < 0.5 ? 'phone' : 'stand', zone: 'town', arch: r < A.elders ? 'elder' : r < A.elders + 0.1 ? 'tourist' : r < A.elders + 0.17 ? 'kid' : undefined, s: r >= A.elders + 0.1 && r < A.elders + 0.17 ? 0.66 : undefined }); }
+  return spots;
+}
+function zoneKits(world, put, solid, lamps, blades, basket) {
+  const { W } = world, spots = [];
+  if (W.brighton) spots.push(...avenueKit(world, { ...BRI, cross: BRI.CROSS.map((c) => ({ x: c.x, name: `Brighton ${c.n} St` })), ave: 'Brighton Beach Av', fourWay: false, litter: 220, step: 9, elders: 0.35, seed: 31337 }, put, solid, lamps, blades, basket));
+  if (W.tavern) spots.push(...avenueKit(world, { ...AVE8, ave: '8 Av', fourWay: true, litter: 90, step: 6, elders: 0.25, seed: 8008 }, put, solid, lamps, blades, basket));
   return spots;
 }
 
@@ -152,7 +157,7 @@ export function buildStreet(world) {
   }
   // ---- stop signs (the minor street's approaches; ALL WAY where equals meet) and green name blades on a corner of every junction ----
   const stops = [], blades = [];
-  const brSpots = brightonKit(world, put, solid, lamps, blades, cornerBins);
+  const brSpots = zoneKits(world, put, solid, lamps, blades, cornerBins);
   for (const j of W.junctions || []) {
     if (!inMap(j.x, j.z)) continue;
     const ways = []; for (const e of j.ways) if (!ways.some((q) => q.dx * e.dx + q.dz * e.dz > 0.9)) ways.push(e);

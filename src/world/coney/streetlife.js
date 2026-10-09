@@ -11,6 +11,8 @@ import { BW } from './shore.js';
 import { streetAt } from './fronts.js';
 import { addFolkSpots } from './folk.js';
 import { BUS_STOPS } from './traffic.js';
+import { AVE8 } from './tavern.js';
+import { BRI } from './brighton.js';
 
 const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return Math.hypot(a[0] + t * dx - x, a[1] + t * dz - z); };
 const inRoad = (x, z, pad = 0.2) => OSM.r.some((r) => { for (let i = 0; i + 1 < r.p.length; i++) if (segD(x, z, r.p[i], r.p[i + 1]) < r.w / 2 + pad) return true; return false; });
@@ -42,7 +44,7 @@ export function buildStreetLife(world) {
       if (!inMap(x, z) || blocked(x, z, 0.1)) continue;
       if (R() < 0.2) cans.push([x, z, R() * 6.28]); else items[(R() * 4) | 0].push([x, z, R() * 6.28, 0.18 + R() * 0.25]);
     }
-    for (const [x, z, a, sc, cell] of W.brightonLitter || []) items[cell].push([x, z, a, sc]);   // Brighton Beach Av's kerbs too
+    for (const [x, z, a, sc, cell] of W.extraLitter || []) items[cell].push([x, z, a, sc]);   // Brighton Beach Av's and 8th Ave's kerbs too
     items.forEach((list, cell) => { if (!list.length) return; const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setX(i, (cell + u.getX(i)) / 4);
       const im = new THREE.InstancedMesh(g, mat, list.length); list.forEach(([x, z, a, sc], i) => { _e.set(0, a, 0); _q.setFromEuler(_e); im.setMatrixAt(i, _m.compose(_p.set(x, 0.035 + i * 1e-5, z), _q, _s.set(sc * (cell === 3 ? 2.2 : 1), 1, sc * (cell === 3 ? 1.8 : 1)))); }); im.receiveShadow = true; im.name = 'life:litter'; scene.add(im); st.litter += list.length; });
     if (cans.length) { const g = new THREE.CylinderGeometry(0.033, 0.033, 0.12, 8); g.rotateZ(Math.PI / 2); const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.8 }), cans.length);
@@ -89,7 +91,9 @@ export function buildStreetLife(world) {
   // ---- pigeons ------------------------------------------------------------------------------------------------------------
   { const flocksAt = [[-82, -150], [-60, -136], [-110, -96], [-56, -210], [-30, -205], [80, -392], [-150, -282], [-85, -282], [20, -125], [200, -102], [-20, 130], [120, 132], [-200, 135]];
     if (W.onlineStart) flocksAt.push([W.onlineStart[0] + 6, W.onlineStart[2] + 4]);
-    const NF = lite ? 7 : flocksAt.length, NB = lite ? 5 : 8, birds = [];
+    if (W.tavern) flocksAt.push([-60, AVE8.ZC + AVE8.HALF + 2.5], [40, AVE8.ZC - AVE8.HALF - 2.5]);   // 8th Ave by Soc Tav
+    if (W.brighton) flocksAt.push([BRI.STN_X + 20, BRI.ZC + BRI.HALF + 2.5], [1300, BRI.ZC - BRI.HALF - 2.5]);   // Brighton Beach Av
+    const NF = lite ? Math.min(flocksAt.length, 9) : flocksAt.length, NB = lite ? 5 : 8, birds = [];
     const body = (() => { const parts = []; const b = new THREE.SphereGeometry(0.1, 8, 6); b.scale(0.85, 0.8, 1.45); b.translate(0, 0.14, 0); parts.push(b); const h = new THREE.SphereGeometry(0.052, 8, 6); h.translate(0, 0.25, 0.13); parts.push(h);
       const beak = new THREE.ConeGeometry(0.014, 0.045, 5); beak.rotateX(Math.PI / 2); beak.translate(0, 0.245, 0.19); parts.push(beak); const tail = new THREE.BoxGeometry(0.09, 0.015, 0.11); tail.rotateX(0.25); tail.translate(0, 0.12, -0.17); parts.push(tail);
       for (const s of [-1, 1]) { const w = new THREE.BoxGeometry(0.03, 0.06, 0.2); w.translate(s * 0.08, 0.15, -0.02); parts.push(w); } for (const s of [-1, 1]) { const l = new THREE.BoxGeometry(0.012, 0.07, 0.012); l.translate(s * 0.03, 0.035, 0.01); parts.push(l); }
