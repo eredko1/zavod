@@ -9,7 +9,8 @@ import { OSM, PLAY } from './osm.js';
 import { BW } from './shore.js';
 import { ribbon, walk, footprint, footprintAngle, decompose, segDist, segDist1, bbox, cen, pip } from '../osmkit.js';
 import { placeCars } from '../carkit.js';
-import { BUS_STOPS } from './traffic.js';   // no parking at the bus stops
+import { BUS_STOPS } from './traffic.js';
+import { SURF_HH, stationClear } from './stillwell.js';   // no parking at the bus stops
 
 
 export function buildCity(world, M) {
@@ -48,6 +49,7 @@ export function buildCity(world, M) {
   for (const b of OSM.b) {
     // Luna Park Houses (the five ~21-storey towers north of the avenue) are built by coney/housing.js — skip them here
     if (b.s === 'tower' && b.h > 50) { const [lx, lz] = cen(b.p); if (lx > 60 && lx < 380 && lz > -520 && lz < -110) continue; }
+    { const [lx, lz] = cen(b.p); if (stationClear(lx, lz)) continue; }   // the Stillwell Ave station's Surf Ave head house + bus loop: stillwell.js
     const T = inPlay(b) ? S : F;
     try { building(T, world, M, b); } catch (e) { console.warn('[coney] building', e); }
   }
@@ -332,7 +334,8 @@ function viaducts(world, M) {
   const near = (x, z) => x > PLAY.x0 - 30 && x < PLAY.x1 + 30 && z > PLAY.z0 - 30 && z < PLAY.z1 + 30;
   const W8u = [0.970, 0.242];   // W 8 St station axis (coney/w8th.js): its own two-level structure
   const inW8 = (x, z) => { const dx = x - 274.5, dz = z + 153, a = dx * W8u[0] + dz * W8u[1], o = -dx * W8u[1] + dz * W8u[0]; return a > -12 && a < 200 && Math.abs(o) < 11; };
-  const inTerminal = (x, z) => (x > -90 && x < -22 && z > -446 && z < -255) || inW8(x, z);   // the Stillwell terminal + W 8 St build their own decks + tracks
+  const inTerminal = (x, z) => (x > -90 && x < -22 && z > -446 && z < -255) || inW8(x, z);
+  const inHeadHouse = (x, z) => x > SURF_HH.x0 - 1.5 && x < SURF_HH.x1 + 1.5 && z > -259 && z < SURF_HH.z + 1.5;   // the Surf Ave head house carries the el there: no columns through its concourse   // the Stillwell terminal + W 8 St build their own decks + tracks
   // columns stay out of the carriageways (the girders span the street, as on the real el) and parallel tracks share columns
   const segDist2 = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2; };
   const inRoad = (x, z) => OSM.r.some((r) => { const h = r.w / 2 - 0.2; for (let i = 0; i + 1 < r.p.length; i++) if (segDist2(x, z, r.p[i], r.p[i + 1]) < h * h) return true; return false; });
@@ -342,7 +345,7 @@ function viaducts(world, M) {
     if (!l.el) continue;
     const pts = l.p; if (pts.length < 2) continue;
     walk(pts, 12, (x, z, dx, dz) => { // bents: two columns + cap girder across the track (+ knee braces in play)
-      if (inTerminal(x, z)) return;
+      if (inTerminal(x, z) || inHeadHouse(x, z)) return;
       const ang = Math.atan2(dx, dz);
       for (const s of [-2.4, 2.4]) { const cx = x + Math.cos(ang) * s, cz = z - Math.sin(ang) * s; if (!colOK(cx, cz)) continue; const g = boxGeo([-0.25, 0, -0.25], [0.25, Y - 1.1, 0.25]); g.translate(s, 0, 0); g.rotateY(ang); g.translate(x, 0, z); V.add('elGirder', g); world.box([cx - 0.3, 0, cz - 0.3], [cx + 0.3, Y - 1, cz + 0.3]); }
       const cap = boxGeo([-3.0, Y - 1.3, -0.35], [3.0, Y - 0.9, 0.35]); cap.rotateY(ang); cap.translate(x, 0, z); V.add('elGirder', cap);

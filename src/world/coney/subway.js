@@ -820,11 +820,11 @@ function buildElStation(world, sHead, opt) {
 // Av's stair feet — and an "F ↑" sign over the one Stillwell stair bank that leads to the F platform
 function buildEntrances(world) {
   const { scene, W } = world; const u = W8U, w8 = (a, o) => [W8.P0.x + u.x * a - u.y * o, W8.P0.y + u.y * a + u.x * o];
-  const spots = [[-72.8, -256.5], [-59.2, -256.5], [-52.8, -256.5], [-39.2, -256.5], [-89.6, -277.8], [-89.6, -270.2]];
+  const spots = [[-72.8, -256.5], [-59.2, -256.5], [-52.8, -256.5], [-39.2, -256.5], [-89.6, -277.8], [-89.6, -270.2], [-68.2, -143.1], [-42.8, -143.1]];   // + the Surf Ave head house front
   const oN = -(W8.platOut + 2.3), oS = W8.platOut + 2.3, oE = W8.platOut + 38 - 1.4;
   for (const o of [oN, oS]) for (const d of [-1.7, 1.7]) spots.push(w8(38.2, o + d));
   for (const d of [-1.7, 1.7]) spots.push(w8(133.8, oE + d));
-  const RT = spots.map((q, i) => (i < 6 ? 'DFNQ' : 'FQ'));   // Stillwell: D F N Q · W 8 St: F Q
+  const RT = spots.map((q, i) => (i < 8 ? 'DFNQ' : 'FQ'));   // Stillwell: D F N Q · W 8 St: F Q
   for (const [id, r] of [['NEP', 'F'], ['OCP', 'Q'], ['B50', 'D']]) for (const q of STN[id]?.feet || []) { spots.push(q); RT.push(r); }
   const poles = [], globes = [], bul = [];
   spots.forEach(([x, z], si) => {
