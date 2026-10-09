@@ -19,6 +19,7 @@ import { W8 } from './w8th.js';
 import { STILLWELL } from './stillwell.js';
 import { BW } from './shore.js';
 import { buildHustlers, hustlerTaken } from './hustlers.js';
+import { streetAt } from './fronts.js';
 
 const hash = (x, z, k = 0) => { const v = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
 const pick = (a, h = Math.random()) => a[Math.floor(h * a.length) % a.length];
@@ -34,6 +35,8 @@ const BARK = {
   witness: ['Я всё видел! I SAW that!', 'Somebody call the cops!', 'Ой-ой-ой, что делается…', 'Yo, that\'s messed up!', 'Не моё дело. Не моё дело.', 'Brighton was quieter in \'89.'],
   chatter: ['Вода сегодня как лёд.', 'Who took my flip-flops?!', 'Семечки будешь?', 'Nathan\'s line is crazy today.', 'Сынок, намажься кремом!', 'The Cyclone is closed AGAIN?', 'В моё время чебурек стоил доллар.', 'Yo, the Mets lost again.', 'Бурбон, братва, Гудзон…', 'That seagull took my knish!'],
   panic: ['Бежим!', 'RUN!', 'Мама!', 'Nope. Nope. Nope.'],
+  vendor: ['Water! Cold water, one dollar!', 'Phone chargers, phone cases!', 'Холодная вода! Один доллар!', 'Selfie stick, five dollar, best price!', 'Boss, sunglasses? Two for ten!', 'Mango, mango, mango!', 'Kids love it — bubble gun, eight dollar!'],
+  kid: ['Mom! MOM! Can we go on the Cyclone?', 'Мама, хочу мороженое!', 'Last one to the beach is a rotten egg!', 'My backpack weighs like a thousand pounds.'],
 };
 const TINT = {
   beach: [0xe8205a, 0x1a8ad8, 0xf2c418, 0x2fbf6a, 0xff6a2a, 0x18c0c8, 0xff7ab0, 0xf0f0f0, 0x7a2ae0, 0xd01a1a],
@@ -72,12 +75,36 @@ function persona(s) {
   const fem = h(1) < 0.45, ids = fem ? F.av.f : F.av.m, avatar = ids[Math.floor(h(2) * ids.length) % ids.length];
   const t = h(3), dark = !!AVATARS[avatar]?.dark;
   const temper = !fem && t < 0.14 ? 'tough' : t < 0.36 ? 'scrappy' : 'soft';
-  s.p = { avatar, fem, name: pick(NAMES[fem ? 'f' : 'm'], h(4)), temper, type: temper === 'tough' ? (dark ? 'st' : 'ru') : 'mk', blade: temper === 'tough' && h(5) < 0.8,
+  const arch = archetype(s, h);
+  s.p = { arch, kid: arch === 'kid' || arch === 'schoolkid', avatar, fem, name: pick(NAMES[fem ? 'f' : 'm'], h(4)), temper, type: temper === 'tough' ? (dark ? 'st' : 'ru') : 'mk', blade: temper === 'tough' && h(5) < 0.8,
     cash: 10 + 5 * Math.floor(h(6) * 8), tint: h(7) < 0.7 ? pick(beach ? TINT.beach : TINT.town, h(8)) : null, glasses: h(9) < (beach ? 0.45 : 0.25),
     hat: h(10) < (beach ? 0.4 : 0.22) ? (fem ? 'sun' : h(11) < 0.5 ? 'cap' : 'bucket') : null, belly: h(12) < 0.25,
     gun: temper === 'tough' ? (h(5) < 0.8 ? 'knife' : 'm9') : h(15) < 0.12 ? 'm9' : null,   // some carry: rob or drop them and it's yours
     mood: s.zone === 'queue' || s.zone === 'park' ? (h(13) < 0.4 ? 'talk' : null) : s.zone === 'bw' && h(13) < 0.08 ? 'drunk' : null, speed: 1.15 + h(14) * 0.35 };
+  const P = s.p;   // the street types (Surf Ave tourists and families, kids with school bags on Mermaid, the old-timers, hi-vis crews on Stillwell, the sellers)
+  if (P.kid) { P.temper = 'soft'; P.gun = null; P.blade = false; P.speed = 1.0 + h(16) * 0.25; P.cash = 2; P.name = pick(['LITTLE VINNIE', 'MISHA', 'KAYLA', 'DIMA', 'JAYDEN', 'SOFIA', 'ARTYOM', 'MIA'], h(17)); P.glasses = false; P.hat = h(18) < 0.25 ? 'cap' : null; }
+  if (arch === 'elder') { P.speed = 0.62 + h(16) * 0.18; P.tint = pick([0x5a5a5a, 0x3a3f50, 0x6b5a4a, 0x8a8478, 0x2a2a2a], h(8)); P.hat = h(18) < 0.55 ? 'cap' : null; P.hatCol = pick([0x3a3a3a, 0x5a4a3a, 0x2a3040], h(19)); P.name = pick(['DEDUSHKA FIMA', 'BABA RAYA', 'OLD SAL', 'MRS. GOLDBERG', 'UNCLE ZYAMA', 'MR. ESPOSITO'], h(17)); }
+  if (arch === 'worker') { P.tint = 0xd6ff1f; P.hat = 'cap'; P.hatCol = 0xff7a1a; P.glasses = h(18) < 0.4; P.mood = h(13) < 0.5 ? 'talk' : null; }
+  if (arch === 'tourist') { P.glasses = h(9) < 0.6; P.hat = h(10) < 0.45 ? (fem ? 'sun' : h(11) < 0.5 ? 'cap' : 'bucket') : P.hat; P.tint = pick(TINT.beach, h(8)); }
+  if (arch === 'vendor') { P.temper = h(3) < 0.3 ? 'scrappy' : 'soft'; P.hat = h(10) < 0.6 ? (h(11) < 0.5 ? 'cap' : 'bucket') : null; P.mood = null; P.cash = 40 + 5 * Math.floor(h(6) * 8); }
   return s.p;
+}
+
+/** who walks this street: set by life.js on the town spots (s.arch), or worked out from where the spot is */
+function archetype(s, h) {
+  if (s.arch) return s.arch;
+  if (s.zone === 'vendor') return 'vendor';
+  if (s.zone === 'towel' || s.zone === 'water' || s.zone === 'subway' || s.zone === 'rail') return null;
+  const st = s.zone === 'bw' ? 'surf' : streetAt(s.x, s.z), r = h(22);
+  return pickArch(st, r);
+}
+/** street → mix of types (shared with life.js so the far instanced crowd agrees with the live one) */
+export function pickArch(st, r) {
+  if (st === 'surf') return r < 0.45 ? 'tourist' : r < 0.6 ? 'kid' : r < 0.68 ? 'elder' : null;
+  if (st === 'mermaid' || st === 'neptune') return r < 0.22 ? 'schoolkid' : r < 0.47 ? 'elder' : null;
+  if (st === 'stillwell') return r < 0.24 ? 'worker' : r < 0.34 ? 'elder' : r < 0.44 ? 'tourist' : null;
+  if (st === 'w8' || st === 'w12') return r < 0.12 ? 'schoolkid' : r < 0.3 ? 'elder' : r < 0.4 ? 'tourist' : null;
+  return r < 0.1 ? 'kid' : r < 0.2 ? 'elder' : null;
 }
 
 // clothes recolour: keeps skin-toned texels, pushes the rest toward the person's colour (luminance kept)
@@ -97,7 +124,7 @@ function tintMat(src, col) {
   m.customProgramCacheKey = () => 'folkTint1';
   return m;
 }
-const HATM = {};
+const HATM = {}, BAGG = {};
 function hatMat(c) { return HATM[c] || (HATM[c] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 })); }
 const HATG = {};
 function hat(kind, col) {
@@ -116,7 +143,13 @@ function makeFig(s, sit) {
   const f = buildPerson({ avatar: p.avatar, seed: Math.floor(hash(s.x, s.z, 20) * 997), pose: sit ? 'sit' : undefined, glasses: p.glasses, female: p.fem });
   f.mood = p.mood;
   if (p.tint != null) f.group.traverse((o) => { if (o.isSkinnedMesh && /_body$/.test(o.material?.name || '')) o.material = tintMat(o.material, p.tint); });
-  if (p.hat) f.head.add(hat(p.hat, pick([0xf2f0ea, 0x1a2a5a, 0xc0202a, 0xe8c890, 0x151515, 0x2a6a3a, 0xf2c418], hash(s.x, s.z, 21))));
+  if (p.hat) f.head.add(hat(p.hat, p.hatCol ?? pick([0xf2f0ea, 0x1a2a5a, 0xc0202a, 0xe8c890, 0x151515, 0x2a6a3a, 0xf2c418], hash(s.x, s.z, 21))));
+  if (p.kid) f.group.scale.setScalar(s.s && s.s < 0.8 ? s.s : 0.68);
+  if (p.arch === 'schoolkid' || (p.arch === 'tourist' && hash(s.x, s.z, 23) < 0.3)) {   // a backpack: a rounded pack + a front pocket, on the back (the figure faces +z)
+    const bag = new THREE.Group(), m = hatMat(pick([0x1a2a5a, 0xc0202a, 0x2a6a3a, 0xff7ab0, 0x151515, 0xf2c418, 0x7a2ae0], hash(s.x, s.z, 24)));
+    const a = new THREE.Mesh(BAGG.body || (BAGG.body = new THREE.BoxGeometry(0.32, 0.4, 0.15)), m); a.position.set(0, 1.22, -0.2); const b = new THREE.Mesh(BAGG.pocket || (BAGG.pocket = new THREE.BoxGeometry(0.24, 0.18, 0.06)), m); b.position.set(0, 1.12, -0.3);
+    a.castShadow = b.castShadow = true; bag.add(a, b); f.group.add(bag);
+  }
   return f;
 }
 function disposeFig(f) { f.group.traverse((o) => { if (o.material?.userData?.tint) o.material.dispose(); }); }
@@ -135,7 +168,9 @@ function activate(s) {
     const hb = mode === 'lie' ? new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.32, 1.8), hbm) : new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, mode === 'sit' ? 1.3 : 1.75, 8), hbm);
     hb.position.y = mode === 'lie' ? 0.16 : mode === 'sit' ? 0.2 : 0.88; hb.userData.surface = 'flesh'; holder.add(hb);
     E = { s, p, fig, holder, hb, mode, meshes: [], cast: true, hp: 100, pos: new THREE.Vector3(s.x, s.y || 0, s.z), yaw: s.ry || 0, leg: null, dir: 1, speed: 0, acc: 0, inView: true, barkT: 0, bubble: null, bubbleT: 0, hands: 0, panic: 0 };
-    hb.userData.onHit = (dmg, head, point, dir) => { if (s.sub) return lightHit(E, dmg * (head ? 1.6 : 1)); const t = promote(E, 'hit'); if (t) folkHurt(t, dmg * (head ? 1.6 : 1), dir, head); };
+    hb.userData.onHit = (dmg, head, point, dir) => { if (s.sub) return lightHit(E, dmg * (head ? 1.6 : 1));
+      if (p.kid) { const P = F.ctx.player.position; E.panic = 5; E.panicYaw = Math.atan2(E.pos.x - P.x, E.pos.z - P.z); say(E, pick(BARK.panic)); return; }   // kids run, they don't fight
+      const t = promote(E, 'hit'); if (t) folkHurt(t, dmg * (head ? 1.6 : 1), dir, head); };
     if (mode === 'walk') planLeg(E);
     fig.group.traverse((o) => { if (o.isMesh) E.meshes.push(o); });
   }
@@ -156,6 +191,7 @@ function deactivate(E, keep = true) {
 /** walkers ping-pong along their heading (boardwalk strollers along the deck, bathers along the waterline), clear of colliders */
 function planLeg(E) {
   const s = E.s; let yaw = s.ry || 0;
+  if (s.cross) { E.leg = { ...s.cross.leg }; E.atEnd = true; return; }
   if (s.zone === 'water' || s.zone === 'bw') yaw = Math.sin(yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
   if (s.zone === 'subway') yaw = 0;   // pace along the platform (they face the tracks: walking that way took them off the edge)
   const fx = Math.sin(yaw), fz = Math.cos(yaw), cols = F.ctx.colliders, L = 7 + hash(s.x, s.z, 40) * 7;
@@ -163,6 +199,19 @@ function planLeg(E) {
   let a = 0, b = 0; while (a < L && free(s.x - fx * (a + 1), s.z - fz * (a + 1))) a += 1; while (b < L && free(s.x + fx * (b + 1), s.z + fz * (b + 1))) b += 1;
   if (a + b < 3) { E.mode = 'stand'; return; }
   E.leg = { ax: s.x - fx * a, az: s.z - fz * a, bx: s.x + fx * b, bz: s.z + fz * b, yaw };
+}
+/** a crosswalk walker may step off: the cars along the way they walk have the green (so the ones crossing their path are stopped) */
+function crossOK(E) {
+  const S = F.world.W.signals, c = E.s.cross; if (!S) return true;
+  const hx = E.dir > 0 ? c.hx : -c.hx, hz = E.dir > 0 ? c.hz : -c.hz, n = c.j.n, t = ((Date.now() / 1000 + n.sig.off) % 34 + 34) % 34;
+  const g = Math.abs(hx * n.sig.ax + hz * n.sig.az) > 0.7 ? 0 : 1, e = t - (g ? 18 : 0);
+  return e >= 0 && e < 4 && S.state(c.j, hx, hz) === 'G';   // only in the first 4 s of their green, so they're across before the amber (traffic.js: 12-14 s green)
+}
+/** more spots, added after the crowd is built (coney/street.js: crosswalk walkers, the sellers at the vendor tables): live only */
+export function addFolkSpots(world, list) {
+  if (!F || F.world !== world) return 0;
+  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; F.spots.push(s); }
+  return list.length;
 }
 /** pull a live local into the street systems (chill.js): he's a real crew member from here on, streamed to friends */
 function promote(E, why) {
@@ -262,7 +311,10 @@ function update(dt) {
     } else if (E.mode === 'walk' && E.leg) {
       const L = E.leg, tx = E.dir > 0 ? L.bx : L.ax, tz = E.dir > 0 ? L.bz : L.az, dx = tx - E.pos.x, dz = tz - E.pos.z, d = Math.hypot(dx, dz);
       const nearMe = Math.hypot(P.x - E.pos.x, P.z - E.pos.z) < 1.1;   // don't walk through the player
-      if (d < 0.3) E.dir = -E.dir; else if (!nearMe && !E.fig.hands) { speed = E.p.speed; E.pos.x += dx / d * speed * dt; E.pos.z += dz / d * speed * dt; const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 5); }
+      const wait = E.s.cross && E.atEnd && !crossOK(E);   // at the kerb: the hand is up
+      if (E.s.cross && E.atEnd && !wait) { E.atEnd = false; F.stats.crossStarts = (F.stats.crossStarts || 0) + 1; }
+      if (wait) { const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 3); }
+      else if (d < 0.3) { E.dir = -E.dir; if (E.s.cross) E.atEnd = true; } else if (!nearMe && !E.fig.hands) { speed = E.p.speed; E.pos.x += dx / d * speed * dt; E.pos.z += dz / d * speed * dt; const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 5); }
       if (E.s.zone === 'water' || F.world.W.sandAt(E.pos.x, E.pos.z)) { const gy = F.world.W.groundHeight?.(E.pos.x, E.pos.z); if (Number.isFinite(gy)) E.pos.y = gy - (E.s.zone === 'water' ? 0.2 : 0); }
     }
     if (E.hands > 0) { E.hands -= dt; if (E.hands <= 0) E.fig.hands = false; }
@@ -276,7 +328,7 @@ function update(dt) {
   F.robE = null;
   if (!ctx.vehicles?.mounted && (F.pspeed < 2.6 || me.mounted?.train) && !K.state()?.dialog) {   // riding the F: the train's speed doesn't count
     const fx = -Math.sin(me.yaw || 0), fz = -Math.cos(me.yaw || 0); let bd = 2.3;
-    for (const E of F.active) { const vx = E.pos.x - P.x, vz = E.pos.z - P.z, d = Math.hypot(vx, vz); if (d < bd && Math.abs(E.pos.y - P.y) < 2 && (vx * fx + vz * fz) / (d || 1) > 0.7) { bd = d; F.robE = E; } }
+    for (const E of F.active) { const vx = E.pos.x - P.x, vz = E.pos.z - P.z, d = Math.hypot(vx, vz); if (d < bd && Math.abs(E.pos.y - P.y) < 2 && (vx * fx + vz * fz) / (d || 1) > 0.7 && !E.p.kid) { bd = d; F.robE = E; } }
     if (F.robE) F.robPos.copy(F.robE.pos).setY(P.y);
   }
 }
@@ -304,7 +356,7 @@ function tick() {
       if (E.barkT <= 0 && F.barkT <= 0) bark(E, 'gun', true);
     } else if (d < 1.5 && F.pspeed > 1.2 && E.barkT <= 0 && F.barkT <= 0) bark(E, 'bump', true);
     else if (wasted && d < 4.5 && E.barkT <= 0 && F.barkT <= 0 && Math.random() < 0.3) bark(E, 'wasted', true);
-    else if (d < 7 && E.barkT <= 0 && F.barkT <= -6 && Math.random() < 0.04) bark(E, 'chatter', false);
+    else if (d < 7 && E.barkT <= 0 && F.barkT <= -6 && Math.random() < (E.p.arch === 'vendor' ? 0.12 : 0.04)) bark(E, E.p.arch === 'vendor' ? 'vendor' : E.p.kid ? 'kid' : 'chatter', false);
   }
   // muggers: now and then one of the locals near you decides you look rich
   F.mugT -= 0.25;
@@ -312,8 +364,8 @@ function tick() {
 }
 function mugger(dmin, dmax) {
   const P = F.ctx.player.position; let best = null, bd = Infinity;
-  for (const E of F.active) { if (E.p.fem || E.mode === 'lie' || E.mode === 'sit') continue; const d = Math.hypot(E.pos.x - P.x, E.pos.z - P.z); if (d < dmin || d > dmax) continue; const k = Math.abs(d - (dmin + dmax) / 2); if (k < bd) { bd = k; best = E; } }
-  if (!best) for (const E of F.active) { if (E.p.fem) continue; const d = Math.hypot(E.pos.x - P.x, E.pos.z - P.z); if (d < bd) { bd = d; best = E; } }
+  for (const E of F.active) { if (E.p.fem || E.p.kid || E.mode === 'lie' || E.mode === 'sit') continue; const d = Math.hypot(E.pos.x - P.x, E.pos.z - P.z); if (d < dmin || d > dmax) continue; const k = Math.abs(d - (dmin + dmax) / 2); if (k < bd) { bd = k; best = E; } }
+  if (!best) for (const E of F.active) { if (E.p.fem || E.p.kid) continue; const d = Math.hypot(E.pos.x - P.x, E.pos.z - P.z); if (d < bd) { bd = d; best = E; } }
   if (!best) return null; const name = best.p.name;
   const t = promote(best, 'mug'); if (t) F.stats.muggers++; return t ? name : null;
 }
@@ -349,6 +401,11 @@ function onCrime(e) {
 
 /** QA hooks: window.__game.folk */
 export const folkQA = {
+  crossers: () => F ? [...F.active].filter((E) => E.s.cross).map((E) => { const c = E.s.cross, hx = E.dir > 0 ? c.hx : -c.hx, hz = E.dir > 0 ? c.hz : -c.hz, L = E.leg;
+    const along = L ? ((E.pos.x - L.ax) * (L.bx - L.ax) + (E.pos.z - L.az) * (L.bz - L.az)) / ((L.bx - L.ax) ** 2 + (L.bz - L.az) ** 2 || 1) : 0;
+    return { waiting: !!E.atEnd && !crossOK(E), mid: along > 0.3 && along < 0.7, leaving: !E.atEnd && (E.dir > 0 ? along < 0.12 : along > 0.88), state: F.world.W.signals?.state(c.j, hx, hz) }; }) : [],
+  crossStats: () => F ? { starts: F.stats.crossStarts || 0 } : null,
+  archs: () => F ? [...F.active].map((E) => E.p.arch || 'none') : [],
   state: () => F && { spots: F.spots.length, active: F.active.size, gone: F.spots.filter((s) => s.gone).length, cache: F.cache.length, stats: { ...F.stats }, robTarget: F.robE?.p.name || null, pspeed: +F.pspeed.toFixed(2),
     near: [...F.active].map((E) => ({ name: E.p.name, avatar: E.p.avatar, mode: E.mode, zone: E.s.zone, temper: E.p.temper, tint: E.p.tint != null, hat: E.p.hat, pos: E.pos.toArray().map((v) => +v.toFixed(1)), real: !!E.fig.avatar, d: +Math.hypot(E.pos.x - F.ctx.player.position.x, E.pos.z - F.ctx.player.position.z).toFixed(1) })).sort((a, b) => a.d - b.d) },
   /** face the nearest live local (optionally of a temper) from `d` m and return its name */

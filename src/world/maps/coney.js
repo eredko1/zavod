@@ -1,6 +1,8 @@
 // MAP: CONEY ISLAND — the amusement district, boardwalk and beach, 1:1 from an OSM plan (qa/tools/osm-coney.py) with hand-built
 // landmarks to the reference photos (qa/refs/coney). Levels: streets / amusement area / boardwalk y = 0 · beach sand −1.3 → −2.4
 // at the waterline (stairs every ~95 m) · pier deck 0 · wheel platform +0.6 · ballpark stands to +8. Owned by: CONEY agent.
+import { buildStreet } from '../coney/street.js';
+import { buildFronts } from '../coney/fronts.js';
 import * as THREE from 'three';
 import { makeConeyMats } from '../coney/mats.js';
 import { buildSky } from '../sbu/sky.js';
@@ -40,6 +42,7 @@ export function build(world) {
   ctx.progress(0.13, 'coney: sky'); buildSky(world, { shadowHalf: 130, center: [0, 0, 0] });
   const M = makeConeyMats(world); world.mats = M;
   ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
+  try { buildFronts(world, M); } catch (e) { console.warn('[coney] fronts', e); }   // real storefronts, walk-up fire escapes + cornices, Surf Ave arches + billboards (coney/fronts.js)
   ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
   try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
   try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)
@@ -97,7 +100,8 @@ export function build(world) {
   for (let x = PLAY.x0 + 10; x < PLAY.x1; x += 22) world.cover(x, BW.z1 - 2.8, 0, -1);
   ctx.progress(0.24, 'coney: crowds'); if (!skip.has('crowds')) try { buildBeachLife(world, M); } catch (e) { console.warn('[coney] life', e); }
   ctx.progress(0.25, 'coney: spawns + bikes'); placeSpawnsBikesCover(world, M, piers);   // after every collider exists (city, housing, park, shore, life)
-  if (!skip.has('traffic')) try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
+  if (!skip.has('traffic')) try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }
+  if (!skip.has('street')) try { buildStreet(world); } catch (e) { console.warn('[coney] street', e); }   // signals, poles + wires, bins, Surf Ave parking, vendor tables (coney/street.js), after traffic (it reads the signals)   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
 
   W.surfaceAt = (p) => {
     if (p.z > BW.z1 && p.y < -0.5) return 'ground';

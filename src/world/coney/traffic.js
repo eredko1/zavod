@@ -230,6 +230,11 @@ export function buildTraffic(world) {
   const lite = !!ctx.lite, budget = want ? Math.max(1, Math.min(60, +want | 0)) : lite ? 10 : 24;
   T = { world, ctx, W, lite, budget, ring: lite ? 150 : 250, cars: [], kinds: {}, t: 0, frame: 0, spawnN: 0, spawnCool: 0, people: [], peopleT: 0, spot: null, jackable: null, stats: { jacked: 0, crashes: 0, honks: 0 }, obs: [], fz: false };
   T.G = buildGraph(world); if (!T.G.segs.length) { console.warn('[traffic] no roads'); return null; }
+  // the signalised junctions for the street kit (coney/street.js draws the heads, folk.js crosses on the WALK): where they are, the
+  // streets into them, and the phase for traffic heading (hx, hz) into one, on the same wall clock the cars obey
+  W.signals = { list: T.G.nodes.filter((n) => n.sig).map((n) => ({ x: n.x, z: n.z, ways: n.adj.map((e) => ({ dx: e.dx, dz: e.dz, w: e.w })), n })),
+    state: (j, hx, hz, now = Date.now()) => { const n = j.n, t = ((now / 1000 + n.sig.off) % CYC + CYC) % CYC, g = Math.abs(hx * n.sig.ax + hz * n.sig.az) > 0.7 ? 0 : 1;
+      return g === 0 ? (t < 14 ? 'G' : t < 17 ? 'Y' : 'R') : (t >= 18 && t < 30 ? 'G' : t >= 30 && t < 33 ? 'Y' : 'R'); } };
   T.shellMat = new THREE.MeshStandardMaterial({ color: 0x3a3733, roughness: 0.9, side: THREE.BackSide }); T.shellMat.name = 'traffic_shell';
   T.cabMat = new THREE.MeshStandardMaterial({ color: 0x232221, roughness: 0.75 }); T.cabMat.name = 'traffic_cabin';
   // the fleet: fixed kinds per pool slot (each slot = one instance in its kind's meshes)
@@ -299,7 +304,7 @@ function spawn(c, boot) {
     evalAt(c, c.s, _o); c.x = _o.x; c.z = _o.z; c.h = Math.atan2(-_o.dx, -_o.dz); c.hPrev = c.h; c.y = T.W.groundHeight?.(c.x, c.z) ?? 0;
     c.v = Math.min(roadSpeed(seg.w) * 0.7, 7); c.state = 'drive'; c.stateT = 0; c.driver = true; c.shift = 0; c.shiftT = 0; c.ox = c.oz = c.oyaw = 0; c.avoid = null; c.panic = 0; c.hornT = 0; c.blockT = 0; c.waitT = 0; c.ghostT = 0; c.brake = 0;
     c.pers = 0.85 + rng() * 0.3; c.seed = (rng() * 1e6) | 0;
-    c.color.copy(c.kind === 'cab' ? new THREE.Color(0xf2b820) : CAR_COLORS[(rng() * CAR_COLORS.length) | 0]);
+    c.color.copy(c.kind === 'cab' ? new THREE.Color(rng() < 0.4 ? 0x8cd04a : 0xf2b820) : CAR_COLORS[(rng() * CAR_COLORS.length) | 0]);   // cabs: yellow, or an apple-green boro taxi
     if (c.R.paint) { c.R.paint.setColorAt(c.slot, c.color); c.R.paint.instanceColor.needsUpdate = true; }
     if (c.model) { c.model.visible = true; c.color.setHex([0xb3120f, 0xe8b400, 0xf2f2f0, 0x111214, 0x1f4fb8][(rng() * 5) | 0]); if (c.modelPaint) c.modelPaint.color.copy(c.color); }
     c.shirt = (rng() * SHIRTS.length) | 0; c.skin = (rng() * SKINS.length) | 0;
