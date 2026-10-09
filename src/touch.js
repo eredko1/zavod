@@ -113,7 +113,7 @@ export async function init(ctx) {
 
 export function update(dt, ctx) {
   if (!S || !S.act) return;
-  const m = ctx.player?.mounted, stowed = !!(m && (m.elevator || (m.spec?.car && (ctx.weapons?.current?.spec?.slot ?? 0) !== 1)));   // passengers + pistol drivers shoot
+  const m = ctx.player?.mounted, stowed = !!(m && (m.elevator || m.craft || (m.spec?.car && (ctx.weapons?.current?.spec?.slot ?? 0) !== 1)));   // passengers + pistol drivers shoot
   if (stowed !== S.stowed) { S.stowed = stowed; S.root.classList.toggle('stow', stowed); if (stowed) { S.clearFire(); S.setAds?.(false); } }
   // fire buttons say what they do (the left one is a second trigger for the left thumb)
   const melee = ctx.weapons?.current?.mode === 'MELEE', ft = melee ? (ctx.weapons?.current?.id === 'fists' ? 'PUNCH' : 'SLASH') : 'FIRE';

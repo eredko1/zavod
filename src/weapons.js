@@ -484,7 +484,7 @@ function fireShot(w, opts = {}) {
 }
 
 /** Weapons are put away while riding an elevator / sitting as a passenger / driving a car (hands on the wheel). Bikes keep the sidearm live. */
-function stowedFor(p) { const m = p?.mounted; return !!(m && (m.elevator || m.dialog || (m.spec?.car && (S.weapons[S.cur]?.spec?.slot ?? 0) !== 1))); }   // drivers can drive-by with a pistol (one hand on the wheel); rifles stay stowed   // passengers keep their gun: drive-bys
+function stowedFor(p) { const m = p?.mounted; return !!(m && (m.elevator || m.dialog || m.craft || (m.spec?.car && (S.weapons[S.cur]?.spec?.slot ?? 0) !== 1))); }   // drivers can drive-by with a pistol (one hand on the wheel); rifles stay stowed   // passengers keep their gun: drive-bys
 
 // ------------------------------------------------------------------ per-frame
 export function update(dt, ctx) {
