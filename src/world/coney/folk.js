@@ -229,10 +229,18 @@ function crossOK(E) {
   const g = Math.abs(hx * n.sig.ax + hz * n.sig.az) > 0.7 ? 0 : 1, e = t - (g ? 18 : 0);
   return e >= 0 && e < 4 && S.state(c.j, hx, hz) === 'G';   // only in the first 4 s of their green, so they're across before the amber (traffic.js: 12-14 s green)
 }
+/** who's out at this hour (every 2 s, from horizon.js's W.night): the beach empties, the boardwalk thins, the bars fill up */
+function nightPeople() {
+  F.nightT = (F.nightT ?? 0) - 0.25; if (F.nightT > 0) return; F.nightT = 2; const n = F.world.W.night ?? 0, now = performance.now();
+  for (const s of F.spots) {
+    let off; if (s.zone === 'towel' || s.zone === 'water') off = hash(s.x, s.z, 60) < 0.9 * n; else if (s.zone === 'bw') off = hash(s.x, s.z, 61) < 0.5 * n; else if (s.zone === 'nightlife') off = n < 0.45; else continue;
+    if (off && !s.nightOff) { s.nightOff = true; s.gone = now + 1e12; F.crowd.hide(s, true); } else if (!off && s.nightOff) { s.nightOff = false; s.gone = 0; if (!s.E) F.crowd.hide(s, false); }
+  }
+}
 /** more spots, added after the crowd is built (coney/street.js: crosswalk walkers, the sellers at the vendor tables): live only */
 export function addFolkSpots(world, list) {
   if (!F || F.world !== world) return 0;
-  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; F.spots.push(s); }
+  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; if (s.zone === 'nightlife') { s.nightOff = true; s.gone = performance.now() + 1e12; } F.spots.push(s); }
   return list.length;
 }
 /** pull a live local into the street systems (chill.js): he's a real crew member from here on, streamed to friends */
@@ -395,7 +403,8 @@ function tick() {
     else if (d < 7 && E.barkT <= 0 && F.barkT <= -6 && Math.random() < (E.p.arch === 'vendor' ? 0.12 : 0.04)) bark(E, E.p.arch === 'vendor' ? 'vendor' : E.p.kid ? 'kid' : 'chatter', false);
   }
   // muggers: now and then one of the locals near you decides you look rich
-  F.mugT -= 0.25;
+  F.mugT -= 0.25 * (1 + 0.67 * (F.world.W.night ?? 0));   // more muggings after dark
+  nightPeople();
   if (F.mugT <= 0) { F.mugT = (ctx.mode === 'chill' ? 70 : 150) + Math.random() * 70; if (!crewCalm() && !st.dialog && !ctx.vehicles?.mounted) mugger(10, 30); }
 }
 function mugger(dmin, dmax) {

@@ -354,7 +354,8 @@ function update(dt) {
   }
   // refill the ring: two spawns a frame at most (one a frame once running), none while the ring is dry for a second
   T.spawnCool -= dt;
-  if (T.spawnCool <= 0 && !T.fz) { const boot = T.t < 1.5; let n = boot ? T.budget : 1, fails = 0;
+  const allowed = Math.round(T.budget * (1 - 0.33 * (T.W.night ?? 0))), activeN = T.cars.reduce((a, c) => a + (c.active && !c.bus ? 1 : 0), 0);   // fewer cars out at night (24 → 16)
+  if (T.spawnCool <= 0 && !T.fz && activeN < allowed) { const boot = T.t < 1.5; let n = boot ? T.budget : 1, fails = 0;
     for (const c of T.cars) { if (n <= 0) break; if (c.active || c.bus) continue; if (spawn(c, boot)) n--; else if (++fails > 2) { T.spawnCool = 1; break; } } }
   collidePlayer(dt); busSeparate();
   render(dt);

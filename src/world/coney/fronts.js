@@ -152,6 +152,10 @@ function shopUnit(K, F, u, w, s, signs, o = {}) {
   if (s.aw) awning(K, F, u0 + 0.1, u1 - 0.1, sy0 - 0.12, s.aw, o.stripe);
   return { u0, u1, dx, dw, sy0 };
 }
+/** after dark, a few people out front of the bars and restaurants (folk.js shows them at night) */
+function nightOut(world, F, K, u, w) { const L = world.W.nightSpots || (world.W.nightSpots = []); if (L.length > 60) return;
+  for (let k = 0; k < 3; k++) { const p = new THREE.Vector3(K.U(F, u + (k - 1) * w * 0.3), 0, 2.2 + (k % 2) * 0.8).applyMatrix4(F.m), c = new THREE.Vector3(K.U(F, u), 0, 2.6).applyMatrix4(F.m);
+    L.push({ x: p.x, y: 0, z: p.z, ry: Math.atan2(c.x - p.x, c.z - p.z), pose: k === 1 ? 'phone' : 'stand', zone: 'nightlife' }); } }
 // ---- enterable shops: the room behind the storefront is carved out of the building's colliders (AABBs, so square-on faces
 // only), a front wall either side of the doorway; coney/shops.js builds the interior when you come near and puts people in it
 const KIND = (k) => /restaurant|fast_food|cafe|pizza/.test(k) ? 'food' : /ice_cream|confectionery/.test(k) ? 'candy' : /bar|pub/.test(k) ? 'bar' : /bank|beauty|hairdresser|laundry|clinic|dancing|nail/.test(k) ? 'service' : 'grocery';
@@ -296,6 +300,8 @@ function adsTex(lite) {
 /** storefronts on faces given from outside (8th Ave by Soc Tav: its painted fronts have no real doors). items:
  *  [{ A: [x, z], B: [x, z], poly: [[x, z] …] (the building, for the room depth), store: {n, s, st, bg, fg, aw, k}, enter }]; the
  *  outward normal is taken to point away from the polygon's centre. Returns the walk-in units (pushed to W.shopUnits). */
+/** a material that brightens after dark (horizon.js runs W.nightGlow with the lamp level) */
+export function glow(world, m, f) { (world.W.nightGlow || (world.W.nightGlow = [])).push({ m, e0: m.emissiveIntensity, f }); }
 export function extraFronts(world, items) {
   const { scene } = world, lite = !!world.ctx.lite, K = new Kit(), signs = [], out = [];
   for (const it of items) {
@@ -333,6 +339,7 @@ export function buildFronts(world, M) {
     best.used.push([u - w / 2, u + w / 2]); best.store = true;
     const square = Math.abs(best.tx) > 0.995 || Math.abs(best.tz) > 0.995, F = K.frame(best), enter = square && enterN < ENTER_MAX && !big && w >= 4.5;
     const unit = shopUnit(K, F, u, w, s, signs, { ...(big ? { sy1: SIGN_Y1 + 0.5 } : {}), enter }); st.stores++;
+    if (/bar|restaurant|fast_food/.test(s.k || '')) nightOut(world, F, K, u, w);   // a crowd out front after dark
     if (enter) { const e = makeEnterable(world, K, best, F, unit, s); if (e) { shopUnits.push(e); enterN++; } }
   }
   // NORMAN'S: every street face of its building
@@ -362,13 +369,13 @@ export function buildFronts(world, M) {
 
   // ---- meshes ----
   if (signs.length) { const tex = atlasOf(signs, lite); for (const s of signs) s.place();
-    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3 }); mats.push(m);
+    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3 }); mats.push(m); glow(world, m, 6);
     const me = new THREE.Mesh(mergeGeometries(K.sign, false), m); me.name = 'fronts:signs'; me.receiveShadow = true; scene.add(me); }
   if (K.col.length) { const me = new THREE.Mesh(mergeGeometries(K.col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.15 })); me.name = 'fronts:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }
-  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), new THREE.MeshStandardMaterial({ color: 0x24303c, roughness: 0.08, metalness: 0.75, emissive: 0x3a2e1c, emissiveIntensity: 0.35 })); me.name = 'fronts:glass'; scene.add(me); }
+  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), new THREE.MeshStandardMaterial({ color: 0x24303c, roughness: 0.08, metalness: 0.75, emissive: 0x3a2e1c, emissiveIntensity: 0.35 })); me.name = 'fronts:glass'; scene.add(me); glow(world, me.material, 5); }
   if (arches.length) { const me = new THREE.Mesh(mergeGeometries(arches, false), new THREE.MeshStandardMaterial({ map: archTexture(), roughness: 0.85 })); me.name = 'fronts:arches'; me.receiveShadow = true; scene.add(me); }
   if (boards.length) { const tex = adsTex(lite), list = []; for (const b of boards) { const i = ADS.indexOf(b.ad); list.push(K.quad(b.F, [], b.u0, b.u1, b.y0, b.y1, b.w, [(i % 2) / 2, 1 - (Math.floor(i / 2) + 1) / 2, 0.5, 0.5])); }
-    const me = new THREE.Mesh(mergeGeometries(list, false), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 })); me.name = 'fronts:billboards'; scene.add(me); }
+    const me = new THREE.Mesh(mergeGeometries(list, false), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 })); me.name = 'fronts:billboards'; scene.add(me); glow(world, me.material, 8); }
   console.log('[fronts]', st.stores, 'mapped stores ·', st.generic, 'procedural shops ·', st.walkups, 'walk-up faces ·', st.arches, 'arched upper storeys ·', st.boards, 'billboards');
   st.enterable = shopUnits.length; world.W.shopUnits = shopUnits;
   world.W.fronts = { stats: st, faces: all.filter((f) => f.store).length };
