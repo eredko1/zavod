@@ -7,7 +7,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const pg = await b.newPage({ viewport: { width: 1100, height: 620 } }); const errs = []; pg.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); });
 pg.on('console', (m) => { if (/\[belt\]/.test(m.text())) console.log(m.text()); });
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.belt, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.belt, null, { timeout: 150000 });
 await pg.evaluate(() => window.__game.setState('playing'));
 const car = () => pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return v ? { x: +v.pos.x.toFixed(1), y: +v.pos.y.toFixed(2), z: +v.pos.z.toFixed(1), h: +v.heading.toFixed(2), sp: +(v.fwdSpeed || 0).toFixed(1) } : null; });
 await pg.evaluate(() => { const r = window.__game.belt.ramp; window.__game.teleport((r.x0 + r.x1) / 2, 0, r.z1 + 25, 0, 0); }); await pg.waitForTimeout(500);

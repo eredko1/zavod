@@ -780,7 +780,7 @@ export function update(dt, ctx) {
   // ---------- scope (sniper): overlay replaces the viewmodel once the eye is on the eyepiece; aim sway moves the camera ----------
   const scoped = !!sp.scope && S.ads > 0.85 && !S.reload && !S.swap && !S.throwing && S.lower < 0.3 && !S.showcase && !(w.needsAction && w.actionT >= 0);
   if (scoped !== S.scoped) { S.scoped = scoped; S.scope.rig.visible = scoped; if (scoped) ctx.bus.emit('scope', { on: true }); else ctx.bus.emit('scope', { on: false }); }
-  if (!S.swap) w.group.visible = !scoped && !(stowed && S.lower > 0.9) && !(sp.fists && S.time - w.lastShot > 2.2 && !S.swing);   // fists: hands down when you're not fighting
+  if (!S.swap) w.group.visible = !S.ctx.trainCab && !scoped && !(stowed && S.lower > 0.9) && !(sp.fists && S.time - w.lastShot > 2.2 && !S.swing);   // fists: hands down when you're not fighting
   // only the gun in your hands is ever drawn: bag swaps / pickups / loadout changes could leave an earlier gun's model showing
   { const held = S.weapons[S.cur]; for (const id in S.cache) { const c = S.cache[id]; if (c !== held && c.group.visible) c.group.visible = false; } }
   if (scoped) {

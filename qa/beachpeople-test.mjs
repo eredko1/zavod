@@ -8,7 +8,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const pg = await b.newPage({ viewport: { width: 960, height: 540 } }); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
 pg.on('console', (m) => { if (/\[folk\]|\[hustlers\]/.test(m.text())) console.log('  console:', m.text().slice(0, 200)); });
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-await pg.goto(`http://localhost:8790/?qa=1&map=coney${mode === 'chill' ? '&mode=chill' : '&ai=0'}&time=day`, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney${mode === 'chill' ? '&mode=chill' : '&ai=0'}&time=day`, { timeout: 150000 });
 await pg.waitForFunction(() => window.__game?.ready && window.__game.crews && window.__game.folk, null, { timeout: 150000 });
 await pg.waitForTimeout(3500);   // chill deals you a character ~1.5 s in and walks you to their spot: let that happen before teleporting
 await pg.evaluate(() => { window.__game.setState('playing'); window.__game.hangout.give(300); window.__game.crews.calm(1e9); });

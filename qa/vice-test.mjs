@@ -6,7 +6,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const pg = await b.newPage({ viewport: { width: 1100, height: 620 } });
 const errs = []; pg.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); });
 pg.on('console', (m) => { const t = m.text(); if (/\[(wsp|sbu|hangkit)\]/.test(t)) console.log(t.slice(0, 200)); });
-await pg.goto(`http://localhost:8790/?qa=1&map=${map}&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=${map}&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
 const st = () => pg.evaluate(() => window.__game.hangout.state());
 const pos = () => pg.evaluate(() => window.__ctx.player.position.toArray().map((v) => +v.toFixed(2)));
 const tp = (p, yaw = 0, pitch = 0) => pg.evaluate(([p, yaw, pitch]) => window.__game.teleport(p[0], p[1], p[2], yaw, pitch), [p, yaw, pitch]);

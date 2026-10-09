@@ -33,7 +33,7 @@ const HELPERS = () => {
 const open = async (q, name = 'P') => {
   const pg = await b.newPage({ viewport: { width: 1000, height: 560 } }); pg.on('pageerror', (e) => errs.push(name + ': ' + e.message));
   await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-  await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day' + q, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.subway, null, { timeout: 150000 });
+  await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day` + q, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.subway, null, { timeout: 150000 });
   await pg.evaluate(() => window.__game.setState('playing')); await pg.evaluate(HELPERS); return pg;
 };
 const S = (pg) => pg.evaluate(() => window.__game.subway.state());

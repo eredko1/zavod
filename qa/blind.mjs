@@ -13,7 +13,7 @@ ours.forEach((o, i) => {
   const left = rnd() < 0.5 ? 'ours' : 'ref';
   const a = left === 'ours' ? o : r, b = left === 'ours' ? r : o;
   const name = `pair-${String(i + 1).padStart(2, '0')}.png`;
-  const url = `http://localhost:8790/qa/compare.html?imgs=${encodeURIComponent('/' + a)},${encodeURIComponent('/' + b)}&labels=A,B&cols=2&w=1920&h=560`;
+  const url = `http://localhost:${process.env.PORT || 8790}/qa/compare.html?imgs=${encodeURIComponent('/' + a)},${encodeURIComponent('/' + b)}&labels=A,B&cols=2&w=1920&h=560`;
   execFileSync('node', ['qa/shot.mjs', url, path.join(outDir, name), '--wait', 'window.__done===true', '--settle', '300', '--w', '1920', '--h', '560'], { stdio: 'ignore' });
   key.push({ pair: name, A: left === 'ours' ? 'OURS ' + o : 'REF ' + r, B: left === 'ours' ? 'REF ' + r : 'OURS ' + o });
 });

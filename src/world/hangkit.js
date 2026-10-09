@@ -44,7 +44,7 @@ export const ITEMS = {
   blunt: { kind: 'smoke', icon: '🍂', name: 'fat blunt', hi: 0.4 },   // hits harder than a bag
   gin: { kind: 'booze', icon: '🍸', name: 'Tanqueray, neat', drunk: 0.55, dur: 150, glass: 'shot', liq: 0xe8eef0 },
   drone: { kind: 'gear', icon: '🛸', name: 'killer drone (hunts bad guys, 45 s)', drone: true },
-  shrooms: { kind: 'trip', icon: '🍄', name: 'Feliks\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
+  shrooms: { kind: 'trip', icon: '🍄', name: 'Felip\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
   coke: { kind: 'smoke', icon: '❄️', name: 'bag of coke', rush: 60 },   // B: a bump. Sobers you up some, a minute of speed, then the crash
   zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
 };
@@ -411,10 +411,10 @@ function updateHigh(dt) {
   // drunk: the view drifts on its own and your aim swims — you fight it with the mouse
   const p = ctx.player; if (d > 0.05 && p && !p.dead && ctx.state === 'playing') { p.yaw += Math.sin(t * 0.62) * 0.35 * d * dt; p.pitch += Math.sin(t * 0.47 + 1.3) * 0.12 * d * dt; }
 }
-// mushrooms (Feliks's — the strongest thing in the game): onset → peak → comedown over two minutes. Screen: colour cycling,
+// mushrooms (Felip's — the strongest thing in the game): onset → peak → comedown over two minutes. Screen: colour cycling,
 // rainbow double vision, breathing / swaying, a kaleidoscope wash. World: glowing shapes drift round you. Sound: a low drone.
 // Mind: stray thoughts. Everything is torn down when it ends (or on world reset).
-const TRIP_THOUGHTS = ['The Wonder Wheel is winking at you.', 'The babushkas are singing in five-part harmony.', 'You understand durak on a molecular level.', 'The towers are breathing. In… out…', 'Feliks was right about the mycelium.', 'Every brick has a name. That one is Gennady.', 'You can hear the F train thinking.', 'The ocean is just very slow applause.'];
+const TRIP_THOUGHTS = ['The Wonder Wheel is winking at you.', 'The babushkas are singing in five-part harmony.', 'You understand durak on a molecular level.', 'The towers are breathing. In… out…', 'Felip was right about the mycelium.', 'Every brick has a name. That one is Gennady.', 'You can hear the F train thinking.', 'The ocean is just very slow applause.'];
 function trip(cv, dt = 1 / 60) {
   const t = performance.now() / 1000, el = V.tripMax - V.tripT, e = Math.max(0, Math.min(1, el / 15, V.tripT / 20)), peak = Math.max(0, Math.min(1, (el - 15) / 10, (V.tripT - 20) / 10));
   const F = V.tripFx || (V.tripFx = tripFx());

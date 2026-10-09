@@ -5,7 +5,7 @@ const room = 'fo' + Math.random().toString(36).slice(2, 6);
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'] });
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const mk = async (n) => { const p = await b.newPage({ viewport: { width: 960, height: 540 } }); p.on('pageerror', (e) => console.log(n, 'PAGEERROR', e.message));
-  await p.goto(`http://localhost:8790/?qa=1&room=${room}&map=zavod&ai=0&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&room=${room}&map=zavod&ai=0&name=${n}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected, null, { timeout: 150000 }); return p; };
 const A = await mk('ALPHA'), B = await mk('BRAVO');
 await A.waitForFunction(() => window.__ctx.net.peers === 1, null, { timeout: 30000 }).catch(() => {});
 // A: pause → "Friends · switch map" → pick wsp → Go

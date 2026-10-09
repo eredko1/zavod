@@ -1,12 +1,12 @@
 // «Бурбон, братва, Гудзон»: Arkasha's ice run (Sammy's ice → back before it melts → a Manhattan), the table regulars
-// (Sasha, McGuinness, the Elf), the Elf's magic spliff. node qa/bourbon-test.mjs [outdir]
+// (Sasha, Mac, the Elf), the Elf's magic spliff. node qa/bourbon-test.mjs [outdir]
 import { chromium } from 'playwright-core';
 const out = process.argv[2] || '/tmp';
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--mute-audio'] });
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 1000, height: 560 } }); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.jobs, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.jobs, null, { timeout: 150000 });
 await pg.evaluate(() => { window.__game.setState('playing'); window.__game.hangout.give(50); window.__ctx.camera.getObjectByName('viewmodel').visible = false; });
 const A = await pg.evaluate(() => window.__game.hangout.arkady());
 const toArk = () => pg.evaluate((a) => { const s = a.seat, p = a.pos; window.__game.teleport(s[0], 0, s[2], Math.atan2(-(p[0] - s[0]), -(p[2] - s[2])), -0.1); }, A);
@@ -34,7 +34,7 @@ await pg.keyboard.press('KeyB'); await pg.waitForTimeout(800); st = await pg.eva
 await pg.screenshot({ path: `${out}/bourbon-manhattan.png` });
 // the regulars
 const vs = await pg.evaluate(() => window.__game.hangout.vendors().map((v) => v.name));
-ok(['SASHA', 'McGUINNESS', 'THE ELF'].every((n) => vs.includes(n)), 'Sasha, McGuinness and the Elf are at the table', JSON.stringify(vs));
+ok(['SASHA', 'MAC', 'THE ELF'].every((n) => vs.includes(n)), 'Sasha, Mac and the Elf are at the table', JSON.stringify(vs));
 const elf = await pg.evaluate(() => window.__game.hangout.vendors().find((v) => v.name === 'THE ELF').pos);
 await pg.evaluate(([e, a]) => { const dx = e[0] - a[0], dz = e[2] - a[2], L = Math.hypot(dx, dz); const x = e[0] + dx / L * 1.3, z = e[2] + dz / L * 1.3; window.__game.teleport(x, 0, z, Math.atan2(-(e[0] - x), -(e[2] - z)), -0.05); }, [elf, A.pos]); await pg.waitForTimeout(600);
 await pg.evaluate(() => window.__game.hangout.state().inv.length && null);

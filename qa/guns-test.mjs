@@ -6,7 +6,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const errs = [];
 const open = async (url) => { const p = await b.newPage({ viewport: { width: 1000, height: 560 } }); p.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); }); await p.goto(url, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 }); return p; };
 // ---- 1. mercs carry different guns and drop them; walk-over ammo; F swap ----
-let pg = await open('http://localhost:8790/?qa=1&map=zavod&time=day');
+let pg = await open(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=zavod&time=day`);
 await pg.evaluate(() => { const p = window.__ctx.player.position; for (let i = 0; i < 14; i++) window.__ctx.ai.qaSpawnAt(p.x + 8 + (i % 7) * 2.2, p.z - 8 - Math.floor(i / 7) * 2.5, { state: 'cover', health: 30 }); });
 await pg.waitForTimeout(800);
 const guns = await pg.evaluate(() => window.__ctx.ai.qaGuns());
@@ -35,7 +35,7 @@ drops = await pg.evaluate(() => window.__ctx.ai.qaDrops());
 ok(await pg.evaluate(() => { window.__ctx.ai; return true; }), 'drops last 5 min (timer)', '300 s');
 await pg.close();
 // ---- 2. coney: respawn resupply + sniper wheel zoom + the Wonder Wheel ----
-pg = await open('http://localhost:8790/?qa=1&map=coney&ai=0&time=day');
+pg = await open(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`);
 await pg.evaluate(() => { const w = window.__ctx.weapons; w.qaLoadout('m24'); });
 await pg.waitForTimeout(500);
 await pg.evaluate(() => window.__ctx.weapons.setAdsForQA(1)); await pg.waitForTimeout(600);

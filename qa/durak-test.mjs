@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 1100, height: 650 } }); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); localStorage.removeItem('zavod.durak'); } catch {} });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
 await pg.evaluate(() => { window.__game.setState('playing'); window.__ctx.camera.getObjectByName('viewmodel').visible = false; });
 const A = await pg.evaluate(() => window.__game.hangout.arkady()); ok(!!A, 'Arkady\'s table exists by building 1', JSON.stringify(A));
 await pg.evaluate((a) => { const s = a.seat, p = a.pos; window.__game.teleport(s[0], 0, s[2], Math.atan2(-(p[0] - s[0]), -(p[2] - s[2])), -0.12); }, A); await pg.waitForTimeout(1500);

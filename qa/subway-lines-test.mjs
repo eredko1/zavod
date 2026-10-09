@@ -7,9 +7,10 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 1000, height: 560 } }); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.subway?.line, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.subway?.line, null, { timeout: 150000 });
 await pg.evaluate(() => { window.__game.setState('playing'); window.__ctx.camera.getObjectByName('viewmodel').visible = false; });
-ok(JSON.stringify(await pg.evaluate(() => window.__game.subway.lines())) === '["F","Q","D"]', 'three lines: F, Q, D');
+ok(JSON.stringify(await pg.evaluate(() => window.__game.subway.lines())) === '["F","Q","D","N"]', 'four lines: F, Q, D, N');
+{ const per = await pg.evaluate(() => window.__game.subway.trainsPer()); ok(per.F >= 2 && per.Q >= 2 && per.D >= 2, 'more than one train a line (a train every ~2 min)', JSON.stringify(per)); }
 const S = (id) => pg.evaluate((id) => window.__game.subway.line(id).state(), id);
 const goTo = async (id, st, extra = 6) => { await pg.evaluate(([id, st, e]) => { const U = window.__game.subway.line(id); U.skew(U.until(st) + e); }, [id, st, extra]); await pg.waitForTimeout(500); };
 const boardAt = async (id, x, z) => {

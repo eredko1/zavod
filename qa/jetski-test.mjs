@@ -8,7 +8,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const errs = [];
 const mk = async (n, mp) => { const p = await b.newPage({ viewport: { width: 960, height: 540 } }); p.on('pageerror', (e) => errs.push(n + ': ' + e.message));
   await p.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-  await p.goto(`http://localhost:8790/?qa=1&map=coney&ai=0&time=day${mp ? `&mp=1&room=${room}&name=${n}` : ''}`, { timeout: 150000 });
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day${mp ? `&mp=1&room=${room}&name=${n}` : ''}`, { timeout: 150000 });
   await p.waitForFunction((mp) => window.__game?.ready && (!mp || window.__ctx.net?.connected), mp, { timeout: 150000 }); await p.evaluate(() => window.__game.setState('playing')); return p; };
 const A = await mk('ALPHA', true);
 const st = () => A.evaluate(() => { const V = window.__ctx.vehicles, s = V.qaState(); if (s) s.wave = window.__game.ocean.waveHeight(s.x, s.z); return s; });

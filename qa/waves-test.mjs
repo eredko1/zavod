@@ -15,7 +15,7 @@ const mk = async (n) => {
   const p = await b.newPage({ viewport: { width: 960, height: 540 } });
   p.on('pageerror', (e) => { errs.push(n + ': ' + e.message); console.log(n, 'PAGEERROR', e.message); });
   p.on('console', (m) => { const t = m.text(); if (/\[netwaves\]/.test(t) || (m.type() === 'error' && !/RGBE|deprecated|404|Failed to load/.test(t))) console.log(n, t.slice(0, 200)); });
-  await p.goto(`http://localhost:8790/?qa=1&mp=1&room=${room}&map=${map}&name=${n}`, { timeout: 150000 });
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&mp=1&room=${room}&map=${map}&name=${n}`, { timeout: 150000 });
   await p.waitForFunction(() => window.__game?.ready && window.__ctx.net?.connected && window.__game.waves, null, { timeout: 150000 });
   p.tag = n; return p;
 };

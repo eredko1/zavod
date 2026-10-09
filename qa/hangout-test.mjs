@@ -4,7 +4,7 @@ const out = process.argv[2] || '/tmp';
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--mute-audio'] });
 const pg = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 pg.on('pageerror', e => console.log('PAGEERROR', e.message)); pg.on('console', m => { const t = m.text(); if (/\[hangout\]|\[coney\]|error/i.test(t) && !/RGBE|deprecated/.test(t)) console.log(t); });
-console.log('goto'); await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0', { timeout: 120000 }); console.log('loaded'); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 }); console.log('ready');
+console.log('goto'); await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0`, { timeout: 120000 }); console.log('loaded'); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 }); console.log('ready');
 const st = () => pg.evaluate(() => ({ ...window.__game.hangout.state(), pos: window.__ctx.player.position.toArray().map(v => +v.toFixed(1)), mounted: !!window.__ctx.player.mounted, veh: !!window.__ctx.vehicles.mounted }));
 const shot = (n) => pg.screenshot({ path: `${out}/hg-${n}.png` });
 let s = await st(); console.log('start', JSON.stringify(s));

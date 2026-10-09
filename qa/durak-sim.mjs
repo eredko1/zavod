@@ -10,7 +10,7 @@ const classicSrc = classic.slice(s0, s1 + 1).join('\n');
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--mute-audio'] });
 const pg = await b.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-await pg.goto('http://localhost:8790/?qa=1&map=zavod', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=zavod`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
 const r = await pg.evaluate(async (classicSrc) => {
   const D = await import('/src/world/coney/durak-engine.js'), UI = await import('/src/world/coney/durak.js');
   const O = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(classicSrc));

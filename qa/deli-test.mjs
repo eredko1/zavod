@@ -7,7 +7,7 @@ let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL '
 const pg = await b.newPage({ viewport: { width: 1100, height: 620 } });
 const errs = []; pg.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); });
 pg.on('console', (m) => { const t = m.text(); if (/\[hangout\]|\[hangkit\]/.test(t)) console.log(t); });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&ai=0&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
 const st = () => pg.evaluate(() => window.__game.hangout.state());
 let s = await st(); ok(!!s.deli, 'deli placed', JSON.stringify(s.deli));
 // outside shot: stand across the street looking at the storefront

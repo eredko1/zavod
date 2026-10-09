@@ -1,4 +1,4 @@
-// CONEY — the shared durak table at ARKASHA's: 2–4 humans over the net, empty seats played by ARKASHA, SASHA, McGUINNESS, THE ELF.
+// CONEY — the shared durak table at ARKASHA's: 2–4 humans over the net, empty seats played by ARKASHA, SASHA, MAC, THE ELF.
 // Casual trust: the HOST (whoever opened the table) deals, runs the AI seats (each with its own card memory), validates every human
 // move with the engine's apply() and broadcasts the FULL state with a monotonic seq after each move. Every client keeps the full
 // state (so host migration is trivial: if the host drops, the lowest remaining seated human id takes over at the same seq); the UI
@@ -26,7 +26,7 @@ import { hangkit as K } from '../hangkit.js';
 import { SUITS, newGame, legalMoves, toAct, apply, aiMove, makeMemory, remember, toJSON, fromJSON } from './durak-engine.js';
 import { openDurak, durakSync, durakOpen, durakMine, closeDurak, potShare } from './durak.js';
 
-const AI_NAMES = ['ARKASHA', 'SASHA', 'McGUINNESS', 'THE ELF'], KINDS = ['play', 'beat', 'take', 'transfer', 'show', 'bito', 'done'];
+const AI_NAMES = ['ARKASHA', 'SASHA', 'MAC', 'THE ELF'], KINDS = ['play', 'beat', 'take', 'transfer', 'show', 'bito', 'done'];
 const LIVE_MS = 12000, BEAT_MS = 4000, BEAT_PLAY_MS = 1500, NEAR = 30;
 const RETRY_MS = 1200, RETRIES = 8, ASK_GAP_MS = 300, AFK_MS = 8000, HOST_STALE_MS = 9000, PEER_FRESH_MS = 3000;
 let TURN_MS = 35000;   // ?dkturn=ms (QA)

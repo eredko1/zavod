@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 1100, height: 620 } }); const errs = []; pg.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); });
 pg.on('console', (m) => { if (/\[locals\]/.test(m.text())) console.log(m.text()); });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.locals, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.locals, null, { timeout: 150000 });
 const H = () => pg.evaluate(() => window.__game.hangout.state());
 const tp = (p, yaw = 0, pitch = 0) => pg.evaluate(([p, yaw, pitch]) => window.__game.teleport(p[0], p[1], p[2], yaw, pitch), [p, yaw, pitch]);
 await pg.evaluate(() => { window.__ctx.ai.qaStartWave = () => {}; window.__game.killAll(); window.__game.hangout.give(100); });

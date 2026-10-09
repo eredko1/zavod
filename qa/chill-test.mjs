@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 1100, height: 620 } }); const errs = []; pg.on('pageerror', (e) => { errs.push(e.message); console.log('PAGEERROR', e.message); });
 pg.on('console', (m) => { if (/\[chill\]/.test(m.text())) console.log(m.text()); });
-await pg.goto('http://localhost:8790/?qa=1&map=coney&mode=chill&time=day', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.chill, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&mode=chill&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.chill, null, { timeout: 150000 });
 await pg.waitForTimeout(1500);
 const lo = await pg.evaluate(() => ({ ...window.__ctx.weapons.loadout, cur: window.__ctx.weapons.currentId, cash: window.__game.hangout.state().cash }));
 ok(lo.primary === 'fists' && lo.cur === 'fists' && lo.cash === 60, 'start: fists (nothing drawn) + $60', JSON.stringify(lo));

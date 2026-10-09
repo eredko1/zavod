@@ -6,7 +6,7 @@ const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--u
 let fails = 0; const ok = (c, m, x = '') => { console.log((c ? 'PASS ' : 'FAIL ') + m, x); if (!c) fails++; };
 const pg = await b.newPage({ viewport: { width: 800, height: 450 } }); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
 await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1'); } catch {} });
-await pg.goto('http://localhost:8790/?qa=1&map=zavod&primary=m4a1&secondary=m9', { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
+await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=zavod&primary=m4a1&secondary=m9`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready, null, { timeout: 150000 });
 await pg.evaluate(() => { window.__game.setState('playing'); window.__game.freezeAI(true); });
 await pg.waitForTimeout(1500);
 await pg.evaluate(() => { const p = window.__ctx.player.position; for (let i = 0; i < 3; i++) window.__ctx.ai.qaSpawnAt(p.x + 6 + i * 3, p.z + 4); });   // a few mercs to stab

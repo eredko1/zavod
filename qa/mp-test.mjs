@@ -13,7 +13,7 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
 const errs = [];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mk = async (name) => { const p = await browser.newPage({ viewport: { width: 960, height: 540 } }); p.on('pageerror', e => { errs.push(name + ': ' + e.message); console.log(name, 'PAGEERROR', e.message); }); p.on('console', m => { const t = m.text(); if (/\[net\]|error/i.test(t) && !/RGBE|deprecated|link up|404|Failed to load/.test(t)) console.log(name, t); });
-  await p.goto(`http://localhost:8790/?qa=1&mp=1&room=${room}&map=${map}&ai=0&name=${name}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx?.net?.connected, null, { timeout: 150000 }); return p; };
+  await p.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&mp=1&room=${room}&map=${map}&ai=0&name=${name}`, { timeout: 150000 }); await p.waitForFunction(() => window.__game?.ready && window.__ctx?.net?.connected, null, { timeout: 150000 }); return p; };
 const A = await mk('ALPHA'); const B = await mk('BRAVO');
 await sleep(3000);
 ok((await A.evaluate(() => window.__ctx.net.peers)) === 1 && (await B.evaluate(() => window.__ctx.net.peers)) === 1, 'A and B see each other');

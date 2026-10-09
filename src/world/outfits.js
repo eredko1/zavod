@@ -72,7 +72,7 @@ export const SHIRTS = [
       [['#d90012', 0], ['#1d48b8', 1], ['#f2a800', 2]].forEach(([c, i]) => { g.fillStyle = c; g.fillRect(x0, y0 + (h / 3) * i, w, h / 3 + 1); });
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.save(); g.globalCompositeOperation = 'destination-out'; fitText(g, 'SOAD', S / 2, y0 + h / 2 + 6, `900 #px ${IMPACT}`, 250, w * 0.86); g.restore();
       g.textBaseline = 'alphabetic'; g.fillStyle = '#f4f2ec'; fitText(g, BAND, S / 2, S * 0.86, `900 #px ${BLACKF}`, 40, S * 0.9); } },
-  { key: 'tool', label: 'TOOL', c: '#c9c2b0', c2: '#8a7f66', front(g, S) {   // Redko's tee: plain lettering, no album art
+  { key: 'tool', label: 'TOOL', c: '#c9c2b0', c2: '#8a7f66', front(g, S) {   // Red's tee: plain lettering, no album art
       g.textAlign = 'center'; g.fillStyle = '#c9c2b0'; g.save(); g.translate(S / 2, S * 0.5); g.scale(1, 1.35); fitText(g, 'TOOL', 0, 0, `900 #px ${SERIF}`, 210, S * 0.86); g.restore();
       g.strokeStyle = '#8a7f66'; g.lineWidth = 4; g.strokeRect(S * 0.12, S * 0.2, S * 0.76, S * 0.6); } },
 ];
@@ -361,12 +361,12 @@ export function addAfro(fig, { scale = 1 } = {}) {
 // ------------------------------------------------------------------------------------------------ remote players (net.js)
 const REMOTES = new Set();
 let sigAt = 0, sig = '';
-/** playable looks (chill-mode picker; everyone online sees your pick) — the table crew plus REDKO, the default hero */
+/** playable looks (chill-mode picker; everyone online sees your pick) — the table crew plus RED, the default hero */
 export const CHARS = {
-  redko: { name: 'REDKO', avatar: 'm02', h: 1.83, wide: 1.07, outfit: { top: 'tee', shirt: 8, bottom: 'jeans', skin: 0xe7bda0 } },
+  redko: { name: 'RED', avatar: 'm02', h: 1.83, wide: 1.07, outfit: { top: 'tee', shirt: 8, bottom: 'jeans', skin: 0xe7bda0 } },
   arkasha: { name: 'ARKASHA', avatar: 'm02', h: 1.80, glasses: 'clear', glassesY: 0.035 },
-  mcguinness: { name: 'McGUINNESS', avatar: 'm12', h: 1.73, wx: 1.22, wz: 1.18, afro: true, outfit: { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 } },
-  feliks: { name: 'FELIKS', avatar: 'm20', h: 1.83, hair: 0x2b1d14, outfit: { top: 'tee', shirt: 6, bottom: 'jeans' } },
+  mcguinness: { name: 'MAC', avatar: 'm12', h: 1.73, wx: 1.22, wz: 1.18, afro: true, outfit: { top: 'tee', shirt: 3, bottom: 'jeans', skin: 0x5a3a26 } },
+  feliks: { name: 'FELIP', avatar: 'm20', h: 1.83, hair: 0x2b1d14, outfit: { top: 'tee', shirt: 6, bottom: 'jeans' } },
   elf: { name: 'THE ELF', avatar: 'm08', h: 1.70, knife: true, outfit: { top: 'track', bottom: 'track', shoes: 'white' } },
   sasha: { name: 'SASHA', avatar: 'm01', h: 1.78 },
 };
