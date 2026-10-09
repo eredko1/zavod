@@ -119,6 +119,9 @@ function drawMarkers(g, P, scale, rot = 0, big = false) {
   const dot = (x, z, r, fill, stroke = 'rgba(0,0,0,.6)') => { const [u, v] = P(x, z); g.beginPath(); g.arc(u, v, r, 0, Math.PI * 2); g.fillStyle = fill; g.fill(); g.lineWidth = 1.5; g.strokeStyle = stroke; g.stroke(); return [u, v]; };
   const label = (u, v, t, col, fs) => { g.save(); g.font = `700 ${fs}px Barlow Condensed, Arial`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t, u, v); g.fillStyle = col; g.fillText(t, u, v); g.restore(); };
   const k = big ? 1 : 2;   // minimap canvas is 2x
+  // the police search circle (coney/chase.js W.mapSearch): where they're combing for you; flashes red when they re-sight you
+  const sr = ctx.world?.mapSearch?.(); if (sr) { const [u, v] = P(sr[0], sr[1]), [u2, v2] = P(sr[0] + sr[2], sr[1]), rr = Math.hypot(u2 - u, v2 - v), pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260); g.save(); g.beginPath(); g.arc(u, v, rr, 0, Math.PI * 2);
+    g.fillStyle = sr[3] ? 'rgba(255,40,40,.35)' : `rgba(70,120,255,${0.12 + 0.1 * pulse})`; g.fill(); g.lineWidth = 2 * k; g.strokeStyle = sr[3] ? 'rgba(255,60,60,.9)' : 'rgba(110,160,255,.7)'; g.stroke(); g.restore(); }
   // subway: station icons on the minimap too (the big map bakes them with the POIs) + the F train itself, an orange bar
   if (!big) for (const q of ctx.world?.mapPOIs || []) { if (q.kind !== 'transit') continue; const [u, v] = P(q.x, q.z); g.beginPath(); g.arc(u, v, 8 * k, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,.7)'; g.fill(); g.lineWidth = 2 * k; g.strokeStyle = '#8ac7ff'; g.stroke(); g.font = `700 ${11 * k}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#8ac7ff'; g.fillText('Ⓜ', u, v + 0.5); }
   // subway lines in their colours (Q wide yellow under the F where they share the el, the D dashed darker orange), station

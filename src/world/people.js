@@ -108,7 +108,7 @@ export function buildPerson(o = {}) {
   const limbs = { arms: [{ sh: L.up, fore: handR, s: -1 }, { sh: R.up, fore: handR, s: 1 }], legs: [] };
   const F = {
     group, head, body: inner, limbs, handR, avatar: id, mood: null,   // mood: 'talk' | 'drunk' | 'angry' swaps the idle loop
-    guard: false, hands: false, act: null,
+    guard: false, hands: false, phone: false, act: null,
     play(name, dur = name === 'punch' ? 0.34 : name === 'hit' ? 0.42 : 0.5) { F.act = { name, t: 0, dur, side: Math.random() < 0.5 ? 1 : 0 }; },
     update(dt, speed = 0) {
       if (base === 'sit') { mixer.update(dt); return; }
@@ -137,6 +137,7 @@ export function buildPerson(o = {}) {
   const side = { R: -1, L: 1 };
   function overlay(dt) {
     if (F.hands) for (const [s, a] of [['R', R], ['L', L]]) { aim(a.up, a.fore, side[s] * 0.8, 0.6, 0.05); aim(a.fore, a.hand, side[s] * 0.1, 1, 0.1); }
+    else if (F.phone) { aim(R.up, R.fore, -0.3, -0.85, 0.3); aim(R.fore, R.hand, 0.45, 1, 0.1); }   // on the phone: right hand at the ear
     else if (F.guard) {
       const t = performance.now() / 1000;
       for (const [s, a] of [['R', R], ['L', L]]) { aim(a.up, a.fore, side[s] * 0.35, -0.6, 0.7); aim(a.fore, a.hand, -side[s] * 0.3, 0.9, 0.5 + Math.sin(t * 6 + side[s]) * 0.08); }

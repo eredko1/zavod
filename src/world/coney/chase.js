@@ -12,7 +12,8 @@ import { carGeometries, carMaterials } from '../carkit.js';
 import { buildBike } from '../../vehicles/bike.js';
 import { hangkit as HK } from '../hangkit.js';
 
-const EVADE_BASE = 20, EVADE_PER_STAR = 2, EVADE_MAX = 30;   // seconds unseen before the stars clear
+const EVADE_BASE = 20, EVADE_PER_STAR = 2, EVADE_MAX = 30, SEARCH_OUT = 8;   // SEARCH_OUT: s outside the search circle, unseen, before the stars clear
+const searchR = () => 50 + 25 * K.stars;
 const CREW_EVADE = 25, TERR_R = 85, TERR_LEAVE = 170;         // crew: give up after 25 s unseen or once you are far off their blocks
 let MAX_COPS = 8, MAX_CREW = 6, MAX_CARS = 6;   // phones get a smaller force (buildChase)
 const CAR_SPEED = 17, CAR_PURSUIT = 21;
@@ -50,7 +51,7 @@ export function buildChase(world) {
   bus.on('worldReset', () => { try { wasted(); } catch {} });
   bus.on('npcHurt', (d) => crime(d?.dead ? 'kill' : 'shot', d?.position));
   bus.on('enemyKilled', (d) => { if (!K || !d?.position || !K.units.some((u) => u.s === d.soldier)) return; try { HK.dropCash(d.position.clone().setY(0.05), 20 + 10 * Math.floor(Math.random() * 5)); } catch {} });   // drop a cop / a pursuer: his wallet hits the pavement (his gun drops via ai.js)   // stabbing / shooting the locals (hangkit hurtable NPCs)
-  bus.on('vehicle', (e) => { if (e?.stage === 'mount' && e.bike?.spec?.car) crime('steal', e.bike.pos || ctx.player?.position); });
+  bus.on('vehicle', (e) => { if (e?.stage === 'mount' && e.bike?.spec?.car) { const b = e.bike; crime('steal', b.pos || ctx.player?.position, { mine: !!b._mine || !!b.gift || !!b.hangout, jack: !!b.jacked }); b._mine = true; } });
   // a cop car the cops have jumped out of: F at it and it's yours (a real drivable car in NYPD colours, lightbar and all)
   K.copSpot = new THREE.Vector3(0, -999, 0);
   HK.spot({ pos: K.copSpot, r: 5, dy: 2.5, when: () => !!K.copTarget && !ctx.vehicles?.mounted, prompt: 'F — STEAL THE COP CAR', act: () => stealCop() });
@@ -59,6 +60,7 @@ export function buildChase(world) {
   bus.on('restart', () => { for (const u of K.units) disposeBike(u); K.units.length = 0; for (const c of K.cars) disposeCar(c); K.cars.length = 0; K.stars = 0; K.crew.heat = 0; renderUI(); });
   bus.on('net:chase', (m) => onRemote(m));
   world.updaters.push((dt) => { try { update(dt); } catch (e) { if ((K.errN = (K.errN || 0) + 1) < 4) console.error('[chase]', e); } });
+  W.mapSearch = () => (K.stars && K.t - K.seenT > 2 ? [K.lastKnown.x, K.lastKnown.z, searchR(), K.t - (K.flashT || -9) < 0.4] : null);
   if (typeof window !== 'undefined' && window.__game) window.__game.chase = chaseQA;
   console.log('[chase] lobbies', zones.length, '· road nodes', K.roads.nodes.length, '· edges', K.roads.edges.length);
 }
@@ -140,11 +142,25 @@ function roadPath(s, tx, tz) {
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // crimes → stars / crew heat
-function witnessed() { const t = K.t; for (const u of K.units) if (u.kind === 'cop' && !u.s.dead && t - u.seenT < 1.5) return true; for (const c of K.cars) if (c.manned && t - c.seenT < 1.5) return true; return false; }
-function crime(type, pos) {
+function witnessed() { const t = K.t; for (const u of K.units) if (u.kind === 'cop' && !u.s.dead && !u.leaving && !u.patrol && t - u.seenT < 1.5) return true; for (const c of K.cars) if (c.manned && !c.leaving && !c.patrol && t - c.seenT < 1.5) return true; return false; }
+// GTA rules: a crime only costs stars if a cop sees it (a unit, a manned car, a foot patrol: then at least 2 stars) or a witness
+// phones it in (coney/folk.js: a local pulls out a phone, ~6 s, and you can stop them). Killing a cop and the crew's own
+// business are always known. Cars you've already driven are yours; a parked car only counts if somebody sees it.
+const PHONED = new Set(['shot', 'steal', 'rob', 'kill', 'hit']);
+function crime(type, pos, opts = {}) {
   if (!K || !K.ctx.player || K.ctx.player.dead || K.ctx.state !== 'playing') return;
-  const t = K.t, me = K.ctx.player.position; pos = pos || me;
-  const before = K.stars; const w = witnessed();
+  pos = pos || K.ctx.player.position;
+  const patrol = patrolSaw(), w = witnessed() || patrol;
+  if (type === 'steal' && opts.mine) return;
+  if (!w && PHONED.has(type) && !opts.called && !(type === 'steal' && opts.jack)) {   // a carjack: the driver saw it all
+    K.phone?.(type, pos, (who) => crime(type, pos, { called: who || true }));   // the stars come if the call goes through
+    return;
+  }
+  apply(type, pos, w, patrol, opts.called);
+}
+function apply(type, pos, w, patrol, called) {
+  const t = K.t, me = K.ctx.player.position;
+  const before = K.stars;
   switch (type) {
     case 'shot': K.stars = Math.max(K.stars, 1); if (w && t - K.bump.shot > 12) { K.bump.shot = t; K.stars = Math.min(Math.max(K.stars, 2) + (K.stars >= 2 ? 1 : 0), 3); } break;
     case 'steal': K.stars = Math.max(K.stars, w ? 2 : 1); break;
@@ -152,9 +168,12 @@ function crime(type, pos) {
     case 'kill': K.stars = Math.min(5, Math.max(K.stars + 1, 2)); break;
     case 'copKill': K.stars = Math.min(5, Math.max(K.stars + 1, 3)); break;
     case 'crewKill': K.stars = Math.max(K.stars, 1); break;
+    case 'hit': K.stars = Math.max(K.stars, 1); break;
     default: return;
   }
-  K.crimeT = t; K.seenT = Math.max(K.seenT, t); K.lastKnown.copy(me);
+  if (patrol) K.stars = Math.max(K.stars, 2);   // a cop on the beat watched you do it
+  K.crimeT = t; if (w) { K.seenT = Math.max(K.seenT, t); K.lastKnown.copy(me); } else { K.seenT = Math.max(K.seenT, t - 2.5); K.lastKnown.copy(pos); }   // a call: they know where it happened, not where you are
+  if (called) K.ctx.hud?.toast?.(`${called === true ? 'Somebody' : called} called the cops.`, 2400);
   // the crew: anything violent or a theft on (or right next to) their blocks
   const nt = nearestTower(pos);
   if (nt && nt.d < TERR_R) {
@@ -163,9 +182,38 @@ function crime(type, pos) {
   }
   if (K.stars !== before) { if (!before) { K.carT = 1.2; K.footT = 6; } renderUI(); }
 }
+/** folk.js hands over its witness picker: (type, pos, onCalled(name)) → started a call? */
+export function setReporter(fn) { if (K) K.phone = fn; }
+/** a foot patrol or a cruising car that can see you right now */
+function patrolSaw() { const p = K.ctx.player.position; for (const u of K.units) if (u.patrol && !u.s.dead && u.s.seesPlayer && u.s.position.distanceTo(p) < 40) return true;
+  for (const c of K.cars) if (c.patrol && c.manned && K.t - c.seenT < 1.5) return true; return false; }
+// ---- ambient NYPD: cruisers in traffic and two foot patrols on the beat, before anything has happened ------------------------
+const BEATS = [[[-58, -246], [-80, -196], [-82, -146], [-70, -128]], [[-80, 142], [20, 142], [130, 142], [20, 142]]];   // Stillwell plaza ↔ Surf & Stillwell; the boardwalk, Stillwell ↔ W 10th
+function patrols(dt) {
+  const ctx = K.ctx, lite = !!ctx.lite, p = ctx.player.position; K.patrolT = (K.patrolT ?? 3) - dt; if (K.patrolT > 0) return; K.patrolT = 2;
+  // cruisers: keep 2 (phones 1) somewhere within a few blocks, lights off
+  const want = lite ? 1 : 2; let have = K.cars.filter((c) => c.patrol && !c.gone).length;
+  for (const c of K.cars.slice()) if (c.patrol && !K.stars && c.pos.distanceTo(p) > 380 && !inView(c.pos)) { disposeCar(c); K.cars.splice(K.cars.indexOf(c), 1); have--; }
+  if (have < want && K.cars.length < MAX_CARS) { const c = spawnCar(); if (c) { c.patrol = true; c.path = null; } }
+  // foot patrols: a pair per beat (phones: the first beat only)
+  BEATS.slice(0, lite ? 1 : 2).forEach((beat, bi) => {
+    const on = K.units.filter((u) => u.beat === bi && !u.s.dead); if (on.length >= 2 || ctx.ai?.nav == null) return;
+    const pts = beat.map(([x, z]) => ctx.ai.nav.nearestFree(x, z, 8, 0)).filter(Boolean); if (pts.length < 2) return;
+    const near = hyp(pts[0].x, pts[0].z, p.x, p.z); if (near < 25 && inView(pts[0])) return;   // nobody pops in under your nose
+    const u = spawnUnit('cop', pts[0].clone().add(new THREE.Vector3(on.length ? 1.4 : 0, 0, 0))); u.patrol = pts; u.beat = bi; u.wi = 1; u.leaving = false;
+  });
+}
+/** on the beat: walk the waypoints, look around at each end, never fire */
+function patrolBrain(u, s) {
+  s.wantFire = false; s.leanTarget = 0; s.crouchTarget = 0;
+  const wp = u.patrol[u.wi % u.patrol.length], mate = K.units.find((o) => o !== u && o.beat === u.beat && !o.s.dead);
+  if (s.position.distanceTo(wp) < 2.5) { u.pauseT = (u.pauseT || 0) + 0.2; if (u.pauseT > 3) { u.pauseT = 0; u.wi++; } s.setGoal(null); return; }
+  const tgt = mate && mate.uid < u.uid ? wp.clone().add(new THREE.Vector3(1.3, 0, 0.6)) : wp;   // walk side by side
+  goal(u, s, tgt, 'walk');
+}
 function wasted() {
   if (!K) return; const had = K.stars || K.crew.heat;
-  K.stars = 0; K.crew.heat = 0; for (const u of K.units) u.leaving = true; for (const c of K.cars) c.leaving = true;
+  K.stars = 0; K.crew.heat = 0; for (const u of K.units) if (!u.patrol) u.leaving = true; for (const c of K.cars) if (!c.patrol) c.leaving = true;
   if (had) renderUI();
 }
 
@@ -185,7 +233,13 @@ function update(dt) {
   // sight bookkeeping
   for (const u of K.units) { if (u.s.dead || u.leaving) continue; if (u.s.seesPlayer) { u.seenT = t; if (u.kind === 'cop') { K.seenT = t; K.lastKnown.copy(p.position); } else { K.crew.seenT = t; } } }
   // decay
-  if (K.stars > 0) { const need = Math.min(EVADE_MAX, EVADE_BASE + EVADE_PER_STAR * K.stars); if (t - K.seenT > need) { K.stars = 0; for (const u of K.units) if (u.kind === 'cop') u.leaving = true; for (const c of K.cars) c.leaving = true; ctx.hud?.toast?.('Lost them.', 2000); } }
+  // the search circle (GTA): unseen, they comb a circle round the last sighting; stay out of it for SEARCH_OUT s and they give up
+  if (K.stars > 0) { const unseen = t - K.seenT > 2, out = unseen && hyp(p.position.x, p.position.z, K.lastKnown.x, K.lastKnown.z) > searchR();
+    K.outT = out ? (K.outT || 0) + dt : 0; K.evading = out;
+    if (K.outT > SEARCH_OUT || t - K.seenT > EVADE_MAX * 4) { K.stars = 0; K.outT = 0; for (const u of K.units) if (u.kind === 'cop' && !u.patrol) u.leaving = true; for (const c of K.cars) if (!c.patrol) c.leaving = true; ctx.hud?.toast?.('Lost them.', 2000); } }
+  else K.evading = false;
+  if (K.sightT !== K.seenT && t - K.seenT < 0.05) { K.sightT = K.seenT; K.flashT = t; }   // re-centred on a sighting: the rim flashes
+  patrols(dt);
   if (K.crew.heat) { const nt = nearestTower(p.position); if (t - K.crew.seenT > CREW_EVADE || !nt || nt.d > TERR_LEAVE) { K.crew.heat = 0; for (const u of K.units) if (u.kind !== 'cop') u.leaving = true; } }
   if (playing) spawnLogic(dt);
   updateCars(dt);
@@ -270,10 +324,15 @@ function removeUnit(u) { if (u.bike) disposeBike(u); K.ctx.ai.removeSoldier(u.s)
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // foot / bike behaviour (runs in ai.js think() at ~5 Hz; perceive() already ran: vis = sees the player)
+const COP_DMG = [0, 0, 0.15, 0.25, 0.35, 0.45];   // by stars: 1 = no fire (the collar), 2 = only at a drawn gun
 function brain(u, s, vis) {
+  if (u.patrol && !K.stars && !u.leaving) { patrolBrain(u, s); return; }
   brainInner(u, s, vis);
+  if (u.kind === 'cop') { s.dmgMul = COP_DMG[Math.min(5, K.stars)] || 0.15; const W = K.ctx.weapons;
+    if (K.stars === 2 && !(W?.current && W.current.mode !== 'MELEE')) s.wantFire = false;
+    if (s.burst > 0) u.firing = true; else if (u.firing) { u.firing = false; s.fireCooldown = Math.max(s.fireCooldown || 0, 1.2); } }
   // one star = they want to cuff you, not kill you: hold fire, and a cop within arm's reach for ~1.2 s makes the collar
-  if (u.kind === 'cop' && K.stars <= 1 && !K.crew.heat) {
+  if (u.kind === 'cop' && K.stars === 1 && !K.crew.heat) {
     s.wantFire = false; const p = K.ctx.player;
     if (vis && !p.dead && s.position.distanceTo(p.position) < 1.9) { K.bustT = (K.bustT || 0) + 0.2; if (K.bustT > 1.2) busted(); } else K.bustT = Math.max(0, (K.bustT || 0) - 0.1);
   }
@@ -308,7 +367,7 @@ function brainInner(u, s, vis) {
   }
   if (know) { goal(u, s, know, 'run'); return; }
   // cold trail: search around the last known spot
-  if (!u.wander || s.arrived || t - u.goalT > 9) { const lk = u.kind === 'cop' ? K.lastKnown : p.position; const a = rng() * Math.PI * 2, r = 6 + rng() * 22; u.wander = ctx.ai.nav.nearestFree(lk.x + Math.cos(a) * r, lk.z + Math.sin(a) * r, 6, 0) || lk.clone(); u.goalT = t; }
+  if (!u.wander || s.arrived || t - u.goalT > 9) { const lk = u.kind === 'cop' ? K.lastKnown : p.position; const a = rng() * Math.PI * 2, r = u.kind === 'cop' ? rng() * searchR() * 0.8 : 6 + rng() * 22; u.wander = ctx.ai.nav.nearestFree(lk.x + Math.cos(a) * r, lk.z + Math.sin(a) * r, 6, 0) || lk.clone(); u.goalT = t; }
   goal(u, s, u.wander, 'walk');
 }
 /** re-target only when the goal moved enough (repaths are the expensive part) */
@@ -366,7 +425,14 @@ function updateCars(dt) {
   if (K.copTarget) K.copSpot.copy(K.copTarget.pos); else K.copSpot.set(0, -999, 0);
   if (K.stolen?.v && !K.stolen.v.gone) { const k = veh === K.stolen.v ? Math.floor(t * 6) % 2 : -1; K.stolen.lamps[0].material = k === 0 ? carMats().red : carMats().off; K.stolen.lamps[1].material = k === 1 ? carMats().blue : carMats().off; }
   for (const c of K.cars) {
-    lampFlash(c, c.manned || K.units.some((u) => u.car === c && !u.s.dead), t);
+    const cruising = c.patrol && !K.stars && c.manned;
+    lampFlash(c, !cruising && (c.manned || K.units.some((u) => u.car === c && !u.s.dead)), t);
+    if (cruising && c.state === 'drive') {   // on patrol: from one corner of the map to another, watching
+      if (!c.path || c.pi >= c.path.length) { const N = K.roads.nodes, n = N[((ctx.rng?.() ?? Math.random()) * N.length) | 0]; c.path = roadPath(c.node, n.x, n.z); c.pi = 0; }
+      const dp = hyp(c.pos.x, c.pos.z, p.position.x, p.position.z);
+      if (dp < 60 && (ctx.time.frame + c.vid) % 20 === 0 && carSees(c)) c.seenT = t;
+      drive(c, dt, veh); continue;
+    }
     if (c.state === 'stopped' && !c.leaving && veh && Math.abs(veh.speed || 0) > 6 && c.pos.distanceTo(p.position) > 30) {
       // the player drove off: whoever is still by the car jumps back in and the pursuit resumes
       const crew = K.units.filter((u) => u.car === c && !u.s.dead && u.s.position.distanceTo(c.pos) < 16);
@@ -398,7 +464,7 @@ function drive(c, dt, veh) {
   const want = Math.atan2(-(wp.x - c.pos.x), -(wp.z - c.pos.z)); const dh = wrap(want - c.heading);
   const next = c.path[c.pi + 1]; let corner = 0; if (next) corner = Math.abs(wrap(Math.atan2(-(next.x - wp.x), -(next.z - wp.z)) - want));
   const toWp = hyp(wp.x, wp.z, c.pos.x, c.pos.z);
-  let vmax = c.leaving ? 12 : veh ? CAR_PURSUIT : CAR_SPEED;
+  let vmax = c.leaving ? 12 : c.patrol && !K.stars ? 9 : veh ? CAR_PURSUIT : CAR_SPEED;
   if (Math.abs(dh) > 0.5) vmax = Math.min(vmax, 5); if (corner > 0.6 && toWp < 25) vmax = Math.min(vmax, 7 + toWp * 0.35);
   if (c.pi === c.path.length - 1) vmax = Math.min(vmax, 3 + toWp * 0.6);
   // don't run the player over / rear-end another car
@@ -570,7 +636,10 @@ function lastKnownFor(u) { return u.kind === 'cop' ? K.lastKnown : K.ctx.player.
 /** QA hooks (window.__game.chase) */
 export const chaseQA = {
   state: () => K && { stars: K.stars, crew: K.crew.heat, evadeIn: K.stars ? +(Math.min(EVADE_MAX, EVADE_BASE + EVADE_PER_STAR * K.stars) - (K.t - K.seenT)).toFixed(1) : 0, units: K.units.map((u) => ({ kind: u.kind, dead: !!u.s.dead, leaving: u.leaving, pos: u.s.position.toArray().map((v) => +v.toFixed(1)), sees: !!u.s.seesPlayer, noGo: noGo(u.s.position.x, u.s.position.z, u.s.position.y) })), cars: K.cars.map((c) => ({ pos: c.pos.toArray().map((v) => +v.toFixed(1)), state: c.state, manned: c.manned, speed: +c.speed.toFixed(1), path: c.path ? c.path.length - c.pi : 0 })), remotes: [...K.remotes.values()].map((R) => ({ puppets: R.puppets.size, cars: R.cars.size, stars: R.stars, pos: [...R.puppets.values()].slice(0, 3).map((q) => q.s.position.toArray().map((v) => +v.toFixed(1))) })), zones: K.zones.length, roads: K.roads.nodes.length },
-  crime: (type = 'shot') => crime(type, K.ctx.player.position),
+  crime: (type = 'shot', pos, opts) => crime(type, pos || K.ctx.player.position, opts),
+  report: (type = 'shot') => apply(type, K.ctx.player.position, true, false),
+  dmg: () => K && K.units.filter((u) => u.kind === 'cop' && !u.s.dead).map((u) => ({ dmg: u.s.dmgMul, stars: K.stars })),
+  search: () => K && { stars: K.stars, outT: +(K.outT || 0).toFixed(1), r: K.stars ? searchR() : 0, evading: !!K.evading, patrols: K.units.filter((u) => u.patrol && !u.s.dead).length, cruisers: K.cars.filter((c) => c.patrol && !c.gone).length },
   stars: (n) => { K.stars = Math.max(0, Math.min(5, n | 0)); K.seenT = K.t; K.lastKnown.copy(K.ctx.player.position); K.carT = 0; K.footT = 0; renderUI(); return K.stars; },
   crew: () => { const nt = nearestTower(K.ctx.player.position); K.crew.heat = 1; K.crew.seenT = K.t; K.crew.tower = nt?.t || null; K.crew.spawned = 0; K.crewT = 0; renderUI(); return !!nt; },
   clear: () => wasted(),
