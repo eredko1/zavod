@@ -256,7 +256,7 @@ function update(dt, playing) {
     let speed = 0, goal = null;
     if (t.st === 'robbed') {   // hands up, then the wallet, then legs
       t.robT += dt; t.yaw = Math.atan2(dx, dz);
-      if (t.robT > 1.3) { const n = t.cash; t.cash = 0; if (n > 0) { K.earn(n); K.toast(`+$${n} off the ${t.type === 'mk' ? t.name.toLowerCase() : t.name}`, 1800); } flee(t); if (Math.random() < 0.6) { try { chaseQA.crime('rob'); } catch {} } }
+      if (t.robT > 1.3) { const n = t.cash; t.cash = 0; if (n > 0) { K.earn(n); K.toast(`+$${n} off the ${t.type === 'mk' ? t.name.toLowerCase() : t.name}`, 1800); } flee(t); { try { chaseQA.crime('rob', t.pos); } catch {} } }
       g.position.copy(t.pos); g.rotation.y = t.yaw; t.m.f.update(dt, 0); continue;
     }
     if (t.st === 'flee' || t.st === 'leave') {
@@ -332,7 +332,7 @@ function robVictim(t, force = null) {
     return;
   }
   if (t.temper === 'tough' || t.temper === 'scrappy') { emitCrime('fight', t); startFight(t); return; }   // locals with a spine: they swing (the tough ones pull a blade)
-  if (t.type === 'mk' && Math.random() < 0.55) { flee(t); say(t, M.run[Math.floor(Math.random() * M.run.length)]); try { chaseQA.crime('rob'); } catch {} return; }
+  if (t.type === 'mk' && Math.random() < 0.55) { flee(t); say(t, M.run[Math.floor(Math.random() * M.run.length)]); try { chaseQA.crime('rob', t.pos); } catch {} return; }
   if (t.type === 'mk') say(t, M.no[Math.floor(Math.random() * M.no.length)]);
   startFight(t, t.type === 'mk'); for (const o of C.thugs.values()) if (o !== t && o.type === t.type && t.type !== 'mk' && o.st !== 'dead' && o.pos.distanceTo(t.pos) < 15) startFight(o, true);
 }

@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { buildPerson, peopleReady, peopleDebug, AVATARS } from '../people.js';
 import { hangkit as K, kit } from '../hangkit.js';
 import { adoptFolk, folkRob, folkHurt, crewCalm, crewTakeGun } from './chill.js';
-import { chaseQA } from './chase.js';
+import { chaseQA, setReporter } from './chase.js';
 import { W8 } from './w8th.js';
 import { STILLWELL } from './stillwell.js';
 import { BW } from './shore.js';
@@ -64,6 +64,7 @@ export function buildFolk(world, spots, crowd) {
   ctx.bus.on('worldReset', () => { for (const s of F.spots) if (s.gone) { s.gone = 0; if (!s.E) crowd.hide(s, false); } F.mugT = 90; });
   ctx.bus.on('npcHurt', (d) => { if (d?.position) onCrime({ kind: d.dead ? 'kill' : 'hit', pos: d.position, name: d.name }); });
   world.updaters.push((dt) => { if (F?.world === world) update(dt); });
+  setReporter(phoneCops);   // chase.js: unseen crimes need a witness who phones it in
   if (typeof window !== 'undefined' && window.__game) window.__game.folk = folkQA;
   console.log('[folk]', F.spots.length, 'crowd spots can come alive ·', av.length, 'avatars');
 }
@@ -168,7 +169,7 @@ function activate(s) {
     const hb = mode === 'lie' ? new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.32, 1.8), hbm) : new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, mode === 'sit' ? 1.3 : 1.75, 8), hbm);
     hb.position.y = mode === 'lie' ? 0.16 : mode === 'sit' ? 0.2 : 0.88; hb.userData.surface = 'flesh'; holder.add(hb);
     E = { s, p, fig, holder, hb, mode, meshes: [], cast: true, hp: 100, pos: new THREE.Vector3(s.x, s.y || 0, s.z), yaw: s.ry || 0, leg: null, dir: 1, speed: 0, acc: 0, inView: true, barkT: 0, bubble: null, bubbleT: 0, hands: 0, panic: 0 };
-    hb.userData.onHit = (dmg, head, point, dir) => { if (s.sub) return lightHit(E, dmg * (head ? 1.6 : 1));
+    hb.userData.onHit = (dmg, head, point, dir) => { if (E.call) endCall(E, false); if (s.sub) return lightHit(E, dmg * (head ? 1.6 : 1));
       if (p.kid) { const P = F.ctx.player.position; E.panic = 5; E.panicYaw = Math.atan2(E.pos.x - P.x, E.pos.z - P.z); say(E, pick(BARK.panic)); return; }   // kids run, they don't fight
       const t = promote(E, 'hit'); if (t) folkHurt(t, dmg * (head ? 1.6 : 1), dir, head); };
     if (mode === 'walk') planLeg(E);
@@ -200,6 +201,24 @@ function planLeg(E) {
   if (a + b < 3) { E.mode = 'stand'; return; }
   E.leg = { ax: s.x - fx * a, az: s.z - fz * a, bx: s.x + fx * b, bz: s.z + fz * b, yaw };
 }
+// ---- witnesses phone the cops (GTA): the nearest local who saw it pulls out a phone; ~6 s later the stars come, unless you stop them
+const _ray = new THREE.Raycaster();
+function sees(E, pos) {
+  _v.set(E.pos.x, E.pos.y + 1.6, E.pos.z); const to = new THREE.Vector3(pos.x, (pos.y || 0) + 1.2, pos.z), d = _v.distanceTo(to); if (d < 2) return true;
+  _ray.set(_v, to.sub(_v).normalize()); _ray.near = 0.5; _ray.far = d - 0.8;
+  try { for (const h of _ray.intersectObjects(F.ctx.raycastTargets, false)) { const u = h.object.userData; if (u.soldier || u.noLOS || u.surface === 'flesh') continue; return false; } } catch { return false; }
+  return true;
+}
+function phoneCops(type, pos, done) {
+  if (!F || [...F.active].filter((E) => E.call).length >= 2) return false;
+  const R = type === 'shot' ? 60 : 30; let best = null, bd = R;
+  for (const E of F.active) { if (E.call || E.dead || E.angry > 0 || E.p.temper === 'tough' || E.s.sub || E.s.train || E.mode === 'lie' || E.p.arch === 'kid') continue;
+    const d = Math.hypot(E.pos.x - pos.x, E.pos.z - pos.z); if (d < bd && sees(E, pos)) { bd = d; best = E; } }
+  if (!best) return false;
+  best.call = { t: 6, done }; best.panic = 0; best.fig.phone = true; say(best, pick(['☎ 911? Yeah, somebody just…', '☎ Алло, полиция?!', '☎ Yo, 911, there\'s a guy on Surf…', '☎ Police, please, hurry!']));
+  return true;
+}
+function endCall(E, ok) { if (!E.call) return; const c = E.call; E.call = null; E.fig.phone = false; if (ok) { say(E, pick(['…yeah, hurry up.', '…они уже едут.', '…OK, they\'re coming.'])); c.done(E.p.name); } else { say(E, pick(['OK OK! No cops!', 'Я никому не звоню!', 'I wasn\'t calling nobody!'])); E.fig.hands = true; E.hands = 3; } }
 /** a crosswalk walker may step off: the cars along the way they walk have the green (so the ones crossing their path are stopped) */
 function crossOK(E) {
   const S = F.world.W.signals, c = E.s.cross; if (!S) return true;
@@ -268,7 +287,7 @@ function lightRob(E, force = null) {
     if (E.mode !== 'sit') { E.fig.hands = true; E.hands = 3; }
     const line = pick(GIVE); say(E, line); K.earn(p.cash); K.toast(`${p.name}: "${line}" — +$${p.cash}`, 2400);
     if (p.gun) setTimeout(() => crewTakeGun(p.gun, p.name), 1200);
-    if (Math.random() < 0.6) { try { chaseQA.crime('rob'); } catch {} }
+    try { chaseQA.crime('rob', E.pos); } catch {}   // witnesses decide (chase.js → phoneCops)
     return true;
   }
   const line = pick(NO); say(E, line); K.toast(`${p.name}: "${line}"`, 2000); E.angry = 7; E.strikeT = 0.4; return false;
@@ -311,12 +330,13 @@ function update(dt) {
     } else if (E.mode === 'walk' && E.leg) {
       const L = E.leg, tx = E.dir > 0 ? L.bx : L.ax, tz = E.dir > 0 ? L.bz : L.az, dx = tx - E.pos.x, dz = tz - E.pos.z, d = Math.hypot(dx, dz);
       const nearMe = Math.hypot(P.x - E.pos.x, P.z - E.pos.z) < 1.1;   // don't walk through the player
-      const wait = E.s.cross && E.atEnd && !crossOK(E);   // at the kerb: the hand is up
-      if (E.s.cross && E.atEnd && !wait) { E.atEnd = false; F.stats.crossStarts = (F.stats.crossStarts || 0) + 1; }
-      if (wait) { const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 3); }
+      const wait = (E.s.cross && E.atEnd && !crossOK(E)) || !!E.call;   // at the kerb: the hand is up
+      if (E.s.cross && E.atEnd && !wait && !E.call) { E.atEnd = false; F.stats.crossStarts = (F.stats.crossStarts || 0) + 1; }
+      if (wait && !E.call) { const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 3); }
       else if (d < 0.3) { E.dir = -E.dir; if (E.s.cross) E.atEnd = true; } else if (!nearMe && !E.fig.hands) { speed = E.p.speed; E.pos.x += dx / d * speed * dt; E.pos.z += dz / d * speed * dt; const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 5); }
       if (E.s.zone === 'water' || F.world.W.sandAt(E.pos.x, E.pos.z)) { const gy = F.world.W.groundHeight?.(E.pos.x, E.pos.z); if (Number.isFinite(gy)) E.pos.y = gy - (E.s.zone === 'water' ? 0.2 : 0); }
     }
+    if (E.call) { E.call.t -= dt; const want = Math.atan2(E.pos.x - P.x, E.pos.z - P.z); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 3); if (E.call.t <= 0) endCall(E, true); }
     if (E.hands > 0) { E.hands -= dt; if (E.hands <= 0) E.fig.hands = false; }
     E.holder.position.copy(E.pos); E.holder.rotation.y = E.yaw;
     // animation: every frame in view and close, every other frame further out, not at all off-screen
@@ -352,6 +372,7 @@ function tick() {
     const cast = !ctx.lite && d < 18; if (cast !== E.cast) { E.cast = cast; for (const m of E.meshes) m.castShadow = cast; }   // shadow LOD
     if (E.dead) continue;
     if (aiming && d < 28 && d > 0.5 && (dx * fx + dz * fz) / d > 0.985) {   // a gun on them: hands up (and a mouthful)
+      if (E.call) endCall(E, false);
       if (E.mode !== 'lie' && E.mode !== 'sit') { E.fig.hands = true; E.hands = 2.5; }
       if (E.barkT <= 0 && F.barkT <= 0) bark(E, 'gun', true);
     } else if (d < 1.5 && F.pspeed > 1.2 && E.barkT <= 0 && F.barkT <= 0) bark(E, 'bump', true);
@@ -404,6 +425,8 @@ export const folkQA = {
   crossers: () => F ? [...F.active].filter((E) => E.s.cross).map((E) => { const c = E.s.cross, hx = E.dir > 0 ? c.hx : -c.hx, hz = E.dir > 0 ? c.hz : -c.hz, L = E.leg;
     const along = L ? ((E.pos.x - L.ax) * (L.bx - L.ax) + (E.pos.z - L.az) * (L.bz - L.az)) / ((L.bx - L.ax) ** 2 + (L.bz - L.az) ** 2 || 1) : 0;
     return { waiting: !!E.atEnd && !crossOK(E), mid: along > 0.3 && along < 0.7, leaving: !E.atEnd && (E.dir > 0 ? along < 0.12 : along > 0.88), state: F.world.W.signals?.state(c.j, hx, hz) }; }) : [],
+  callers: () => F ? [...F.active].filter((E) => E.call).map((E) => ({ name: E.p.name, t: +E.call.t.toFixed(1), pos: E.pos.toArray().map((v) => +v.toFixed(1)) })) : [],
+  hitCaller: () => { const E = F && [...F.active].find((q) => q.call); if (!E) return false; E.hb.userData.onHit(5, false, null, null); return true; },
   crossStats: () => F ? { starts: F.stats.crossStarts || 0 } : null,
   archs: () => F ? [...F.active].map((E) => E.p.arch || 'none') : [],
   state: () => F && { spots: F.spots.length, active: F.active.size, gone: F.spots.filter((s) => s.gone).length, cache: F.cache.length, stats: { ...F.stats }, robTarget: F.robE?.p.name || null, pspeed: +F.pspeed.toFixed(2),
