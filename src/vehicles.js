@@ -5,6 +5,7 @@
 // ground follow with ramp launch, circle-vs-AABB collisions. Cameras: first person (driver's seat / on the bike) and a
 // third-person chase cam (V key / CAM button) with wall avoidance. Running people over: ctx.ai.damage for local soldiers,
 // bus 'vehicleHit' {peerId, speed, damage, point} for remote players (net.js turns it into a hit).
+import { damageHit, updateDamage, isWrecked } from './vehicledamage.js';
 import * as THREE from 'three';
 import { buildBike, buildRider, WHEEL_R, WHEELBASE, FRONT_Z, REAR_Z } from './vehicles/bike.js';
 import { buildJetski } from './vehicles/jetski.js';
@@ -192,7 +193,7 @@ function setRaycastable(v, on) {
   for (const m of v.meshes) { const i = T.indexOf(m); if (on && i < 0) T.push(m); else if (!on && i > -1) T.splice(i, 1); }
 }
 function mount(bike) {
-  const p = C.player; if (!bike || !p || S.mounted || p.mounted) return false;
+  const p = C.player; if (!bike || !p || S.mounted || p.mounted || isWrecked(bike)) return false;
   S.mounted = bike; p.mounted = bike; bike.parked = false; unparkBox(bike);
   setRaycastable(bike, false);   // your own vehicle never eats your bullets (chase cam rays pass through it)
   bike.headlight.visible = true; bike.headlight.intensity = 260; bike.lens.material.emissiveIntensity = bike.spec.car ? 1.2 : 3.5;
@@ -690,6 +691,7 @@ export async function init(ctx) {
 }
 
 export function update(dt, ctx) {
+  try { updateDamage(ctx, S.bikes, dt); } catch (e) { if (!S.dmgErr) { S.dmgErr = 1; console.error('[vehicles] damage', e); } }
   const p = ctx.player; if (!p) return;
   const input = ctx.input;
   S.grid.sync(ctx.colliders);
@@ -754,7 +756,8 @@ export function update(dt, ctx) {
     if (drop > 6 && !bike.air && performance.now() - (bike.crashT || 0) > 600) { bike.crashT = performance.now(); const k = Math.min(1, drop / 20);
       try { C.audio?.play?.('impact', { position: bike.pos, volume: 0.6 + k }); } catch {} try { C.audio?.play?.('glass', { position: bike.pos, volume: k }); } catch {}
       const p = C.player; if (p) { p.pitch += (Math.random() - 0.3) * 0.12 * k; p.yaw += (Math.random() - 0.5) * 0.1 * k; } bike.suspV -= 2 * k; bike.hitT = Math.max(bike.hitT || 0, 0.25);
-      if (!bike.spec.car && drop > 12) C.hud?.toast?.('*CRUNCH* …you ate the bumper', 1400); } }
+      if (!bike.spec.car && drop > 12) C.hud?.toast?.('*CRUNCH* …you ate the bumper', 1400);
+      if (bike.spec.car) try { damageHit(C, bike, drop); } catch (e) { console.warn('[vehicles] damage', e); } } }   // dents, lights out, smoke, fire, boom (vehicledamage.js)
   // speed FOV kick: written through settings.fov so weapons' ADS fov logic composes with it
   {
     if (S.fovWritten > 0 && Math.abs(ctx.settings.fov - S.fovWritten) > 1e-6) S.fovBase = ctx.settings.fov; // user moved the slider while riding
