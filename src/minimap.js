@@ -156,7 +156,7 @@ function drawMini() {
   drawMarkers(g, P, k, rot, false);
   g.restore();
   const off = p.position.x < m.b.min.x || p.position.x > m.b.max.x || p.position.z < m.b.min.z || p.position.z > m.b.max.z;
-  if (off) { const zn = (ctx.world?.zones || []).find((z) => p.position.z >= z.z0 && p.position.z <= z.z1);   // off the plan (the Belt / JFK run)
+  if (off) { const zn = (ctx.world?.zones || []).find((z) => p.position.z >= z.z0 && p.position.z <= z.z1 && (z.x0 == null || (p.position.x >= z.x0 && p.position.x <= z.x1)));   // off the plan (the Belt / JFK run, the yard)
     g.save(); g.fillStyle = 'rgba(14,26,36,.9)'; g.beginPath(); g.arc(R, R, R - 2, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#ffd27a'; g.font = '700 20px Barlow Condensed, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(zn?.name || 'OFF THE MAP', R, R - 10);
     g.fillStyle = '#c9d2da'; g.font = '600 14px Barlow, Arial'; g.fillText(zn?.hint || 'back to Coney: the ramp', R, R + 14); g.restore(); }

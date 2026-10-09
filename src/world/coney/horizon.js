@@ -20,6 +20,7 @@
 // ?time=golden|sunset|dusk|night|<0..1> freezes the phase for QA. Owned by: CONEY horizon agent.
 import * as THREE from 'three';
 import { OSM } from './osm.js';
+import { YARD } from './yard.js';
 
 const D2R = Math.PI / 180;
 const LAT0 = 40.5745, LON0 = -73.98, KX = 111320 * Math.cos(LAT0 * D2R), KY = 110540, CT = Math.cos(8.33 * D2R), ST_ = Math.sin(8.33 * D2R);
@@ -40,7 +41,9 @@ const ZCUT = (() => { const n = Math.ceil((EXCL.x1 - EXCL.x0) / 20), a = new Flo
 // the Brighton Beach strip (coney/brighton.js builds it, walkable): no sprawl, towers or land tiles in it
 const CORR = { x0: 880, x1: 2420, z0: -100, z1: 470 };
 const inCorr = (x, z, m = 0) => x > CORR.x0 - m && x < CORR.x1 + m && z > CORR.z0 - m && z < CORR.z1 + m;
-const inExcl = (x, z, m = 0) => (inRect(x, z, m) && !(z < ZCUT(x) - m)) || inCorr(x, z, m);
+// Coney Island Yard (coney/yard.js lays it out past the OSM plan): ballast and laid-up trains, no houses
+const inYard = (x, z, m = 0) => x > YARD.x0 - m && x < YARD.x1 + m && z > YARD.z0 - m && z < YARD.z1 + m;
+const inExcl = (x, z, m = 0) => (inRect(x, z, m) && !(z < ZCUT(x) - m)) || inCorr(x, z, m) || inYard(x, z, m);
 // OSM streets inside the rect (the scene draws them): sprawl boxes keep off them
 const ROADS = []; for (const r of OSM.r) for (let i = 0; i + 1 < r.p.length; i++) { const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1]; ROADS.push({ ax, az, bx, bz, w: r.w / 2 + 3, x0: Math.min(ax, bx) - r.w, x1: Math.max(ax, bx) + r.w, z0: Math.min(az, bz) - r.w, z1: Math.max(az, bz) + r.w }); }
 function onRoad(x0, z0, x1, z1) {
