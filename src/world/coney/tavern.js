@@ -21,7 +21,7 @@ import { buildTavernPeople } from './tavern-people.js';
 import { buildDarts } from './darts.js';
 import { LAYOUT } from './tavern-layout.js';
 
-export const TZ = { x0: -125, x1: 125, z0: -12052, z1: -11948, oz: -12000 };   // world rect of the zone; local z = world z − oz (x is shared)
+export const TZ = { x0: -135, x1: 135, z0: -12052, z1: -11948, oz: -12000 };   // world rect of the zone; local z = world z − oz (x is shared)
 const SW = 0.15;                                                                // sidewalk / bar floor height
 const ROAD = 6, WALK = 10.5;                                                    // road half-width, building line
 const ST60 = [-30, -18], ST61 = [62, 74];                                        // the cross streets (local x)
@@ -84,7 +84,7 @@ export function buildTavern(world) {
   const bld = [];   // { x0, x1, sd, floors, h, shop, hero }
   for (const sd of [-1, 1]) {
     for (const [a, b] of walkSegs) {
-      let x = a; const aa = Math.max(a, -104), bb = Math.min(b, 106); x = aa;
+      let x = a; const aa = Math.max(a, lite ? -104 : -128), bb = Math.min(b, lite ? 106 : 128); x = aa;   // desktop: the frontage runs on to the ends of the sidewalks
       while (x < bb - 3) {
         let w = 6 + Math.floor(rnd() * 3) * 0.8; if (x + w > bb - 2) w = bb - x;
         if (sd > 0 && x < 2.7 && x + w > -12) { // the tavern's block: 6002 | 6004 SOCCER TAVERN | 6006, fixed
@@ -130,8 +130,22 @@ export function buildTavern(world) {
     if (!lite) for (let f = 1; f < B.floors; f++) if (rnd() < 0.35) { const ax = B.x0 + 0.9 + Math.floor(rnd() * Math.max(1, Math.floor(w / 1.75))) * 1.75; const g = new THREE.BoxGeometry(0.62, 0.42, 0.5); g.translate(Math.min(B.x1 - 0.5, ax), gf + (f - 1) * 3.1 + 1.25, fz - B.sd * 0.24); shade(g, 0xc9c6bf); put(M.prop, g); }
   }
   try { extraFronts(world, walkIns); } catch (e) { console.warn('[tavern] walk-in shops', e); }
+  // ---- 60th and 61st St off the avenue: sidewalks and a row of brick rowhouses down each side to the end of the block (stoops,
+  // doors, a cornice, the same brick-and-windows facade as the avenue), so looking down a cross street isn't a bare road
+  { const brick = [0x9a4a36, 0x8a5a44, 0xb07a5a, 0x7e3f30, 0xa8876a];
+    for (const [a, b] of [ST60, ST61]) for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const curb = sx < 0 ? a : b, face = curb + sx * 3.2, z0 = sz * (WALK + 16.5), z1 = sz * 49;
+      { const g = new THREE.BoxGeometry(3.2, SW, Math.abs(z1 - z0)); g.translate(curb + sx * 1.6, SW / 2, (z0 + z1) / 2); boxUV(g, 1.5); put(M.walk, g); }   // the sidewalk
+      for (let z = Math.min(z0, z1); z < Math.max(z0, z1) - 3; ) { const w = Math.min(Math.max(z0, z1) - z, 5.4 + rnd() * 1.2), floors = rnd() < 0.6 ? 3 : 2, h = 0.9 + floors * 3.1, d = 12, cz = z + w / 2, back = face + sx * d, col = brick[(rnd() * brick.length) | 0];
+        { const g = new THREE.BoxGeometry(d, h, w); g.translate((face + back) / 2, h / 2, cz); put(M.side, g); wbox(face, 0, z + 0.02, back, h, z + w - 0.02); }
+        { const g = new THREE.PlaneGeometry(w, h - 1.2); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / 1.75, uv.getY(i) * (h - 1.2) / 3.1); g.rotateY(sx < 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(face - sx * 0.01, 1.2 + (h - 1.2) / 2, cz); setColor(g, col); put(M.upper, g); }
+        { const g = new THREE.BoxGeometry(0.4, 0.25, w); g.translate(face - sx * 0.2, h - 0.15, cz); shade(g, 0x8d877c); put(M.prop, g); }   // cornice
+        if (!lite) for (let k = 0; k < 4; k++) { const g = new THREE.BoxGeometry(0.35, 0.2 * (k + 1), 1.4); g.translate(face - sx * (1.6 - k * 0.35), 0.1 * (k + 1), cz + w * 0.25); shade(g, 0xa8a090); put(M.prop, g); }   // the stoop
+        if (!lite) { const g = new THREE.BoxGeometry(0.08, 2.3, 1.0); g.translate(face - sx * 0.04, 0.8 + 1.15, cz + w * 0.25); shade(g, [0x3a2a1e, 0x1f3a2a, 0x5a1a1a][(rnd() * 3) | 0]); put(M.prop, g); }   // the door
+        z += w; }
+    } }
   // far backdrop: the avenue runs on (cheap boxes with the same window material), and the cross streets end in blocks
-  { const far = []; for (const sd of [-1, 1]) for (let x = -300; x < 300; x += 7 + rnd() * 3) { if (x > -106 && x < 108) continue; far.push([x, sd, 7 + rnd() * 3, 7 + Math.floor(rnd() * 3) * 3.1]); }
+  { const far = []; for (const sd of [-1, 1]) for (let x = -300; x < 300; x += 7 + rnd() * 3) { if (x > (lite ? -106 : -130) && x < (lite ? 108 : 130)) continue; far.push([x, sd, 7 + rnd() * 3, 7 + Math.floor(rnd() * 3) * 3.1]); }
     for (const [a, b] of [ST60, ST61]) for (const sd of [-1, 1]) far.push([(a + b) / 2, sd * 5.5, b - a + 8, 11, true]);
     for (const q of far) { const [x, sd, w, h, cross] = q; const z = cross ? sd * 55 : sd * (WALK + 0.2); const d = cross ? 8 : 14;
       const g = new THREE.BoxGeometry(w, h, d); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / 1.75, uv.getY(i) * h / 3.1); g.translate(x, h / 2, z + (cross ? 0 : sd * d / 2)); setColor(g, brickTint[Math.floor(rnd() * brickTint.length)]); put(M.upper, g); } }
