@@ -12,6 +12,9 @@ const TRACKS = [
   { src: './assets/audio/radio/burbon-bratva-gudzon-2.mp3', title: 'Бурбон, братва, Гудзон (версия 2)' },
   { src: './assets/audio/radio/trinidad-daddy-remastered.mp3', title: 'Trinidad Daddy (Remastered)' },
   { src: './assets/audio/radio/nutcracker-sandman-remastered.mp3', title: 'Nutcracker Sandman (Remastered)' },
+  { src: './assets/audio/radio/luna-park-kruzhis.mp3', title: 'Луна-парк, кружись' },
+  { src: './assets/audio/radio/olya-angliyskaya-ruki-verh.mp3', title: 'Оля Английская (Ruki Verh)' },
+  { src: './assets/audio/radio/soccer-tavern.mp3', title: 'Soccer Tavern' },
 ];
 
 export function buildRadio(world) {
