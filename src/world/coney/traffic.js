@@ -708,7 +708,7 @@ const ROUTES = [
 ];
 export const BUS_STOPS = [
   ['Surf Av / W 15 St', -10, -119], ['W 12 St / Luna Park', 68, -250], ['W 12 St / Neptune Av', 94, -430],
-  ['Neptune Av / W 15 St', 20, -536], ['Stillwell Av Terminal', -32.6, -186], ['Stillwell Av Terminal', -23.4, -186], ['Stillwell Av / Mermaid Av', -87, -330], ['Stillwell Av / Surf Av', -87, -185],
+  ['Neptune Av / W 15 St', 20, -536], ['Stillwell Av Terminal', -32.6, -186], ['Surf Av / Stillwell Terminal', -23.4, -186], ['Stillwell Av / Mermaid Av', -87, -330], ['Stillwell Av / Surf Av', -87, -185],
   ['Surf Av / W 17 St', -175, -140], ['Surf Av / W 21 St', -310, -142], ['W 23 St / Mermaid Av', -365, -240], ['Mermaid Av / W 21 St', -300, -291], ['Mermaid Av / W 17 St', -170, -291],
 ];
 const BUS_V = 6.2, DWELL = 10;

@@ -15,7 +15,7 @@ import { streetAt } from './fronts.js';
 // streets by the towers): walkers heading along the street, a few standing on their phones. Instanced like the rest (one draw call
 // per body part for all of them); coney/folk.js brings the nearest ones to life. Their own seeded generator: the world's shared R
 // sequence (and everything placed after this) stays exactly as it was, and every client places the same people.
-const TOWN_N = { full: 600, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6;
+const TOWN_N = { full: 850, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6;
 function townCrowd(world, blocked) {
   let seed = 90127; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const want = world.ctx.lite ? TOWN_N.lite : TOWN_N.full, out = [], inRoad = (x, z) => OSM.r.some((r) => r.w >= 6 && segNear(x, z, r.p, r.w / 2));

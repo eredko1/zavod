@@ -185,7 +185,7 @@ async function prewarm() {
   // phones: the big merged static meshes nobody raycasts (parked cars, Brighton, the backdrop, 8th Ave) are on the GPU now,
   // their JS copies are dead weight (~35 MB): iOS kills the tab near its memory ceiling
   if (ctx.lite) { const rt = new Set(ctx.raycastTargets || []), seen = new Set();
-    scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern|street|fronts):/.test(o.name || '')) return; seen.add(g);
+    scene.traverse((o) => { const g = o.geometry; if (!o.isMesh || !g || seen.has(g) || rt.has(o) || o.isSkinnedMesh || !/^(cars|brighton|horizon|tavern|street|fronts|life|school):/.test(o.name || '')) return; seen.add(g);
       if (!g.boundingSphere) g.computeBoundingSphere(); if (!g.boundingBox) g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].array = null; if (g.index) g.index.array = null; }); }
   // phones: the big static buildings' own geometry (city, landmarks, boardwalk, the viaduct …) was kept in JS only so bullets,
   // sight lines and footsteps could raycast it (~120 MB + its BVH). Those raycasts go to one invisible mesh of the collision
