@@ -34,7 +34,7 @@ for (let i = 0; i < 14; i++) {
 const s3 = await st(); ok(s3.cr.thugs.some((t) => t.st === 'dead') || s3.cr.thugs.every((t) => t.st !== 'fight'), 'knife ends the fight', JSON.stringify(s3.cr.thugs.map((t) => [t.name, t.st, t.hp])));
 await pg.screenshot({ path: `${out}/fight-after.png` });
 // 3) cops answer a mugging
-const sb = await pg.evaluate(() => { window.__bust = 0; window.__ctx.bus.on('busted', () => window.__bust++); (window.__game.chase?.report || window.__game.chase?.crime)?.('rob');   // reported straight away (in play a witness has to phone it in) return window.__game.chase?.state?.()?.stars; }); console.log('stars right after', sb); await pg.waitForTimeout(9000);
+const sb = await pg.evaluate(() => { window.__bust = 0; window.__ctx.bus.on('busted', () => window.__bust++); (window.__game.chase?.report || window.__game.chase?.crime)?.('rob'); return window.__game.chase?.state?.()?.stars; }); console.log('stars right after', sb); await pg.waitForTimeout(9000);
 const s4 = await st(); const bust = await pg.evaluate(() => window.__bust);
 ok(sb >= 1 && ((s4.chase?.stars || 0) >= 1 || bust > 0), 'mugging brings the cops (still wanted, or busted)', JSON.stringify({ stars: s4.chase?.stars, units: s4.chase?.units?.length, bust, hp: s4.hp }));
 ok(s4.hp > 0, 'one-star cops cuff, they don\'t kill', `hp ${s4.hp}`);
