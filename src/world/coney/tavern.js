@@ -526,7 +526,7 @@ function arrive(how) {
 function leave(how) {
   if (!Z || Z.busy) return false; const { ctx, W } = Z; restoreRadio();
   if (how === 'belt' || (how === 'car' && ctx.vehicles?.mounted)) {
-    if (W.belt?.exit) { Z.busy = true; Z.lastTrip = performance.now() / 1000; W.belt.exit(); setTimeout(() => { Z.busy = false; }, 2000); return true; }   // the Belt is westbound only: heading home you're off at EXIT 7
+    if (W.belt?.enter) { Z.busy = true; Z.lastTrip = performance.now() / 1000; W.belt.enter(); setTimeout(() => { Z.busy = false; }, 2000); return true; }   // up onto the Belt: lap it and take your exit
     how = 'N'; }
   if (ctx.vehicles?.mounted) { try { ctx.vehicles.dismount?.(); } catch {} }
   fade(['8 AV · N TRAIN', 'CONEY ISLAND–STILLWELL AV'], () => { moveTo(-47, 0, -226, Math.PI, 0); K.toast('Coney Island–Stillwell Av. The D back to Sunset Park leaves from here (ride it past Bay 50 St).', 4200); });
