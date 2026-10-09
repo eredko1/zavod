@@ -27,9 +27,9 @@ export function buildShops(world) {
     const yawIn = (() => { const a = toW(U.dx, 0, 0), b = toW(U.dx, 0, -1); return Math.atan2(b.x - a.x, b.z - a.z); })();
     const doorU = U.dx + U.dw / 2, counterU = U.dx < (U.u0 + U.u1) / 2 ? U.u1 - 1.6 : U.u0 + 1.6;
     // the cashier behind the counter by the door, a shopper in the room, someone walking in and out of the door
-    { const p = toW(counterU, 0, -2.1); spots.push({ x: p.x, y: 0, z: p.z, ry: yawIn + Math.PI, pose: 'stand', zone: 'shop' }); }
-    { const a = toW((U.u0 + U.u1) / 2, 0, -U.rd + 1.6), b = toW((U.u0 + U.u1) / 2, 0, -3.2); spots.push({ x: a.x, y: 0, z: a.z, ry: yawIn, pose: 'walk', zone: 'shop', leg: { ax: a.x, az: a.z, bx: b.x, bz: b.z, yaw: Math.atan2(b.x - a.x, b.z - a.z) } }); }
-    { const a = toW(doorU, 0, -2.4), b = toW(doorU, 0, 2.8); spots.push({ x: b.x, y: 0, z: b.z, ry: yawIn, pose: 'walk', zone: 'shop', leg: { ax: b.x, az: b.z, bx: a.x, bz: a.z, yaw: Math.atan2(a.x - b.x, a.z - b.z) } }); }
+    { const p = toW(counterU, 0, -2.1); spots.push({ x: p.x, y: p.y, z: p.z, ry: yawIn + Math.PI, pose: 'stand', zone: 'shop' }); }
+    { const a = toW((U.u0 + U.u1) / 2, 0, -U.rd + 1.6), b = toW((U.u0 + U.u1) / 2, 0, -3.2); spots.push({ x: a.x, y: a.y, z: a.z, ry: yawIn, pose: 'walk', zone: 'shop', leg: { ax: a.x, az: a.z, bx: b.x, bz: b.z, yaw: Math.atan2(b.x - a.x, b.z - a.z) } }); }
+    { const a = toW(doorU, 0, -2.4), b = toW(doorU, 0, 2.8); spots.push({ x: b.x, y: b.y, z: b.z, ry: yawIn, pose: 'walk', zone: 'shop', leg: { ax: b.x, az: b.z, bx: a.x, bz: a.z, yaw: Math.atan2(a.x - b.x, a.z - b.z) } }); }
     U.toW = toW;
   }
   try { addFolkSpots(world, spots); } catch (e) { console.warn('[shops] folk', e); }

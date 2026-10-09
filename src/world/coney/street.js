@@ -17,6 +17,7 @@ import { placeCars } from '../carkit.js';
 import { addFolkSpots } from './folk.js';
 import { STREET_NAMES } from './streetnames.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
+import { BRI } from './brighton.js';
 
 const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return Math.hypot(a[0] + t * dx - x, a[1] + t * dz - z); };
 const inRoad = (x, z, pad = 0.3) => OSM.r.some((r) => { for (let i = 0; i + 1 < r.p.length; i++) if (segD(x, z, r.p[i], r.p[i + 1]) < r.w / 2 + pad) return true; return false; });
@@ -73,7 +74,39 @@ function stopTex() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+// ---- Brighton Beach Av (its own strip, not in the OSM street set): signals at every cross street on their own wall-clock
+// phase, pedestrian heads, the green name blades, corner baskets, litter along the kerbs, and people on both sidewalks
+/** the phase a lamp shows: the traffic system's signals, or Brighton's own (same 34 s cycle: the avenue, then the cross street) */
+const sigState = (L, now = Date.now()) => { if (!L.j.br) return L.j.n && globalThis.__zvSignals ? globalThis.__zvSignals.state(L.j, L.hx, L.hz, now) : 'R';
+  const t = ((now / 1000 + L.j.off) % 34 + 34) % 34, g = Math.abs(L.hx) > 0.7 ? 0 : 1; return g === 0 ? (t < 14 ? 'G' : t < 17 ? 'Y' : 'R') : (t >= 18 && t < 30 ? 'G' : t >= 30 && t < 33 ? 'Y' : 'R'); };
+function brightonKit(world, put, solid, lamps, blades, basket) {
+  const { W, ctx } = world, B = BRI, lite = !!ctx.lite; if (!W.brighton) return [];
+  let seed = 31337; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const zN = B.ZC - B.HALF - 0.9, zS = B.ZC + B.HALF + 0.9, y = B.SW;
+  const cyl = (r0, r1, h) => new THREE.CylinderGeometry(r1, r0, h, 8).translate(0, h / 2, 0);
+  const head = (x, hy, z, ry, j, hx, hz) => { put(new THREE.BoxGeometry(0.42, 1.12, 0.3).translate(0, 0.56, 0), 0xd8a81a, x, hy, z, ry); ['R', 'Y', 'G'].forEach((k, i) => lamps.push({ j, hx, hz, k, x: x + Math.sin(ry) * 0.16, y: hy + 0.88 - i * 0.34, z: z + Math.cos(ry) * 0.16, ry })); };
+  for (const c of B.CROSS) {
+    const j = { x: c.x, z: B.ZC, br: true, off: (c.n * 7.3) % 34 };
+    for (const [px, pz] of [[c.x - B.CW - 1.2, zS], [c.x + B.CW + 1.2, zS], [c.x + B.CW + 1.2, zN]]) { put(cyl(0.16, 0.12, 6.0), 0x6b6f75, px, y, pz); solid(px, pz, 0.25, 6); basket.push([px + (px > c.x ? 1.3 : -1.3), pz]); }
+    head(c.x + B.CW + 1.2, y + 4.6, zN - 0.3, Math.PI / 2, j, -1, 0);   // westbound on the avenue (they keep right: the north kerb) — faces east
+    head(c.x - B.CW - 1.2, y + 4.6, zS + 0.3, -Math.PI / 2, j, 1, 0);   // eastbound — faces west
+    head(c.x + B.CW + 1.2, y + 2.9, zS + 0.3, 0, j, 0, -1);             // up the cross street from the boardwalk — faces south
+    for (const [px, pz, ry, hx, hz] of [[c.x - B.CW - 1.2, zS, Math.PI / 2, 0, 1], [c.x + B.CW + 1.2, zS, -Math.PI / 2, 0, 1], [c.x + B.CW + 1.2, zN, Math.PI, 1, 0]]) {
+      put(new THREE.BoxGeometry(0.4, 0.75, 0.3).translate(0, 0.37, 0), 0xd8a81a, px, y + 2.0, pz, ry);
+      lamps.push({ j, hx, hz, k: 'hand', x: px + Math.sin(ry) * 0.16, y: y + 2.55, z: pz + Math.cos(ry) * 0.16, ry }, { j, hx, hz, k: 'man', x: px + Math.sin(ry) * 0.16, y: y + 2.2, z: pz + Math.cos(ry) * 0.16, ry }); }
+    const bx = c.x + B.CW + 1.2, bz = zN; blades.push({ x: bx, z: bz, y: y + 3.6, ry: Math.PI / 2 + Math.PI / 2, n: 'Brighton Beach Av' }, { x: bx, z: bz, y: y + 3.32, ry: Math.PI / 2, n: `Brighton ${c.n} St` });
+  }
+  // litter along both kerbs
+  const lit = []; for (let k = 0; k < (lite ? 90 : 220); k++) { const x = B.X0 + R() * (B.X1 - B.X0), z = R() < 0.5 ? B.ZC - B.HALF + 0.3 + R() * 0.4 : B.ZC + B.HALF - 0.3 - R() * 0.4; lit.push([x, z, R() * 6.28, 0.2 + R() * 0.25, (R() * 4) | 0]); }
+  W.brightonLitter = lit;
+  // people on the sidewalks: babushkas and dedushkas, families, the odd tourist
+  const spots = []; for (let x = B.X0 + 20; x < B.X1 - 20; x += lite ? 22 : 9) for (const z of [B.ZC - B.HALF - 2.6, B.ZC + B.HALF + 2.6]) { if (R() < 0.45) continue; if (B.CROSS.some((c) => Math.abs(c.x - x) < B.CW + 2 && z > B.ZC)) continue;
+    const r = R(), walk = R() < 0.65; spots.push({ x: x + (R() - 0.5) * 4, y, z: z + (R() - 0.5) * 1.6, ry: walk ? (R() < 0.5 ? Math.PI / 2 : -Math.PI / 2) : R() * 6.28, pose: walk ? 'walk' : R() < 0.5 ? 'phone' : 'stand', zone: 'town', arch: r < 0.35 ? 'elder' : r < 0.45 ? 'tourist' : r < 0.52 ? 'kid' : undefined, s: r >= 0.45 && r < 0.52 ? 0.66 : undefined }); }
+  return spots;
+}
+
 export function buildStreet(world) {
+  globalThis.__zvSignals = world.W.signals;
   const { scene, ctx, W } = world, lite = !!ctx.lite; let seed = 77213; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const blocked = (x, z, rad = 0.5) => ctx.colliders.some((b) => x > b.min.x - rad && x < b.max.x + rad && z > b.min.z - rad && z < b.max.z + rad && b.max.y > 0.2 && b.min.y < 2.5);
   const col = [], st = { heads: 0, poles: 0, bins: 0, cars: 0, stalls: 0, crossers: 0 };
@@ -119,6 +152,7 @@ export function buildStreet(world) {
   }
   // ---- stop signs (the minor street's approaches; ALL WAY where equals meet) and green name blades on a corner of every junction ----
   const stops = [], blades = [];
+  const brSpots = brightonKit(world, put, solid, lamps, blades, cornerBins);
   for (const j of W.junctions || []) {
     if (!inMap(j.x, j.z)) continue;
     const ways = []; for (const e of j.ways) if (!ways.some((q) => q.dx * e.dx + q.dz * e.dz > 0.9)) ways.push(e);
@@ -153,7 +187,7 @@ export function buildStreet(world) {
     scene.add(lampIM);
     const LIT = { R: 0xff2a1a, Y: 0xffb21a, G: 0x2affa0, hand: 0xff7a1a, man: 0xf2f6ff }, DIM = { R: 0x3a0e0a, Y: 0x3a2a0a, G: 0x0a2a1a, hand: 0x2a1a0a, man: 0x22252a };
     let t = 0; world.updaters.push((dt) => { t -= dt; if (t > 0) return; t = 0.25; const now = Date.now(), blink = Math.floor(now / 500) % 2 === 0;
-      lamps.forEach((L, i) => { const s = W.signals.state(L.j, L.hx, L.hz, now); let on;
+      lamps.forEach((L, i) => { const s = sigState(L, now); let on;
         if (L.k === 'hand') on = s !== 'G' && (s !== 'Y' || blink); else if (L.k === 'man') on = s === 'G'; else on = s === L.k;
         lampIM.setColorAt(i, _c.set(on ? LIT[L.k] : DIM[L.k])); });
       lampIM.instanceColor.needsUpdate = true; });
@@ -239,9 +273,9 @@ export function buildStreet(world) {
 
   if (col.length) { const me = new THREE.Mesh(mergeGeometries(col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.2 })); me.name = 'street:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }
   // the walkers that wait for the WALK and the people behind the tables
-  st.crossers = crossers.length; try { addFolkSpots(world, [...crossers, ...sellers, ...(W.schoolKids || [])]); } catch (e) { console.warn('[street] folk', e); }
+  st.crossers = crossers.length; try { addFolkSpots(world, [...crossers, ...sellers, ...(W.schoolKids || []), ...brSpots]); } catch (e) { console.warn('[street] folk', e); }
   console.log('[street]', st.stops, 'stop signs ·', st.blades, 'name blades ·', st.heads, 'signal heads ·', st.poles, 'utility poles ·', st.bins, 'bins / planters / bollards / barrels ·', st.cars, 'parked on Surf ·', st.stalls, 'vendor tables ·', st.crossers, 'crosswalk walkers');
   W.street = st;
-  if (typeof window !== 'undefined' && window.__game) window.__game.street = { stats: () => ({ ...st }), lamps: () => lamps.map((L) => ({ k: L.k, s: W.signals.state(L.j, L.hx, L.hz) })), heads: () => heads.slice(), stalls: () => stalls.slice() };
+  if (typeof window !== 'undefined' && window.__game) window.__game.street = { stats: () => ({ ...st }), lamps: () => lamps.map((L) => ({ k: L.k, s: sigState(L), br: !!L.j.br })), heads: () => heads.slice(), stalls: () => stalls.slice() };
   return st;
 }

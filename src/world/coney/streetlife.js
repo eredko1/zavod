@@ -42,6 +42,7 @@ export function buildStreetLife(world) {
       if (!inMap(x, z) || blocked(x, z, 0.1)) continue;
       if (R() < 0.2) cans.push([x, z, R() * 6.28]); else items[(R() * 4) | 0].push([x, z, R() * 6.28, 0.18 + R() * 0.25]);
     }
+    for (const [x, z, a, sc, cell] of W.brightonLitter || []) items[cell].push([x, z, a, sc]);   // Brighton Beach Av's kerbs too
     items.forEach((list, cell) => { if (!list.length) return; const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); const u = g.attributes.uv; for (let i = 0; i < u.count; i++) u.setX(i, (cell + u.getX(i)) / 4);
       const im = new THREE.InstancedMesh(g, mat, list.length); list.forEach(([x, z, a, sc], i) => { _e.set(0, a, 0); _q.setFromEuler(_e); im.setMatrixAt(i, _m.compose(_p.set(x, 0.035 + i * 1e-5, z), _q, _s.set(sc * (cell === 3 ? 2.2 : 1), 1, sc * (cell === 3 ? 1.8 : 1)))); }); im.receiveShadow = true; im.name = 'life:litter'; scene.add(im); st.litter += list.length; });
     if (cans.length) { const g = new THREE.CylinderGeometry(0.033, 0.033, 0.12, 8); g.rotateZ(Math.PI / 2); const im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.8 }), cans.length);
