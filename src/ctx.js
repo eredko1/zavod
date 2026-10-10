@@ -27,6 +27,9 @@ export const deg = (d) => d * Math.PI / 180;
 export function createCtx() {
   const qs = new URLSearchParams(location.search);
   // ?mode=chill (coney): no mercs — knives, street fights, robbing / getting robbed, cops on muggings, get wasted (coney/chill.js)
+  // a bare URL loads Coney chill (the one most people want, and one load instead of the menu → reload); any ?map= / ?mode= link
+  // (shared rooms, the map picker, Play solo) gets exactly what it names
+  if (!qs.has('map') && !qs.has('mode')) { qs.set('map', 'coney'); qs.set('mode', 'chill'); }
   const mode = qs.get('mode') === 'chill' ? 'chill' : null;
   if (mode) { qs.set('ai', '0'); qs.set('waves', '0'); }
   const qa = qs.get('qa') === '1';
