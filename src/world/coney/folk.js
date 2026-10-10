@@ -11,7 +11,7 @@
 // wasted, or when something goes down nearby. Online: whoever pulls a local into the street systems owns him (chill streams
 // him as a 'thug'); a 'folk' event hides that spot on every other client so nobody sees a double. CONEY agent.
 import * as THREE from 'three';
-import { buildPerson, peopleReady, peopleDebug, AVATARS } from '../people.js';
+import { buildPerson, peopleReady, peopleDebug, AVATARS, wearHat } from '../people.js';
 import { hangkit as K, kit } from '../hangkit.js';
 import { adoptFolk, folkRob, folkHurt, crewCalm, crewTakeGun } from './chill.js';
 import { chaseQA, setReporter } from './chase.js';
@@ -129,16 +129,6 @@ function tintMat(src, col) {
 }
 const HATM = {}, BAGG = {};
 function hatMat(c) { return HATM[c] || (HATM[c] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 })); }
-const HATG = {};
-function hat(kind, col) {
-  const g = new THREE.Group();
-  if (!HATG.cap) { HATG.cap = new THREE.SphereGeometry(0.108, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5); HATG.brim = new THREE.BoxGeometry(0.17, 0.012, 0.11); HATG.sunB = new THREE.CylinderGeometry(0.22, 0.22, 0.008, 20); HATG.sunC = new THREE.CylinderGeometry(0.095, 0.105, 0.09, 16); HATG.buckB = new THREE.CylinderGeometry(0.14, 0.155, 0.05, 16, 1, true); HATG.buckC = new THREE.CylinderGeometry(0.1, 0.112, 0.07, 16); }
-  const m = hatMat(col), add = (geo, x, y, z, rx = 0) => { const e = new THREE.Mesh(geo, m); e.position.set(x, y, z); e.rotation.x = rx; e.castShadow = true; g.add(e); };
-  if (kind === 'cap') { add(HATG.cap, 0, 0.035, -0.01); add(HATG.brim, 0, 0.04, 0.1, -0.12); }
-  else if (kind === 'sun') { add(HATG.sunB, 0, 0.05, 0); add(HATG.sunC, 0, 0.09, -0.005); }
-  else { add(HATG.buckB, 0, 0.045, 0); add(HATG.buckC, 0, 0.09, -0.005); }
-  return g;
-}
 
 /** a person for a spot; sitting ones are built on the chair clip (they get re-built standing if they have to get up) */
 function makeFig(s, sit) {
@@ -146,7 +136,7 @@ function makeFig(s, sit) {
   const f = buildPerson({ avatar: p.avatar, seed: Math.floor(hash(s.x, s.z, 20) * 997), pose: sit ? 'sit' : undefined, glasses: p.glasses, female: p.fem });
   f.mood = p.mood;
   if (p.tint != null) f.group.traverse((o) => { if (o.isSkinnedMesh && /_body$/.test(o.material?.name || '')) o.material = tintMat(o.material, p.tint); });
-  if (p.hat) f.head.add(hat(p.hat, p.hatCol ?? pick([0xf2f0ea, 0x1a2a5a, 0xc0202a, 0xe8c890, 0x151515, 0x2a6a3a, 0xf2c418], hash(s.x, s.z, 21))));
+  if (p.hat) wearHat(f, p.hat, p.hatCol ?? pick([0xf2f0ea, 0x1a2a5a, 0xc0202a, 0xe8c890, 0x151515, 0x2a6a3a, 0xf2c418], hash(s.x, s.z, 21)));
   if (p.kid) f.group.scale.setScalar(s.s && s.s < 0.8 ? s.s : 0.68);
   if (p.arch === 'schoolkid' || (p.arch === 'tourist' && hash(s.x, s.z, 23) < 0.3)) {   // a backpack: a rounded pack + a front pocket, on the back (the figure faces +z)
     const bag = new THREE.Group(), m = hatMat(pick([0x1a2a5a, 0xc0202a, 0x2a6a3a, 0xff7ab0, 0x151515, 0xf2c418, 0x7a2ae0], hash(s.x, s.z, 24)));

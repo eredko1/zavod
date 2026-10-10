@@ -83,6 +83,41 @@ function pickAvatar(o, seed) {
 }
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 
+// ---- head fit: each avatar's head measured once from its own skinned vertices (in the upright `head` accessory frame), so
+// glasses sit on the eye line at the brow and hats sit on the crown at the right size, whoever the model is
+const FIT = {}, FIT0 = { crown: 0.135, eyeY: -0.045, front: 0.098, back: -0.1, halfW: 0.075, bandY: 0.08, bandR: 0.1, cz: -0.005 };
+function headFit(id, model, headB, head) {
+  if (FIT[id]) return FIT[id];
+  const xs = [], ys = [], zs = [], v = new THREE.Vector3(); model.updateMatrixWorld(true); head.updateMatrixWorld(true);
+  model.traverse((m) => { if (!m.isSkinnedMesh || !m.geometry.attributes.skinIndex) return; const bi = m.skeleton.bones.indexOf(headB); if (bi < 0) return; const G = m.geometry.attributes, si = G.skinIndex, sw = G.skinWeight;
+    for (let i = 0; i < si.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === bi) w += sw.getComponent(i, k); if (w < 0.5) continue;
+      v.fromBufferAttribute(G.position, i); m.applyBoneTransform(i, v); m.localToWorld(v); head.worldToLocal(v); xs.push(v.x); ys.push(v.y); zs.push(v.z); } });
+  if (xs.length < 50) return (FIT[id] = FIT0);
+  const n = xs.length, band = (y0, y1, f) => { const out = []; for (let i = 0; i < n; i++) if (ys[i] >= y0 && ys[i] <= y1) out.push(f(i)); return out.sort((a, b) => a - b); }, q = (a, k) => a.length ? a[Math.min(a.length - 1, Math.floor(a.length * k))] : 0;
+  const crown = q([...ys].sort((a, b) => a - b), 0.995), chin = q([...ys].sort((a, b) => a - b), 0.02);
+  // the nose tip is the most forward point on the centre line (hair makes the crown useless for this): the eyes are just above it
+  let nz = -1, ny = chin + (crown - chin) * 0.42; for (let i = 0; i < n; i++) if (Math.abs(xs[i]) < 0.01 && ys[i] > chin + 0.03 && ys[i] < crown - 0.06 && zs[i] > nz) { nz = zs[i]; ny = ys[i]; }
+  const eyeY = ny + 0.032;
+  const front = Math.max(nz - 0.016, q(band(eyeY - 0.008, eyeY + 0.008, (i) => (Math.abs(xs[i]) > 0.02 && Math.abs(xs[i]) < 0.05 ? zs[i] : -1)), 0.98)), back = q(band(eyeY - 0.03, eyeY + 0.03, (i) => zs[i]), 0.02);
+  const halfW = q(band(eyeY - 0.02, eyeY + 0.02, (i) => Math.abs(xs[i])), 0.98), bandY = Math.min(crown - 0.045, eyeY + 0.062);   // a hat's band sits on the forehead, a couple of fingers above the brow
+  const bw = q(band(bandY - 0.015, bandY + 0.015, (i) => Math.abs(xs[i])), 0.99), bz = band(bandY - 0.015, bandY + 0.015, (i) => zs[i]), bf = q(bz, 0.99), bb = q(bz, 0.01);
+  return (FIT[id] = { crown, eyeY, front, back, halfW, bandY, bandR: Math.max(bw, (bf - bb) / 2), cz: (bf + bb) / 2 });
+}
+const HATM = {};
+/** a hat fitted to a person's head (F from buildPerson): 'cap' (dome, curved visor, button), 'bucket', 'sun' (wide brim, ribbon) */
+export function wearHat(F, kind, col = 0x1a2a5a) {
+  const f = F.fit || FIT0, m = HATM[col] || (HATM[col] = new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, side: THREE.DoubleSide }));
+  const g = new THREE.Group(); g.position.set(0, f.bandY, f.cz); const r = f.bandR * 1.07, top = Math.max(0.05, f.crown + 0.014 - f.bandY);
+  const add = (geo, x, y, z, rx = 0) => { const e = new THREE.Mesh(geo, m); e.position.set(x, y, z); e.rotation.x = rx; e.castShadow = true; g.add(e); return e; };
+  if (kind === 'cap') { add(new THREE.SphereGeometry(1, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), 0, -0.004, 0).scale.set(r, top, r * 1.06);
+    const brim = new THREE.CircleGeometry(r * 0.92, 18, 0, Math.PI); brim.rotateX(Math.PI / 2); brim.scale(1, 1, 0.95); add(brim, 0, 0.002, r * 0.5, 0.14);
+    add(new THREE.SphereGeometry(0.009, 8, 6), 0, top - 0.004, 0); }
+  else if (kind === 'bucket') { add(new THREE.CylinderGeometry(r * 0.9, r, top * 0.9, 18), 0, top * 0.45, 0); add(new THREE.CircleGeometry(r * 0.9, 18).rotateX(-Math.PI / 2), 0, top * 0.9, 0); add(new THREE.CylinderGeometry(r + 0.012, r + 0.06, 0.035, 20, 1, true), 0, -0.012, 0); }
+  else { add(new THREE.CylinderGeometry(r * 0.88, r, top * 0.85, 18), 0, top * 0.42, 0); add(new THREE.CircleGeometry(r * 0.88, 18).rotateX(-Math.PI / 2), 0, top * 0.85, 0);
+    add(new THREE.CylinderGeometry(r + 0.004, r + 0.085, 0.035, 28, 1, true), 0, -0.004, 0); const rb = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.003, r + 0.006, 0.022, 18, 1, true), HATM[0x1a1a1a] || (HATM[0x1a1a1a] = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8, side: THREE.DoubleSide }))); rb.position.y = 0.022; g.add(rb); }
+  F.head.add(g); return g;
+}
+
 export function buildPerson(o = {}) {
   const seed = o.seed ?? Math.floor(Math.random() * 1000);
   const id = pickAvatar(o, seed), A = P.av[id], g = AVATARS[id].g;
@@ -151,16 +186,19 @@ export function buildPerson(o = {}) {
     else if (a.name === 'shove') { for (const [s, b] of [['R', R], ['L', L]]) { aim(b.up, b.fore, side[s] * 0.25, 0.1, 1, e); aim(b.fore, b.hand, side[s] * 0.2, 0.2, 1, e); } lean(spine, [1, 0, 0], 0.25 * e); }
     if (k >= 1) F.act = null;
   }
+  F.fit = headFit(id, model, headB, head);
   // props the capsule figures had: a rasta tam, shades
   const mat = (c, r = 0.9) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
   if (o.tam) { [0x1f7a33, 0xe0b422, 0xb4221c].forEach((c, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.125 - i * 0.01, 0.13 - i * 0.01, 0.05, 16), mat(c)); m.position.set(0, -0.03 + i * 0.042, -0.03); head.add(m); });
     const top = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(0x1f7a33)); top.scale.set(1.05, 0.7, 1.1); top.position.set(0, 0.14, -0.02); head.add(top); }
   if (o.glasses) {   // thin dark rims: two lens frames, a bridge, temples back to the ears (o.glasses === 'clear' → see-through lenses)
     const gm = mat(0x151515, 0.3), lens = new THREE.MeshStandardMaterial({ color: o.glasses === 'clear' ? 0xdfe8ee : 0x0a0a0a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: o.glasses === 'clear' ? 0.18 : 0.85 });
-    const G = new THREE.Group(); G.position.set(0, -0.045 + (o.glassesY || 0), 0.098 + (o.glassesZ || 0)); head.add(G);
-    for (const sx of [-1, 1]) { const f = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0028, 6, 20), gm); f.scale.set(1.25, 0.9, 1); f.position.set(sx * 0.033, 0, 0); G.add(f);
-      const l = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), lens); l.scale.set(1.25, 0.9, 1); l.position.set(sx * 0.033, 0, -0.001); G.add(l);
-      const t = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.004, 0.1), gm); t.position.set(sx * 0.064, 0.004, -0.05); G.add(t); }
+    // on the measured eye line, just proud of the brow; lenses spaced and temples run back to the ears for this head (the hand-tuned offsets only for an unmeasured one)
+    const fit = F.fit, measured = fit !== FIT0, G = new THREE.Group(); G.position.set(0, fit.eyeY + (measured ? 0 : o.glassesY || 0), fit.front + 0.006 + (measured ? 0 : o.glassesZ || 0)); head.add(G);
+    const k = THREE.MathUtils.clamp(fit.halfW / 0.075, 0.9, 1.08) * 0.82, tl = Math.max(0.06, (fit.front - (fit.back + fit.front) / 2) * 0.95);
+    for (const sx of [-1, 1]) { const f = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0028, 6, 20), gm); f.scale.set(1.25 * k, 0.9 * k, 1); f.position.set(sx * 0.033 * k, 0, 0); G.add(f);
+      const l = new THREE.Mesh(new THREE.CircleGeometry(0.024, 16), lens); l.scale.set(1.25 * k, 0.9 * k, 1); l.position.set(sx * 0.033 * k, 0, -0.001); G.add(l);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(0.003, 0.004, tl), gm); t.position.set(sx * (fit.halfW + 0.004), 0.004, -tl / 2); G.add(t); }
     const br = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.003, 0.003), gm); br.position.set(0, 0.006, 0); G.add(br);
   }
   F.update(0.001, 0); F._mixer = mixer; F._act = act;
