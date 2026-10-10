@@ -10,9 +10,9 @@ await pg.addInitScript(() => { try { localStorage.setItem('zavod.helpSeen', '1')
 await pg.goto(`http://localhost:${process.env.PORT || 8790}/?qa=1&map=coney&ai=0&time=day`, { timeout: 150000 }); await pg.waitForFunction(() => window.__game?.ready && window.__game.belt, null, { timeout: 150000 });
 await pg.evaluate(() => window.__game.setState('playing'));
 const car = () => pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return v ? { x: +v.pos.x.toFixed(1), y: +v.pos.y.toFixed(2), z: +v.pos.z.toFixed(1), h: +v.heading.toFixed(2), sp: +(v.fwdSpeed || 0).toFixed(1) } : null; });
-await pg.evaluate(() => { const r = window.__game.belt.ramp; window.__game.teleport((r.x0 + r.x1) / 2, 0, r.z1 + 25, 0, 0); }); await pg.waitForTimeout(500);
+await pg.evaluate(() => { const r = window.__game.belt.ramp; window.__game.teleport((r.x0 + r.x1) / 2, 0, r.z1 + 9, 0, 0); }); await pg.waitForTimeout(500);
 await pg.evaluate(() => { const V = window.__ctx.vehicles; const p = window.__ctx.player.position; const c = V.spawnCar(p.x, p.z, 0, 'sedan', 0x2b3f73, 0); V.mount(c); }); await pg.waitForTimeout(500);
-for (let k = 0; k < 20 && await pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return window.__ctx.world.traffic.cars().some((t) => Math.abs(t.x - v.pos.x) < 5 && t.z < v.pos.z + 3 && t.z > v.pos.z - 40); }); k++) await pg.waitForTimeout(500);   // Coney traffic queues at the ramp: wait for a clear lane
+for (let k = 0; k < 20 && await pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return window.__ctx.world.traffic.cars().some((t) => Math.abs(t.x - v.pos.x) < 14 && t.z < v.pos.z + 3 && t.z > -565); }); k++) await pg.waitForTimeout(500);   // Coney traffic queues at the ramp: wait for a clear lane
 pg.evaluate(() => window.__ctx.vehicles.qaDrive(1, 0, 6)).catch(() => {}); await pg.waitForTimeout(6500);
 let c = await car(); ok(c && c.z > 11400 && Math.abs(c.y - 9) < 0.6, 'through the gantry → up on the elevated loop', JSON.stringify(c));
 if (!(c && c.z > 11400)) console.log('  traffic within 10 m:', await pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return JSON.stringify(window.__ctx.world.traffic.cars().filter((t) => Math.hypot(t.x - v.pos.x, t.z - v.pos.z) < 10).map((t) => [t.kind, +t.x.toFixed(1), +t.z.toFixed(1), t.state]));}));
@@ -43,6 +43,22 @@ await pg.waitForTimeout(3200); await pg.evaluate(() => window.__game.tavern.arri
 await pg.evaluate(() => { const v = window.__ctx.vehicles.mounted, Z = window.__game.tavern.zone; if (v) { v.pos.set(Z.x1 - 10, 0.15, Z.oz + 3); v.vel.set(0, 0, 0); } }); await pg.waitForTimeout(2500);
 { const p = await car(); ok(p && p.z > 11400, 'drive off 8th Ave → onto the Belt', JSON.stringify(p)); }
 ok(await pg.evaluate(() => window.__ctx.scene.getObjectByName('beltTraffic:sedan:paint')?.count > 0), 'traffic on the loop is real cars');
+// stop in a lane: the traffic behind queues up; get out, walk to the car behind, pull the driver out and drive off in it
+{ await pg.waitForTimeout(3200);
+  await pg.evaluate(() => { const V = window.__ctx.vehicles; V.dismount?.(); for (const v of V.list) if (v.pos.z > 11400) { v.pos.y = -200; v.group.position.y = -200; }   /* cars the earlier steps left on the deck */
+    const B = window.__game.belt, list = B.traffic(), i = list.findIndex((c) => c.lane === 1 && !c.jacked), c = list[i], a = B.at(c.s + 35, B.lane(1));
+    const car = V.spawnCar(a[0], a[2], a[3], 'sedan', 0x2b3f73, a[1]); V.mount(car); car.pos.set(a[0], a[1], a[2]); car.heading = a[3]; car.vel.set(0, 0, 0); return i; });   // 35 m in front of a lane-1 car
+  await pg.waitForTimeout(6000);
+  const q = await pg.evaluate(() => { const B = window.__game.belt, me = window.__ctx.vehicles.mounted.pos, behind = B.traffic().filter((c) => c.lane === 1 && !c.jacked).map((c) => ({ ...c, d: +Math.hypot(c.p[0] - me.x, c.p[1] - me.z).toFixed(1) })).sort((a, b) => a.d - b.d); return behind[0]; });   // the car right behind you
+  ok(q && q.v < 0.5 && q.d < 14, 'Belt traffic queues behind you when you stop', JSON.stringify(q));
+  await pg.evaluate(() => window.__ctx.vehicles.dismount()); await pg.waitForTimeout(300);
+  await pg.evaluate((c) => window.__game.teleport(c.p[0] + 0.5, 9.3, c.p[1] + 0.5, 0, 0), q); await pg.waitForTimeout(600);
+  ok(await pg.evaluate(() => window.__game.belt.jackable()), 'F prompt: pull the driver out');
+  await pg.evaluate(() => window.__game.belt.jack()); await pg.waitForTimeout(500);
+  const m = await pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return v ? { kind: v.kind, y: +v.pos.y.toFixed(1) } : null; });
+  ok(m && Math.abs(m.y - 9) < 0.6, 'jacked it: driving it on the deck', JSON.stringify(m));
+  pg.evaluate(() => window.__ctx.vehicles.qaDrive(1, 0, 2)).catch(() => {}); await pg.waitForTimeout(2300); }
+
 await pg.evaluate(() => window.__game.belt.exit()); await pg.waitForTimeout(2000);
 // look down on Brighton / the bay from the deck on foot
 await pg.evaluate(() => { window.__ctx.vehicles.dismount?.(); }); await pg.waitForTimeout(500);
