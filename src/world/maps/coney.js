@@ -21,6 +21,7 @@ import { buildHangout, hangoutQA } from '../coney/hangout.js';
 import { buildChase } from '../coney/chase.js';
 import { buildAirSupport } from '../coney/airsupport.js';
 import { buildBelt } from '../coney/belt.js';
+import { buildFerry } from '../coney/ferry.js';
 import { buildSubway } from '../coney/subway.js';
 import { buildGreens } from '../coney/greens.js';
 import { buildRadio } from '../coney/radio.js';
@@ -59,6 +60,7 @@ export function build(world) {
   const skip = new Set(String(ctx.qs?.get?.('skip') || '').split(','));   // ?skip=horizon,belt,subway,greens,crowds,traffic (and tavern, brighton in hangout.js)
   if (!skip.has('horizon')) try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
   if (!skip.has('belt')) try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
+  if (!skip.has('ferry')) try { buildFerry(world); } catch (e) { console.warn('[coney] ferry', e); }   // the NYC Ferry from the pier to the Verrazzano and back (coney/ferry.js)
   if (!skip.has('subway')) try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
   Object.defineProperty(W, 'filmGrade', { get: () => (/night|dusk/i.test(W.tod?.get?.() || '') ? null : 'lunafilm'), configurable: true });   // the aerial-photo grade by day (Settings → Film look)
   if (!skip.has('greens')) try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
