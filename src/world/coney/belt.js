@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { carGeometries, carMaterials, CAR_COLORS, wheelInstances, wheelLayout } from '../carkit.js';
+import { hangkit as K } from '../hangkit.js';
 
 export const ZONE = { x0: -2000, x1: 3400, z0: 11400, z1: 12700, oz: 12000 };   // world rect of the zone; local z = world z − oz
 const CX = 900, LS = 300, R = 72, DECK = 9;                                      // loop centre (local x), straight length, bend radius, deck height
@@ -164,9 +165,11 @@ export function buildBelt(world) {
     if (along) pn.position.set(x, 6.1, z + 0.25); else { pn.position.set(x - 0.25, 6.1, z); pn.rotation.y = -Math.PI / 2; } scene.add(pn);
     if (r.id !== 'coney') (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'BELT PKWY ↑', x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, kind: 'road' }); }
 
+  Z.jackPos = new THREE.Vector3(1e6, 0, 0);
+  K.spot({ pos: Z.jackPos, r: 3.6, dy: 2.5, when: () => !!Z.jackable, prompt: 'F — PULL THE DRIVER OUT', act: () => Z.jackable && jack(Z.jackable) });
   world.updaters.push((dt) => { if (Z?.world === world) update(dt); });
   W.belt = { enter: () => enter(), exit: () => exit() };   // tavern.js: drive off either end of 8th Ave onto the loop
-  if (typeof window !== 'undefined' && window.__game) window.__game.belt = { enter: () => enter(), exit: () => exit(), state: () => ({ inZone: inZone(ctx.player.position), t: +Z.t.toFixed(1) }), ramp: RAMP, ramps: RAMPS, zone: ZONE, at: (s, off = 0) => { const p = at(s), r = right(p); return [p.x + r.x * off, DECK, p.z + r.z * off + ZONE.oz, Math.atan2(-p.tx, -p.tz)]; }, exits: EXITS, dest: DEST, entry: ENTRY, lane: (l) => -ROAD / 2 + SH + LW * (l + 0.5), per: PER, deck: DECK };
+  if (typeof window !== 'undefined' && window.__game) window.__game.belt = { enter: () => enter(), exit: () => exit(), state: () => ({ inZone: inZone(ctx.player.position), t: +Z.t.toFixed(1) }), ramp: RAMP, ramps: RAMPS, zone: ZONE, at: (s, off = 0) => { const p = at(s), r = right(p); return [p.x + r.x * off, DECK, p.z + r.z * off + ZONE.oz, Math.atan2(-p.tx, -p.tz)]; }, exits: EXITS, dest: DEST, traffic: () => Z.traffic.map((c) => ({ s: +c.s.toFixed(1), v: +c.v.toFixed(1), lane: c.lane, jacked: !!c.jacked, p: [+c.p.x.toFixed(1), +c.p.z.toFixed(1)] })), jackable: () => !!Z.jackable, jack: () => !!(Z.jackable && (jack(Z.jackable), true)), entry: ENTRY, lane: (l) => -ROAD / 2 + SH + LW * (l + 0.5), per: PER, deck: DECK };
   console.log('[belt] elevated loop built', Math.round(PER), 'm');
 }
 
@@ -174,14 +177,27 @@ export function buildBelt(world) {
 const inZone = (p) => p.z > ZONE.z0 && p.z < ZONE.z1 && p.x > ZONE.x0 && p.x < ZONE.x1;
 function update(dt) {
   Z.t += dt; const { ctx } = Z; const p = ctx.player; const now = performance.now() / 1000;
-  for (const c of Z.traffic) { c.s = (c.s + c.v * dt) % PER; const q = at(c.s), r = right(q), off = -ROAD / 2 + SH + LW * (c.lane + 0.5);
+  // car following: anything in a car's lane ahead (another car, your car, you on foot, a car left on the deck) slows it to a stop
+  // a few metres short, so it queues behind you; a hit car stalls, then pulls away again
+  const mvv = ctx.vehicles?.mounted, obs = [], laneOf = (d) => (d + ROAD / 2 - SH) / LW - 0.5;
+  const addObs = (pos) => { if (!inZone(pos) || Math.abs(pos.y - DECK) > 2.5) return; const q = project(pos.x, pos.z - ZONE.oz); if (Math.abs(q.d) < ROAD / 2 + 0.5) obs.push({ s: q.s, lane: laneOf(q.d) }); };
+  if (p && !p.dead) addObs(mvv ? mvv.pos : p.position);
+  for (const v of ctx.vehicles?.list || []) if (v !== mvv && v.parked) addObs(v.pos);
+  for (const c of Z.traffic) if (!c.jacked) obs.push({ s: c.s, lane: c.lane, car: c });
+  for (const c of Z.traffic) { if (c.jacked) { c.respawnT -= dt; if (c.respawnT <= 0 && !inZone(p.position)) { c.jacked = false; c.v = c.v0; } continue; }
+    c.v0 = c.v0 || c.v; let gap = 1e9; for (const o of obs) { if (o.car === c || Math.abs(o.lane - c.lane) > 0.8) continue; const ds = ((o.s - c.s) % PER + PER) % PER; if (ds < gap) gap = ds; }
+    const want = gap < 45 ? Math.max(0, Math.min(c.v0, (gap - 7) * 0.9)) : c.v0; c.v += want > c.v ? Math.min(4 * dt, want - c.v) : Math.max(-10 * dt, want - c.v);
+    c.s = (c.s + c.v * dt) % PER; const q = at(c.s), r = right(q), off = -ROAD / 2 + SH + LW * (c.lane + 0.5);
     c.p.set(q.x + r.x * off, DECK, q.z + r.z * off + ZONE.oz); c.yaw = Math.atan2(-q.tx, -q.tz);
-    c.v0 = c.v0 || c.v; if (c.v < c.v0) c.v = Math.min(c.v0, c.v + 4 * dt);   // a hit car stalls, then pulls away again
     const mv = ctx.vehicles?.mounted; if (mv?.pos && mv.spec?.car !== undefined) { const dx = mv.pos.x - c.p.x, dz = mv.pos.z - c.p.z, d = Math.hypot(dx, dz);   // traffic is solid: crash into it
       if (d < 2.7 && Math.abs(mv.pos.y - DECK) < 2.5) { const nx = dx / (d || 1), nz = dz / (d || 1), push = 2.7 - d; mv.pos.x += nx * push; mv.pos.z += nz * push;
         const vn = mv.vel.x * nx + mv.vel.z * nz; if (vn < 0) { mv.vel.x -= 1.6 * vn * nx; mv.vel.z -= 1.6 * vn * nz; mv.vel.multiplyScalar(0.55); }
         if (!c.hitT || now - c.hitT > 0.8) { c.hitT = now; c.v *= 0.15; try { ctx.audio?.play?.('impact', { position: c.p, volume: 1.2 }); } catch {} try { ctx.audio?.play?.('glass', { position: c.p, volume: 0.8 }); } catch {} } } } }
+  for (const c of Z.traffic) if (c.jacked) c.p.set(0, -500, 0);   // a jacked car's slot is out of sight until it comes back
   if (Z.carIM) Z.carIM(Z.traffic, dt);
+  // on foot by a stopped (or crawling) car: F pulls the driver out and it's yours
+  Z.jackable = null; if (!mvv && p && !p.dead && inZone(p.position)) { let bd = 3.6; for (const c of Z.traffic) { if (c.jacked || c.v > 2.5) continue; const d = Math.hypot(c.p.x - p.position.x, c.p.z - p.position.z); if (d < bd) { bd = d; Z.jackable = c; } } }
+  if (Z.jackable) Z.jackPos.set(Z.jackable.p.x, p.position.y, Z.jackable.p.z); else Z.jackPos.set(1e6, 0, 0);
   for (const T of Z.trains) { const L = T.x1 - T.x0, k = ((Date.now() / 1000) * 14) % (L * 2); T.m.position.x = k < L ? T.x0 + k : T.x1 - (k - L); T.m.visible = true; }   // wall clock: friends see the same train
   if (!p || p.dead || now - Z.lastTrip < 3) return;
   const v = ctx.vehicles?.mounted, here = v ? v.pos : p.position;
@@ -199,6 +215,13 @@ function takeExit(to, now) {
   if (to === 'tavern') { if (!Z.world.W.tavern) return; Z.busy = true; Z.lastTrip = now; Z.world.W.tavern.arrive('belt'); setTimeout(() => { Z.busy = false; }, 4000); return; }
   const D = DEST[to], sp = Math.max(10, Math.abs(Z.ctx.vehicles?.mounted?.fwdSpeed || 0) * 0.6);
   fade(D.name, () => moveTo(D.x, 0, D.z, D.h, Z.ctx.vehicles?.mounted ? sp : 0));
+}
+/** pull the driver out of a Belt traffic car: a real car of the same kind and colour takes its place and you're at the wheel */
+function jack(c) {
+  const V = Z.ctx.vehicles; if (!V || V.mounted || c.jacked) return;
+  const car = V.spawnCar(c.p.x, c.p.z, c.yaw, c.kind, c.color.getHex(), DECK); if (!car) return;
+  car.jacked = true; c.jacked = true; c.respawnT = 60; c.v = 0;
+  V.mount(car); Z.ctx.hud?.toast?.('You pulled the driver out — it\'s yours', 2200);
 }
 function moveTo(x, y, z, h, speed) {
   const { ctx } = Z; const v = ctx.vehicles?.mounted, p = ctx.player;
