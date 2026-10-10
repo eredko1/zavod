@@ -38,9 +38,9 @@ ok(await pg.evaluate(() => window.__game.air.leave()), 'set down → F out'); aw
 { const s = await st(); const p = await pg.evaluate(() => window.__ctx.player.position.toArray()); ok(!s.pilot && s.heli.st === 'parked' && Math.hypot(p[0] - s.heli.pos[0], p[2] - s.heli.pos[2]) < 6, 'standing beside it', JSON.stringify({ s, p })); }
 // ---- you can shake it: get well away from where they last saw you and the stars fade, the chopper goes home
 await pg.evaluate(() => { window.__game.chase.stars(2); window.__game.air.spawnHeli(); }); await pg.waitForTimeout(1000);
-await pg.evaluate(() => window.__game.teleport(1800, 0.3, -40, 0, 0));
+await pg.evaluate(() => { const a = window.__game.belt.at(150); window.__game.teleport(a[0], a[1], a[2], a[3], 0); });   // up on the Belt: out of sight of every cop on the street
 const cleared = await wait(() => window.__game.chase.state().stars === 0, 45);
-ok(cleared, 'outrun it: the stars fade', JSON.stringify(await pg.evaluate(() => window.__game.chase.search())));
+ok(cleared, 'outrun it: the stars fade', JSON.stringify(await pg.evaluate(() => ({ ...window.__game.chase.search(), seen: window.__game.chase.seenAgo(), p: window.__ctx.player.position.toArray().map((v) => +v.toFixed(0)), m: window.__ctx.player.mounted, dead: window.__ctx.player.dead, st: window.__ctx.state }))));
 ok(await wait(() => { const h = window.__game.air.state().heli; return !h || h.st === 'leave' || h.st === 'parked'; }, 5), 'the chopper backs off', JSON.stringify(await st()));
 await pg.evaluate(() => window.__game.teleport(-40, 0.3, -121, 0, 0)); await pg.waitForTimeout(800);
 // ---- the tank
@@ -57,6 +57,10 @@ ok(await pg.evaluate(() => window.__game.air.board('tank')), 'F → hijack the t
 const t0 = (await st()).tank.pos;
 await pg.evaluate(() => window.__ctx.input.keys.add('KeyW')); await pg.waitForTimeout(2500); await pg.evaluate(() => window.__ctx.input.keys.delete('KeyW'));
 const t1 = (await st()).tank.pos; ok(Math.hypot(t1[0] - t0[0], t1[2] - t0[2]) > 6, 'W drives it', JSON.stringify([t0, t1]));
+// a parked car dead ahead gets shoved out of the way
+const car0 = await pg.evaluate(() => { const V = window.__ctx.vehicles, A = window.__game.air.state().tank, h = window.__ctx.player.yaw; const x = A.pos[0] - Math.sin(h) * 8, z = A.pos[2] - Math.cos(h) * 8; const c = V.spawnCar(x, z, 0, 'sedan', 0x8a1c1c, 0); window.__shoveCar = c; return [c.pos.x, c.pos.z]; });
+await pg.evaluate(() => window.__ctx.input.keys.add('KeyW')); await pg.waitForTimeout(2500); await pg.evaluate(() => window.__ctx.input.keys.delete('KeyW'));
+const car1 = await pg.evaluate(() => [window.__shoveCar.pos.x, window.__shoveCar.pos.z]); ok(Math.hypot(car1[0] - car0[0], car1[1] - car0[1]) > 2, 'the tank shoves a parked car aside', JSON.stringify([car0, car1]));
 await pg.evaluate(() => window.__game.air.fire()); await pg.waitForTimeout(1200); await pg.screenshot({ path: `${out}/air-tank-fire.png` });
 ok(await pg.evaluate(() => window.__game.air.leave()), 'F out of the tank');
 ok(!errs.length, 'no page errors', JSON.stringify(errs.slice(0, 3)));
