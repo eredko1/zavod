@@ -37,7 +37,7 @@ const GRIP_OUT = 0.4;   // s: the right grip held off the wheel to get out of a 
 const ACT_DIST = 0.55, ACT_DROP = 0.38, WATCH_HZ = 4, SIGHT_FAR = 80;
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
 let T = null, P = null;   // the wrist tablet (tablet.js), hands-on actions (physical.js)
 const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, eye: EYE_DEFAULT, ...load() };
 function load() { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch { return {}; } }
@@ -68,6 +68,7 @@ export async function init(ctx) {
   }
   V.panel = null;   // see ensurePanel()
   V.wrist = { shown: false }; V.vig = vignette(); V.cam.add(V.vig);
+  ctx.bus.on('vrFace', () => { V.mode = null; });   // re-seat facing forward (taking a train's controls)
   const host = { V, prefs, ctx, K, ITEMS, save, tap, key, pulse, quick, mainHand, offHand, handPose, jointDist, handPos, tipOf, get P() { return P; } };
   T = createTablet(host); P = createPhysical(host);
   // the overlays that need a mouse release pointer lock on desktop: that's our "a 2D screen is up" signal, whatever screen it is
@@ -182,8 +183,12 @@ export function update(dt, ctx) {
   // a pinch: the headset's own select (what the Quest system UI uses; fingertip joint centres stay ~2 cm apart even when touching, so
   // distance alone misses real pinches), or the fingertips close enough as a fallback
   for (const H of [LH, RH]) if (H) { const d = jointDist(H.hand, 'thumb-tip', 'index-finger-tip'); H.pinch = !!H.select || (H.pinch ? d < PINCH_OFF : d < PINCH_ON); }
-  // the hand stick is in the frame you pinched in: keep the hand forward, turn your head, and you walk where you look
-  if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { if (!LH.stick0) { LH.stick0 = tip.position.clone(); LH.yaw0 = headYaw; } _v.subVectors(tip.position, LH.stick0); V.handLift = _v.y > HAND_LIFT; V.handLiftY = _v.y; _v.applyAxisAngle(_up, -LH.yaw0); mx = clamp(_v.x / HAND_STICK, -1, 1); my = clamp(_v.z / HAND_STICK, -1, 1); } } else { LH.stick0 = null; V.handLift = false; V.handLiftY = null; } }
+  // the hand stick: where the pinched hand sits relative to your head, in your body's frame (the torso follows the head, lagging a
+  // glance), minus where it sat when you pinched. Turning your whole body (hand and all) isn't input; pushing the hand forward
+  // walks the way you're looking (the player's yaw is the head's). Lifting the hand (rig height) is still the jump / jet pack
+  if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { const by = bodyFrame(), rel = _v3.set(tip.position.x - V.head.x, 0, tip.position.z - V.head.z).applyAxisAngle(_up, -by);
+      if (!LH.stick0) { LH.stick0 = tip.position.clone(); LH.rel0 = rel.clone(); } V.handLiftY = tip.position.y - LH.stick0.y; V.handLift = V.handLiftY > HAND_LIFT;
+      mx = clamp((rel.x - LH.rel0.x) / HAND_STICK, -1, 1); my = clamp((rel.z - LH.rel0.z) / HAND_STICK, -1, 1); } } else { LH.stick0 = null; V.handLift = false; V.handLiftY = null; } }
   // movement: analog to the player, and the touch stick for cars (vehicles.js reads it as analog throttle / steer)
   const moving = Math.hypot(mx, my) > 0.05;
   inp.xrMove = playing && !V.ui && moving ? { x: mx, y: -my } : null;
@@ -569,7 +574,9 @@ function placeRig(ctx, ease) {
   // any camera motion you didn't make is what makes people sick); rides without a vehicle body (train, bus seat) follow the camera
   const veh = !foot && p.mounted?.pos && p.mounted.spec && Number.isFinite(p.mounted.heading) ? p.mounted : null;
   _e.setFromQuaternion(cam.quaternion, 'YXZ'); const base = foot ? 0 : veh ? veh.heading : _e.y;
-  if (mode !== V.mode) { V.turn = V.rigYaw - base; V.mode = mode; V.seatY = V.head.y; }   // no world-spin on getting in or out
+  // getting in (a car, a bike, a train, the cab): you face the way it goes, the wheel in front of you, however you climbed in.
+  // Getting out: no world-spin
+  if (mode !== V.mode) { if (mode === 'seat') { _e.setFromQuaternion(V.headQ, 'YXZ'); V.turn = -_e.y; _e.setFromQuaternion(cam.quaternion, 'YXZ'); } else V.turn = V.rigYaw - base; V.mode = mode; V.seatY = V.head.y; }
   V.rigYaw = base + V.turn;
   rig.rotation.set(0, V.rigYaw, 0);
   _v.set(V.head.x, 0, V.head.z).applyAxisAngle(_up, V.rigYaw);

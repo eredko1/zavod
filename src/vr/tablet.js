@@ -27,7 +27,8 @@ export function createTablet(host) {
   // ---- painting --------------------------------------------------------------------------------------------------------------
   function content(ctx) {
     const K = host.K, st = K.state?.() || {}, W = ctx.weapons, out = [];
-    if (T.tab === 'act') for (const [t, k] of ctx.trainCab ? ACTS.map((a) => (a[1] === 'KeyX' ? ['🔀 YARD SWITCH', 'KeyY'] : a)) : ACTS) out.push({ t, act: () => doAct(ctx, k), on: k === 'crouch' && V.crouch });
+    // on a train the jet pack slot drives it; in the cab it throws the yard switch
+    if (T.tab === 'act') for (const [t, k] of ACTS.map((a) => (a[1] !== 'KeyX' ? a : ctx.trainCab ? ['🔀 YARD SWITCH', 'KeyY'] : ctx.trainRide ? ['🚇 DRIVE THE TRAIN', 'KeyK'] : a))) out.push({ t, act: () => doAct(ctx, k), on: k === 'crouch' && V.crouch });
     else if (T.tab === 'bag') {
       const inv = st.inv || [], seen = new Map(); for (const it of inv) if (!host.ITEMS[it]?.keep) seen.set(it, (seen.get(it) || 0) + 1);
       for (const [it, n] of seen) { const I = host.ITEMS[it] || {}; out.push({ t: `${I.icon || '•'} ${(I.name || it).split(' (')[0]}`, sub: n > 1 ? `×${n}` : '', act: () => host.P.hold(ctx, it), on: V.held?.item === it }); }
@@ -44,6 +45,7 @@ export function createTablet(host) {
       for (const s of net?.scores?.() || []) if (s.id !== net.id) out.push({ t: '👤 ' + s.name, sub: `${s.k} kills · ${s.d} deaths`, act: null });
       if (!net) out.push({ t: 'Offline', sub: 'Main menu → Play online', act: null });
     } else if (T.tab === 'set') {
+      out.push({ t: '⟲ TURN LEFT', sub: `${prefs.snap}° (hands: no turn stick)`, act: () => doAct(ctx, 'turnL') }, { t: '⟳ TURN RIGHT', sub: `${prefs.snap}°`, act: () => doAct(ctx, 'turnR') });
       out.push({ t: prefs.smooth ? '↻ TURN: SMOOTH' : '↻ TURN: SNAP', act: () => setPref('smooth', !prefs.smooth) });
       out.push({ t: `∠ SNAP ${prefs.snap}°`, act: () => setPref('snap', prefs.snap === 30 ? 45 : prefs.snap === 45 ? 90 : 30) });
       out.push({ t: prefs.vignette ? '◎ TUNNEL: ON' : '◎ TUNNEL: OFF', act: () => setPref('vignette', !prefs.vignette) });
@@ -63,6 +65,7 @@ export function createTablet(host) {
   function doAct(ctx, k) {
     if (k === 'pause') { toggle(false); ctx.setState('paused'); return; }
     if (k === 'crouch') { V.crouch = !V.crouch; T.sig = ''; return; }
+    if (k === 'turnL' || k === 'turnR') { V.turn += (k === 'turnL' ? 1 : -1) * prefs.snap * Math.PI / 180; V.vigKick = 1; return; }   // hands-only: no turn stick
     if (k === 'KeyV' && ctx.player?.mounted && !ctx.player.mounted.dialog) return;
     host.tap(k);
   }

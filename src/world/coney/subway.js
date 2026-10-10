@@ -350,7 +350,8 @@ function update(dt) {
       // the front of the lead car: take the controls
       // either end of the train has a cab: the front of the first car drives toward the head, the back of the last car the other way
       const cabDir = A.c === 0 && A.lz > CAB_REACH ? 1 : A.c === NCAR - 1 && A.lz < -CAB_REACH ? -1 : 0, cabEnd = !!cabDir, lead = cabDir;
-      R.cabHere = !R.drive && cabEnd;
+      R.cabHere = !R.drive && cabEnd; ctx.trainRide = !R.drive;   // VR tablet / K: DRIVE from anywhere on the train
+      if (!R.drive && playing && inp?.pressed?.has?.('KeyK')) { inp.pressed.delete('KeyK'); A.c = 0; A.lx = 0; A.lz = CAB_REACH + 0.6; takeControls(1); }   // to the front cab, at the controls
       if (R.drive) driveKeys(inp, playing);
       else if (cabEnd && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); takeControls(lead); }
       else if (R.canAlight && playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF'); alight(); }   // the touch GET OFF button injects F
@@ -373,6 +374,7 @@ const CAB_Z = CAR / 2 - 0.85, CAB_X = 0.95, CAB_REACH = CAR / 2 - 3.6;
 const D_ACC = 1.2, D_BRK = 1.6, D_EMERG = 2.7, D_DRAG = 0.04, LIM_LINE = 22, LIM_SLOW = 11, LIM_YARD = 8, LIM_TRIP = 4.5, TRIP_HOLD = 1.0, LEVER_RATE = 1.6, BERTH = 5;   // 50 mph line, 25 through stations and curves, 18 in the yard; trips only after 1 s at 10 mph over
 const mph = (v) => Math.round(v * 2.237);
 function takeControls(dir) {
+  try { R.ctx.bus.emit('vrFace'); } catch {}   // VR: face down the track at the controls
   const s0 = headS(), T = thruRoute(); R.base = { P: R.P, L: R.L, stops: R.stops };
   if (T) { R.P = T.P; R.L = T.L; R.stops = T.stops; } R.stopsSorted = null;
   const s = s0 + (T ? T.prefix : 0);
@@ -451,7 +453,7 @@ function stepOff() {
   g.updateMatrixWorld(true); _a.set(0, FLOOR, 0).applyMatrix4(g.matrixWorld);
   const lay = D && D.yk != null && D.v < 0.5 && (D.yUp ? D.s - LEN > D.ysJ + 2 : D.s < D.ysJ - 2) ? D.yk : null;   // wholly in the yard: it stays there
   if (lay != null && YD.layUp(lay, R.cars)) K.toast(`The ${R.id} is laid up on yard track ${lay + 1}.`, 2400);
-  leaveControls(); if (!was) return; R.aboard = null; if (p.mounted?.train) p.mounted = null;
+  leaveControls(); R.ctx.trainRide = false; if (!was) return; R.aboard = null; if (p.mounted?.train) p.mounted = null;
   if (_a.z > STW_Z0 - 10 && _a.z < STW_ZS + 10 && _a.x > -90 && _a.x < -20) {   // in the terminal: onto the nearest island platform
     const isl = STW_ISL.reduce((m, q) => (Math.abs((q[0] + q[1]) / 2 - _a.x) < Math.abs((m[0] + m[1]) / 2 - _a.x) ? q : m), STW_ISL[0]);
     p.teleport?.((isl[0] + isl[1]) / 2, _a.y + 0.05, Math.max(STW_Z0 + 6, Math.min(STW_ZS - 6, _a.z)), p.yaw, 0);
@@ -666,7 +668,7 @@ function board(lx, lz, c) {
   K.toast(`On the ${R.id} — next stop ${b.next?.name || ''}. Walk around; ${R.ctx.isTouch ? 'GET OFF' : 'F'} or the open doors at a stop to get off.`, 3200);
 }
 function alight(force = false, dz, side) {
-  const a = R.aboard; if (!a) return; R.aboard = null; const p = R.ctx.player; if (p.mounted?.train) p.mounted = null;
+  const a = R.aboard; if (!a) return; R.aboard = null; R.ctx.trainRide = false; const p = R.ctx.player; if (p.mounted?.train) p.mounted = null;
   if (force) return;
   const s = side || (R.side === 2 ? (Math.sign(a.lx) || 1) : R.side || 1), d = dz ?? DOORZ.reduce((m, z) => (Math.abs(z - a.lz) < Math.abs(m - a.lz) ? z : m), DOORZ[0]);
   const g = R.cars[a.c]; g.updateMatrixWorld(true); _a.set(s * 2.7, FLOOR, d).applyMatrix4(g.matrixWorld);
