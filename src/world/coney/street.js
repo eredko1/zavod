@@ -273,7 +273,7 @@ export function buildStreet(world) {
     walkLine(r.p, 6.4, (x, z, ux, uz) => { for (const s of [1, -1]) {
       if (R() < (nep ? 0.2 : 0.38)) continue; const cx = x - uz * s * o, cz = z + ux * s * o;
       if (!inMap(cx, cz) || corners(cx, cz) || mouths.some(([mx, mz]) => Math.hypot(mx - cx, mz - cz) < 15) || BUS_STOPS.some((b) => Math.hypot(b[1] - cx, b[2] - cz) < 20) || blocked(cx, cz, 1.2)) continue;
-      cars.push({ x: cx, z: cz, ry: Math.atan2(ux, uz) - Math.PI / 2 + (s > 0 ? Math.PI : 0), kind: KINDS[(R() * KINDS.length) | 0] }); } }, 4); }
+      cars.push({ x: cx, z: cz, ry: Math.atan2(ux, uz) - Math.PI / 2 + (s > 0 ? 0 : Math.PI), kind: KINDS[(R() * KINDS.length) | 0] }); } }, 4); }
   if (cars.length) { placeCars(world, cars, { raycast: false }); for (const c of cars) c.box = world.box([c.x - 1.6, 0, c.z - 1.6], [c.x + 1.6, 1.5, c.z + 1.6]); st.cars = cars.length; }
 
   if (col.length) { const me = new THREE.Mesh(mergeGeometries(col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.2 })); me.name = 'street:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }
