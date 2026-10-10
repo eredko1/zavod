@@ -30,6 +30,18 @@ export async function init(ctx) {
     updaters,
   };
 
+  // the play area: the map's bounds plus its extra zones (coney: Brighton, Neptune Av, the yard, the Belt, 8th Ave) as one region.
+  // Inside any rect is fine, and so is a seam a few metres wide between two of them (they don't quite meet); past the outer edge
+  // you're put back inside the nearest one. Returns [x, z]
+  const SEAM = 8;   // m: a 3 m gap + the 1.2 m pad on both sides, with room
+  W.playClamp = (x, z, pad = 0) => {
+    const B = W.bounds; let near = 0, best = null, bd = Infinity;
+    for (const r of [{ x0: B.min.x, x1: B.max.x, z0: B.min.z, z1: B.max.z }, ...(W.zones || [])]) {
+      const cx = Math.min(r.x1 - pad, Math.max(r.x0 + pad, x)), cz = Math.min(r.z1 - pad, Math.max(r.z0 + pad, z)), d = Math.hypot(cx - x, cz - z);
+      if (d === 0) return [x, z]; if (d < SEAM) near++; if (d < bd) { bd = d; best = [cx, cz]; } }
+    return near >= 2 ? [x, z] : best;
+  };
+
   // shared helpers for map builders / submodules
   const world = {
     ctx, R, W, scene, updaters,

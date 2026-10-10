@@ -80,8 +80,8 @@ function floorAt(x, z, yRef, skip = null, stepUp = 0.5) {
   return best === -Infinity ? yRef : best;
 }
 /** the bounds that apply at (x, z): an extra zone's rect (coney's Belt Parkway) when inside one, else the map's */
-function boundsAt(x, z) { const zn = C.world?.zones?.find((r) => x > r.x0 - 2 && x < r.x1 + 2 && z > r.z0 - 2 && z < r.z1 + 2); return zn ? { min: { x: zn.x0, z: zn.z0 }, max: { x: zn.x1, z: zn.z1 } } : C.world?.bounds; }
-function inBounds(x, z, pad = 1) { const b = boundsAt(x, z); return !b || (x > b.min.x + pad && x < b.max.x - pad && z > b.min.z + pad && z < b.max.z - pad); }
+/** inside the play area (the map plus its extra zones, seams included: world.js playClamp), `pad` in from the outer edge */
+function inBounds(x, z, pad = 1) { const W = C.world; if (!W?.playClamp) return true; const [cx, cz] = W.playClamp(x, z, pad); return cx === x && cz === z; }
 
 function baseState(x, z, yaw, yRef) {
   const y = floorAt(x, z, yRef);
@@ -323,13 +323,10 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
       const away = Math.atan2(-hitN.nx, -hitN.nz); v.heading += wrap(away - v.heading) * 0.15 * severity * (sp.car ? 0.4 : 1);
     }
   }
-  const b = boundsAt(px, pz);
-  if (b) {
-    if (px < b.min.x + 1.2) { px = b.min.x + 1.2; if (vel.x < 0) { vel.x = -vel.x * BOUNCE; vel.z *= 0.6; } }
-    if (px > b.max.x - 1.2) { px = b.max.x - 1.2; if (vel.x > 0) { vel.x = -vel.x * BOUNCE; vel.z *= 0.6; } }
-    if (pz < b.min.z + 1.2) { pz = b.min.z + 1.2; if (vel.z < 0) { vel.z = -vel.z * BOUNCE; vel.x *= 0.6; } }
-    if (pz > b.max.z - 1.2) { pz = b.max.z - 1.2; if (vel.z > 0) { vel.z = -vel.z * BOUNCE; vel.x *= 0.6; } }
-  }
+  // the play area's outer edge (seams between the map and its zones are open): put back inside, bounce off it
+  if (C.world?.playClamp) { const [cx, cz] = C.world.playClamp(px, pz, 1.2);
+    if (cx !== px) { if ((cx - px) * vel.x < 0) { vel.x = -vel.x * BOUNCE; vel.z *= 0.6; } px = cx; }
+    if (cz !== pz) { if ((cz - pz) * vel.z < 0) { vel.z = -vel.z * BOUNCE; vel.x *= 0.6; } pz = cz; } }
   p.x = px; p.z = pz;
   // ground: climb kerbs smoothly, stick to downhill slopes, leave the ground off a crest/ledge (keeping the ramp's vertical speed)
   const gy = floorAt(px, pz, p.y, v.box, sp.stepUp), dy = gy - p.y, y00 = p.y;
