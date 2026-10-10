@@ -170,6 +170,17 @@ export function wheelGeometry(r = 0.33) {
   const m = (arr) => mergeGeometries(arr.map((g) => { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); return g; }), false);
   return { rubber: m([tyre]), rim: m(rim), trim: m(trim) };
 }
+/** instanced kit wheels for a crowd of cars (one draw per material slot, `count` wheels): set(i, carMatrix, wheel from
+ *  wheelLayout, spin (radians rolled), steer (+ = right, fronts only), tyre radius), then commit() once a frame */
+export function wheelInstances(parent, count, name = 'wheels', shadows = false) {
+  const wg = wheelGeometry(0.33), CM = carMaterials(), UP = new THREE.Vector3(0, 1, 0), ZAX = new THREE.Vector3(0, 0, 1), q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), m = new THREE.Matrix4(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  const ims = ['rubber', 'rim', 'trim'].map((slot) => { const im = new THREE.InstancedMesh(wg[slot], CM[slot], count); im.name = `${name}:${slot}`; im.frustumCulled = false; im.castShadow = shadows && slot === 'rubber'; parent.add(im); return im; });
+  return {
+    set(i, base, w, spin, steer = 0, r = 0.33) { q.setFromAxisAngle(UP, (w.x > 0 ? -steer : 0) + (w.side < 0 ? Math.PI : 0)); q2.setFromAxisAngle(ZAX, w.side > 0 ? -spin : spin); q.multiply(q2);
+      const k = r / 0.33; sc.set(k, k, 1); m.compose(v.set(w.x, w.y, w.z), q, sc).premultiply(base); for (const im of ims) im.setMatrixAt(i, m); },
+    commit() { for (const im of ims) im.instanceMatrix.needsUpdate = true; },
+  };
+}
 /** wheel centres of a kind in the kit frame: [{ x, y, z, side }] (side +1 = +z / right) and the tyre radius */
 export function wheelLayout(kind = 'sedan') {
   const K = KINDS[kind] || KINDS.sedan, HW = K.w / 2, xf = K.len / 2, xr = -K.len / 2, r = K.clr > 0.25 ? 0.37 : 0.33;

@@ -810,6 +810,7 @@ function renderBus(c, dt) {
   B.group.visible = d < 380;
   if (!B.group.visible) return;
   B.group.position.set(c.x, c.y, c.z); B.group.rotation.set(c.roll, c.h + Math.PI / 2, c.pitch, 'YZX');
+  { const kap = c.v > 0.5 ? -c.yawRate / c.v : 0; B.roll?.(c.spin * (c.R?.wr || 0.33) / BUS.wheelR, -clamp(Math.atan((BUS.axleF - BUS.axleR) * kap), -0.5, 0.5)); }   // the wheels roll and the fronts steer
   c.doorK = damp(c.doorK || 0, c.state === 'dwell' ? c.doorT : 0, 5, dt); B.setDoors(c.doorK);
   B.interior.visible = d < 90; c.sil.visible = d < 200 && T.busNear !== c;
   B.group.updateMatrixWorld();
