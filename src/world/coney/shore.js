@@ -33,7 +33,7 @@ export function sandHeight(x, z) {
 }
 
 export function buildShore(world, M) {
-  const { scene, ctx, R } = world;
+  const { scene, ctx, R, W } = world;
   const G = new Batch(world, M, 'shoreGround'), S = new Batch(world, M, 'shore');
 
   // ---- beach surface: a height-field grid from the bulkhead to 60 m past the waterline, one mesh, wet band in-shader ----
@@ -133,6 +133,7 @@ export function buildShore(world, M) {
   for (const p of OSM.pi) {
     const q = bbox(p.p); if (!(q.z1 > BW.z1 + 40 && q.z0 < BW.z1 + 20)) continue;
     const w = 11, cx = (q.x0 + q.x1) / 2, main = [cx - w / 2, cx + w / 2];
+    W.pier = W.pier || { x: cx, x0: main[0], x1: main[1], z0: BW.z1, z1: q.z1 };   // (coney/ferry.js ties up at its head)
     S.add('planks', boxGeo([main[0], -0.35, BW.z1], [main[1], 0.02, q.z1]), { uvScale: 1 / 2.4 });
     world.walkable([main[0], -0.4, BW.z1], [main[1], 0.02, q.z1]);
     const tee = OSM.pi.find((o) => { const b = bbox(o.p); return b.z0 > q.z1 - 80 && b.x1 - b.x0 > 40; });
