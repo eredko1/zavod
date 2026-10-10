@@ -7,7 +7,7 @@
 // blade and fight (they become a chill.js crew member, streamed to friends) and the pitch is empty for a few minutes. CONEY agent.
 import * as THREE from 'three';
 import { hangkit as K, sell, kit } from '../hangkit.js';
-import { buildPerson, peopleReady } from '../people.js';
+import { buildPerson, peopleReady, wearHat } from '../people.js';
 import { buildFigure, nameTag } from '../deli.js';
 import { adoptFolk } from './chill.js';
 import { chaseQA } from './chase.js';
@@ -67,8 +67,7 @@ function place(d) {
 function build(h) {
   const { world } = HU; const d = h.d;
   const fig = peopleReady() ? buildPerson({ avatar: d.avatar, seed: d.name.length * 7, glasses: d.glasses, tam: d.tam }) : buildFigure({ glasses: d.glasses, tam: d.tam });
-  if (d.hat) { const m = new THREE.MeshStandardMaterial({ color: d.hat === 'cap' ? 0x1a2a5a : 0xe8dcc0, roughness: 0.85 }); const a = new THREE.Mesh(d.hat === 'cap' ? new THREE.SphereGeometry(0.108, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5) : new THREE.CylinderGeometry(0.1, 0.112, 0.07, 16), m); a.position.set(0, d.hat === 'cap' ? 0.035 : 0.09, -0.005); fig.head.add(a);
-    const b = new THREE.Mesh(d.hat === 'cap' ? new THREE.BoxGeometry(0.17, 0.012, 0.11) : new THREE.CylinderGeometry(0.14, 0.155, 0.05, 16, 1, true), m); b.position.set(0, d.hat === 'cap' ? 0.04 : 0.045, d.hat === 'cap' ? 0.1 : 0); fig.head.add(b); }
+  if (d.hat) wearHat(fig, d.hat === 'cap' ? 'cap' : 'bucket', d.hat === 'cap' ? 0x1a2a5a : 0xe8dcc0);
   const tag = nameTag(d.name, '#ffd27a'); tag.position.set(0, 2.15, 0); fig.group.add(tag);
   fig.group.position.copy(h.pos); fig.group.rotation.y = h.yaw; world.scene.add(fig.group); h.fig = fig;
   if (d.cooler && !h.cooler) {   // the cooler: blue tub, white lid, cans on ice
