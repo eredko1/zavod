@@ -1,12 +1,12 @@
-// Car damage (GTA style): a car you drive has 1000 health; a crash costs 6·(speed lost)² (≤ 500 a hit). The body dents in where it
-// hit (the geometry is cloned on the first dent), the headlights or tail lights go out once that end has taken 150, white smoke
+// Car damage (GTA style): a car you drive has 2500 health; a crash costs 6·(speed lost)² (≤ 400 a hit). The body dents in where it
+// hit (the geometry is cloned on the first dent), the headlights or tail lights go out once that end has taken 300, white smoke
 // under 40 %, black smoke and fire under 15 %, and at 0 a 4 s fuse, an explosion ('explosion' on the bus: the audio and blast
 // damage already listen) and a charred wreck that won't drive, put back as new a minute later once you're away from it.
 // Smoke / fire: one pooled sprite set, nothing when no car is hurt. (Engine audio untouched.)
 import * as THREE from 'three';
 import { carMaterials } from './world/carkit.js';
 
-const HP = 1000, SMOKE_AT = 400, FIRE_AT = 150, FUSE = 4, WRECK_T = 60;
+const HP = 2500, SMOKE_AT = 1000, FIRE_AT = 375, FUSE = 4, WRECK_T = 60, HIT_MAX = 400, LIGHTS_AT = 300;
 let POOL = null, CHAR = null, DARK = null;
 function pool(scene) {
   if (POOL) return POOL; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
@@ -24,11 +24,11 @@ const ends = (bike) => { const m = bike.group; m.updateMatrixWorld(); return m; 
 export function damageHit(C, bike, drop) {
   if (!bike?.spec?.car || bike.wrecked) return 0;
   if (bike.hp == null) bike.hp = HP;
-  const dmg = Math.min(500, 6 * drop * drop); bike.hp = Math.max(0, bike.hp - dmg);
+  const dmg = Math.min(HIT_MAX, 6 * drop * drop); bike.hp = Math.max(0, bike.hp - dmg);
   // where it hit: the end that was leading (+x is the front in the car's frame)
   const front = (bike.fwdSpeed ?? bike.speed ?? 0) >= 0; if (front) bike.dmgF = (bike.dmgF || 0) + dmg; else bike.dmgR = (bike.dmgR || 0) + dmg;
   dent(bike, front, Math.min(0.18, drop * 0.012));
-  if ((front ? bike.dmgF : bike.dmgR) > 150) lightsOut(bike, front);
+  if ((front ? bike.dmgF : bike.dmgR) > LIGHTS_AT) lightsOut(bike, front);
   if (bike.hp <= 0 && bike.fuse == null) { bike.fuse = FUSE; C.hud?.toast?.('It\'s going to blow — get out!', 2200); }
   return dmg;
 }

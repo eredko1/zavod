@@ -5,6 +5,7 @@
 // The station is rotated, so its floors / walls are strings of small AABB cells (the game's colliders are axis-aligned).
 import * as THREE from 'three';
 import { Batch } from '../sbu/geo.js';
+import { OSM } from './osm.js';
 
 const P0 = new THREE.Vector2(274.5, -153), P1 = new THREE.Vector2(457, -107.5);
 export const W8 = { P0, P1, L: P0.distanceTo(P1), LO: { rail: 7.5, top: 7.3, bot: 6.8, plat: 8.6 }, UP: { rail: 13.5, top: 13.3, bot: 12.8, plat: 14.6 }, halfTrack: 2.0, platIn: 3.7, platOut: 7.2 };
@@ -49,7 +50,9 @@ export function buildW8th(world, M) {
     for (let a = 6; a < L - 4; a += 12) sbox('railSteelGreen', a - 0.15, a + 0.15, oc - 0.15, oc + 0.15, S.UP.plat, S.UP.plat + 3.2, { cell: 1 });
     sbox('fascia', 2, L - 2, oc - 2.4, oc + 2.4, S.UP.plat + 3.2, S.UP.plat + 3.4, { collide: false }); }
   // bents: columns from the street to the upper deck every 12 m, cross girders under both decks
-  for (let a = -E + 2; a <= L + E - 2; a += 12) { for (const s of [-1, 1]) sbox('elGirder', a - 0.35, a + 0.35, s * 7.7 - 0.35, s * 7.7 + 0.35, 0, S.UP.top, { cell: 1 });
+  // a column that would land in a roadway (W 8th St runs under the station) is left out: the girder spans it, the street stays open
+  const inRoad = (p) => OSM.r.some((r) => r.w >= 6 && r.p.some((q, i) => { const e = r.p[i + 1]; if (!e) return false; const dx = e[0] - q[0], dz = e[1] - q[1], L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((p.x - q[0]) * dx + (p.z - q[1]) * dz) / L2)); return Math.hypot(p.x - q[0] - dx * t, p.z - q[1] - dz * t) < r.w / 2 + 0.8; }));
+  for (let a = -E + 2; a <= L + E - 2; a += 12) { for (const s of [-1, 1]) if (!inRoad(at(a, s * 7.7))) sbox('elGirder', a - 0.35, a + 0.35, s * 7.7 - 0.35, s * 7.7 + 0.35, 0, S.UP.top, { cell: 1 });
     for (const lv of [S.LO, S.UP]) sbox('elGirder', a - 0.3, a + 0.3, -8.1, 8.1, lv.bot - 0.7, lv.bot, { collide: false }); }
   // ---- stairs: from the street up to the lower level (north side, at the W 8th St end) and on up to the upper level ----------
   // each flight is axis-aligned to the station (rotated steps = small cells), 2.4 m wide, 0.187 m risers
@@ -60,12 +63,16 @@ export function buildW8th(world, M) {
     return aStart + dir * run;
   };
   const oN = -(S.platOut + 2.3), oS = S.platOut + 2.3;   // clear of the bent columns at ±7.7   // stair towers just outside each side
-  { const aTop = flight(40, oN, 0, S.LO.plat, 1); sbox('w8Plat', aTop, aTop + 3, oN - 1.4, -S.platOut + 0.1, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); }        // street → lower (north side)
-  { const aTop = flight(40, oS, 0, S.LO.plat, 1); sbox('w8Plat', aTop, aTop + 3, S.platOut - 0.1, oS + 1.4, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); }        // street → lower (south side)
+  // the street flights start at the W 8th St end and slide west along the platform (the Luna Park side, away from the precinct
+  // and the firehouse up W 8th) until their footprint is off the roadway
+  const RUN0 = Math.round(S.LO.plat / 0.187) * 0.29, clearAt = (o) => { for (let a = 40; a > -30; a -= 1) { let ok = true; for (let d = -1; d <= RUN0 + 1 && ok; d += 1.5) for (const w of [-1.4, 0, 1.4]) if (inRoad(at(a + d, o + w))) { ok = false; break; } if (ok) return a; } return 40; };
+  const aN0 = clearAt(oN), aS0 = clearAt(oS); S.stairs = { n: aN0, s: aS0, run: RUN0, oN, oS };   // (qa/subway-walk-test walks them)
+  { const aTop = flight(aN0, oN, 0, S.LO.plat, 1); sbox('w8Plat', aTop, aTop + 3, oN - 1.4, -S.platOut + 0.1, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); }        // street → lower (north side)
+  { const aTop = flight(aS0, oS, 0, S.LO.plat, 1); sbox('w8Plat', aTop, aTop + 3, S.platOut - 0.1, oS + 1.4, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); }        // street → lower (south side)
   { const aTop = flight(110, oN, S.LO.plat, S.UP.plat, 1); sbox('w8Plat', 105, 110, oN - 1.4, -S.platOut + 0.1, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); sbox('w8Plat', aTop, aTop + 3, oN - 1.4, -S.platOut + 0.1, S.UP.plat - 0.25, S.UP.plat, { walkable: true }); }   // lower → upper (north)
   { const aTop = flight(110, oS, S.LO.plat, S.UP.plat, 1); sbox('w8Plat', 105, 110, S.platOut - 0.1, oS + 1.4, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); sbox('w8Plat', aTop, aTop + 3, S.platOut - 0.1, oS + 1.4, S.UP.plat - 0.25, S.UP.plat, { walkable: true }); }   // lower → upper (south)
   // gaps in the outer railings where the stairs land (the railing cells there are removed after the fact)
-  const openings = [[40 + 46 * 0.29, 40 + 46 * 0.29 + 3, S.LO.plat, 0], [105, 110, S.LO.plat, 0], [110 + 32 * 0.29, 110 + 32 * 0.29 + 3, S.UP.plat, 0], [148.2, 151.8, S.LO.plat, 1]];   // [a0, a1, level, south only]
+  const openings = [[aN0 + RUN0, aN0 + RUN0 + 3, S.LO.plat, -1], [aS0 + RUN0, aS0 + RUN0 + 3, S.LO.plat, 1], [105, 110, S.LO.plat, 0], [110 + 32 * 0.29, 110 + 32 * 0.29 + 3, S.UP.plat, 0], [148.2, 151.8, S.LO.plat, 1]];   // [a0, a1, level, side: 0 both, 1 south, −1 north]
   const colsBefore = ctx.colliders.length;
   // ---- the footbridge to the Aquarium: south from the lower level's south platform, over Surf Ave, stairs down at the end ----
   { const aB = 150, o0 = S.platOut, len = 38, y = S.LO.plat;
@@ -87,7 +94,7 @@ export function buildW8th(world, M) {
     sbox('railSteelGreen', a + 1.6, a + 2.1, oo - 0.25, oo + 0.25, lv.plat, lv.plat + 0.85, { cell: 1 }); }
   B.flush({ shadow: true });
   // cut the railing cells where stairs arrive on the platforms (they were added as plain boxes)
-  const inOpen = (b) => { const c = new THREE.Vector3((b.min.x + b.max.x) / 2, 0, (b.min.z + b.max.z) / 2); const d = c.clone().sub(new THREE.Vector3(P0.x, 0, P0.y)); const a = d.x * u.x + d.z * u.y, o = d.x * n.x + d.z * n.y; return Math.abs(Math.abs(o) - S.platOut) < 0.4 && b.max.y - b.min.y < 1.4 && openings.some(([a0, a1, y, south]) => a > a0 - 0.5 && a < a1 + 0.5 && Math.abs(b.min.y - y) < 0.1 && (!south || o > 0)); };
+  const inOpen = (b) => { const c = new THREE.Vector3((b.min.x + b.max.x) / 2, 0, (b.min.z + b.max.z) / 2); const d = c.clone().sub(new THREE.Vector3(P0.x, 0, P0.y)); const a = d.x * u.x + d.z * u.y, o = d.x * n.x + d.z * n.y; return Math.abs(Math.abs(o) - S.platOut) < 0.4 && b.max.y - b.min.y < 1.4 && openings.some(([a0, a1, y, south]) => a > a0 - 0.5 && a < a1 + 0.5 && Math.abs(b.min.y - y) < 0.1 && (!south || Math.sign(o) === south)); };
   for (let i = ctx.colliders.length - 1; i >= 0; i--) { const b = ctx.colliders[i]; if (b && inOpen(b)) ctx.colliders.splice(i, 1); }
   void colsBefore;
   // signs
@@ -95,7 +102,8 @@ export function buildW8th(world, M) {
     const p = at(a, s * (S.platIn + S.platOut) / 2, lv.plat + 2.6); sign(scene, `${route}  ·  ${name}`, p, ang + Math.PI / 2 + (s > 0 ? Math.PI : 0), 4.6, 0.5, col); }
   wayfinding(world, M, S, u, n, at, B);
   // (the F up top and the Q below are the rideable trains in coney/subway.js)
-  W.w8th = { lower: at(80, S.platIn + 1.5, S.LO.plat), upper: at(120, S.platIn + 1.5, S.UP.plat), street: at(40, oN, 0), bridge: W.aquariumBridge }; if (typeof window !== 'undefined' && window.__game) window.__game.w8th = W.w8th;
+  if (typeof window !== 'undefined' && window.__game) window.__game.w8stairs = S.stairs;
+  W.w8th = { lower: at(80, S.platIn + 1.5, S.LO.plat), upper: at(120, S.platIn + 1.5, S.UP.plat), street: at(aN0 - 2, oN, 0), bridge: W.aquariumBridge }; if (typeof window !== 'undefined' && window.__game) window.__game.w8th = W.w8th;
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'W 8 ST – NY AQUARIUM STATION', x: at(L / 2, 0).x, z: at(L / 2, 0).z, kind: 'transit' });
 }
 

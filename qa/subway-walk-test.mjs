@@ -67,7 +67,7 @@ const S = (pg) => pg.evaluate(() => window.__game.subway.state());
   // 4) W 8 St: walk out of the doors, down both flights, out to the street
   await pg.evaluate(() => { const U = window.__game.subway; U.skew(U.until('W8') + 3.5); }); await pg.waitForTimeout(400);
   s = await pg.evaluate(() => window.walkOut()); ok(!s.aboard && Math.abs(s.pos[1] - 14.6) < 0.3, 'walked out onto the W 8 St upper platform', JSON.stringify(s.pos));
-  const w8 = await pg.evaluate(() => window.path([[120.8, -5.5], [120.8, -9.5], [109.5, -9.5], [107, -9.5], [107, -5.5], [54.8, -5.5], [54.8, -9.5], [38, -9.5], [35, -14]].map(([a, o]) => window.w8at(a, o))));
+  const w8 = await pg.evaluate(() => { const T = window.__game.w8stairs, top = T.n + T.run + 1.5; return window.path([[120.8, -5.5], [120.8, -9.5], [109.5, -9.5], [107, -9.5], [107, -5.5], [top, -5.5], [top, -9.5], [T.n - 2, -9.5], [T.n - 5, -14]].map(([a, o]) => window.w8at(a, o))); });
   const wl = w8[w8.length - 1]; ok(w8.every((q) => q.ok) && wl.pos[1] < 0.3, 'W 8 St: upper platform → lower level → street, on foot', JSON.stringify(wl.pos));
   ok((await pg.evaluate(() => window.__ctx.player.health)) > 90, 'no fall on the way down');
   await pg.screenshot({ path: `${out}/subw-w8-street.png` });
