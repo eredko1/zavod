@@ -11,7 +11,7 @@ import { buildBike, buildRider, WHEEL_R, WHEELBASE, FRONT_Z, REAR_Z } from './ve
 import { buildJetski } from './vehicles/jetski.js';
 import { createWaterFX } from './vehicles/waterfx.js';
 import { BoxGrid, resolveCircle, rectBlocked, segmentHit } from './vehicles/collide.js';
-import { carGeometries, carMaterials, carSpec, carEye, carInterior } from './world/carkit.js';
+import { carGeometries, carMaterials, carSpec, carEye, carInterior, wheelGeometry, wheelLayout } from './world/carkit.js';
 import { hasCarModel, carModel } from './world/carmodels.js';
 import { buildBus, BUS } from './vehicles/bus.js';
 
@@ -115,17 +115,22 @@ function makeJetski(x, z, yaw, i = 0) {
 /** A drivable car from the shared car kit (geometry faces +x in the kit; vehicles face -z, so the kit is turned +90 deg). */
 function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
   if (!carSpec(kind) && kind !== 'bus') kind = 'sedan';
-  const geos = kind === 'bus' ? null : carGeometries(kind).geos, CM = carMaterials();
+  const geos = kind === 'bus' ? null : carGeometries(kind, { wheels: false }).geos, CM = carMaterials();
   const group = new THREE.Group(), body = new THREE.Group(); group.add(body);
   const kit = new THREE.Group(); kit.rotation.y = Math.PI / 2; body.add(kit);     // kit frame (+x front) → vehicle frame (-z front)
   const meshes = []; const paint = CM.paint.clone(); paint.color = new THREE.Color(color);
   const lampR = CM.lampR.clone(), lampW = CM.lampW.clone(); lampR.emissive = new THREE.Color(0xff1a0a); lampR.emissiveIntensity = 0.08; lampW.emissive = new THREE.Color(0xfff0d0); lampW.emissiveIntensity = 0.05;
   const mat = { paint, lampR, lampW, glass: CM.glassSee || CM.glass };   // see-through: the cabin (and whoever's in it) shows
-  let cab;
-  if (kind === 'bus') { const B = buildBus({ sign: 'NOT IN SERVICE', lite: !!C.lite }); kit.add(B.group); for (const m of B.meshes) if (m.parent !== B.interior) meshes.push(m); cab = { wheel: new THREE.Group() }; }
+  let cab, wheels = null, busKit = null;
+  if (kind === 'bus') { const B = buildBus({ sign: 'NOT IN SERVICE', lite: !!C.lite }); busKit = B; kit.add(B.group); for (const m of B.meshes) if (m.parent !== B.interior) meshes.push(m); cab = { wheel: new THREE.Group() }; }
   else if (hasCarModel(kind)) { const mdl = carModel(kind, color); kit.add(mdl); mdl.traverse((o) => { if (o.isMesh && o.name !== 'aoShadow') meshes.push(o); }); cab = { wheel: new THREE.Group() }; }   // a real model (with its own cabin)
   else { for (const [slot, g] of Object.entries(geos)) { if (!g) continue; const m = new THREE.Mesh(g, mat[slot] || CM[slot]); m.castShadow = slot === 'paint'; m.receiveShadow = true; m.userData.surface = 'metal'; kit.add(m); meshes.push(m); }
-    cab = carInterior(kind, geos); kit.add(cab.group); }
+    cab = carInterior(kind, geos); kit.add(cab.group);
+    // the wheels: their own meshes on pivots (kit frame), so they roll with the distance driven and the fronts steer (visuals())
+    const lay = wheelLayout(kind), wg = wheelGeometry(0.33), sc = lay.r / 0.33;
+    wheels = lay.wheels.map((w) => { const pivot = new THREE.Group(); pivot.position.set(w.x, w.y, w.z); kit.add(pivot); const flip = new THREE.Group(); if (w.side < 0) flip.rotation.y = Math.PI; pivot.add(flip);
+      const spin = new THREE.Group(); spin.scale.setScalar(sc); flip.add(spin); for (const slot of ['rubber', 'rim', 'trim']) { const m = new THREE.Mesh(wg[slot], CM[slot]); m.castShadow = slot === 'rubber'; m.userData.surface = 'metal'; spin.add(m); meshes.push(m); }
+      return { pivot, spin, front: w.x > 0, side: w.side }; }); }
   const sp = carSpecFor(kind);
   // the bus and the real models have no wheel of ours in their cabin: an invisible one where the driver's hands go (VR grabs it:
   // src/vr/physical.js), turning about the car's forward axis like the procedural ones turn about their column
@@ -133,7 +138,7 @@ function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
   const headlight = new THREE.SpotLight(0xfff2d8, 0, 55, 0.5, 0.5, 1.4); headlight.position.set(0, 0.8, -sp.hz + 0.1); headlight.target.position.set(0, 0, -16); group.add(headlight); group.add(headlight.target); headlight.visible = false;
   const lens = { material: lampW };
   const dummy = new THREE.Group();
-  const car = { group, body, fork: dummy, wheelF: dummy, wheelR: dummy, headlight, lens, lampR, meshes, kind, color, steerWheel: cab.wheel, ...baseState(x, z, yaw, yRef), spec: sp };
+  const car = { group, body, fork: dummy, wheelF: dummy, wheelR: dummy, carWheels: wheels, busKit, headlight, lens, lampR, meshes, kind, color, steerWheel: cab.wheel, ...baseState(x, z, yaw, yRef), spec: sp };
   group.position.copy(car.pos); group.rotation.y = yaw;
   for (const m of meshes) { m.userData.vehicle = car; C.raycastTargets.push(m); }
   C.scene.add(group); parkBox(car); C.colliders.push(car.box); S.bikes.push(car); rebuildGrids();
@@ -452,6 +457,8 @@ function visuals(v, dt, thr, brk, hard) {
   const squat = sp.car ? clamp(v.aLong * 0.0035, -0.05, 0.035) : 0;
   v.body.position.y = v.susp; v.body.rotation.set(v.tPitch - v.suspV * 0.04 + squat, 0, -v.lean + v.tRoll, 'YXZ');
   v.fork.rotation.y = -v.steer * 0.85; v.wheelF.rotation.x = -v.spin; v.wheelR.rotation.x = -v.spin;
+  if (v.carWheels) for (const w of v.carWheels) { w.spin.rotation.z = (w.side > 0 ? -1 : 1) * v.spin * WHEEL_R / 0.33; if (w.front) w.pivot.rotation.y = -v.steer * 0.55; }   // cars: roll + steer
+  if (v.busKit) v.busKit.roll(v.spin * WHEEL_R / 0.5, -v.steer * 0.45);
   if (v.steerWheel) v.steerWheel.rotation.x = clamp(v.steer * 4.5, -2.6, 2.6);
   v.brakeK = damp(v.brakeK, (brk > 0 && v.fwdSpeed > 0.3) || hard ? 1 : 0, 20, dt);
   if (v.lampR) v.lampR.emissiveIntensity = 0.45 + 2.2 * v.brakeK;

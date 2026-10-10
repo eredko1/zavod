@@ -168,13 +168,17 @@ export function buildBus(o = {}) {
   for (const sz of [1, -1]) { lit(box(XR - 0.02, 0.6, sz * (HW - 0.3), XR, 1.32, sz * (HW - 0.12)), 0xc81010); lit(box(XR - 0.02, 1.36, sz * (HW - 0.3), XR, 1.5, sz * (HW - 0.12)), 0xff9a10); }
   P.trim.push(strip(box(XR - 0.1, 0.3, -HW + 0.05, XR + 0.03, 0.52, HW - 0.05)));
   // underbody + wheels (dual at the back), dark arches
+  const WHEELS = [];
   P.trim.push(strip(box(XR + 0.2, 0.22, -HW + 0.12, XF - 0.25, 0.32, HW - 0.12)));
   for (const ax of [BUS.axleF, BUS.axleR]) for (const sz of [1, -1]) {
     const w = ax > 0 ? 0.3 : 0.56, zc = sz * (HW - 0.06 - w / 2);
-    const tyre = cyl(BUS.wheelR, BUS.wheelR, w, 24); tyre.rotateX(Math.PI / 2); tyre.translate(ax, BUS.wheelR, zc); vc(tyre, 0x161616);
-    const rim = cyl(0.3, 0.3, 0.02, 20); rim.rotateX(Math.PI / 2); rim.translate(ax, BUS.wheelR, zc + sz * (w / 2 + 0.005)); vc(rim, 0xb8bcc0);
-    const hub = cyl(0.12, 0.14, 0.08, 12); hub.rotateX(Math.PI / 2); hub.translate(ax, BUS.wheelR, zc + sz * (w / 2 + 0.03)); vc(hub, 0x8c9094);
-    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, nut = cyl(0.018, 0.018, 0.05, 6); nut.rotateX(Math.PI / 2); nut.translate(ax + Math.cos(a) * 0.2, BUS.wheelR + Math.sin(a) * 0.2, zc + sz * (w / 2 + 0.025)); vc(nut, 0x6c7074); }
+    // each wheel its own mesh about its axle (built at the origin), so it can roll and the fronts can steer (roll() below)
+    const parts = [], wv = (g, hex) => parts.push(tint(g, hex));
+    const tyre = cyl(BUS.wheelR, BUS.wheelR, w, 24); tyre.rotateX(Math.PI / 2); wv(tyre, 0x161616);
+    const rim = cyl(0.3, 0.3, 0.02, 20); rim.rotateX(Math.PI / 2); rim.translate(0, 0, sz * (w / 2 + 0.005)); wv(rim, 0xb8bcc0);
+    const hub = cyl(0.12, 0.14, 0.08, 12); hub.rotateX(Math.PI / 2); hub.translate(0, 0, sz * (w / 2 + 0.03)); wv(hub, 0x8c9094);
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, nut = cyl(0.018, 0.018, 0.05, 6); nut.rotateX(Math.PI / 2); nut.translate(Math.cos(a) * 0.2, Math.sin(a) * 0.2, sz * (w / 2 + 0.025)); wv(nut, 0x6c7074); }
+    WHEELS.push({ ax, zc, front: ax > 0, parts });
     const liner = new THREE.CylinderGeometry(0.63, 0.63, 0.5, 14, 1, true, -Math.PI / 2 - 1.4, 2.8); liner.rotateX(Math.PI / 2); liner.translate(ax, 0.42, sz * (HW - 0.3)); P.trim.push(strip(liner));
   }
   // ---- interior --------------------------------------------------------------------------------------------------------
@@ -211,6 +215,10 @@ export function buildBus(o = {}) {
   add(P.paint, M.paint, group, true); add(P.trim, M.trim); add(P.vc, M.vc, group, true); add(P.light, M.light); add(P.sign, sign);
   const gl = add(P.glass, M.glass); if (gl) gl.renderOrder = 2;
   add(P.in, M.vc, interior);
+  const wheels = WHEELS.map((W) => { const pivot = new THREE.Group(); pivot.position.set(W.ax, BUS.wheelR, W.zc); group.add(pivot); const spin = new THREE.Group(); pivot.add(spin);
+    const m = new THREE.Mesh(mergeGeometries(W.parts, false), M.vc); m.castShadow = !o.lite; m.receiveShadow = true; m.userData.surface = 'metal'; spin.add(m); meshes.push(m); return { pivot, spin, front: W.front }; });
+  /** the wheels: `angle` = how far they've rolled (radians, from distance / BUS.wheelR), `steer` = the front wheels' angle (+ = left) */
+  const roll = (angle, steer = 0) => { for (const W of wheels) { W.spin.rotation.z = -angle; if (W.front) W.pivot.rotation.y = steer; } };
   // doors: two leaves each, hinged on the jambs, swinging out
   const leaves = [];
   for (const [a, b] of [BUS.doorF, BUS.doorR]) {
@@ -227,5 +235,5 @@ export function buildBus(o = {}) {
   let doorK = -1;
   const setDoors = (kk) => { kk = Math.max(0, Math.min(1, kk)); if (Math.abs(kk - doorK) < 1e-3) return; doorK = kk; const e = kk * kk * (3 - 2 * kk); for (const l of leaves) { l.pivot.rotation.y = l.dir * e * 1.45; l.pivot.position.z = HW - 0.03 + e * 0.06; } };
   setDoors(0);
-  return { group, interior, meshes, setDoors, seats, driver: { x: dx, y: F + 0.52, z: dz }, len: L, w: BUS.w, h: BUS.h };
+  return { group, interior, meshes, setDoors, roll, seats, driver: { x: dx, y: F + 0.52, z: dz }, len: L, w: BUS.w, h: BUS.h };
 }

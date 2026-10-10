@@ -4,7 +4,7 @@
 // for a few seconds; a couple of cars cross on 60th and 61st on their green. They wrap round out of sight past the far blocks.
 // Instanced per kind × material slot (one draw each), updated only while you're out here. CONEY agent.
 import * as THREE from 'three';
-import { carGeometries, carMaterials, carSpec, CAR_COLORS } from '../carkit.js';
+import { carGeometries, carMaterials, carSpec, CAR_COLORS, wheelInstances, wheelLayout } from '../carkit.js';
 import { buildBus } from '../../vehicles/bus.js';
 import { AVE8 } from './tavern.js';
 
@@ -25,13 +25,14 @@ export function buildAveTraffic(world) {
     list.forEach((c, i) => { c.slot = i; });
     for (const slot of SLOTS) { if (!G[slot]) continue; const mat = slot === 'glass' ? CM.glass : CM[slot]; if (!mat) continue; const im = new THREE.InstancedMesh(G[slot], mat, list.length); im.name = `aveTraffic:${kind}:${slot}`; im.frustumCulled = false; im.castShadow = slot === 'paint' && !lite;
       for (let i = 0; i < list.length; i++) { im.setMatrixAt(i, ZERO); if (slot === 'paint') im.setColorAt(i, list[i].color); } if (slot === 'shadow') im.renderOrder = 1; scene.add(im); ims[kind].push(im); } }
-  const wheelIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.8 }), cars.length * 4); wheelIM.frustumCulled = false; wheelIM.name = 'aveTraffic:wheels'; scene.add(wheelIM);
+  const wheels = wheelInstances(scene, cars.length * 4, 'aveTraffic:wheels'), LAY = {}; for (const k of KINDS) LAY[k] = wheelLayout(k);   // kit wheels that roll
   // the buses: one each way (phones: one), a stop on each side of the block
   const buses = []; for (const dir of lite ? [1] : [1, -1]) { try { const B = buildBus({ sign: 'B70|SUNSET PARK', lite }); B.group.position.set(dir > 0 ? -200 : 200, 0, OZ + dir * (LANE + 0.4)); B.group.rotation.y = dir > 0 ? 0 : Math.PI; scene.add(B.group); buses.push({ B, dir, x: dir > 0 ? -200 : 200, v: 7, len: 12.5, z: OZ + dir * (LANE + 0.4), stopX: dir > 0 ? 30 : -60, dwell: 0, served: false }); } catch (e) { console.warn('[aveTraffic] bus', e); } }
   // the cross-street cars on 60th and 61st
   const cross = []; for (const c of A.cross) for (const dir of [1, -1]) { const kind = 'sedan'; cross.push({ cx: c.x, dir, kind, z: OZ - dir * 40, v: 0, x: c.x + -dir * 2.5 }); }
   const crossG = carGeometries('sedan', { wheels: false }).geos, crossIM = new THREE.InstancedMesh(crossG.paint, CM.paint, cross.length), crossGlass = new THREE.InstancedMesh(crossG.glass, CM.glass, cross.length);
-  for (const im of [crossIM, crossGlass]) { im.frustumCulled = false; im.name = 'aveTraffic:cross'; scene.add(im); } cross.forEach((q, i) => crossIM.setColorAt(i, CAR_COLORS[(i * 3 + 1) % CAR_COLORS.length]));
+  for (const im of [crossIM, crossGlass]) { im.frustumCulled = false; im.name = 'aveTraffic:cross'; scene.add(im); }
+  const crossWheels = wheelInstances(scene, cross.length * 4, 'aveTraffic:crossWheels'), CL = wheelLayout('sedan'); cross.forEach((q, i) => crossIM.setColorAt(i, CAR_COLORS[(i * 3 + 1) % CAR_COLORS.length]));
   // signal state on the avenue / on the cross street (the same offsets avenueKit lights the heads with)
   const phase = (ci) => ((Date.now() / 1000 + ((ci + 1) * 7.3 + 8008) % 34) % CYC + CYC) % CYC;
   const aveGreen = (ci) => phase(ci) < 14 + 2.5, crossGreen = (ci) => { const t = phase(ci); return t >= 18 && t < 30; };
@@ -48,16 +49,16 @@ export function buildAveTraffic(world) {
       const target = Math.min(want, stopV); c.v += (target > c.v ? ACC : -BRK) * dt; c.v = Math.max(0, Math.min(c.v, target + 0.3)); c.x += c.v * c.dir * dt;
       if (c.dir > 0 && c.x > X1) { c.x = X0; c.served = false; } else if (c.dir < 0 && c.x < X0) { c.x = X1; c.served = false; }
     }
-    for (const c of cars) { _e.set(0, c.dir > 0 ? 0 : Math.PI, 0); _q.setFromEuler(_e); _m.compose(_p.set(c.x, 0, c.z), _q, ONE); for (const im of ims[c.kind]) im.setMatrixAt(c.slot, _m); }
-    cars.forEach((c, i) => { const hl = c.len / 2 - 0.8; [[hl, 0.85], [hl, -0.85], [-hl, 0.85], [-hl, -0.85]].forEach(([a, b], k) => wheelIM.setMatrixAt(i * 4 + k, _m.compose(_p.set(c.x + a * c.dir, 0.33, c.z + b), _q.identity(), ONE))); });
-    for (const k in ims) for (const im of ims[k]) im.instanceMatrix.needsUpdate = true; wheelIM.instanceMatrix.needsUpdate = true;
-    for (const b of buses) b.B.group.position.x = b.x;
+    cars.forEach((c, i) => { _e.set(0, c.dir > 0 ? 0 : Math.PI, 0); _q.setFromEuler(_e); _m.compose(_p.set(c.x, 0, c.z), _q, ONE); for (const im of ims[c.kind]) im.setMatrixAt(c.slot, _m);
+      c.spin = (c.spin || 0) + c.v * dt / LAY[c.kind].r; LAY[c.kind].wheels.forEach((w, k) => wheels.set(i * 4 + k, _m, w, c.spin, 0, LAY[c.kind].r)); });
+    for (const k in ims) for (const im of ims[k]) im.instanceMatrix.needsUpdate = true; wheels.commit();
+    for (const b of buses) { b.B.group.position.x = b.x; b.rolled = (b.rolled || 0) + b.v * dt; b.B.roll?.(b.rolled / 0.5); }   // (BUS wheel radius 0.5 m)
     // the cross streets: go on green, out to the end of the block and round again
     cross.forEach((q, i) => { const ci = A.cross.findIndex((c) => c.x === q.cx), atLine = q.z * q.dir > (OZ - q.dir * (A.HALF + 2)) * q.dir - 0.5 && (q.z - OZ) * q.dir < -A.HALF - 1;
       const go = crossGreen(ci) || !atLine; q.v += ((go ? 8 : 0) > q.v ? ACC : -BRK) * dt; q.v = Math.max(0, Math.min(8, q.v)); if (!go && (OZ - q.dir * (A.HALF + 2) - q.z) * q.dir < 1.5) q.v = 0; q.z += q.v * q.dir * dt;
       if ((q.z - OZ) * q.dir > 44) q.z = OZ - q.dir * 44;
-      _e.set(0, q.dir > 0 ? -Math.PI / 2 : Math.PI / 2, 0); _q.setFromEuler(_e); _m.compose(_p.set(q.x, 0, q.z), _q, ONE); crossIM.setMatrixAt(i, _m); crossGlass.setMatrixAt(i, _m); });
-    crossIM.instanceMatrix.needsUpdate = true; crossGlass.instanceMatrix.needsUpdate = true;
+      _e.set(0, q.dir > 0 ? -Math.PI / 2 : Math.PI / 2, 0); _q.setFromEuler(_e); _m.compose(_p.set(q.x, 0, q.z), _q, ONE); crossIM.setMatrixAt(i, _m); crossGlass.setMatrixAt(i, _m); q.spin = (q.spin || 0) + q.v * dt / CL.r; CL.wheels.forEach((w, k) => crossWheels.set(i * 4 + k, _m, w, q.spin, 0, CL.r)); });
+    crossIM.instanceMatrix.needsUpdate = true; crossGlass.instanceMatrix.needsUpdate = true; crossWheels.commit();
   });
   console.log('[aveTraffic] 8th Ave:', cars.length, 'cars ·', buses.length, 'buses ·', cross.length, 'on the cross streets');
   if (typeof window !== 'undefined' && window.__game) window.__game.aveTraffic = { cars: () => cars.map((c) => ({ kind: c.kind, x: +c.x.toFixed(1), v: +c.v.toFixed(1), dir: c.dir })), buses: () => buses.map((b) => ({ x: +b.x.toFixed(1), v: +b.v.toFixed(1) })) };

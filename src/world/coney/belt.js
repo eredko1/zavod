@@ -9,7 +9,7 @@
 // deck height comes from W.groundHeight (a wrapper that knows the viaduct). Passengers are carried with the driver.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { carGeometries, carMaterials, CAR_COLORS } from '../carkit.js';
+import { carGeometries, carMaterials, CAR_COLORS, wheelInstances, wheelLayout } from '../carkit.js';
 
 export const ZONE = { x0: -2000, x1: 3400, z0: 11400, z1: 12700, oz: 12000 };   // world rect of the zone; local z = world z − oz
 const CX = 900, LS = 300, R = 72, DECK = 9;                                      // loop centre (local x), straight length, bend radius, deck height
@@ -181,7 +181,7 @@ function update(dt) {
       if (d < 2.7 && Math.abs(mv.pos.y - DECK) < 2.5) { const nx = dx / (d || 1), nz = dz / (d || 1), push = 2.7 - d; mv.pos.x += nx * push; mv.pos.z += nz * push;
         const vn = mv.vel.x * nx + mv.vel.z * nz; if (vn < 0) { mv.vel.x -= 1.6 * vn * nx; mv.vel.z -= 1.6 * vn * nz; mv.vel.multiplyScalar(0.55); }
         if (!c.hitT || now - c.hitT > 0.8) { c.hitT = now; c.v *= 0.15; try { ctx.audio?.play?.('impact', { position: c.p, volume: 1.2 }); } catch {} try { ctx.audio?.play?.('glass', { position: c.p, volume: 0.8 }); } catch {} } } } }
-  if (Z.carIM) Z.carIM(Z.traffic);
+  if (Z.carIM) Z.carIM(Z.traffic, dt);
   for (const T of Z.trains) { const L = T.x1 - T.x0, k = ((Date.now() / 1000) * 14) % (L * 2); T.m.position.x = k < L ? T.x0 + k : T.x1 - (k - L); T.m.visible = true; }   // wall clock: friends see the same train
   if (!p || p.dead || now - Z.lastTrip < 3) return;
   const v = ctx.vehicles?.mounted, here = v ? v.pos : p.position;
@@ -261,6 +261,8 @@ function trafficMeshes(root, cars, shadows) {
     for (const slot of SLOTS) { const mat = slot === 'glass' ? CM.glass : CM[slot]; if (!G[slot] || !mat) continue; const im = new THREE.InstancedMesh(G[slot], mat, list.length); im.name = `beltTraffic:${kind}:${slot}`; im.frustumCulled = false; im.castShadow = shadows && slot === 'paint';
       if (slot === 'paint') list.forEach((c, i) => im.setColorAt(i, c.color)); if (slot === 'shadow') im.renderOrder = 1; root.add(im); ims[kind].push(im); } }
   // root sits at ZONE.oz: the cars' positions are world, so the matrices go in root-local
-  return (list) => { for (const c of list) { _q.setFromAxisAngle(_y, c.yaw + Math.PI / 2); _m.compose(_p.set(c.p.x, c.p.y, c.p.z - ZONE.oz), _q, ONE); for (const im of ims[c.kind]) im.setMatrixAt(c.slot, _m); }
-    for (const k in ims) for (const im of ims[k]) im.instanceMatrix.needsUpdate = true; };
+  const wheels = wheelInstances(root, cars.length * 4, 'beltTraffic:wheels'), LAY = {}; for (const c of cars) LAY[c.kind] = LAY[c.kind] || wheelLayout(c.kind);   // kit wheels that roll
+  return (list, dt = 0) => { list.forEach((c, i) => { _q.setFromAxisAngle(_y, c.yaw + Math.PI / 2); _m.compose(_p.set(c.p.x, c.p.y, c.p.z - ZONE.oz), _q, ONE); for (const im of ims[c.kind]) im.setMatrixAt(c.slot, _m);
+      const L = LAY[c.kind]; c.spin = (c.spin || 0) + c.v * dt / L.r; L.wheels.forEach((w, k) => wheels.set(i * 4 + k, _m, w, c.spin, 0, L.r)); });
+    for (const k in ims) for (const im of ims[k]) im.instanceMatrix.needsUpdate = true; wheels.commit(); };
 }
