@@ -216,6 +216,24 @@ function tankAI(c, dt, stars) {
 function drive(c, dt) {
   const fx = -Math.sin(c.heading), fz = -Math.cos(c.heading); c.vel.set(fx * c.speed, 0, fz * c.speed); c.pos.addScaledVector(c.vel, dt);
   const floor = collide(c, TANK.radius); c.pos.y += (floor - c.pos.y) * Math.min(1, dt * 8);
+  if (Math.abs(c.speed) > 0.3) shove(c, fx, fz);
+}
+const HULL_HW = 1.9, HULL_HL = 4.0;   // the hull's footprint (half width, half length)
+/** anything in the hull's footprint but a building gets pushed clear: traffic, parked and abandoned cars and bikes; you at
+ *  the controls also run people down. Pushed ahead when it's in front, else out to the side it's on */
+function shove(c, fx, fz) {
+  const ctx = A.ctx, rx = -fz, rz = fx;
+  const push = (x, z, r) => { const dx = x - c.pos.x, dz = z - c.pos.z, lx = dx * rx + dz * rz, lz = dx * fx + dz * fz, ow = HULL_HW + r - Math.abs(lx), ol = HULL_HL + r - Math.abs(lz);
+    if (ow <= 0 || ol <= 0) return null; const ahead = Math.sign(lz) === Math.sign(c.speed) && Math.abs(lz) > HULL_HL * 0.6;
+    return ahead ? [fx * Math.sign(c.speed) * ol + rx * Math.sign(lx || 1) * 0.15, fz * Math.sign(c.speed) * ol + rz * Math.sign(lx || 1) * 0.15] : [rx * Math.sign(lx || 1) * ow, rz * Math.sign(lx || 1) * ow]; };
+  for (const t of A.W.traffic?.cars?.() || []) { const d = push(t.x, t.z, t.hw || 1); if (!d) continue; t.ox += d[0]; t.oz += d[1]; t.x += d[0]; t.z += d[1]; t.v = Math.min(t.v, 1); t.oyaw += (Math.random() - 0.5) * 0.2; }
+  let moved = false;
+  for (const v of ctx.vehicles?.list || []) { if (v === ctx.vehicles.mounted) continue; const d = push(v.pos.x, v.pos.z, v.spec?.car ? 1.1 : 0.6); if (!d) continue;
+    v.pos.x += d[0]; v.pos.z += d[1]; v.heading += (Math.random() - 0.5) * 0.15; v.group.position.copy(v.pos); v.group.rotation.y = v.heading; if (v.parked && v.box) v.box.translate(new THREE.Vector3(d[0], 0, d[1])); moved = true; }
+  if (moved && A.t - (A.rebuildT ?? -9) > 0.4) { A.rebuildT = A.t; try { ctx.player?.rebuildColliders?.(); } catch {} }
+  if (c === A.pilot && Math.abs(c.speed) > 2 && A.t - (c.crushT ?? -9) > 0.25) { c.crushT = A.t; const f = c.pos.clone().addScaledVector(new THREE.Vector3(fx, 0, fz), HULL_HL * Math.sign(c.speed)).setY(c.pos.y + 0.8);
+    try { ctx.ai?.damageRadius?.(f, 2.4, 400); } catch {}
+    const g = new THREE.Vector3(); for (const h of ctx.raycastTargets || []) { const ud = h?.userData; if (!ud?.onHit || ud.soldier || ud.remote || ud.craft || ud.traffic || !h.parent) continue; h.getWorldPosition(g); if (Math.abs(g.y - f.y) < 2 && push(g.x, g.z, 0.3)) try { ud.onHit(300, false, g.clone(), new THREE.Vector3(fx, 0.3, fz)); } catch {} } }
 }
 function fireShell(c, aim, mine) {
   c.group.updateMatrixWorld(); const muzzle = new THREE.Vector3(); c.gunTip.getWorldPosition(muzzle);
