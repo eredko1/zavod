@@ -367,10 +367,11 @@ function onState(H, state, prev) {
   L.vic.classList.toggle('on', state === 'victory');
   openPanel(H, null);
   H.ui = state === 'menu' ? L.menu : state === 'paused' ? L.pause : state === 'dead' ? L.dead : state === 'victory' ? L.vic : null;
-  if (H.ui) select(H, 0);
+  if (H.ui) select(H, H.ctx.mode === 'chill' && state === 'menu' ? 1 : 0);   // chill: Enter goes straight in
   if (state === 'dead' || state === 'victory') fillStats(H, L[state === 'dead' ? 'dead' : 'vic']);
   // chill mode plays like GTA: no Wave / Score / Mercs, and death is WASTED — the picture drains, time crawls for 1.5 s, then the card
   document.getElementById('hud')?.classList.toggle('chill', H.ctx.mode === 'chill');
+  if (H.ctx.mode === 'chill') for (const b of H.root.querySelectorAll('.mainmenu .mi')) b.classList.toggle('primary', b.dataset.act === 'chill');   // loaded in chill: that's the button to press
   if (H.ctx.mode === 'chill') { const cv = gameCanvas(H);
     if (state === 'dead') { if (cv) cv.style.filter = 'grayscale(1) contrast(1.15) brightness(0.8)'; const k = L.dead.querySelector('.kia'); if (k) k.textContent = 'WASTED'; L.dead.classList.add('gta');
       if (!H.slow) { H.slow = true; H.ctx.time.scale = 0.3; setTimeout(() => { H.ctx.time.scale = 1; H.slow = false; }, 1500); } }
@@ -409,7 +410,9 @@ function bindMenus(H) {
   const ctx = H.ctx;
   const act = (a) => {
     switch (a) {
-      case 'deploy': ctx.setState('playing'); break;
+      case 'deploy':   // in chill, Play solo is the regular game on this map (a reload that starts playing)
+        if (ctx.mode === 'chill') { const q = new URLSearchParams(location.search); q.set('map', ctx.world?.mapId || 'coney'); q.set('mode', 'solo'); q.set('go', '1'); location.assign(location.pathname + '?' + q.toString()); }
+        else ctx.setState('playing'); break;
       case 'resume': ctx.setState('playing'); break;
       case 'maps': openPanel(H, H.panel === 'maps' ? null : 'maps'); break;
       case 'loadout': openPanel(H, H.panel === 'loadout' ? null : 'loadout'); break;
