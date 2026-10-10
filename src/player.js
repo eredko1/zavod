@@ -305,10 +305,10 @@ export function update(dt, ctx) {
     if (sup > -Infinity) { stepped -= (p.position.y - sup); p.position.y = sup; v.y = 0; ground = true; }
   }
   // world bounds
-  // extra zones (coney's Belt Parkway run) have their own rect; everywhere else the map bounds
-  const zn = ctx.world?.zones?.find((r) => p.position.x > r.x0 - 2 && p.position.x < r.x1 + 2 && p.position.z > r.z0 - 2 && p.position.z < r.z1 + 2);
-  const b = zn ? { min: { x: zn.x0, y: ctx.world.bounds.min.y, z: zn.z0 }, max: { x: zn.x1, z: zn.z1 } } : ctx.world?.bounds;
-  if (b) { p.position.x = clamp(p.position.x, b.min.x + RADIUS, b.max.x - RADIUS); p.position.z = clamp(p.position.z, b.min.z + RADIUS, b.max.z - RADIUS); if (p.position.y < b.min.y) { p.position.y = b.min.y; v.y = Math.max(0, v.y); ground = true; } }
+  // the map plus its extra zones (coney's Brighton, the Belt…) as one play area, seams and all (world.js playClamp)
+  const b = ctx.world?.bounds;
+  if (b) { if (ctx.world.playClamp) { const [cx, cz] = ctx.world.playClamp(p.position.x, p.position.z, RADIUS); p.position.x = cx; p.position.z = cz; } else { p.position.x = clamp(p.position.x, b.min.x + RADIUS, b.max.x - RADIUS); p.position.z = clamp(p.position.z, b.min.z + RADIUS, b.max.z - RADIUS); }
+    if (p.position.y < b.min.y) { p.position.y = b.min.y; v.y = Math.max(0, v.y); ground = true; } }
   if (ceiling && v.y > 0) v.y = 0;
   if (!S.hover && !ground) v.y -= GRAVITY * dt * 0.5;
   S.physMs = S.physMs * 0.9 + (performance.now() - tPhys) * 0.1;
