@@ -54,6 +54,7 @@ export function buildFolk(world, spots, crowd) {
     N: touch ? 10 : 30, R_ON: touch ? 26 : 42, CACHE: touch ? 14 : 44, robE: null, robPos: new THREE.Vector3(0, -999, 0), lastP: new THREE.Vector3(), pspeed: 0, stats: { barks: 0, muggers: 0, adopted: 0 } };
   W.sandAt = (x, z) => z > BW.z1;
   for (const s of F.spots) if (!s.key) s.key = `${s.x.toFixed(1)},${s.z.toFixed(1)}`;
+  F.taken = new Map(); for (const sp of F.spots) if (!claimSpot(sp)) retireSpot(sp);   // one person per spot: none on top of another, none standing in a parked car
   const av = Object.keys(peopleDebug().av).filter((id) => !AVATARS[id]?.solo);
   F.av = { m: av.filter((id) => AVATARS[id].g === 'm'), f: av.filter((id) => AVATARS[id].g === 'f') };
   if (!F.av.m.length) F.av.m = av; if (!F.av.f.length) F.av.f = F.av.m;
@@ -228,9 +229,18 @@ function nightPeople() {
   }
 }
 /** more spots, added after the crowd is built (coney/street.js: crosswalk walkers, the sellers at the vendor tables): live only */
+/** a spot can have someone in it if nobody else stands within 0.7 m of it and it's not inside a parked car's footprint */
+function claimSpot(sp) {
+  const gx = Math.round(sp.x / 0.7), gz = Math.round(sp.z / 0.7), y = sp.y || 0;
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of F.taken.get(`${gx + i},${gz + j}`) || []) if (Math.abs((q.y || 0) - y) < 1 && Math.hypot(q.x - sp.x, q.z - sp.z) < 0.7) return false;
+  for (const c of F.world.parkedCars || []) { if (c.gone || Math.abs(c.x - sp.x) > 3 || Math.abs(c.z - sp.z) > 3 || y > 1.5) continue; const fx = Math.cos(c.ry || 0), fz = -Math.sin(c.ry || 0), dx = sp.x - c.x, dz = sp.z - c.z;
+    if (Math.abs(dx * fx + dz * fz) < 2.45 && Math.abs(-dx * fz + dz * fx) < 1.05) return false; }
+  const k = `${gx},${gz}`; (F.taken.get(k) || F.taken.set(k, []).get(k)).push(sp); return true;
+}
+function retireSpot(sp) { sp.gone = performance.now() + 1e12; try { F.crowd.hide(sp, true); } catch {} }
 export function addFolkSpots(world, list) {
   if (!F || F.world !== world) return 0;
-  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; if (s.zone === 'nightlife') { s.nightOff = true; s.gone = performance.now() + 1e12; } F.spots.push(s); }
+  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; if (s.zone === 'nightlife') { s.nightOff = true; s.gone = performance.now() + 1e12; } if (!claimSpot(s)) s.gone = performance.now() + 1e12; F.spots.push(s); }
   return list.length;
 }
 /** a friend's game promoted the passer-by at this spot (they're fighting / mugging him): ours steps out so there's one of him */

@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hangkit as K } from '../hangkit.js';
 import { TZ } from './tavern.js';
+import { buildPerson, peopleReady } from '../people.js';
 
 const CYCLE = 240, DOCK_UNTIL = 40, OUT_UNTIL = 70, BR_ARRIVE = 118, BR_LEAVE = 140, NARROWS_UNTIL = 190, IN_UNTIL = 225;   // s on the wall clock: Coney 0..40 (and 225..240), Bay Ridge 118..140
 const OUT_Z = 650;                                   // how far out to sea the boat runs before the Narrows (world z)
@@ -33,6 +34,14 @@ export function buildFerry(world) {
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'NYC FERRY', x: dock.x, z: dock.z, kind: 'transit' });
   ctx.bus.on('playerDied', () => { if (F.aboard) leave(false); });
   world.updaters.push((dt) => update(dt));
+  // net.js: where you stand on the deck (sent with your state) and a friend's deck spot → the world on our copy of the boat
+  ctx.ferry = { local: () => (F.aboard ? [+F.lx.toFixed(2), +F.lz.toFixed(2)] : null),
+    toWorld: (lx, lz, out) => { const w = where(phase().t); if (w.narrows && !F.aboard) return null; F.boat.group.updateMatrixWorld(); return out.set(lx, DECK2, lz).applyMatrix4(F.boat.group.matrixWorld); } };
+  // passengers: a few on the benches, two at the stern rail, one by the bar — they ride the boat (children of it); added once the
+  // people models are in, animated only while you're near
+  const crew = [], seats = ctx.lite ? [[2.2, -0.9, Math.PI, 'sit'], [-2.2, 4, 0, 'sit'], [1.6, 9.0, 0, 'stand']] : [[2.2, -0.9, Math.PI, 'sit'], [-2.2, 2.3, Math.PI, 'sit'], [2.2, 5.5, 0, 'sit'], [-2.2, 7.1, 0, 'sit'], [1.6, 9.0, 0, 'stand'], [-1.2, 9.0, 0.3, 'stand'], [-1.75, -2.6, -Math.PI / 2, 'stand']];
+  const addCrew = () => { if (crew.length || !peopleReady()) return; seats.forEach(([x, z, yaw, pose], i) => { try { const f = buildPerson({ seed: 300 + i * 17, pose: pose === 'sit' ? 'sit' : undefined }); f.group.position.set(x, DECK2 + (pose === 'sit' ? 0.02 : 0), z); f.group.rotation.y = yaw; F.boat.group.add(f.group); crew.push(f); if (i === seats.length - 1) f.mood = 'talk'; } catch (e) { console.warn('[ferry] passenger', e); } }); };
+  world.updaters.push((dt) => { addCrew(); const P = ctx.player?.position; if (!crew.length || !P || !F.boat.group.visible || F.boat.group.position.distanceTo(P) > 90) return; for (const f of crew) f.update(dt, 0); });
   if (typeof window !== 'undefined' && window.__game) window.__game.ferry = { state: () => ({ ...phase(), aboard: F.aboard, pos: F.boat.group.position.toArray().map((v) => +v.toFixed(1)) }), skew: (t) => { F.skew = t - ((Date.now() / 1000) % CYCLE); }, board: () => board(), leave: () => leave(true), dock };
 }
 
