@@ -4,7 +4,7 @@
 // cash dropped by mercenaries you kill, "respawn at <spot>" on the death screen. Maps configure it (coney/hangout.js,
 // wsp + sbu hangouts); everything online rides net.js events: elev / steal / smoke / drink / buy.
 import * as THREE from 'three';
-import { hideParkedCar } from './carkit.js';
+import { hideParkedCar, carEye } from './carkit.js';
 
 const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 12, SHARE_R = 4;
 // kind: 'smoke' | 'booze' | 'drink' | 'food' | 'loot' | 'misc' (inventory categories); effects: drunk/dur, food (HP), cig (smokes per pack, no high), magic, keep (not for B), melt
@@ -250,7 +250,7 @@ function update(dt) {
     }
     if (!act) { const c = nearestParked(3.0); if (c) { prompt = c.gpsGone ? 'F — STEAL CAR' : 'F — STEAL CAR  ·  X — SWIPE THE GPS'; act = () => steal(c);
       if (!c.gpsGone && ctx.input?.pressed?.has?.('KeyX')) { ctx.input.pressed.delete('KeyX'); swipeGps(c); } } }
-    if (!act) { const f = nearestFriendCar(3.8); if (f) { prompt = `F — HOP IN WITH ${f.name}`; act = () => enterPassenger(f.id); } }
+    { const f = nearestFriendCar(3.8); if (f && (!act || dist(f.pos) < bd)) { prompt = `F — HOP IN WITH ${f.name}`; act = () => enterPassenger(f.id); } }   // a friend's car beats anything further away
   }
   ctx.interactNear = !!act;   // next frame's weapons.js leaves F alone while a prompt is up
   ctx.interactPrompt = prompt;   // VR's action button (src/vr/vr.js) shows it
@@ -418,11 +418,12 @@ const TRIP_THOUGHTS = ['The Wonder Wheel is winking at you.', 'The babushkas are
 function trip(cv, dt = 1 / 60) {
   const t = performance.now() / 1000, el = V.tripMax - V.tripT, e = Math.max(0, Math.min(1, el / 15, V.tripT / 20)), peak = Math.max(0, Math.min(1, (el - 15) / 10, (V.tripT - 20) / 10));
   const F = V.tripFx || (V.tripFx = tripFx());
-  F.ov.style.opacity = (0.3 * e + 0.2 * peak * (0.5 + 0.5 * Math.sin(t * 0.9))).toFixed(3); F.ov.style.transform = `rotate(${(t * 25) % 360}deg) scale(${1.1 + 0.15 * Math.sin(t * 0.7)})`;
-  F.kal.style.opacity = (0.22 * peak).toFixed(3); F.kal.style.transform = `rotate(${(-t * 12) % 360}deg) scale(${1.4 + 0.2 * Math.sin(t * 0.4)})`;
-  const sx = (14 + 10 * peak) * e * Math.sin(t * 1.3), sy = (9 + 6 * peak) * e * Math.cos(t * 1.1);
-  cv.style.filter = `saturate(${(1 + 2.2 * e).toFixed(2)}) contrast(${(1 + 0.25 * e).toFixed(2)}) brightness(${(1 + 0.08 * Math.sin(t * 2.1) * e).toFixed(3)}) hue-rotate(${((t * (50 + 60 * peak)) % 360 * e).toFixed(1)}deg) drop-shadow(${sx.toFixed(1)}px ${sy.toFixed(1)}px 0 rgba(255,0,200,${(0.38 * e).toFixed(2)})) drop-shadow(${(-sx).toFixed(1)}px ${(-sy).toFixed(1)}px 0 rgba(0,255,220,${(0.32 * e).toFixed(2)}))${peak > 0.05 ? ` drop-shadow(0 ${(-sx * 0.6).toFixed(1)}px 0 rgba(255,230,0,${(0.25 * peak).toFixed(2)}))` : ''}`;
-  cv.style.transform = `perspective(900px) rotateX(${(Math.sin(t * 0.37) * 4 * peak).toFixed(2)}deg) rotateY(${(Math.cos(t * 0.29) * 5 * peak).toFixed(2)}deg) rotate(${(Math.sin(t * 0.8) * 3 * e).toFixed(2)}deg) scale(${(1 + 0.06 * e + Math.sin(t * 1.7) * 0.035 * e).toFixed(4)}) skew(${(Math.sin(t * 0.9) * 4 * e).toFixed(2)}deg, ${(Math.cos(t * 0.7) * 2.5 * e).toFixed(2)}deg)`;
+  // smooth, slow changes only: no per-frame drop-shadows or brightness pulses on the canvas (they read as the screen blinking,
+  // and some GPUs / headsets flash on them); colour drifts round the wheel over ~20 s, the overlays breathe slowly
+  F.ov.style.opacity = (0.18 * e + 0.08 * peak * (0.5 + 0.5 * Math.sin(t * 0.35))).toFixed(3); F.ov.style.transform = `rotate(${(t * 8) % 360}deg) scale(${1.1 + 0.08 * Math.sin(t * 0.3)})`;
+  F.kal.style.opacity = (0.1 * peak).toFixed(3); F.kal.style.transform = `rotate(${(-t * 4) % 360}deg) scale(${1.4 + 0.1 * Math.sin(t * 0.2)})`;
+  const ff = `saturate(${(1 + 1.4 * e).toFixed(2)}) contrast(${(1 + 0.12 * e).toFixed(2)}) hue-rotate(${((t * (14 + 10 * peak)) % 360 * e).toFixed(0)}deg)`; if (cv.style.filter !== ff) cv.style.filter = ff;
+  cv.style.transform = `perspective(900px) rotateX(${(Math.sin(t * 0.21) * 2 * peak).toFixed(2)}deg) rotateY(${(Math.cos(t * 0.17) * 2.5 * peak).toFixed(2)}deg) rotate(${(Math.sin(t * 0.3) * 1.5 * e).toFixed(2)}deg) scale(${(1 + 0.04 * e + Math.sin(t * 0.5) * 0.015 * e).toFixed(4)})`;
   // glowing shapes drifting round you
   const me = V.ctx.player?.position; if (me) F.orbs.forEach((o, i) => { const a = t * (0.2 + i * 0.013) + i * 2.4, r = 3 + (i % 5) * 1.6; o.position.set(me.x + Math.cos(a) * r, me.y + 1.2 + Math.sin(t * 0.7 + i) * 1.4 + (i % 3), me.z + Math.sin(a) * r); o.material.opacity = 0.75 * peak; o.material.color.setHSL(((t * 0.1 + i * 0.07) % 1), 1, 0.6); const k = 0.35 + 0.25 * Math.sin(t * 2 + i); o.scale.set(k, k, k); });
   if (F.gain) F.gain.gain.value = 0.05 * e; if (F.osc) F.osc.frequency.value = 55 + 8 * Math.sin(t * 0.3);
@@ -639,7 +640,8 @@ function updatePassenger() {
   const [sr, sf] = bike ? [0, -0.55] : SEATS[sid];
   const seat = q.pos.clone().addScaledVector(right, sr).addScaledVector(fwd, sf);
   p.position.set(seat.x, seat.y + (bike ? 0.55 : 0.3), seat.z); p.velocity?.set?.(0, 0, 0);
-  const cam = ctx.camera; cam.position.set(seat.x, seat.y + (bike ? 1.5 : 1.17), seat.z); cam.rotation.set(p.pitch, p.yaw, 0); p.cameraPosition?.copy?.(cam.position);
+  const eyeY = bike ? 1.5 : (carEye(q.veh.k)?.y ?? 1.17);   // that car's eye height (an SUV or a van sits you higher)
+  const cam = ctx.camera; cam.position.set(seat.x, seat.y + eyeY, seat.z); cam.rotation.set(p.pitch, p.yaw, 0); p.cameraPosition?.copy?.(cam.position);
 }
 
 // ---- death screen: "Respawn at <spot>" (button or T). Solo: respawn right now. Online: net.js keeps its countdown; the choice

@@ -439,9 +439,11 @@ export function addLongHair(fig, { color = 0x2b1d14 } = {}) {
   fig.group.updateWorldMatrix(true, true); const hs = fig.head.getWorldScale(new THREE.Vector3()).x / (fig.group.getWorldScale(new THREE.Vector3()).x || 1);
   const g = new THREE.Group(); g.name = 'longhair'; g.scale.setScalar(1 / (hs || 1));
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: THREE.DoubleSide });
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.4), m); cap.scale.set(1, 1.02, 1.08); cap.position.set(0, 0.012, -0.012);
-  const back = new THREE.Mesh(new THREE.CylinderGeometry(0.122, 0.17, 0.46, 18, 1, true, Math.PI * 0.62, Math.PI * 0.76), m); back.position.set(0, -0.2, -0.018);
-  for (const s of [-1, 1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.1), m); side.position.set(s * 0.112, -0.13, -0.035); side.rotation.z = s * 0.08; g.add(side); }
+  // fitted to this head (people.js measures each avatar's crown, brow, width): the cap hugs the skull, the curtain hangs from the back of it
+  const f = fig.fit, r = f ? f.bandR * 1.06 : 0.118, top = f ? f.crown + 0.01 : 0.132, cz = f ? f.cz : -0.012, hw = f ? f.halfW : 0.105, ey = f ? f.eyeY : -0.045;
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), m); cap.scale.set(1, 1, 1.08); cap.position.set(0, top - r, cz);
+  const back = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.02, r * 1.4, 0.46, 18, 1, true, Math.PI * 0.62, Math.PI * 0.76), m); back.position.set(0, top - r - 0.21, cz - 0.006);
+  for (const s of [-1, 1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.1), m); side.position.set(s * (hw + 0.018), ey - 0.05, cz - 0.03); side.rotation.z = s * 0.08; g.add(side); }
   for (const o of [cap, back]) { o.castShadow = true; g.add(o); }
   fig.head.add(g); return g;
 }

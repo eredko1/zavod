@@ -283,12 +283,12 @@ function updateRed() {
   if (!H.redTried && H.ctx.vehicles?.spawnCar) { H.redTried = true; try { buildRedCar(H.world); } catch (e) { console.warn('[hangout] red car', e); } }   // vehicles.js boots after the world
   const r = H.red; if (!r) return; const mv = H.ctx.vehicles?.mounted;
   if (mv === r.car && !r.mine) { r.mine = true; r.tag.visible = false; H.ctx.net?.send?.('red', { s: 'taken' }); }
-  else if (r.mine && mv !== r.car) { r.mine = false; r.tag.visible = true; const c = r.car; H.ctx.net?.send?.('red', { s: 'parked', x: +c.pos.x.toFixed(2), z: +c.pos.z.toFixed(2), y: +c.pos.y.toFixed(2), h: +c.heading.toFixed(3) }); }
+  else if (r.mine && mv !== r.car) { r.mine = false; r.tag.visible = true; const c = r.car; H.ctx.net?.send?.('red', { s: 'parked', p: [+c.pos.x.toFixed(2), +c.pos.y.toFixed(2), +c.pos.z.toFixed(2)], h: +c.heading.toFixed(3) }); }
 }
 function onRemoteRed(m) {
   const r = H.red; if (!r || r.mine) return;
   if (m.s === 'taken') return redHide(true);
-  if (m.s === 'parked' && Number.isFinite(+m.x)) { const c = r.car; c.pos.set(+m.x, +m.y || 0, +m.z); c.heading = +m.h || 0; c.group.position.copy(c.pos); c.group.rotation.set(0, c.heading, 0);
+  if (m.s === 'parked' && Array.isArray(m.p) && m.p.every((v) => Number.isFinite(+v))) { const c = r.car; c.pos.set(+m.p[0], +m.p[1] || 0, +m.p[2]); c.heading = +m.h || 0; c.group.position.copy(c.pos); c.group.rotation.set(0, c.heading, 0);
     const cs = Math.cos(c.heading), sn = Math.sin(c.heading), hx = Math.abs(cs) * 0.95 + Math.abs(sn) * 2.35, hz = Math.abs(sn) * 0.95 + Math.abs(cs) * 2.35; c.box.min.set(c.pos.x - hx, c.pos.y, c.pos.z - hz); c.box.max.set(c.pos.x + hx, c.pos.y + 1.5, c.pos.z + hz); redHide(false); }
 }
 

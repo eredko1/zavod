@@ -268,6 +268,17 @@ function surfaceUnder(v) {
   return SURF.hard;
 }
 /** One frame of physics, sub-stepped so every step is ≤ 1/120 s (same handling at any frame rate). */
+/** push your vehicle out of friends' vehicles (their last networked pose): circles along each body, a soft bounce on contact */
+function remoteBump(v) {
+  const net = C.net; if (!net?.list || v.spec.water) return; const sp = v.spec, fx = -Math.sin(v.heading), fz = -Math.cos(v.heading);
+  for (const id of net.list()) { const q = net.peer(id); if (!q?.veh || q.veh.k === 'pass' || !q.pos || Math.abs(q.pos.y - v.pos.y) > 2.5) continue;
+    const dx0 = q.pos.x - v.pos.x, dz0 = q.pos.z - v.pos.z; if (dx0 * dx0 + dz0 * dz0 > 100) continue;
+    const os = q.veh.k === 'bike' ? BIKE_SPEC : q.veh.k === 'jetski' ? JETSKI_SPEC : carSpecFor(q.veh.k), ox = -Math.sin(q.heading), oz = -Math.cos(q.heading);
+    for (const a of sp.circles) for (const b of os.circles) {
+      const ax = v.pos.x - fx * a, az = v.pos.z - fz * a, bx = q.pos.x - ox * b, bz = q.pos.z - oz * b, dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz), r = sp.bodyR + os.bodyR;
+      if (d >= r || d < 1e-4) continue; const nx = dx / d, nz = dz / d, push = r - d; v.pos.x += nx * push; v.pos.z += nz * push;
+      const vn = v.vel.x * nx + v.vel.z * nz; if (vn < 0) { v.vel.x -= 1.5 * vn * nx; v.vel.z -= 1.5 * vn * nz; v.vel.multiplyScalar(0.8); v.hitT = Math.max(v.hitT, 0.15); } } }
+}
 function simulate(v, dt, thr, brk, hard, steer) {
   const n = Math.max(1, Math.ceil(dt / MAX_STEP - 1e-6)), h = dt / n;
   v.surfT -= dt; if (v.surfT <= 0) { v.surfT = 0.1; v.surf = surfaceUnder(v); }
@@ -710,7 +721,10 @@ export function update(dt, ctx) {
     if (b && playing) {
       const dBike = Math.hypot(b.pos.x - p.position.x, b.pos.z - p.position.z) - Math.max(b.spec.hx, b.spec.hz) * 0.5;
       const dGun = ctx.ai?.nearPickupDist; const gunWins = typeof dGun === 'number' && dGun < dBike;
-      if (!gunWins) { S.toastT -= dt; if (S.toastT <= 0) { S.toastT = 0.35; ctx.hud?.toast?.(b.spec.car ? 'F — DRIVE' : 'F — RIDE', 600); } if (fHeld) { input.pressed?.delete?.('KeyF'); mount(b); } }
+      // a friend's car closer than this one: F hops in with them (hangkit), it doesn't steal the car parked behind them
+      let dFriend = Infinity; const net = ctx.net; if (net?.list) for (const id of net.list()) { const q = net.peer(id); if (q?.veh && q.veh.k !== 'pass' && q.pos) dFriend = Math.min(dFriend, Math.hypot(q.pos.x - p.position.x, q.pos.z - p.position.z)); }
+      const friendWins = dFriend < 3.8 && dFriend < dBike + 0.5;
+      if (!gunWins && !friendWins) { S.toastT -= dt; if (S.toastT <= 0) { S.toastT = 0.35; ctx.hud?.toast?.(b.spec.car ? 'F — DRIVE' : 'F — RIDE', 600); } if (fHeld) { input.pressed?.delete?.('KeyF'); mount(b); } }
     }
     updateUI(ctx);
     return;
@@ -755,6 +769,7 @@ export function update(dt, ctx) {
     }
   }
   simulate(bike, dt, thr, brake, hard, steer);
+  remoteBump(bike);   // friends' cars are solid to yours (each client drives its own; this keeps them from passing through each other)
   runOver(bike, dt);
   { const drop = (bike.lastSpd ?? bike.speed) - bike.speed; bike.lastSpd = bike.speed;   // a crash: lost a lot of speed in one frame against something solid
     if (drop > 6 && !bike.air && performance.now() - (bike.crashT || 0) > 600) { bike.crashT = performance.now(); const k = Math.min(1, drop / 20);

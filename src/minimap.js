@@ -137,7 +137,11 @@ function drawMarkers(g, P, scale, rot = 0, big = false) {
   for (const [x, z, n] of mk.vendors) { const [u, v] = dot(x, z, 4.5 * k, '#ffd27a'); if (big) label(u, v - 9, n, '#ffd27a', 12); }
   for (const [x, z, cop, far] of mk.enemies) { g.globalAlpha = far ? 0.35 : 1; dot(x, z, 4 * k, cop ? '#b36bff' : '#ff4a3a', '#2a0000'); } g.globalAlpha = 1;
   for (const [x, z] of mk.thugs) dot(x, z, 4 * k, '#ff9a3a', '#2a1000');
-  for (const [x, z, n, dead, far] of mk.friends) { g.globalAlpha = far ? 0.45 : 1; const [u, v] = dot(x, z, 5 * k, dead ? '#667' : '#4aa3ff', '#fff'); if (big) label(u, v - 10, n, '#cfe3ff', 13); else label(u, v - 12, n, '#cfe3ff', 20); } g.globalAlpha = 1;
+  // friends: a blue dot with their name; off the minimap's dial they're pinned to its rim in their direction (like a job), so you can always find each other
+  for (const [x, z, n, dead, far] of mk.friends) { g.globalAlpha = far ? 0.5 : 1; let [u, v] = P(x, z), pinned = false;
+    if (!big) { const R = g.canvas.width / 2, dx = u - R, dy = v - R, d = Math.hypot(dx, dy), lim = R - 8 * k; if (d > lim) { u = R + dx / d * lim; v = R + dy / d * lim; pinned = true; } }
+    g.beginPath(); g.arc(u, v, (pinned ? 5 : 6) * k, 0, Math.PI * 2); g.fillStyle = dead ? '#667' : '#4aa3ff'; g.fill(); g.lineWidth = 2 * k; g.strokeStyle = '#fff'; g.stroke();
+    if (big) label(u, v - 10, n, '#cfe3ff', 13); else if (!pinned) label(u, v - 14, n, '#cfe3ff', 20); } g.globalAlpha = 1;
   // the current job's destination: a gold diamond (pinned to the rim of the minimap when it's off the dial)
   const jb = ctx.world?.mapJob?.(); if (jb) { let [u, v] = P(jb[0], jb[1]);
     if (!big) { const R = g.canvas.width / 2, dx = u - R, dy = v - R, d = Math.hypot(dx, dy), lim = R - 14 * k / 2 - 6; if (d > lim) { u = R + dx / d * lim; v = R + dy / d * lim; } }
