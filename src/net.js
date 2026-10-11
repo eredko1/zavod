@@ -66,7 +66,7 @@ let S = null;
 const rid = () => Math.random().toString(36).slice(2, 10).padEnd(8, '0');
 const num = (v, lim) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-lim, Math.min(lim, v)) : NaN);
 const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null);
-const vec = (a, lim = 20000) => { if (!Array.isArray(a) || a.length < 3) return null; const r = [num(a[0], lim), num(a[1], lim), num(a[2], lim)]; return r.some(Number.isNaN) ? null : r; };
+const vec = (a, lim = 40000) => { if (!Array.isArray(a) || a.length < 3) return null; const r = [num(a[0], lim), num(a[1], lim), num(a[2], lim)]; return r.some(Number.isNaN) ? null : r; };
 export const cleanName = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>&"'\\`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
 export const cleanRoom = (s) => String(s ?? '').toLowerCase().replace(/[^\w-]/g, '').slice(0, 24);
 
@@ -338,8 +338,9 @@ function onState(pid, m, now) {
   const z = typeof m.z === 'string' ? m.z.slice(0, 8) : '';
   if (p && z === p.z && q <= p.lastQ) return;                      // same packet via another broker, or out of order
   if (!allow(pid, 's', 40, 60)) return;
-  const x = num(P[0], 20000), y = num(P[1], 5000), zz = num(P[2], 20000), yaw = num(P[3], 1000), sp = num(P[4], 200), fl = int(P[5], 0, 255) ?? 0;
+  const x = num(P[0], 40000), y = num(P[1], 5000), zz = num(P[2], 40000), yaw = num(P[3], 1000), sp = num(P[4], 200), fl = int(P[5], 0, 255) ?? 0;
   if ([x, y, zz, yaw, sp].some(Number.isNaN)) return;
+  const held = typeof m.w === 'string' && /^[a-z0-9_]{1,12}$/i.test(m.w) ? m.w : null;
   let v = null;
   if (m.v && typeof m.v === 'object' && m.v.k !== 'pass') {
     const k = String(m.v.k || ''); const vp = vec([m.v.x, m.v.y, m.v.z]); const h = num(m.v.h, 1000);
@@ -347,7 +348,7 @@ function onState(pid, m, now) {
   }
   p = p || peerFor(pid, cleanName(m.n)); if (!p) return;
   if (z !== p.z) { p.z = z; p.lastQ = -1; p.off = null; p.lastTs = null; }   // they reloaded (same id, new instance): reset sequence + clock
-  p.lastQ = q; p.seen = now;
+  p.lastQ = q; p.seen = now; p.inst.heldId = held;   // outfits.js puts it in their hands
   const n = cleanName(m.n); if (n && n !== p.name) peerFor(pid, n);
   if (Array.isArray(m.sc)) mergeScore(pid, n || p.name, int(m.sc[0], 0, 99999) ?? 0, int(m.sc[1], 0, 99999) ?? 0);
   // sender-clock timeline (skew-free: only differences of their own clock are used)
@@ -358,8 +359,9 @@ function onState(pid, m, now) {
   p.delayT = Math.min(DELAY_MAX, Math.max(DELAY_MIN, 1.5 * p.iv, p.iv + 2.5 * p.jit + 15));
   const last = p.snaps[p.snaps.length - 1];
   let t = ts + p.off; if (last && t <= last.t) t = last.t + 1;
+  let fe = null; if (Array.isArray(m.fe) && m.fe.length === 2) { const lx = num(m.fe[0], 5), lz = num(m.fe[1], 14); if (!Number.isNaN(lx) && !Number.isNaN(lz)) fe = [lx, lz]; }   // on the ferry deck (boat-local)
   let tr = null; if (Array.isArray(m.tr) && m.tr.length === 3) { const c = int(m.tr[0], 0, 15), lx = num(m.tr[1], 3), lz = num(m.tr[2], 12); if (c != null && !Number.isNaN(lx) && !Number.isNaN(lz)) tr = [c, lx, lz]; }
-  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tr, tp: false };
+  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tr, fe, tp: false };
   if (last && Math.hypot(s.x - last.x, s.y - last.y, s.z - last.z) > TELEPORT) s.tp = true;
   p.snaps.push(s); if (p.snaps.length > 40) p.snaps.shift();
   const afk = !!(fl & F_AFK); if (afk !== p.afk) { p.afk = afk; UI.refresh(); }
@@ -470,7 +472,7 @@ function sendState(now, force = false) {
   let vi = null;
   try { const mv = ctx.vehicles?.mounted; vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : mv.spec?.water ? 'jetski' : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null); } catch {}
   const sc = S.score.get(S.id); let tr = null; try { tr = me.mounted?.train ? ctx.subway?.local?.() || null : null; } catch {}   // riding the F: car + spot in the car
-  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, tr, sc: [sc.k, sc.d] });
+  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, tr, fe: ctx.ferry?.local?.() || undefined, sc: [sc.k, sc.d], w: String(ctx.weapons?.currentId || '').slice(0, 12) || undefined });   // w: what you're holding (friends draw it)
 }
 
 // ---------- per frame ----------
@@ -509,6 +511,8 @@ function renderPeer(p, now, rdt, ctx) {
   }
   // on the F: place them in OUR copy of the (wall-clock) train from their spot in the car — a world position ~100 ms old would
   // put a rider metres behind a moving train, floating over the el
+  // a friend on the ferry: on our copy of the boat (same wall clock), not metres behind a 40 m/s ferry
+  if (cur.fe && ctx.ferry?.toWorld) { const q = ctx.ferry.toWorld(cur.fe[0], cur.fe[1], _trV); if (q) { x = q.x; y = q.y; z = q.z; } }
   if (cur.tr && ctx.subway?.toWorld) { const a = A.tr, b = B.tr, k = rt > A.t && rt < B.t ? (rt - A.t) / Math.max(1, B.t - A.t) : rt >= B.t ? 1 : 0, same = a && b && a[0] === b[0];
     const q = ctx.subway.toWorld(cur.tr[0], same ? a[1] + (b[1] - a[1]) * k : cur.tr[1], same ? a[2] + (b[2] - a[2]) * k : cur.tr[2], _trV); if (q) { x = q.x; y = q.y; z = q.z; } }
   const g = p.inst.group; g.position.set(x, y, z); g.rotation.y = yaw + Math.PI; p.heading = yaw;

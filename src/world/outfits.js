@@ -12,6 +12,7 @@
 //  - dressViewmodelArms(mats)           first-person forearms: bare fair skin instead of the multicam sleeve
 // Tee prints are original typographic layouts of the band / album NAMES only — no album artwork or logos are reproduced.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildPerson, peopleReady, peopleDebug, loadPeople } from './people.js';
 
 export const HERO = { avatar: 'm20', height: 1.83 };
@@ -386,6 +387,22 @@ export function setRemoteChar(pid, id, ctx) {
 }
 function heroOutfit(pid, ctx) { return { top: 'tee', shirt: shirtOf(pid, ctx), bottom: 'jeans', shoes: 'keep', skin: SKIN_FAIR }; }
 /** swap the soldier look of a remote player for the hero (jeans + his own SOAD-style tee). Hitboxes / muzzle stay on the soldier rig. */
+// what a friend is holding, carried at low ready in front of them (figure frame: +Z forward, right hand on -X). One shared
+// dark-metal material; tiny merged geometry per kind, built once
+const HELD = {}, HELD_M = new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.45, metalness: 0.75 }), HELD_W = new THREE.MeshStandardMaterial({ color: 0x5a3d26, roughness: 0.8 });
+function heldKind(id) { return !id || /fist|hand|none/i.test(id) ? null : /knife|blade/i.test(id) ? 'knife' : /sniper|awp|svd|rem700/i.test(id) ? 'sniper' : /r870|shotgun|spas/i.test(id) ? 'shotgun' : /mp5|smg|uzi|mac10|p90/i.test(id) ? 'smg' : /m9|deagle|makarov|glock|pistol|tt|revolver/i.test(id) ? 'pistol' : 'rifle'; }
+function heldProp(id) {
+  const k = heldKind(id); if (!k) return null;
+  if (!HELD[k]) { const G = [], W = [], b = (a, w, h, d, x, y, z) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(x, y, z); a.push(g); }, cy = (a, r, l, x, y, z) => { const g = new THREE.CylinderGeometry(r, r, l, 8); g.rotateX(Math.PI / 2); g.translate(x, y, z); a.push(g); };
+    if (k === 'pistol') { b(G, 0.035, 0.035, 0.19, 0, 0.03, 0.06); b(G, 0.03, 0.11, 0.045, 0, -0.03, -0.01); }
+    else if (k === 'knife') { b(G, 0.006, 0.03, 0.17, 0, 0, 0.1); b(W, 0.02, 0.025, 0.1, 0, 0, -0.03); }
+    else { const L = k === 'sniper' ? 1.1 : k === 'smg' ? 0.5 : k === 'shotgun' ? 0.95 : 0.8; b(G, 0.05, 0.08, L * 0.45, 0, 0, 0.05); cy(G, 0.014, L * 0.5, 0, 0.015, 0.05 + L * 0.45);
+      b(k === 'rifle' && /ak/i.test(id) ? W : G, 0.04, 0.07, L * 0.28, 0, -0.01, -L * 0.3); if (k !== 'shotgun') b(G, 0.03, 0.12, 0.05, 0, -0.08, 0.12); if (k === 'sniper') cy(G, 0.022, 0.26, 0, 0.07, 0.08); }
+    HELD[k] = { g: mergeGeometries(G, false), w: W.length ? mergeGeometries(W, false) : null }; }
+  const g = new THREE.Group(); g.name = 'held'; g.userData.remoteWeapon = true; const m = new THREE.Mesh(HELD[k].g, HELD_M); m.castShadow = true; g.add(m); if (HELD[k].w) g.add(new THREE.Mesh(HELD[k].w, HELD_W));
+  if (k === 'pistol' || k === 'knife') g.position.set(-0.24, 0.98, 0.28); else { g.position.set(-0.12, 1.12, 0.3); g.rotation.set(-0.15, 0.25, 0); }
+  return g;
+}
 export function dressRemote(inst, pid, ctx) {
   if (!inst || inst.hero) return;
   if (!peopleReady()) { const pd = peopleDebug(); (pd.loading || loadPeople(ctx)).then(() => { if (peopleReady()) dressRemote(inst, pid, ctx); }).catch(() => {}); return; }
@@ -401,6 +418,7 @@ export function dressRemote(inst, pid, ctx) {
   const tick = (dt) => {
     inst.group.getWorldPosition(wp);
     if (dt > 0) { const d = H.first ? 0 : Math.hypot(wp.x - H.last.x, wp.z - H.last.z) / dt; H.first = false; H.sp += (Math.min(d, 9) - H.sp) * Math.min(1, dt * 6); }
+    if ((inst.heldId || null) !== (H.held ?? null)) { H.held = inst.heldId || null; if (H.prop) { H.fig.group.remove(H.prop); H.prop = null; } const pr = heldProp(H.held); if (pr) { H.fig.group.add(pr); H.prop = pr; } }   // what they're holding
     H.last.copy(wp); H.fig.update(dt, H.fig.mood === 'sit' || H.sp < 0.25 ? 0 : H.sp);   // seated in a car: no running legs
     const now = performance.now(); if (now - sigAt > 500) { sigAt = now; refreshShirts(ctx); }
   };

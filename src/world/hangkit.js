@@ -238,7 +238,7 @@ function update(dt) {
   if (ctx.input?.pressed?.has?.('KeyB')) { ctx.input.pressed.delete('KeyB'); useItem(); }   // B = blaze / drink, anywhere
   const pos = p.position; const near = (v, r, dy = 1.3) => Math.hypot(v.x - pos.x, v.z - pos.z) < r && Math.abs(v.y - pos.y) < dy;
   let prompt = null, act = null;
-  if (!ctx.vehicles?.mounted) {
+  if (!ctx.vehicles?.mounted && !p.mounted?.ferry) {   // (on the ferry F is the ferry's: the bar, getting off)
     // the closest vendor / interaction point wins (walkers pass by the mangal, the deli counter, …)
     let bd = Infinity; const dist = (v) => Math.hypot(v.x - pos.x, v.z - pos.z);
     for (const v of V.vendors) if (!v.off && near(v.pos, v.r) && dist(v.pos) < bd) { bd = dist(v.pos); prompt = `F — TALK TO ${v.name}`; act = () => talk(v); }

@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { OSM } from './osm.js';
 import { BW } from './shore.js';
-import { carGeometries, carMaterials, carSpec, carEye, carInterior, wheelGeometry, wheelLayout, CAR_COLORS } from '../carkit.js';
+import { carGeometries, carMaterials, carSpec, carEye, carInterior, wheelGeometry, wheelLayout, CAR_COLORS, hideParkedCar } from '../carkit.js';
 import { hasCarModel, carModel } from '../carmodels.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { BoxGrid, rectBlocked } from '../../vehicles/collide.js';
@@ -447,7 +447,8 @@ function drive(c, dt, now) {
   if (c.avoid) { c.avoidT -= dt; if (c.avoidT <= 0 || (!obst && c.v > 3 && c.blockT === 0 && c.avoidT < 4)) { c.avoid = null; c.shiftT = 0; } }
   // stuck behind a car that is itself stuck (a gridlocked junction): after a while, nudge through
   if (lim === 'obst' && obst?.ped && c.v < 0.5) { c.pedT = (c.pedT || 0) + dt; if (c.pedT > 3 && c.hornT <= 0) { honk(c); c.hornT = 3 + c.rng() * 3; } } else c.pedT = 0;   // held up by someone in the road: lean on the horn
-  if (lim === 'car' && c.v < 0.1) { c.waitT += dt; if (c.waitT > 9) { c.ghostT = 2.5; c.waitT = 0; } } else if (c.v > 1) c.waitT = 0;
+  // stuck behind a car for 9 s: slip through it (a deadlock breaker), but never where you can see it happen — in view it waits on
+  if (lim === 'car' && c.v < 0.1) { c.waitT += dt; if (c.waitT > 9) { const P = T.ctx.player?.position, far = !P || Math.hypot(c.x - P.x, c.z - P.z) > 60; if (far || !inView(c.x, c.y, c.z, 6)) { c.ghostT = 2.5; c.waitT = 0; } else c.waitT = 7; } } else if (c.v > 1) c.waitT = 0;
   c.lim = lim;
   // integrate
   a = clamp(a, -9, AM); c.a = damp(c.a, a, 6, dt); c.v = Math.max(0, c.v + a * dt);
@@ -737,6 +738,8 @@ function buildRoute(R) {
     let best = null; for (let i = 0; i < nodes.length; i++) { const a = N[nodes[i]], b = N[nodes[(i + 1) % nodes.length]], dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1, t = clamp(((sx - a.x) * dx + (sz - a.z) * dz) / L2, 0.05, 0.95), px = a.x + dx * t, pz = a.z + dz * t, d = Math.hypot(sx - px, sz - pz);
       if (d < 12 && (!best || d < best.d)) { const L = Math.sqrt(L2), e = edge(nodes[i], nodes[(i + 1) % nodes.length]); best = { d, name, rs: cum[i] + t * L, x: px, z: pz, dx: dx / L, dz: dz / L, w: e?.w || 10 }; } }
     if (best) { const kerb = best.w / 2 - 1.6, sh = Math.max(0, kerb - laneOff(best.w, 1)); stops.push({ ...best, shift: sh, px: best.x - best.dz * (best.w / 2 + 1.2), pz: best.z + best.dx * (best.w / 2 + 1.2) }); }
+    // the bus pulls in to the kerb here: no car parked in its way (they're placed before the stops are known)
+    if (best) for (const c of T?.world?.parkedCars || []) if (!c.gone && Math.hypot(c.x - best.x, c.z - best.z) < 30) { hideParkedCar(c); c.gone = true; if (c.box) { c.box.min.set(0, -9999, 0); c.box.max.set(0.001, -9998, 0.001); } }
   }
   stops.sort((a, b) => a.rs - b.rs);
   // timetable: run at BUS_V between stops, DWELL at each → position on the loop at any wall-clock second
