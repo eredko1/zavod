@@ -16,7 +16,7 @@ const OUT_Z = 650;                                   // how far out to sea the b
 const NZ = 30000;                                   // the Narrows area: world z offset
 // the run up the Narrows (local x, z): in from the sea, under the bridge, up the Brooklyn side to the 69th St pier in Bay Ridge
 const NP = [[300, 700], [300, -300], [420, -650], [600, -860], [700, -890], [875, -890]].map(([x, z]) => new THREE.Vector3(x, 0, z));
-const BAR = new THREE.Vector3(-2.9, 0, -2.6), DECK_X = 3.3, DECK_Z0 = -3.4, DECK_Z1 = 9.2;   // the bar on the upper deck; where you can walk
+const BAR = new THREE.Vector3(-1, 0, -1.85), DECK_X = 3.3, DECK_Z0 = -2.15, DECK_Z1 = 9.2;   // BAR: where you stand to buy (the counter is just forward of it)   // the bar on the upper deck; where you can walk
 const LEN = 26, BEAM = 8.5, DECK2 = 3.95;           // the boat: length, beam, upper deck height
 let F = null;
 
@@ -39,7 +39,7 @@ export function buildFerry(world) {
     toWorld: (lx, lz, out) => { const w = where(phase().t); if (w.narrows && !F.aboard) return null; F.boat.group.updateMatrixWorld(); return out.set(lx, DECK2, lz).applyMatrix4(F.boat.group.matrixWorld); } };
   // passengers: a few on the benches, two at the stern rail, one by the bar — they ride the boat (children of it); added once the
   // people models are in, animated only while you're near
-  const crew = [], seats = ctx.lite ? [[2.2, -0.9, Math.PI, 'sit'], [-2.2, 4, 0, 'sit'], [1.6, 9.0, 0, 'stand']] : [[2.2, -0.9, Math.PI, 'sit'], [-2.2, 2.3, Math.PI, 'sit'], [2.2, 5.5, 0, 'sit'], [-2.2, 7.1, 0, 'sit'], [1.6, 9.0, 0, 'stand'], [-1.2, 9.0, 0.3, 'stand'], [-1.75, -2.6, -Math.PI / 2, 'stand']];
+  const crew = [], seats = ctx.lite ? [[2.2, 0.25, Math.PI, 'sit'], [-2.2, 3.45, Math.PI, 'sit'], [1.6, 9.0, 0, 'stand'], [-1, -3.25, 0, 'stand']] : [[2.2, 0.25, Math.PI, 'sit'], [-2.2, 1.85, Math.PI, 'sit'], [2.2, 5.05, Math.PI, 'sit'], [-2.2, 6.65, Math.PI, 'sit'], [1.6, 9.0, 0, 'stand'], [-1.2, 9.0, 0.3, 'stand'], [-1, -3.25, 0, 'stand']];   // sitters on the bench pads (benches face the bow), the bartender behind the counter
   const addCrew = () => { if (crew.length || !peopleReady()) return; seats.forEach(([x, z, yaw, pose], i) => { try { const f = buildPerson({ seed: 300 + i * 17, pose: pose === 'sit' ? 'sit' : undefined }); f.group.position.set(x, DECK2 + (pose === 'sit' ? 0.02 : 0), z); f.group.rotation.y = yaw; F.boat.group.add(f.group); crew.push(f); if (i === seats.length - 1) f.mood = 'talk'; } catch (e) { console.warn('[ferry] passenger', e); } }); };
   world.updaters.push((dt) => { addCrew(); const P = ctx.player?.position; if (!crew.length || !P || !F.boat.group.visible || F.boat.group.position.distanceTo(P) > 90) return; for (const f of crew) f.update(dt, 0); });
   if (typeof window !== 'undefined' && window.__game) window.__game.ferry = { state: () => ({ ...phase(), aboard: F.aboard, pos: F.boat.group.position.toArray().map((v) => +v.toFixed(1)) }), skew: (t) => { F.skew = t - ((Date.now() / 1000) % CYCLE); }, board: () => board(), leave: () => leave(true), dock };
@@ -52,8 +52,10 @@ const ease = (k) => k * k * (3 - 2 * k);
 function where(t) {
   const D = F.dock;
   if (t < DOCK_UNTIL || t >= IN_UNTIL) return { x: D.x, z: D.z, h: 0 };   // tied up, bow to the beach
-  if (t < OUT_UNTIL) { const k = (t - DOCK_UNTIL) / (OUT_UNTIL - DOCK_UNTIL), back = Math.min(1, k / 0.35);   // back off, swing round, run out
-    const z = D.z + ease(back) * 30 + Math.max(0, k - 0.35) / 0.65 * (OUT_Z - D.z - 30) * (0.6 + 0.4 * ease(Math.max(0, k - 0.35) / 0.65)); return { x: D.x + Math.sin(back * Math.PI) * 12, z, h: ease(Math.min(1, k / 0.45)) * Math.PI }; }
+  if (t < OUT_UNTIL) { const k = (t - DOCK_UNTIL) / (OUT_UNTIL - DOCK_UNTIL);   // straight back till the stern's clear of the pier head, swing round off it, run out
+    if (k < 0.4) return { x: D.x, z: D.z + 45 * ease(k / 0.4), h: 0 };
+    if (k < 0.65) { const e = ease((k - 0.4) / 0.25); return { x: D.x + 14 * e, z: D.z + 45 + 15 * e, h: Math.PI * e }; }
+    const e = (k - 0.65) / 0.35; return { x: D.x + 14, z: D.z + 60 + (OUT_Z - D.z - 60) * e * (0.5 + 0.5 * e), h: Math.PI }; }
   if (t < NARROWS_UNTIL) {   // up to Bay Ridge, tie up, and back down the same way
     const back = t >= BR_LEAVE, u = t < BR_ARRIVE ? ease((t - OUT_UNTIL) / (BR_ARRIVE - OUT_UNTIL)) : !back ? 1 : 1 - ease((t - BR_LEAVE) / (NARROWS_UNTIL - BR_LEAVE));
     const P = F.path.getPointAt(u), T = F.path.getTangentAt(Math.min(0.999, Math.max(0.001, u))); const dx = back ? -T.x : T.x, dz = back ? -T.z : T.z;
@@ -122,7 +124,8 @@ function liveryTex() {   // the cabin side: dark window band, the teal + navy st
 function ferryModel(lite) {
   const S = (c, r = 0.5, m = 0.1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
   const M = { white: S(0xf2f3f5, 0.35, 0.15), navy: S(0x132a63, 0.4, 0.2), teal: S(0x16b3c2, 0.4, 0.1), glass: S(0x0d1520, 0.08, 0.6), steel: S(0x9aa0a6, 0.35, 0.8), dark: S(0x24272b, 0.6, 0.4), orange: S(0xff6a1a, 0.6, 0), bench: S(0x2f5f8a, 0.6, 0.1),
-    side: new THREE.MeshStandardMaterial({ map: liveryTex(), roughness: 0.4, metalness: 0.1 }) };
+    side: new THREE.MeshStandardMaterial({ map: liveryTex(), roughness: 0.4, metalness: 0.1 }), deck: S(0x9ea4aa, 0.9, 0.05), wood: S(0x6b4a2e, 0.6, 0.05),
+    btlG: S(0x2f6b2a, 0.15, 0.1), btlB: S(0x6a3a14, 0.15, 0.1), btlC: S(0xc9d7d6, 0.1, 0.2) };
   const group = new THREE.Group(); group.name = 'nycFerry'; const G = new Map(), put = (m, g) => (G.get(m) || G.set(m, []).get(m)).push(g.index ? g.toNonIndexed() : g);
   const box = (m, x0, y0, z0, x1, y1, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); put(m, g); };
   // twin hulls (a catamaran): pointed bows, navy below the waterline stripe, white above
@@ -132,19 +135,27 @@ function ferryModel(lite) {
   box(M.white, -BEAM / 2, 1.2, -LEN / 2 + 1.5, BEAM / 2, 1.5, LEN / 2);                                   // the main deck slab across both hulls
   box(M.teal, -BEAM / 2 - 0.02, 1.2, -LEN / 2 + 2, BEAM / 2 + 0.02, 1.32, LEN / 2 + 0.02);
   // the cabin: livery panels both sides (window band, stripes, the name), glazed front, doors at the back
-  box(M.white, -3.6, 1.5, -8, 3.6, DECK2 - 0.05, 9); box(M.white, -3.75, DECK2 - 0.1, -8.3, 3.75, DECK2, 9.6);
+  box(M.white, -3.6, 1.5, -8, 3.6, DECK2 - 0.05, 9); box(M.deck, -3.75, DECK2 - 0.1, -8.3, 3.75, DECK2, 9.6);
   for (const s of [-1, 1]) { const pl = new THREE.PlaneGeometry(17, 2.4); pl.rotateY(s * Math.PI / 2); pl.translate(s * 3.61, 2.7, 0.5); if (s < 0) { const uv = pl.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i)); } put(M.side, pl); }
   box(M.glass, -3.4, 2.1, -8.05, 3.4, 3.5, -7.95); box(M.glass, -1.4, 1.5, 8.95, 1.4, 3.6, 9.05);
   // the upper deck: railings, benches, the wheelhouse forward with its windscreen, a mast with radar and lights
-  for (const s of [-1, 1]) { box(M.steel, s * 3.7 - 0.03, DECK2, -8.2, s * 3.7 + 0.03, DECK2 + 1.05, 9.5); box(M.steel, s * 3.7 - 0.04, DECK2 + 1.0, -8.2, s * 3.7 + 0.04, DECK2 + 1.08, 9.5);
-    for (let z = -8; z <= 9.5; z += 1.25) box(M.steel, s * 3.7 - 0.02, DECK2, z - 0.02, s * 3.7 + 0.02, DECK2 + 1.0, z + 0.02); }
-  box(M.steel, -3.7, DECK2 + 1.0, 9.46, 3.7, DECK2 + 1.08, 9.54); for (let x = -3.6; x <= 3.6; x += 1.2) box(M.steel, x - 0.02, DECK2, 9.48, x + 0.02, DECK2 + 1.0, 9.52);
-  if (!lite) for (let z = -1.5; z < 8.5; z += 1.6) for (const s of [-1, 1]) { box(M.bench, s * 2.2 - 0.9, DECK2 + 0.42, z, s * 2.2 + 0.9, DECK2 + 0.5, z + 0.45); box(M.bench, s * 2.2 - 0.9, DECK2 + 0.5, z + 0.4, s * 2.2 + 0.9, DECK2 + 0.95, z + 0.48); box(M.dark, s * 2.2 - 0.05, DECK2, z + 0.1, s * 2.2 + 0.05, DECK2 + 0.42, z + 0.35); }
+  for (const s of [-1, 1]) { box(M.steel, s * 3.7 - 0.05, DECK2 + 1.0, -8.2, s * 3.7 + 0.05, DECK2 + 1.1, 9.5); box(M.steel, s * 3.7 - 0.025, DECK2 + 0.5, -8.2, s * 3.7 + 0.025, DECK2 + 0.55, 9.5);
+    for (let z = -8; z <= 9.5; z += 1.25) box(M.steel, s * 3.7 - 0.035, DECK2, z - 0.035, s * 3.7 + 0.035, DECK2 + 1.0, z + 0.035); }
+  box(M.steel, -3.7, DECK2 + 1.0, 9.45, 3.7, DECK2 + 1.1, 9.55); for (let x = -3.6; x <= 3.6; x += 1.2) box(M.steel, x - 0.035, DECK2, 9.465, x + 0.035, DECK2 + 1.0, 9.535);
+  for (let z = -1.5; z < 8.5; z += 1.6) for (const s of [-1, 1]) { box(M.bench, s * 2.2 - 0.9, DECK2 + 0.42, z, s * 2.2 + 0.9, DECK2 + 0.5, z + 0.45); box(M.bench, s * 2.2 - 0.9, DECK2 + 0.5, z + 0.4, s * 2.2 + 0.9, DECK2 + 0.95, z + 0.48); box(M.dark, s * 2.2 - 0.05, DECK2, z + 0.1, s * 2.2 + 0.05, DECK2 + 0.42, z + 0.35); }
   box(M.white, -2.6, DECK2, -8, 2.6, DECK2 + 2.3, -3.8); box(M.glass, -2.5, DECK2 + 1.2, -8.06, 2.5, DECK2 + 2.0, -7.95); for (const s of [-1, 1]) box(M.glass, s * 2.6 - 0.02, DECK2 + 1.2, -7.6, s * 2.6 + 0.02, DECK2 + 2.0, -4.2);
   box(M.navy, -2.7, DECK2 + 2.3, -8.2, 2.7, DECK2 + 2.45, -3.6); box(M.steel, -0.06, DECK2 + 2.45, -6.1, 0.06, DECK2 + 4.4, -5.9); box(M.dark, -0.9, DECK2 + 3.6, -6.1, 0.9, DECK2 + 3.75, -5.9);
-  for (const s of [-1, 1]) { const ring = new THREE.TorusGeometry(0.32, 0.08, 6, 14); ring.translate(s * 3.72, DECK2 + 0.6, 4); ring.rotateY(0); put(M.orange, ring); }
-  box(M.navy, BAR.x - 0.55, DECK2, BAR.z - 0.9, BAR.x + 0.55, DECK2 + 1.05, BAR.z + 0.9); box(M.teal, BAR.x - 0.6, DECK2 + 1.05, BAR.z - 0.95, BAR.x + 0.6, DECK2 + 1.12, BAR.z + 0.95);   // the bar
+  for (const s of [-1, 1]) { const ring = new THREE.TorusGeometry(0.3, 0.07, 6, 14); ring.rotateY(Math.PI / 2); ring.translate(s * 3.78, DECK2 + 0.55, 4); put(M.orange, ring); }   // lifebuoys hung on the rails, facing out
+  // the bar: a counter along the back of the wheelhouse (wood top, navy front), the bartender's alley behind it, a shelf of bottles and a
+  // lit sign on the wheelhouse wall, stools in front
+  box(M.navy, -2.5, DECK2, -2.75, 0.5, DECK2 + 1.0, -2.3); box(M.wood, -2.55, DECK2 + 1.0, -2.8, 0.55, DECK2 + 1.07, -2.25);
+  box(M.wood, -2.4, DECK2 + 1.2, -3.8, 0.4, DECK2 + 1.24, -3.62); box(M.wood, -2.4, DECK2 + 1.6, -3.8, 0.4, DECK2 + 1.64, -3.62);
+  { const cols = [M.btlG, M.btlB, M.btlC]; for (let i = 0; i < 14; i++) { const g = new THREE.CylinderGeometry(0.035, 0.035, 0.26, 8); g.translate(-2.25 + (i % 7) * 0.38, DECK2 + (i < 7 ? 1.37 : 1.77), -3.71); put(cols[i % 3], g); } }
+  for (let i = 0; i < 3; i++) { const st = new THREE.CylinderGeometry(0.19, 0.19, 0.06, 12); st.translate(-1.9 + i, DECK2 + 0.75, -1.95); put(M.wood, st); const leg = new THREE.CylinderGeometry(0.035, 0.05, 0.75, 6); leg.translate(-1.9 + i, DECK2 + 0.37, -1.95); put(M.steel, leg); }
   for (const [m, list] of G) { const mesh = new THREE.Mesh(mergeGeometries(list, false), m); mesh.castShadow = !lite; mesh.receiveShadow = true; mesh.userData.surface = 'metal'; group.add(mesh); }
+  { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#132a63'; g.fillRect(0, 0, 512, 128); g.strokeStyle = '#16b3c2'; g.lineWidth = 8; g.strokeRect(6, 6, 500, 116);
+    g.fillStyle = '#ffd36a'; g.font = '900 64px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BAR', 160, 66); g.fillStyle = '#fff'; g.font = '700 30px Arial'; g.fillText('TALLBOYS $3', 360, 66);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.48), new THREE.MeshBasicMaterial({ map: t })); sign.position.set(-1, DECK2 + 2.0, -3.79); group.add(sign); }
   return { group };
 }
 
