@@ -99,7 +99,7 @@ function headFit(id, model, headB, head) {
   let nz = -1, ny = chin + (crown - chin) * 0.42; for (let i = 0; i < n; i++) if (Math.abs(xs[i]) < 0.01 && ys[i] > chin + 0.03 && ys[i] < crown - 0.06 && zs[i] > nz) { nz = zs[i]; ny = ys[i]; }
   const eyeY = ny + 0.032;
   const front = Math.max(nz - 0.016, q(band(eyeY - 0.008, eyeY + 0.008, (i) => (Math.abs(xs[i]) > 0.02 && Math.abs(xs[i]) < 0.05 ? zs[i] : -1)), 0.98)), back = q(band(eyeY - 0.03, eyeY + 0.03, (i) => zs[i]), 0.02);
-  const halfW = q(band(eyeY - 0.02, eyeY + 0.02, (i) => Math.abs(xs[i])), 0.98), bandY = Math.min(crown - 0.045, eyeY + 0.062);   // a hat's band sits on the forehead, a couple of fingers above the brow
+  const halfW = q(band(eyeY - 0.02, eyeY + 0.02, (i) => Math.abs(xs[i])), 0.98), bandY = Math.min(crown - 0.045, eyeY + 0.05);   // a hat's band sits on the forehead, just above the brow
   const bw = q(band(bandY - 0.015, bandY + 0.015, (i) => Math.abs(xs[i])), 0.99), bz = band(bandY - 0.015, bandY + 0.015, (i) => zs[i]), bf = q(bz, 0.99), bb = q(bz, 0.01);
   return (FIT[id] = { crown, eyeY, front, back, halfW, bandY, bandR: Math.max(bw, (bf - bb) / 2), cz: (bf + bb) / 2 });
 }
@@ -107,7 +107,7 @@ const HATM = {};
 /** a hat fitted to a person's head (F from buildPerson): 'cap' (dome, curved visor, button), 'bucket', 'sun' (wide brim, ribbon) */
 export function wearHat(F, kind, col = 0x1a2a5a) {
   const f = F.fit || FIT0, m = HATM[col] || (HATM[col] = new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, side: THREE.DoubleSide }));
-  const g = new THREE.Group(); g.position.set(0, f.bandY, f.cz); const r = f.bandR * 1.07, top = Math.max(0.05, f.crown + 0.014 - f.bandY);
+  const g = new THREE.Group(); g.position.set(0, f.bandY, f.cz); const r = f.bandR * 1.04, top = THREE.MathUtils.clamp(f.crown + 0.01 - f.bandY, 0.07, 0.095);   // hair puffs the measured crown up: a hat sits snug, not perched
   const add = (geo, x, y, z, rx = 0) => { const e = new THREE.Mesh(geo, m); e.position.set(x, y, z); e.rotation.x = rx; e.castShadow = true; g.add(e); return e; };
   if (kind === 'cap') { add(new THREE.SphereGeometry(1, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), 0, -0.004, 0).scale.set(r, top, r * 1.06);
     const brim = new THREE.CircleGeometry(r * 0.92, 18, 0, Math.PI); brim.rotateX(Math.PI / 2); brim.scale(1, 1, 0.95); add(brim, 0, 0.002, r * 0.5, 0.14);

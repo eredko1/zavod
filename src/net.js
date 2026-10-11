@@ -98,8 +98,10 @@ export async function init(ctx) {
   // so friends don't stack, and snapped onto a free nav floor on the start's own level (never inside the booth / a bench)
   if (W?.onlineStart) {
     const [x, y, z, yaw] = W.onlineStart; const nav = ctx.ai?.nav; let at = [x, y, z];
-    for (let k = 0; k < 6; k++) {
-      const a = Math.random() * Math.PI * 2, r = 0.8 + Math.random() * 2.2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+    // everyone gets their own spot round the meet-up (an angle from their id, golden-angle steps if blocked), never on top of a friend
+    const a0 = [...String(S.id || id || 'x')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 360 * Math.PI / 180;
+    for (let k = 0; k < 12; k++) {
+      const a = a0 + k * 2.39996, r = 1.8 + (k % 3) * 0.9, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
       if (!nav) { at = [px, y, pz]; break; }
       if (nav.isFree(px, pz, y) && Math.abs(nav.floorAt(px, pz, y) - y) < 0.5) { at = [px, nav.floorAt(px, pz, y), pz]; break; }
     }

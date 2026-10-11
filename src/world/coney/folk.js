@@ -233,6 +233,11 @@ export function addFolkSpots(world, list) {
   for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; if (s.zone === 'nightlife') { s.nightOff = true; s.gone = performance.now() + 1e12; } F.spots.push(s); }
   return list.length;
 }
+/** a friend's game promoted the passer-by at this spot (they're fighting / mugging him): ours steps out so there's one of him */
+export function hideFolkSpot(key, ms = 180000) {
+  if (!F) return; const s = F.spots.find((q) => q.key === key); if (!s || (s.gone && s.gone > performance.now())) return;
+  s.gone = performance.now() + ms; for (const E of F.active) if (E.s === s) { deactivate(E, false); break; } F.crowd.hide(s, true);
+}
 /** pull a live local into the street systems (chill.js): he's a real crew member from here on, streamed to friends */
 function promote(E, why) {
   const s = E.s; if (s.gone || !F.active.has(E)) return null;
@@ -246,7 +251,7 @@ function promote(E, why) {
   fig.hands = false; fig.mood = why === 'mug' ? 'angry' : null;
   s.gone = performance.now() + 180000; deactivate(E, false); F.crowd.hide(s, true);
   const tough = why === 'mug';
-  const t = adoptFolk({ fig, pos, yaw, name: p.name, type: tough && p.type === 'mk' ? (AVATARS[p.avatar]?.dark ? 'st' : 'ru') : p.type, temper: tough && p.temper === 'soft' ? 'scrappy' : p.temper, blade: tough ? p.blade || Math.random() < 0.4 : p.blade, gun: tough ? (p.gun || (Math.random() < 0.5 ? 'm9' : null)) : p.gun, cash: p.cash, intent: why === 'mug' ? 'mug' : 'mark', onGone: () => disposeFig(fig) });
+  const t = adoptFolk({ spot: s.key, fig, pos, yaw, name: p.name, type: tough && p.type === 'mk' ? (AVATARS[p.avatar]?.dark ? 'st' : 'ru') : p.type, temper: tough && p.temper === 'soft' ? 'scrappy' : p.temper, blade: tough ? p.blade || Math.random() < 0.4 : p.blade, gun: tough ? (p.gun || (Math.random() < 0.5 ? 'm9' : null)) : p.gun, cash: p.cash, intent: why === 'mug' ? 'mug' : 'mark', onGone: () => disposeFig(fig) });
   if (!t) return null;
   F.stats.adopted++;
   ctx.net?.send?.('folk', { p: [+s.x.toFixed(2), +s.z.toFixed(2)], k: s.key, st: 'take' });

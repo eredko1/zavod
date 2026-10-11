@@ -7,6 +7,7 @@
 // some shake you down together. Every client owns the crews that come for its own player and streams them ('thug', 5 Hz);
 // friends see them as puppets and can hit them too ('thughit' → the owner applies it).
 import * as THREE from 'three';
+import { hideFolkSpot } from './folk.js';
 import { hangkit as K } from '../hangkit.js';
 import { buildFigure, nameTag } from '../deli.js';
 import { chaseQA } from './chase.js';
@@ -63,11 +64,14 @@ export const crewsAlive = (t) => !!(C && t && C.thugs.get(t.id) === t);
 /** coney/folk.js: a local on the beach / boardwalk / in the rides gets pulled into the street-life systems (robbed, hit, or turning
  *  mugger). o = { fig (buildPerson, already standing), pos, yaw, name, type 'mk'|'ru'|'st', intent 'mark'|'mug'|'fight', temper
  *  'soft'|'scrappy'|'tough', blade, cash, onGone() }. From then on it is a normal crew member: streamed to friends, loot on death. */
+/** friends see this one fight: every punch / hit / shove it plays is sent ('thugact') and played on their copy */
+function announce(t) { const f = t.m.f, play = f.play.bind(f); f.play = (name, dur) => { play(name, dur); if (/^(punch|hit|shove)$/.test(name)) C.ctx.net?.send?.('thugact', { i: t.id, a: name }); }; }
 export function adoptFolk(o) {
   if (!C) return null; const { ctx, world } = C; const type = CREWS[o.type] ? o.type : 'mk';
   const id = C.nextId++; const m = thugModel(o.name, id, type, { fig: o.fig, blade: !!o.blade }); if (!m.f.group.parent) world.scene.add(m.f.group);
   const t = { id, name: o.name, type, intent: o.intent || 'mark', m, pos: o.pos.clone(), yaw: o.yaw || 0, st: 'walk', hp: HP, cash: o.cash ?? 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.5, said: false, talkT: 0, lk: id, blade: !!m.blade, temper: o.temper || 'soft', folk: true, onGone: o.onGone || null, avatar: m.f.avatar || null, gun: o.gun ?? (m.blade ? 'knife' : null) };
   for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); h.userData.thug = t; ctx.raycastTargets.push(h); }
+  t.spot = o.spot || null; announce(t);
   C.thugs.set(id, t); m.f.group.position.copy(t.pos); m.f.group.rotation.set(0, t.yaw, 0);
   if (t.intent === 'fight') { t.intent = 'mark'; startFight(t); }
   return t;
@@ -92,6 +96,7 @@ export function buildCrews(world, { chill = false } = {}) {
   K.spot({ pos: C.robPos, r: 3.3, dy: 2, low: true, when: () => !!C.robT, prompt: () => (C.robT?.dealer ? `F — TALK TO ${C.robT.name}` : `F — ROB ${C.robT?.name || ''}`), act: () => { const t = C.robT; if (!t) return; if (t.dealer) { t.talkT = -20; t.st = 'talk'; K.openDialog(t.name, gunShop(t.name, t.dealer, `${t.name}: "${t.type === 'ru' ? 'Bratan. You need something that goes bang? I have.' : 'Psst. You need a piece? I got a couple. Cash only.'}"`)); } else robVictim(t); } });   // no shakedowns for a minute after you respawn
   W.mapThugs = () => [...C.thugs.values(), ...C.remote.values()].filter((t) => t.st !== 'dead' && t.type !== 'mk').map((t) => [t.pos.x, t.pos.z]);
   ctx.bus.on('net:thug', (m) => onRemoteThug(m));
+  ctx.bus.on('net:thugact', (m) => { const t = C.remote.get(m.f + ':' + m.i); if (t && /^(punch|hit|shove)$/.test(m.a)) t.m.f.play(m.a); });
   ctx.bus.on('worldReset', () => { for (const t of [...C.thugs.values()]) removeThug(t); for (const t of [...C.remote.values()]) removeThug(t, C.remote); C.robbed = 0; C.calmUntil = performance.now() + 30000; C.markT = 5; });
   ctx.bus.on('net:thughit', (m) => { if (m.o !== ctx.net?.id) return; const t = C.thugs.get(m.i); if (t) hurt(t, Math.min(120, +m.d || 0), null, m.f, !!m.h); });
   ctx.bus.on('net:loot', (m) => { if (m.to !== ctx.net?.id) return; const n = Math.round(+m.n); if (!(n > 0 && n <= 300)) return; K.earn(n); K.toast(`+$${n} off ${String(m.w || 'him').slice(0, 14)}`, 1800); if (typeof m.g === 'string' && GUN_IDS.includes(m.g)) setTimeout(() => takeGun(m.g, String(m.w || 'him').slice(0, 14)), 900); });   // you dropped a friend's robber (and took his piece)
@@ -163,7 +168,7 @@ function spawnGang(type = Math.random() < 0.5 ? 'ru' : 'st', intent = Math.rando
     const t = { id, name, type, intent, m, pos: at, yaw: 0, st: 'walk', hp: HP, cash: 10 + 5 * Math.floor(Math.random() * 5), loot: [], t: 0, path: null, pathT: 0, punchT: 0.6 * i, said: false, talkT: 0, lk: lk + i, blade: !!m.blade };
     for (const h of m.hit) { h.userData.onHit = (dmg, headshot, point, dir) => hurt(t, dmg, dir, null, headshot); h.userData.thug = t; ctx.raycastTargets.push(h); }
     t.gun = t.blade ? 'knife' : type !== 'mk' && Math.random() < 0.25 ? 'm9' : null;   // what he carries: strip it off him (rob / drop him)
-    C.thugs.set(id, t); out.push(t);
+    announce(t); C.thugs.set(id, t); out.push(t);
   }
   if (opts.cash != null) for (const t of out) t.cash = opts.cash;
   if (intent === 'talk' && type !== 'mk' && out.length && Math.random() < 0.4) { const t = out[0]; const pool = ['m9', 'deagle', 'mp5', 'r870', 'ak74'].sort(() => Math.random() - 0.5); t.dealer = pool.slice(0, 2); }   // this one's holding
@@ -224,13 +229,15 @@ function flee(t) { t.st = 'flee'; t.t = 0; t.m.f.guard = false; t.m.f.hands = fa
 function emitCrime(kind, t) { try { C.ctx.bus.emit('streetCrime', { kind, name: t.name, pos: t.pos.clone(), folk: !!t.folk }); } catch {} }
 function onRemoteThug(m) {
   if (!C || !m || !/^[a-z0-9]{8}$/.test(m.f) || !Number.isSafeInteger(m.i) || m.i < 0 || m.i > 2147483647) return;
-  if (![m.x, m.y, m.z].every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 20000) || (m.r != null && !Number.isFinite(m.r))) return;
+  // position as p: [x, y, z] (net.js stamps every message's own `z` with the sender's instance)
+  if (!Array.isArray(m.p) || m.p.length !== 3 || !m.p.every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 40000) || (m.r != null && !Number.isFinite(m.r))) return;
   const { ctx } = C;
   const key = m.f + ':' + m.i; let t = C.remote.get(key);
+  if (!t && typeof m.s === 'string' && m.s.length < 80) try { hideFolkSpot(m.s); } catch {}   // a passer-by a friend started on: their copy is the real one, ours steps out
   if (!t) { if (m.st === 'gone') return; const mm = thugModel(String(m.n || 'GOPNIK').slice(0, 14), m.i | 0, m.k === 'st' || m.k === 'mk' ? m.k : 'ru', { avatar: /^[mf]\d\d$/.test(m.a) ? m.a : undefined, blade: m.b != null ? !!+m.b : undefined }); C.world.scene.add(mm.f.group); t = { key, id: key, type: m.k === 'st' || m.k === 'mk' ? m.k : 'ru', m: mm, pos: new THREE.Vector3(+m.x, +m.y, +m.z), yaw: 0, st: m.st, seen: performance.now() };
     for (const h of mm.hit) { h.userData.onHit = (dmg, headshot) => ctx.net?.send?.('thughit', { o: m.f, i: m.i, d: Math.round(dmg), h: headshot ? 1 : 0 }); ctx.raycastTargets.push(h); } C.remote.set(key, t); }
   if (m.st === 'gone') { removeThug(t, C.remote); return; }
-  t.target = new THREE.Vector3(+m.x, +m.y, +m.z); t.yaw = +m.r || 0; t.st = m.st; t.seen = performance.now();
+  t.target = new THREE.Vector3(+m.p[0], +m.p[1], +m.p[2]); t.yaw = +m.r || 0; t.st = m.st; t.seen = performance.now();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -254,7 +261,7 @@ function update(dt, playing) {
     C.robT = best; if (best) C.robPos.copy(best.pos); }
   // Table Park is neutral ground, and there's a breather after every respawn / robbery: robbers who arrive then just talk
   const os = C.world.W.onlineStart, safe = (os && Math.hypot(me.position.x - os[0], me.position.z - os[2]) < 25) || now < C.calmUntil;
-  const gone = (t) => { removeThug(t); ctx.net?.send?.('thug', { i: t.id, st: 'gone', x: 0, y: 0, z: 0 }); };
+  const gone = (t) => { removeThug(t); ctx.net?.send?.('thug', { i: t.id, st: 'gone', p: [0, 0, 0] }); };
   for (const t of [...C.thugs.values()]) {
     t.t += dt; const g = t.m.f.group, T = CREWS[t.type] || CREWS.ru;
     if (t.st === 'dead') { t.fallK = Math.min(1, (t.fallK ?? 1) + dt * 2.4); const e = 1 - (1 - t.fallK) ** 2; g.rotation.x = -Math.PI / 2 * e; g.position.set(t.pos.x, t.pos.y + 0.25 * e, t.pos.z); if (t.t > 20) gone(t); continue; }   // crumples, doesn't pop
@@ -319,7 +326,7 @@ function update(dt, playing) {
     g.position.copy(t.pos); g.rotation.y = t.yaw; t.m.f.update(dt, speed);
   }
   // stream mine (5 Hz), animate friends'
-  C.sendT -= dt; if (C.sendT <= 0 && ctx.net?.connected) { C.sendT = 0.2; for (const t of C.thugs.values()) ctx.net.send('thug', { i: t.id, n: t.name, k: t.type, a: t.avatar || undefined, b: t.blade ? 1 : 0, st: t.st, x: +t.pos.x.toFixed(2), y: +t.pos.y.toFixed(2), z: +t.pos.z.toFixed(2), r: +t.yaw.toFixed(2) }); }
+  C.sendT -= dt; if (C.sendT <= 0 && ctx.net?.connected) { C.sendT = 0.2; for (const t of C.thugs.values()) ctx.net.send('thug', { i: t.id, n: t.name, k: t.type, s: t.spot || undefined, a: t.avatar || undefined, b: t.blade ? 1 : 0, st: t.st, p: [+t.pos.x.toFixed(2), +t.pos.y.toFixed(2), +t.pos.z.toFixed(2)], r: +t.yaw.toFixed(2) }); }
   for (const t of [...C.remote.values()]) {
     if (now - t.seen > 3000) { removeThug(t, C.remote); continue; }
     const g = t.m.f.group; const moving = t.target && t.target.distanceTo(t.pos) > 0.05;
