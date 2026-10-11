@@ -650,6 +650,9 @@ function grounds(G, B, world, M, parts, m, ang, [ox, oz], [cx, cz], trees, other
 }
 
 function plantTrees(world, trees) {
+  // none whose crown would reach over the el (the Q / F run along the north edge of the Luna lawns at ~8 m)
+  const tx = (t) => (Array.isArray(t) ? t[0] : t.x), tz = (t) => (Array.isArray(t) ? t[1] : t.z);
+  trees = trees.filter((t) => !OSM.rl.some((l) => l.el && segDist(tx(t), tz(t), l.p) < 8.5));
   const { scene, ctx, R } = world; if (!trees.length) return;
   const bark = barkTexture(R), leaf = leafTexture(R, { hue: 92 });
   // a mature shade tree (London plane / honey locust, as in the aerial photo): a stout trunk forking into three limbs under a

@@ -25,14 +25,14 @@ const LINES_CFG = [
   { id: 'F', color: '#ff6319', fg: '#fff', stwX: STW_X, dir: 'S', dst: [520, NEP_Z - 40, (v) => v[0] > 440 && v[1] < NEP_Z + 60], w8: 'UP', ext: 40, off: 0,
     dest: { out: 'Jamaica-179 St', in: 'Coney Island|Stillwell Av' }, bound: { out: 'Jamaica–179th Street–bound F local', in: 'Coney Island–bound F' },
     strip: ['Stillwell Av', 'W 8 St', 'Neptune Av', 'Avenue X', 'Avenue U', 'Kings Hwy', 'Avenue P', 'Avenue N', 'Bay Pkwy', 'Avenue I'] },
-  { id: 'Q', color: '#fccc0a', fg: '#111', stwX: -40, dir: 'S', dst: [823, -105, (v) => v[0] > 800], w8: 'LO', ext: 520, off: 97, bend: { x: 1035, h: -0.138 },
+  { id: 'Q', color: '#fccc0a', fg: '#111', stwX: -44, dir: 'S', dst: [823, -105, (v) => v[0] > 800], w8: 'LO', ext: 520, off: 97, bend: { x: 1035, h: -0.138 },
     dest: { out: '96 St-2 Av', in: 'Coney Island|Stillwell Av' }, bound: { out: '96th Street–bound Q', in: 'Coney Island–bound Q' },
     strip: ['Stillwell Av', 'W 8 St', 'Ocean Pkwy', 'Brighton Bch', 'Sheepshead Bay', 'Neck Rd', 'Avenue U', 'Kings Hwy', 'Avenue M', 'Avenue J'] },
   { id: 'D', color: '#ff6319', fg: '#fff', stwX: -58.2, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 340, off: 41,
     dest: { out: 'Norwood-205 St', in: 'Coney Island|Stillwell Av' }, bound: { out: 'Norwood–205th Street–bound D', in: 'Coney Island–bound D' },
     strip: ['Stillwell Av', 'Bay 50 St', '25 Av', 'Bay Pkwy', '20 Av', '18 Av', '79 St', '71 St', '62 St', 'Ft Hamilton'] },
   // the N: a Sea Beach express straight to 8 Av (Soccer Tavern) — every minute (a short dwell, it turns just past the throat)
-  { id: 'N', color: '#fccc0a', fg: '#111', stwX: -43.1, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 60, off: 7, turn: 58, dwell: 22,
+  { id: 'N', color: '#fccc0a', fg: '#111', stwX: -44, dir: 'N', dst: [-21, -668, (v) => v[1] < -640], w8: null, ext: 60, off: 7, turn: 58, dwell: 22,
     dest: { out: '8 Av|Sunset Park', in: 'Coney Island|Stillwell Av' }, bound: { out: '8th Avenue–bound N express', in: 'Coney Island–bound N' },
     strip: ['Stillwell Av', '8 Av'] },
 ];
@@ -748,6 +748,8 @@ function buildEl(world, P) {
   const skip = (p) => (p.x < 300 && p.z > -672 && Math.abs(p.y - RAIL) < 0.3) || (Math.abs(p.x - 365) < 110 && p.z > -175 && p.z < -90);   // city.js covers the west at rail height (the ramps up to W 8 St's upper level are ours); W 8 St builds its own
   const segD2 = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)); return (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2; };
   const inRoad = (x, z) => OSM.r.some((r) => { const h = r.w / 2; for (let i = 0; i + 1 < r.p.length; i++) if (segD2(x, z, r.p[i], r.p[i + 1]) < h * h) return true; return false; });
+  // the ramps up to W 8 St's upper level cross over the lower tracks: their bents never put a column under a rail
+  const onTrack = (x, z) => OSM.rl.some((l) => { if (!l.el) return false; for (let i = 0; i + 1 < l.p.length; i++) if (segD2(x, z, l.p[i], l.p[i + 1]) < 2.0 * 2.0) return true; return false; });
   let k = 0;
   for (let i = 0; i + 3 < P.length; i += 3, k++) {
     const a = P[i], b = P[i + 3]; if (skip(a) || skip(b)) continue;
@@ -767,7 +769,7 @@ function buildEl(world, P) {
     // a bent every 12 m: two columns (not in the street), the cap girder, knee braces
     if (k % 2 === 0) {
       const ys = Y - 1.62; seg(-W - 0.5, W + 0.5, ys - 0.5, ys, 'elGirder');
-      for (const u of [-(W + 0.3), W + 0.3]) { const px = cx + ox * u, pz = cz + oz * u; if (inRoad(px, pz)) continue;
+      for (const u of [-(W + 0.3), W + 0.3]) { const px = cx + ox * u, pz = cz + oz * u; if (inRoad(px, pz) || (Y > RAIL + 1 && onTrack(px, pz))) continue;
         const c = new THREE.BoxGeometry(0.5, ys - 0.5, 0.5); c.translate(px, (ys - 0.5) / 2, pz); B.add('elGirder', c);
         const pl = new THREE.BoxGeometry(0.9, 0.12, 0.9); pl.translate(px, 0.06, pz); B.add('elGirder', pl);
         if (!lite) { const kb = new THREE.BoxGeometry(0.14, 2.0, 0.18); kb.rotateZ(Math.sign(u) * 0.75); kb.translate(u - Math.sign(u) * 0.6, ys - 1.1 - Y, 0); kb.rotateY(ang); kb.translate(cx, Y, cz); B.add('elGirder', kb); }

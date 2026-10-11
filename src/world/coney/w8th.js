@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Batch } from '../sbu/geo.js';
 import { OSM } from './osm.js';
 
-const P0 = new THREE.Vector2(274.5, -153), P1 = new THREE.Vector2(457, -107.5);
+const P0 = new THREE.Vector2(274.5, -107.5), P1 = new THREE.Vector2(457, -153);   // west end by Surf Ave, east end up toward Brighton: along the el (the OSM Brighton / Culver tracks run this way, ~14° off the grid)
 export const W8 = { P0, P1, L: P0.distanceTo(P1), LO: { rail: 7.5, top: 7.3, bot: 6.8, plat: 8.6 }, UP: { rail: 13.5, top: 13.3, bot: 12.8, plat: 14.6 }, halfTrack: 2.0, platIn: 3.7, platOut: 7.2 };
 const CAR = 18.4, NCAR = 6;
 

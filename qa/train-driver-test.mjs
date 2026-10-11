@@ -37,7 +37,8 @@ await N(() => { const L = window.__game.subway.line('F'); L.stopDrive(); }); con
 // ---- through Stillwell: the N driven south past its platform carries on onto the Q (it used to hit the bumper), and F anywhere gets you off ----
 await N(async () => { const S = window.__game.subway.line('N');   // the N at its platform with no Q in the throat it's about to run into (it would stop behind it: buffers)
   const qClear = () => window.__ctx.subway.trains().filter((t) => t.id === 'Q').every((t) => [t.seg[1], t.seg[3]].every((z) => z < -460 || z > -60) || [t.seg[0], t.seg[2]].every((x) => x > 0));
-  for (let i = 0; i < 600; i++) { const st = S.state(); if (st.leg === 'dwell' && st.stop === 'STW' && qClear()) break; S.skew(1); await new Promise((r) => setTimeout(r, 20)); } });
+  // the Q leaves Stillwell on the N's track: with the N berthed, shift the Q's timetable until the throat is clear
+  for (let i = 0; i < 600; i++) { const st = S.state(); if (st.leg === 'dwell' && st.stop === 'STW') { if (qClear()) break; window.__game.subway.line('Q').skew(3); } else S.skew(1); await new Promise((r) => setTimeout(r, 20)); } });
 await N(() => window.__game.subway.line('F').alight()); await pg.waitForTimeout(500);   // still aboard the F from the part above
 const nc = await N(() => window.__game.subway.line('N').debug().cars[1]);
 let nOn = false; for (const x of [-33, -36, -49.5, -64]) { await N(`window.__game.teleport(${x}, ${nc[1] + 1.2}, ${nc[2]}, 0, 0)`); await pg.waitForTimeout(700); nOn = await N(() => { const S = window.__game.subway.line('N'); S.board(); return S.state().aboard; }); if (nOn) break; }
@@ -48,7 +49,8 @@ await N(() => { window.__ctx.input.touch.axis.y = -0.35; }); let nd = n0;
 for (let i = 0; i < 40 && nd.s > n0.s - 200; i++) { await pg.waitForTimeout(1000); nd = await N(() => window.__game.subway.line('N').driving()); }
 await N(() => { window.__ctx.input.touch.axis.y = 0.6; }); await pg.waitForTimeout(5000); await N(() => { window.__ctx.input.touch.axis.y = 0; });
 const lead = await N(() => { const c = window.__game.subway.line('N').debug().cars; return c[c.length - 1]; });
-ok(nd.s < n0.s - 190 && lead[2] > -262, 'the N driven south runs on past Stillwell onto the Q (no bumper)', JSON.stringify({ from: n0.s, to: nd.s, lead }));
+ok(nd.s < n0.s - 120 && lead[2] > -262,   // past the end of the platform (a Q that left meanwhile may hold it 150 m out)
+   'the N driven south runs on past Stillwell onto the Q (no bumper)', JSON.stringify({ from: n0.s, to: nd.s, lead }));
 await N(() => window.__ctx.input.pressed.add('KeyF')); await pg.waitForTimeout(800);
 const gone = await N(() => ({ aboard: window.__game.subway.line('N').state().aboard, driving: !!window.__game.subway.line('N').driving(), y: +window.__ctx.player.position.y.toFixed(1) }));
 ok(!gone.aboard && !gone.driving && gone.y < 3, 'F out on the line: off the train, down at street level', JSON.stringify(gone));
