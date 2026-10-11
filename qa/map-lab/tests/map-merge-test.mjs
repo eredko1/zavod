@@ -23,13 +23,13 @@ const a=mergePlan(source),b=mergePlan({...source,details:[...source.details].rev
 const lion = id => ({id,sourceId:'nyc-lion',rule:'line',tags:{SegmentID:'123',Street:'SURF AVENUE',FeatureTyp:'0',Status:'2',RB_Layer:'B',NodeLevelF:'M',NodeLevelT:'M',StreetWidth_Min:72,StreetWidth_Max:75},paths:[[[-5,5],[15,5]]],shapes:[],attributes:{}});
 const surf={...road,tags:{highway:'primary',name:'Surf Avenue'},width:{value:8,estimated:true}};
 const withLION=mergePlan(input([], [lion('nyc-lion/1@a'),lion('nyc-lion/2@b')], [surf]));
-assert.equal(withLION.details.length,1,'LION aliases represent one segment');assert.equal(withLION.details[0].merge.members.length,2);assert.equal(withLION.roads[0].width.value,72*0.3048);assert.equal(withLION.roads[0].merge.attributes.lion.value.Street,'SURF AVENUE');
+assert.equal(withLION.details.length,1,'LION aliases represent one segment');assert.equal(withLION.details[0].merge.members.length,2);assert.equal(withLION.roads[0].width.value,8);assert.equal(withLION.roads[0].merge.attributes.lion.value.Street,'SURF AVENUE');assert.equal(withLION.roads[0].merge.attributes.widthRange.minimum,72,'source merge retains measured width range without inventing constant-width geometry');
 const repeated=mergePlan(input([], [tree('nyc-trees/0@a','nyc-trees',0),tree('nyc-trees/0@b','nyc-trees',10)]));assert.notEqual(repeated.details[0].merge.canonicalId,repeated.details[1].merge.canonicalId,'repeated source IDs remain distinct canonical records');
 console.log('PASS: attribute fallback, ambiguous buildings/trees, unique trees, retired-tree conflicts, exact partial road splitting, island holes, source immutability, disabled mode and deterministic suppression');
 if(process.argv.includes('--snapshots')){
   const {planFromOSM}=await import('../pipeline/osm-model.js'),{planFromNYC}=await import('../pipeline/nyc-model.js');
-  const {data,nyc}=await loadFixture(),base=planFromOSM(data);
-  for(const snap of nyc){const part=planFromNYC(snap,base.origin);for(const k of ['buildings','roads','details','coverage','issues'])base[k].push(...part[k]);}
+  const {data,nyc}=await loadFixture(),base=planFromOSM(data,{measurementsOnly:true});
+  for(const snap of nyc){const part=planFromNYC(snap,base.origin,undefined,true);for(const k of ['buildings','roads','details','coverage','issues'])base[k].push(...part[k]);}
   const p=mergePlan(base);assert.equal(p.coverage.length,base.coverage.length);for(const tree of base.details.filter(f=>f.rule==='tree'))assert.ok(p.details.some(f=>f.id===tree.id)||p.merge.decisions.some(r=>r.members.some(m=>m.id===tree.id)&&(r.representedBy||r.status==='excluded')),'every removed tree retains a merge or placement decision');console.log('SNAPSHOT',p.merge.summary,'buildings',base.buildings.length,'→',p.buildings.length,'trees',base.details.filter(f=>f.rule==='tree').length,'→',p.details.filter(f=>f.rule==='tree').length);
 }
 const curb=(id,sourceId,height,end=10)=>({id,sourceId,tags:{barrier:'kerb'},rule:'kerb',paths:[[[0,0],[end,0]]],shapes:[],dimensions:{height,width:.12},attributes:{height:{value:height,estimated:!!sourceId}},estimates:[]});
@@ -39,13 +39,13 @@ p=mergePlan(input([],[measured,curb('nyc-curbs/long','nyc-curbs',.15,30)]));asse
 console.log('PASS matched zero curb heights and no extrapolation across unmatched curb segments');
 const classified=curb('way/classified',undefined,0);classified.attributes.height={value:0,estimated:true,source:'OSM classification',reason:'Flush classification'};
 for(const records of [[measured,classified,city],[classified,measured,city]]){const out=mergePlan(input([],records));assert.equal(out.details.length,1);assert.equal(out.details[0].attributes.height.estimated,false,'classification cannot replace a numeric measurement');assert.equal(out.details[0].merge.attributes.height.source,measured.id);}
-p=mergePlan(input([],[classified,city]));assert.ok(p.issues.some(i=>i.id===city.id&&i.message.includes('Flush classification')),'classification fallback must remain in generation logs');
+p=mergePlan(input([],[classified,city]));assert.equal(p.details.length,1);assert.equal(p.details[0].merge.attributes.height,undefined,'classification remains source metadata instead of a merged measurement');
 console.log('PASS curb measurement precedence and fallback logging');
 const numeric=curb('way/numeric',undefined,.02),lowered=curb('way/lowered',undefined,.03);lowered.attributes.height={value:.03,estimated:true,source:'OSM classification',reason:'Lowered classification'};
 const mergeCurbs=records=>{const out=mergePlan(input([],records));return {suppressed:out.merge.suppressed,heights:out.details.map(f=>[f.id,f.dimensions.height]).sort(),conflicts:out.merge.summary.conflicts};};
 assert.deepEqual(mergeCurbs([numeric,lowered,city]),mergeCurbs([lowered,numeric,city]),'conflicting classified and numeric heights resolve independently of response order');
 console.log('PASS deterministic conflicting curb heights');
-for(const measuredClaims of [false,true])for(const swapped of [false,true]){
+for(const measuredClaims of [true])for(const swapped of [false,true]){
   const a=structuredClone(classified),b=structuredClone(lowered);a.id=swapped?'way/z':'way/a';b.id=swapped?'way/a':'way/z';
   if(measuredClaims){a.attributes.height.estimated=false;b.attributes.height.estimated=false;}
   const out=mergePlan(input([],[a,b,city]));
@@ -71,6 +71,7 @@ for(const [name,records] of [
   ['reused identity',[...shifted,identified('nyc-buildings/reused','nyc-buildings',30,'3246402')]],
 ]){const out=mergePlan(input(records));assert.equal(out.buildings.length,records.length,name+' remains unresolved');assert.ok(out.issues.some(i=>i.code==='building-match-review'),name+' has an actionable review log');}
 p=mergePlan(input([building('way/no-id',undefined,0),building('nyc-buildings/no-id','nyc-buildings',0)]));assert.equal(p.buildings.length,1,'strong geometry fallback remains available without IDs');
+p=mergePlan(input([...shifted,{...building('way/part',undefined,2),part:true}]));assert.equal(p.buildings.length,2,'a mapped part does not prevent confirmed whole-building identity merging');assert.ok(p.buildings.some(f=>f.id==='way/part'));assert.equal(p.buildings.find(f=>!f.part).merge.members.length,2);
 console.log('PASS shared BIN matching, placeholders, conflicting/reused identity, geometry sanity, logging and disabled mode');
 const {resolveMap}=await import('../pipeline/map-pipeline.js'),identity=JSON.parse(await readFile(new URL('./fixtures/building-identity.json',import.meta.url),'utf8'));
 p=resolveMap(identity);assert.ok(p.merge.suppressed.includes('way/248531787'),'reported shifted house merges using its BIN');

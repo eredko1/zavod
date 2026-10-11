@@ -7,7 +7,7 @@ export function sceneMetadata(world) {
     stats:world.stats(),
     featureIDs:[...world.plan.buildings,...world.plan.roads,...world.plan.details].map(f=>f.id).sort(),
     gpu:gl.getParameter(debug?debug.UNMASKED_RENDERER_WEBGL:gl.RENDERER),
-    browser:navigator.userAgent,threeRevision:REVISION,mergePolicyVersion:world.plan.merge?.version,
+    browser:navigator.userAgent,threeRevision:REVISION,mergePolicyVersion:world.plan.merge?.version,renderPolicyVersion:world.plan.render?.version,
     viewport:[innerWidth,innerHeight],canvas:[r.domElement.width,r.domElement.height],devicePixelRatio,
     materialTextures:textures.size,geometryBufferBytes:bytes,
     settings:{...world.settings,merge:world.selection.mergeEnabled!==false,hiddenOSM:world.selection.hiddenOSM||[],sources:world.selection.nyc.map(s=>[s.sourceId,s.visible!==false])},

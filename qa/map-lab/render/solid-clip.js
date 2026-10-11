@@ -1,4 +1,4 @@
-import {ShapeUtils,Vector2} from 'three';
+import {ShapeUtils,Vector2} from '../../../vendor/three/build/three.module.js';
 import {vertexData,triangleGroups} from './vertex-data.js';
 import {inRing,ringArea} from '../pipeline/osm-model.js';
 

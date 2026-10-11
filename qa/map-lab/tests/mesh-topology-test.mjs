@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {meshTopology,TOPOLOGY_RULES} from '../render/mesh-topology.js';
+import {clipSolidGeometry} from '../render/solid-clip.js';
+
+const positions=g=>{const flat=g.index?g.toNonIndexed():g;return Array.from(flat.attributes.position.array);};
+const cube=(x=0,y=0,z=0)=>{const g=new THREE.BoxGeometry(2,2,2);g.translate(x,y,z);return positions(g);};
+const box=cube();let audit=meshTopology(box);assert.equal(audit.closed,true);assert.ok(Math.abs(audit.signedVolume-8)<1e-10);
+assert.ok(meshTopology(box.slice(9)).openEdges>0);
+assert.ok(meshTopology([...box,...box.slice(0,9)]).duplicateFaces>0);
+const reversed=[...box];reversed.splice(3,6,...box.slice(6,9),...box.slice(3,6));assert.ok(meshTopology(reversed).orientationConflicts>0);
+audit=meshTopology([...box,...cube(2,2,2)]);assert.ok(audit.nonManifoldVertices>0,'touching closed shells form a disconnected vertex fan');
+audit=meshTopology([...box,...cube(.6,.7,.8)]);assert.ok(audit.selfIntersections>0,'crossing closed shells cannot be certified as a solid');
+audit=meshTopology([...box,...cube(4,0,0)]);assert.equal(audit.closed,true,'disjoint closed shells are valid');assert.ok(Math.abs(audit.signedVolume-16)<1e-10);
+audit=meshTopology([...box,...positions(new THREE.BoxGeometry(1,1,1))]);assert.equal(audit.selfIntersections,0);assert.equal(audit.componentBoundsOverlaps,1);assert.equal(audit.closed,false,'nested closed shells require interior-volume review before capping');
+const a=box.slice(0,3),b=box.slice(3,6),c=box.slice(6,9),mid=a.map((v,i)=>(v+b[i])/2),split=[...a,...mid,...c,...mid,...b,...c,...box.slice(9)];assert.equal(meshTopology(split).closed,true,'collinear T-junctions preserve geometric closure');
+const clipped=clipSolidGeometry(new THREE.BoxGeometry(4,4,4),{x0:0,x1:1,z0:-.5,z1:.8});audit=meshTopology(positions(clipped));assert.equal(audit.closed,true);assert.ok(Math.abs(audit.signedVolume-5.2)<1e-5);clipped.dispose();
+assert.throws(()=>meshTopology([0,1,2]),/Invalid/);
+const oversized=Array.from({length:Math.ceil(TOPOLOGY_RULES.maxTriangles/12)+1},()=>box).flat(),before=[...oversized];audit=meshTopology(oversized);assert.equal(audit.complete,false);assert.equal(audit.closed,false);assert.match(audit.method,/work limit/);assert.deepEqual(oversized,before,'audit budgets do not discard or repair source triangles');
+console.log('PASS measured mesh closure, orientation, duplicate faces, vertex fans, self-intersections, disjoint shells, T-junctions and clipped caps');

@@ -16,7 +16,7 @@ export async function recordRepeat(harness, config, { signal, progress = () => {
     // The caller finishes its layout before the measurement environment is pinned.
     environment=observeEnvironment(world.renderer.domElement);
     check();profiler.start();
-    if(rebuild)await harness.loadResult(world.selection,world.settings,async stage=>{check();await progress('Rebuilding map',stage);check();});
+    if(rebuild)await harness.loadResult(world.selection,world.settings,async stage=>{check();await progress('Rebuilding map',stage);check();},signal);
     const assetWaitMs=await profiler.waitForAssets();check();
     if(rebuild){progress('First draw');await harness.runReplay('first-draw',{warmup:0,frames:2});}
     for(const mode of config.modes){check();progress(mode);await harness.runReplay(mode,config);}

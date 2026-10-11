@@ -1,13 +1,16 @@
-import * as THREE from 'three';
+import * as THREE from '../../../vendor/three/build/three.module.js';
+import {mapMaterial} from './map-material.js';
 import {boundGeometry} from './bounded-geometry.js';
 import {clipPaths} from '../pipeline/area-clip.js';
 import {treeRowPoints} from '../pipeline/tree-placement.js';
 import {clipSurfaceGeometry} from './map-merge-mesh.js';
 import {rollbackMeshes} from './mesh-transaction.js';
+import {supportGeometry} from './bridge-support-mesh.js';
+import {clipSolidGeometry} from './solid-clip.js';
 
 export function buildDetails(plan, shapeOf, featureReferences = []) {
   const group = new THREE.Group(), selectable = [], batches = new Map();
-  const materials = Object.fromEntries(Object.entries({ roadbed: 0x727d82, prop: 0xaab2b1, foliage: 0x899c89, trunk: 0x8b8176, fence: 0x969f9d, land: 0xb1bdaa, paved: 0xc6c9c1, wood:0xbca98b, sand:0xd9c6a1, pitch: 0xa1b69e, water: 0x9bb7c0, reference: 0xb9a4be, rail: 0x7a858b }).map(([k, color]) => [k, new THREE.MeshStandardMaterial({ color, roughness: 1, side: THREE.DoubleSide })]));
+  const materials = Object.fromEntries(Object.entries({ roadbed: 0x727d82, prop: 0xaab2b1, foliage: 0x899c89, trunk: 0x8b8176, fence: 0x969f9d, land: 0xb1bdaa, paved: 0xc6c9c1, wood:0xbca98b, sand:0xd9c6a1, pitch: 0xa1b69e, water: 0x9bb7c0, reference: 0xb9a4be, rail: 0x7a858b }).map(([k, color]) => [k, mapMaterial(color,THREE.DoubleSide)]));
   const outlineMaterial=new THREE.LineBasicMaterial({color:0xb9a4be});
   const primitives = { box: new THREE.BoxGeometry(1, 1, 1), cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 8), ball: new THREE.SphereGeometry(0.5, 8, 6) };
   const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), axis = new THREE.Vector3(0, 1, 0);
@@ -51,6 +54,8 @@ export function buildDetails(plan, shapeOf, featureReferences = []) {
   }
   for (const f of [...plan.details,...featureReferences]) {
     try {
+      if(f.equipmentModel){const start=selectable.length,upright=new THREE.Group();upright.userData.upright=f;group.add(upright);try{for(const s of f.shapes){let g=new THREE.ExtrudeGeometry(shapeOf(s),{depth:f.equipmentModel.height,steps:1,bevelEnabled:false});g.rotateX(-Math.PI/2);g.translate(0,f.equipmentModel.bottom,0);g=clipSolidGeometry(g,f.clipBounds);if(!g.attributes.position.count){g.dispose();continue;}const mesh=new THREE.Mesh(g,materials.prop);mesh.userData.feature=f;upright.add(mesh);selectable.push(mesh);}}catch(e){rollbackMeshes(selectable,start);group.remove(upright);throw e;}continue;}
+      if(f.supportModel){const geometry=supportGeometry(f,shapeOf),mesh=new THREE.Mesh(geometry,materials.prop),upright=new THREE.Group();upright.userData.upright=f;mesh.userData.feature=f;upright.add(mesh);group.add(upright);selectable.push(mesh);continue;}
       if(f.reference&&!f.point){
         let paths=[...f.paths,...f.shapes.flatMap(s=>[s.outer,...s.holes].map(r=>[...r,r[0]]))];if(f.clipBounds)paths=clipPaths(paths,f.clipBounds);
         const vertices=[];for(const path of paths)for(let i=1;i<path.length;i++)for(const p of[path[i-1],path[i]])vertices.push(p[0],.06,p[1]);

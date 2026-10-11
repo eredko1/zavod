@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../../vendor/three/build/three.module.js';
 import { projection } from '../pipeline/osm-model.js';
 import { vertexData, triangleGroups } from './vertex-data.js';
 import { sourceNumber } from '../data/source-number.js';
@@ -9,6 +9,7 @@ import {approachHeight} from '../pipeline/road-approaches.js';
 
 // Every surface uses the same cell diagonal and elevation plane, including clipped edges.
 export const TERRAIN_CELL = 5;
+export const GROUND_DISPLAY_OFFSET=.02;
 function halfPlane(poly, side) {
   const out = [];
   for (let i = 0; i < poly.length; i++) {
@@ -43,7 +44,7 @@ export function terrainGeometry(bounds, terrain) {
   const cell = TERRAIN_CELL, x0 = Math.floor(bounds.x0 / cell) * cell, z0 = Math.floor(bounds.z0 / cell) * cell;
   const x1 = Math.ceil(bounds.x1 / cell) * cell, z1 = Math.ceil(bounds.z1 / cell) * cell;
   const nx = terrain.active ? (x1-x0)/cell : 1, nz = terrain.active ? (z1-z0)/cell : 1, positions = [], indices = [];
-  for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) { const x = x0 + ix * (x1-x0)/nx, z = z0 + iz * (z1-z0)/nz; positions.push(x, terrain.sample(x, z) - 0.02, z); }
+  for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) { const x = x0 + ix * (x1-x0)/nx, z = z0 + iz * (z1-z0)/nz; positions.push(x, terrain.sample(x, z) - GROUND_DISPLAY_OFFSET, z); }
   const boundaryVertices=new Map();
   function triangle(ids){
     const points=ids.map(i=>positions.slice(i*3,i*3+3));
@@ -97,16 +98,16 @@ export function terrainFromSnapshots(snapshots, origin, enabled = true, levelDec
     const a = estimate(x0, z0), d = estimate(x0 + cell, z0 + cell);
     return v <= u ? a * (1 - u) + estimate(x0 + cell, z0) * (u - v) + d * v : a * (1 - v) + d * u + estimate(x0, z0 + cell) * (v - u);
   };
-  return { active, samples, issues, datum, min: values[0] ?? null, max: values.at(-1) ?? null, sample, method: 'Shared 5 m triangle grid; vertex elevations use four-nearest inverse-distance weighting, nearest sample beyond 100 m. Subtype 300000 excluding inferred elevated-road spots and conflicting co-located observations; role evidence retained in merge logs. Estimated surface, not a surveyed terrain mesh.' };
+  return { active, samples, issues, datum, min: values[0] ?? null, max: values.at(-1) ?? null, sample, method: 'Shared 5 m triangle grid; vertex elevations use four-nearest inverse-distance weighting, nearest sample beyond 100 m. Subtype 300000 excluding inferred elevated-road spots and conflicting co-located observations; role evidence retained in render logs. Estimated surface, not a surveyed terrain mesh.' };
 }
 
 export function drapeScene(group, terrain) {
   const elevation=(f,x,z)=>f?.roadElevation?approachHeight(f.roadElevation,x,z,terrain):f?.elevationProfile?profileHeight(f.elevationProfile,x,z)-terrain.datum:Number.isFinite(f?.absoluteElevation)?f.absoluteElevation-terrain.datum:terrain.sample(x,z);
   function visit(o) {
-    if (o.userData.building) {
-      if(!terrain.active)return;
-      const b = o.userData.building, ring = b.shapes[0].outer, x = ring.reduce((s, p) => s + p[0], 0) / ring.length, z = ring.reduce((s, p) => s + p[1], 0) / ring.length;
-      b.ground = Number.isFinite(b.groundElevation) ? b.groundElevation - terrain.datum : terrain.sample(x, z); o.position.y = b.ground; return;
+    if (o.userData.building||o.userData.upright) {
+      if(!terrain.active){const f=o.userData.building||o.userData.upright;f.render.attributes.placement={...f.render.attributes.placement,ground:0,unit:'metres',estimated:true,source:'Flat reference plane; terrain disabled',terrainEnabled:false};return;}
+      const b = o.userData.building||o.userData.upright, ring = b.shapes[0].outer, anchor=b.placementAnchor, [x,z]=anchor?anchor.point:[0,1].map(k=>ring.reduce((sum,p)=>sum+p[k],0)/ring.length),groundElevation=anchor?anchor.groundElevation:b.groundElevation;
+      b.ground = Number.isFinite(groundElevation) ? groundElevation - terrain.datum : terrain.sample(x, z); o.position.y = b.ground;b.render.attributes.placement={...b.render.attributes.placement,ground:b.ground,unit:'metres',estimated:true,source:Number.isFinite(groundElevation)?`Recorded ${anchor?'parent ':''}building base minus terrain datum; alignment provisional`:anchor?'Shared assembly terrain sample at parent footprint center':'Terrain sample at mapped footprint center',terrainEnabled:true,terrainDatum:terrain.datum,point:[x,z],...(anchor?{parentSource:anchor.source}:{})};return;
     }
     if (o.isInstancedMesh) {
       const m = o.matrixWorld.clone();

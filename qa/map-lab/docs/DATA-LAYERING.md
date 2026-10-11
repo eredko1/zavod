@@ -1,6 +1,6 @@
 # Physical layers and vertical placement
 
-The resolver in [physical-level.js](../pipeline/physical-level.js) is shared by source merging, structure association, ground observations, approaches, tree placement and geometry diagnostics. Source tags remain unchanged. The resolver's classification and reason are recorded in `merge.attributes.physicalLevel` for features requiring vertical resolution; unresolved placement produces `missing-structure-elevation` in the generation log.
+The resolver in [physical-level.js](../pipeline/physical-level.js) is shared by source merging, structure association, ground observations, approaches, tree placement and geometry diagnostics. Source tags remain unchanged. The resolver's classification and reason are recorded in `render.attributes.physicalLevel` for features requiring vertical resolution; unresolved placement produces `missing-structure-elevation` in the generation log.
 
 ## Tag meanings
 
@@ -14,7 +14,7 @@ The resolver in [physical-level.js](../pipeline/physical-level.js) is shared by 
 | Evidence | Treatment |
 | --- | --- |
 | No vertical tags, or neutral layer/level without contrary tags | Ground placement eligible; terrain and offsets remain separately attributed estimates or measurements |
-| `bridge=*` other than `no`, including negative layers | May associate with one compatible measured deck; layer sign does not select an elevation |
+| `bridge=*` other than `no`, including negative layers | May associate with one compatible measured deck; ordered layers of the same identified bridge can assign measured height groups, without converting layer numbers to metres |
 | `location=bridge` | Same support requirement as an explicit bridge role |
 | Nonzero layer without a supported physical role | Outline/marker; no guessed ground, bridge or tunnel height |
 | `location=underground/underwater`, or a tunnel other than building passage | Outline/marker; no above-ground deck association |
@@ -23,9 +23,11 @@ The resolver in [physical-level.js](../pipeline/physical-level.js) is shared by 
 | `tunnel=building_passage` with otherwise ground-compatible tags | Ground geometry; building clearance/portal carving is not implemented |
 | Contradictory bridge and tunnel, subsurface, floor or explicit surface placement | No deck association; preserved evidence and a placement diagnostic |
 
-These rules apply with **Merge sources** enabled or disabled. Unresolved buildings cannot suppress surface footprints, replace their above-ground parent with a basement part, extrude at ground level or create walking walls/roofs. Their footprints remain inspectable in both views. Unknown road levels cannot consume roadbed coverage, supply ground observations, anchor a bridge approach or trigger a ground-clearance diagnostic.
+Source matching uses tag compatibility without inventing elevations. Placement rules run in the separate render stage with **Merge sources** enabled or disabled; see [the source/render contract](SOURCE-RENDER-BOUNDARY.md). Unresolved buildings cannot suppress surface footprints, replace their above-ground parent with a basement part, extrude at ground level or create walking walls/roofs. Their footprints remain inspectable in both views. Unknown road levels cannot consume roadbed coverage, supply ground observations, anchor a bridge approach or trigger a ground-clearance diagnostic.
 
 NYC feature codes and elevation subtypes retain separate source-specific rules. LION layer/node-level fields are network classifications, not OSM layers or heights. Ground, bridge and roof observations are not interchangeable. An NYC bridge profile needs supported measurements; ordinary railroad lines cannot borrow an elevated deck solely through overlap.
+
+Mixed bridge height groups cannot feed a blended polygon surface. [Bridge-level rules](../pipeline/bridge-levels.js) require sustained paired measurements and exactly two ordered road layers with a shared bridge identity, then build bounded station profiles. Unresolved intervals stay references. [Connecting ramp rules](../pipeline/bridge-ramps.js) require shared OSM nodes and two compatible measured anchors; a layer change alone supplies no rise. Thresholds, source evidence and remaining topology limits are documented in [fidelity integration](FIDELITY-INTEGRATION.md).
 
 ## Limits and verification
 

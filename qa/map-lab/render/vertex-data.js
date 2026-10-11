@@ -1,4 +1,4 @@
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { BufferGeometry, Float32BufferAttribute } from '../../../vendor/three/build/three.module.js';
 // Carry static vertex channels through polygon cuts. Normals are recomputed for the resulting planes.
 export function vertexData(geometry) {
   const attributes=[['position',geometry.attributes.position],...Object.entries(geometry.attributes).filter(([name])=>!['position','normal'].includes(name))];

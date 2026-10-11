@@ -1,6 +1,7 @@
 import {checkAbort} from '../data/request-abort.js';
-const LABELS={normalize:'Reading map features',merge:'Merging sources',terrainSamples:'Preparing elevation data',meshes:'Creating meshes',drape:'Fitting geometry to elevation',baseTerrain:'Creating ground',surfaceIndex:'Preparing walking surfaces',propPlacement:'Placing objects',boundInstances:'Clipping area edges',sceneSwap:'Opening the world'};
-export const buildStageLabel=name=>LABELS[name]||name;
+const LABELS={normalize:'Reading map features',merge:'Merging sources',renderModels:'Preparing render models',terrainSamples:'Preparing elevation data',meshes:'Creating meshes',drape:'Fitting geometry to elevation',baseTerrain:'Creating ground',surfaceIndex:'Preparing walking surfaces',propPlacement:'Placing objects',boundInstances:'Clipping area edges',sceneSwap:'Opening the world'};
+const WORKER_LABELS={sourceTransfer:'Sending data to the map builder',sceneSerialization:'Preparing the built map',sceneTransfer:'Receiving the built map',sceneHydration:'Preparing the world for display'};
+export const buildStageLabel=name=>WORKER_LABELS[name]||LABELS[name]||name;
 export function paintProgress(signal){
   checkAbort(signal);
   return new Promise((resolve,reject)=>{let frame;

@@ -8,7 +8,7 @@ Open [Map generator](http://localhost:8790/qa/map-lab/index.html), fetch an area
 
 This is a repeated build and warmed rendering experiment in one context, with named build-stage tables. It is not a cold-load test and does not use the command-line runner's network blocking or served-byte asset manifest. Sources are fetched before timing, and changing area/filter selection invalidates the result. The page does not load saved fixtures automatically.
 
-Charts appear after all repeats complete. “Repeated build stages” contains one timing row per measured scene rebuild (normalization, merge, terrain, meshes, surface index, prop placement and scene swap). It stays hidden while empty. Failed/cancelled runs explain why complete frame charts are unavailable and retain any measured build rows plus the diagnostic download.
+Charts appear after all repeats complete. “Repeated build stages” contains one timing row per measured scene rebuild (normalization, source merge, render models, terrain, meshes, surface index, prop placement and scene swap). It stays hidden while empty. Interactive rebuilds use a worker; build records retain execution settings and per-phase thread attribution, with transfer/serialization/restoration costs recorded separately. Failed/cancelled runs explain why complete frame charts are unavailable and retain any measured build rows plus the diagnostic download.
 
 ## Run and compare
 
@@ -81,7 +81,7 @@ Comparisons require a completed baseline with all repeats, matching fixture hash
 | GPU elapsed | Asynchronously measured GL command interval around rendering; separate from CPU submission |
 | Frame interval | Time between animation callback starts; affected by refresh cadence, scheduling and missed frames |
 | Texture/buffer uploads and shader setup | Count and CPU duration of wrapped GL API calls; nested in render submission when issued there |
-| Build phases | Normalization, merge, terrain samples, base meshes, surface projection, base terrain, surface index, prop placement and scene swap |
+| Build phases | Normalization, source merge, render models, terrain samples, base meshes, surface projection, base terrain, surface index, prop placement and scene swap |
 
 Reports contain raw frames and p50/p95/p99/max/mean statistics, CPU/GPU budget exceedances, frame intervals over 25 ms, draw calls, submitted triangles, renderer texture/geometry counts, geometry-buffer payload, GPU query status and browser long-task/long-animation-frame observations where supported. Sub-timer-resolution CPU samples may register zero; they do not establish zero cost.
 

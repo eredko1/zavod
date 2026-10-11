@@ -1,0 +1,175 @@
+{
+  "file": "planimetric-samples.json.gz",
+  "sha256": "6ce6c82c47eb150f65ac78db3aafda558ed5e820586410cc8a1e7a18aa7316da",
+  "description": "One unmodified native/geographic record and full metadata per original NYC layer, one record/schema per pedestrian source, plus the complete bounded MTA entrance capture. Test inventories are constructed for those selected records; full city-service query responses remain in ignored local evidence. Never used as a runtime fallback.",
+  "sources": [
+    {
+      "sourceId": "nyc-transport-2022",
+      "fetchedAt": "2026-09-29T00:41:26.472Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Transport_Structure_2022/FeatureServer/25",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 1228
+    },
+    {
+      "sourceId": "nyc-rail-structures-2022",
+      "fetchedAt": "2026-09-29T00:41:27.368Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Railroad_Structure_2022/FeatureServer/18",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 6385
+    },
+    {
+      "sourceId": "nyc-railroad-2022",
+      "fetchedAt": "2026-09-29T00:41:29.435Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Railroad_2022/FeatureServer/17",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 6553
+    },
+    {
+      "sourceId": "nyc-curbs-2022",
+      "fetchedAt": "2026-09-29T00:41:33.953Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Curb_2022/FeatureServer/4",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 110399
+    },
+    {
+      "sourceId": "nyc-pavement-2022",
+      "fetchedAt": "2026-09-29T00:41:38.967Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Pavement_Edge_2022/FeatureServer/14",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 93898
+    },
+    {
+      "sourceId": "nyc-retaining-walls-2022",
+      "fetchedAt": "2026-09-29T00:41:39.885Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Retaining_Wall_2022/FeatureServer/19",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 2949
+    },
+    {
+      "sourceId": "nyc-curb-cuts-2022",
+      "fetchedAt": "2026-09-29T00:41:44.974Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Curb_Cut_2022/FeatureServer/5",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 358477
+    },
+    {
+      "sourceId": "nyc-cooling-towers-2022",
+      "fetchedAt": "2026-09-29T00:41:46.000Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Cooling_Towers_2022/FeatureServer/3",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 44691
+    },
+    {
+      "sourceId": "nyc-misc-structures-2022",
+      "fetchedAt": "2026-09-29T00:41:46.435Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Miscellaneous_Structure_Polygon_2022/FeatureServer/10",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectId": 2476
+    }
+  ],
+  "streetSources": [
+    {
+      "sourceId": "nyc-pedestrian-ramps",
+      "fetchedAt": "2026-09-29T00:47:48.560Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "queryURL": "https://data.cityofnewyork.us/resource/ufzp-rrqu.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.99+40.575%2C+-73.96+40.575%2C+-73.96+40.59%2C+-73.99+40.59%2C+-73.99+40.575%29%29%27%29&%24order=rampid%2C%3Aid&%24limit=1000&%24offset=0",
+      "metadataURL": "https://data.cityofnewyork.us/api/views/ufzp-rrqu.json"
+    },
+    {
+      "sourceId": "nyc-pedestrian-progress",
+      "fetchedAt": "2026-09-29T00:47:53.434Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "queryURL": "https://data.cityofnewyork.us/resource/e7gc-ub6z.geojson?%24where=intersects%28the_geom%2C+%27POLYGON+%28%28-73.99+40.575%2C+-73.96+40.575%2C+-73.96+40.59%2C+-73.99+40.59%2C+-73.99+40.575%29%29%27%29&%24order=objectid%2C%3Aid&%24limit=1000&%24offset=0",
+      "metadataURL": "https://data.cityofnewyork.us/api/views/e7gc-ub6z.json"
+    }
+  ],
+  "entrances": {
+    "sourceId": "mta-entrances",
+    "fetchedAt": "2026-09-29T00:44:41.278Z",
+    "bounds": {
+      "west": -73.99,
+      "south": 40.575,
+      "east": -73.96,
+      "north": 40.59
+    },
+    "rows": 27,
+    "requests": [
+      {
+        "url": "https://data.ny.gov/api/views/i9wp-a4ja.json",
+        "method": "GET"
+      },
+      {
+        "url": "https://data.ny.gov/resource/i9wp-a4ja.json?%24where=entrance_latitude+between+40.575+and+40.59+AND+entrance_longitude+between+-73.99+and+-73.96&%24order=%3Aid&%24limit=10001&%24select=%3Aid",
+        "method": "GET"
+      },
+      {
+        "url": "https://data.ny.gov/resource/i9wp-a4ja.json?%24where=%3Aid+in+%28%27row-c8bp-vye6_95c5%27%2C%27row-34nr.yyhi-tp88%27%2C%27row-j7h2.3dwm-7mjd%27%2C%27row-df76-n4pj%7Equ4k%27%2C%27row-qmw8_e9gk.jw9e%27%2C%27row-5zr6-em57-bxki%27%2C%27row-ap7t.2v3s%7E5u5k%27%2C%27row-ebpd-9hxt%7Eixm6%27%2C%27row-rgmz.mhb2-nsac%27%2C%27row-wne2-e4jr-9xe5%27%2C%27row-ct72_vj2b%7Eu6zz%27%2C%27row-yg6v_w77n%7E6pqs%27%2C%27row-szv2_tc9j_3u94%27%2C%27row-k3x6%7Ebbx5.v7rg%27%2C%27row-8ht5_isdr.dx4u%27%2C%27row-59ys.vjpy.jr77%27%2C%27row-re58%7Emdvw-eqz8%27%2C%27row-h4fy%7Ek8dc-incs%27%2C%27row-7nnu.u6uz%7E4n9t%27%2C%27row-8r75-8jqd-ridz%27%2C%27row-35g2_bu2k.4vn3%27%2C%27row-gtx6%7Eebd8_78ab%27%2C%27row-q4qg%7Ecby7-mic2%27%2C%27row-4wuw.gqqc%7Eywsa%27%2C%27row-9hs9-2abg%7Er564%27%2C%27row-45y8.x2p4.3n6n%27%2C%27row-2i4b-e74k.fk4f%27%29&%24order=%3Aid&%24limit=10001&%24select=*%2C+%3Aid",
+        "method": "GET"
+      }
+    ]
+  }
+}

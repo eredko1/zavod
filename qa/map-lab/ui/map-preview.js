@@ -1,23 +1,25 @@
 import {eventScope} from './event-scope.js';
 import { initNYCLayers } from './nyc-layers.js';
 import { downloadJSON } from './download.js';
-import { resolveMap } from '../pipeline/map-pipeline.js';
+import { resolveSources } from '../pipeline/map-pipeline.js';
 import { projection } from '../pipeline/osm-model.js';
 import { display2DMerge } from './map-merge-2d.js';
 import { normalize } from '../pipeline/osm-geometry.js';
 import { clipPreviewArea } from './preview-area.js';
 
-export function createMapPreview(root, { options = () => ({}), onMerge = () => {} } = {}) {
+export function createMapPreview(root, { onMerge = () => {} } = {}) {
 const events=eventScope();
 let layerEvents=eventScope();
 const $ = id => root.querySelector(`#${id}`), svg = $('map'), NS = 'http://www.w3.org/2000/svg';
 const COLORS = { land: ['Land & recreation', '#50775e'], water: ['Water', '#5192b5'], buildings: ['Buildings', '#d7a477'], roads: ['Roads', '#97a7af'], paths: ['Paths & steps', '#d8d4a7'], rail: ['Railways', '#cba5c5'], other: ['Other outlines', '#a49cd1'], points: ['Mapped points', '#f3cb72'], vertices: ['Geometry nodes', '#647681'] };
+const EMPTY_OSM_DATA={elements:[]};
 const view = { x: 0, z: 0, span: 600 }, features = new Map(), groups = new Map();
 let nyc = null, displayData = null, mergedPlan = null, mergedInput = null, mergedSnapshots = [], mergedEnabled = null;
 let areaOverride = null;
 let mergedFilters='';
 let origin = [40.5775, -73.978], selected = null, drag = null, moved = false, raw = null, fullBounds = null, lastQuery = '', lastEndpoint = '', fetchedAt = '';
 let project = projection(...origin);
+let acquisitionFailures=[];
 const filters = new Map();
 function el(tag, attrs = {}, parent = svg) { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); parent.append(e); return e; }
 function gps(x, z) { let lat = origin[0] - z / 111132, lon = origin[1] + x / (111320 * Math.cos(origin[0] * Math.PI / 180)); for (let i=0;i<3;i++) { const p=project({lat,lon}); lat -= (z-p[1])/111132; lon += (x-p[0])/(111320*Math.cos(lat*Math.PI/180)); } return [lat,lon]; }
@@ -72,7 +74,7 @@ function show(data) {
     features.set(f.id, f);
   }
   $('coverage').textContent = `${list.length} drawable / ${data.elements.length} returned`;
-  nyc?.render();applyOSMVisibility();
+  nyc?.render({force:true});applyOSMVisibility();
   fit(fullBounds);$('position').textContent=`${list.length.toLocaleString()} OSM features`;
   $('empty').hidden = !!list.length || !!nyc?.hasVisible(); $('empty').textContent = 'No features returned. Try another area or query.';
 }
@@ -98,23 +100,22 @@ nyc = initNYCLayers({ root, svg, project:p=>project(p),
   changed: () => { updateMerge(); $('empty').hidden = features.size > 0 || !!nyc?.hasVisible(); },
 });
 
-function mergeDecision(id) { return mergedPlan?.merge.decisions.find(d => d.members.some(m => m.id === id) && !d.representedBy) || mergedPlan?.merge.decisions.find(d => d.members.some(m => m.id === id)); }
+function mergeDecision(id) { const source = mergedPlan?.merge.decisions.find(d => d.members.some(m => m.id === id) && !d.representedBy) || mergedPlan?.merge.decisions.find(d => d.members.some(m => m.id === id)); return source?{source}:null; }
 function hiddenOSM(){return [...features.values()].filter(f=>!$('osm-visible').checked||groups.get(f.category)?.hasAttribute('hidden')).map(f=>f.id);}
 function updateMerge() {
   const snaps=nyc?.snapshots()||[], enabled=$('merge-enabled').checked,hidden=hiddenOSM(),filterKey=JSON.stringify([hidden,snaps.map(s=>[s.sourceId,s.visible!==false])]);
-  if (mergedInput!==displayData || mergedEnabled!==enabled || mergedFilters!==filterKey || snaps.length!==mergedSnapshots.length || snaps.some((s,i)=>s.data!==mergedSnapshots[i])) { mergedPlan=resolveMap({data:displayData,nyc:snaps,bounds:areaOverride,mergeEnabled:enabled,hiddenOSM:hidden},options()); mergedInput=displayData;mergedSnapshots=snaps.map(s=>s.data);mergedEnabled=enabled;mergedFilters=filterKey; }
+  if (mergedInput!==displayData || mergedEnabled!==enabled || mergedFilters!==filterKey || snaps.length!==mergedSnapshots.length || snaps.some((s,i)=>s.data!==mergedSnapshots[i])) { mergedPlan=resolveSources({data:displayData,nyc:snaps,bounds:areaOverride,mergeEnabled:enabled,hiddenOSM:hidden}); mergedInput=displayData;mergedSnapshots=snaps.map(s=>s.data);mergedEnabled=enabled;mergedFilters=filterKey; }
   display2DMerge(svg,mergedPlan);fullBounds=clipPreviewArea(svg,areaOverride,project)||mergedPlan?.bounds;const m=mergedPlan?.merge;
-  $('merge-summary').textContent=m?.enabled?`${m.summary.matched} matches · ${m.summary.suppressed} suppressed · ${m.summary.partial} partial roads · ${m.summary.conflicts} conflicts.`:'Merging off.';
+  $('merge-summary').textContent=m?.enabled?`${m.summary.matched} matched records · ${m.summary.suppressed} suppressed · ${m.summary.partial} partial roads · ${m.summary.conflicts} conflicts.`:'Merging off.';
   $('merge-download').disabled=!m; onMerge(m);
 }
 events.on($('merge-enabled'),'change',updateMerge);
-events.on($('merge-download'),'click',()=>downloadJSON({merge:mergedPlan.merge,query:lastQuery,endpoint:lastEndpoint,fetchedAt,nycSources:nyc.snapshots().map(({data,...p})=>p)},'map-merge-log.json'));
+events.on($('merge-download'),'click',()=>downloadJSON({merge:mergedPlan.merge,query:lastQuery,endpoint:lastEndpoint,fetchedAt,acquisitionFailures,nycSources:nyc.snapshots().map(({data,...p})=>p)},'map-merge-log.json'));
 return {
-  setArea(bounds) { areaOverride=bounds;origin=[(bounds.south+bounds.north)/2,(bounds.west+bounds.east)/2];project=projection(...origin); },
-  load(result) { raw=result.data;lastQuery=result.query;lastEndpoint=result.endpoint;fetchedAt=result.fetchedAt;nyc.restore(result.nyc||[]);show(raw||{elements:[]});$('download').disabled=!raw; },
-  result() { return { data:raw,query:lastQuery,endpoint:lastEndpoint,fetchedAt,bounds:areaOverride,nyc:nyc.snapshots(),mergeEnabled:$('merge-enabled').checked,hiddenOSM:hiddenOSM() }; },
+  setArea(bounds) { if(areaOverride&&['south','west','north','east'].every(key=>areaOverride[key]===bounds[key]))return;areaOverride={...bounds};origin=[(bounds.south+bounds.north)/2,(bounds.west+bounds.east)/2];project=projection(...origin);displayData=null; },
+  load(result) { raw=result.data;lastQuery=result.query;lastEndpoint=result.endpoint;fetchedAt=result.fetchedAt;acquisitionFailures=result.acquisitionFailures||[];mergedInput=null;nyc.restore(result.nyc||[]);const data=raw||EMPTY_OSM_DATA;if(displayData===data){clearSelection();nyc.render();applyOSMVisibility();fit(fullBounds);}else show(data);$('download').disabled=!raw; },
+  result() { return { data:raw,query:lastQuery,endpoint:lastEndpoint,fetchedAt,bounds:areaOverride,nyc:nyc.snapshots(),acquisitionFailures,mergeEnabled:$('merge-enabled').checked,hiddenOSM:hiddenOSM() }; },
   get plan() { return mergedPlan; },
-  refreshRules() {mergedInput=null;updateMerge();},
   fit() { fit(fullBounds); },
   dispose() {events.dispose();layerEvents.dispose();nyc.dispose();observer.disconnect();if(drag&&svg.hasPointerCapture(drag.id))svg.releasePointerCapture(drag.id);drag=null;svg.classList.remove('dragging');},
 };

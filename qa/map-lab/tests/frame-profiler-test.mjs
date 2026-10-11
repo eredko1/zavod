@@ -8,6 +8,9 @@ function fixture(supported=true,maxPending=8) {
 }
 assert.equal(distribution([]).p95,null); assert.equal(distribution([null,NaN]).samples,0); assert.equal(distribution([1,2,3,4,5]).p95,5);
 {
+  const {profiler:p,advance}=fixture();p.start();p.beginBuild();advance(10);p.buildMark('sceneHydration',2);p.buildMark('sceneHydration',3);p.buildMark('meshes',4,'worker');p.endBuild();const r=await p.stop(),b=r.builds[0];assert.equal(b.phases.sceneHydration,5);assert.equal(b.totalMs,9);assert.deepEqual(b.threads,{sceneHydration:'main',meshes:'worker'});
+}
+{
   const {profiler:p,advance}=fixture();p.start();p.beginBuild();advance(100);advance(8);p.buildMark('mesh',8);advance(50);advance(4);p.buildMark('drape',4);p.endBuild();const r=await p.stop();assert.equal(r.builds[0].totalMs,12);assert.equal(r.builds[0].wallMs,162);assert.equal(r.builds[0].yieldMs,150,'paint waits never inflate measured build work');
 }
 {

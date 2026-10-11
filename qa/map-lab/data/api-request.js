@@ -1,5 +1,6 @@
 import { checkAbort, withRequestTimeout } from './request-abort.js';
-const RETRY_STATUS = new Set([429,502,503,504]), MAX_ATTEMPTS = 3, MAX_WAIT = 15000, ATTEMPT_TIMEOUT = 55000;
+const RETRY_STATUS = new Set([429,502,503,504]), MAX_ATTEMPTS = 3, MAX_WAIT = 15000;
+export const ATTEMPT_TIMEOUT = 55000;
 export class TransportError extends Error {}
 export class APIError extends Error {
   constructor(message, status, retryAfter = null) { super(message);this.status=status;this.retryAfter=retryAfter; }

@@ -1,6 +1,7 @@
 import { areaWKT, CONEY_BOUNDS } from './map-sources.js';
 export { CONEY_BOUNDS };
-export const MAX_AREA_METRES=5000;
+import {ACQUISITION_LIMITS} from './acquisition-limits.js';
+export const MAX_AREA_METRES=ACQUISITION_LIMITS.areaMetres;
 export const SIZE_PRECISION_METRES=1e-6;
 export const METRES_PER_LATITUDE_DEGREE=111132, METRES_PER_LONGITUDE_DEGREE=111320;
 // Adjacent rectangle to the west; Auto Coney keeps its original extent.
@@ -10,7 +11,7 @@ export const areaDimensions = bounds => ({height:(bounds.north-bounds.south)*MET
 export function validateArea(bounds) {
   areaWKT(bounds);
   const {height,width}=areaDimensions(bounds);
-  if(height>MAX_AREA_METRES+SIZE_PRECISION_METRES||width>MAX_AREA_METRES+SIZE_PRECISION_METRES)throw Error('Choose an area no more than 5 km across each side for this local geometry lab.');
+  if(height>MAX_AREA_METRES+SIZE_PRECISION_METRES||width>MAX_AREA_METRES+SIZE_PRECISION_METRES)throw Error(`Choose an area no more than ${MAX_AREA_METRES/1000} km across each side for this local geometry lab.`);
   return bounds;
 }
 export const inNYC = b => b.south<40.93 && b.north>40.49 && b.west<-73.68 && b.east>-74.26;

@@ -19,6 +19,6 @@ await visit(resolve('src/main.js'));await visit(resolve('qa/map-lab/render/map-w
 // Game boot also chooses module paths dynamically; audit every game source file.
 for(const file of await readdir('src',{recursive:true}))if(file.endsWith('.js'))await visit(resolve('src',file));
 const [release]=JSON.parse(execFileSync('npm',['pack','--dry-run','--json','--ignore-scripts','--cache',resolve('.tmp/npm-release-audit')],{encoding:'utf8',maxBuffer:20*1024*1024}));
-const files=release.files.map(f=>f.path);for(const file of files)assert.doesNotMatch(file,/^(qa\/|\.tmp\/|vendor\/echarts\/)|benchmark|frame-profiler/);
+const files=release.files.map(f=>f.path);for(const file of files)assert.doesNotMatch(file,/^(qa\/|\.tmp\/|vendor\/(?:echarts|laz-perf)\/)|benchmark|frame-profiler/);
 for(const required of ['index.html','src/main.js','vendor/three/build/three.module.js'])assert.ok(files.includes(required),`Missing release file ${required}`);
 console.log(`PASS ${visited.size} runtime modules exclude benchmark imports; ${files.length} release files exclude QA, benchmark and chart code`);

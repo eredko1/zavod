@@ -2,8 +2,8 @@ import { inShape } from '../pipeline/osm-model.js';
 import {edgeDistance} from '../pipeline/geometry-distance.js';
 export {edgeDistance};
 export function blocked(x, z, plan, radius = 0.28, ground = plan.groundSample?.(x, z) ?? 0) {
-  return plan.buildings.some(b => b.extrude && !b.suppressed && !b.failed && b.height.bottom + (b.ground || 0) < ground + 1.8 && b.height.top + (b.ground || 0) > ground && b.shapes.some(s =>
-    inShape(x, z, s) || [s.outer, ...s.holes].some(r => r.some((p, i) => edgeDistance(x, z, p, r[(i + 1) % r.length]) < radius))));
+  return plan.buildings.some(b => {const proxy=b.collisionProxy||b,height=b.collisionBounds||proxy.height;return b.extrude && !b.suppressed && !b.failed && proxy.height.valid!==false && height.bottom + (b.ground || 0) < ground + 1.8 && height.top + (b.ground || 0) > ground && proxy.shapes.some(s =>
+    inShape(x, z, s) || [s.outer, ...s.holes].some(r => r.some((p, i) => edgeDistance(x, z, p, r[(i + 1) % r.length]) < radius)));});
 }
 export function move(position, dx, dz, plan, collision = blocked) {
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.12));

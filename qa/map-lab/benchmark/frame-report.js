@@ -24,7 +24,7 @@ export function validateRepeats(report) {
   const first=report.runs[0];
   for(const run of report.runs){
     validateReplay(run.summaries,report.config,report.scenarioRequirements||DEFAULT_SCENARIOS);
-    for(const key of ['gpu','browser','viewport','canvas','devicePixelRatio','settings','featureIDs','assetHashes','geometryCoverage','servedCodeHash'])same(run.metadata[key],first.metadata[key],`Repeat ${key} mismatch`);
+    for(const key of ['gpu','browser','viewport','canvas','devicePixelRatio','settings','featureIDs','assetHashes','geometryCoverage','servedCodeHash','mergePolicyVersion','renderPolicyVersion'])same(run.metadata[key],first.metadata[key],`Repeat ${key} mismatch`);
     for(const mode of report.config.modes)same(run.summaries[mode].poseHash,first.summaries[mode].poseHash,`Replay path drift: ${mode}`);
   }
 }
@@ -40,6 +40,6 @@ export function validateComparison(before, after, allowContentChange=false) {
     const s=run.summaries[mode],unsupported=s.gpu?.samples===0&&s.gpuStatus?.unsupported===s.rendered;
     if(s.rendered>0&&s.gpu?.samples!==s.rendered&&!unsupported)throw Error(`Incomplete GPU sample coverage: ${mode}`);
   }
-  for(const key of ['gpu','browser','viewport','canvas','devicePixelRatio','settings',...allowContentChange?[]:['featureIDs','assetHashes','materialTextures','geometryCoverage']])same(before.runs[0].metadata[key],after.runs[0].metadata[key],`Comparison ${key} mismatch`);
+  for(const key of ['gpu','browser','viewport','canvas','devicePixelRatio','settings',...allowContentChange?[]:['featureIDs','assetHashes','materialTextures','geometryCoverage','mergePolicyVersion','renderPolicyVersion']])same(before.runs[0].metadata[key],after.runs[0].metadata[key],`Comparison ${key} mismatch`);
   for(const mode of after.config.modes)same(before.runs[0].summaries[mode].poseHash,after.runs[0].summaries[mode].poseHash,`Camera route differs: ${mode}`);
 }

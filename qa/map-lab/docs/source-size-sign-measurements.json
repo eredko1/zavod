@@ -1,0 +1,62 @@
+{
+  "capturedAt": "2026-09-29T22:54:37.041Z",
+  "method": "Headed Chrome under Xvfb, direct browser fetchNYC using ArcGIS object-ID inventory and paired native/GeoJSON batches",
+  "sourceId": "nysdot-overhead-signs",
+  "sourceURL": "https://gis.dot.ny.gov/hostingny/rest/services/Asset/NYSDOT_Structures/FeatureServer/2",
+  "geometryType": "esriGeometryPoint",
+  "samples": [
+    {
+      "name": "coney",
+      "bounds": {
+        "south": 40.568501691681966,
+        "west": -73.98982724778705,
+        "north": 40.586498308318035,
+        "east": -73.96617275221294
+      },
+      "records": 8,
+      "snapshotJSONBytes": 26416,
+      "snapshotSHA256": "33d763e6c8037f5238767c2df600203f969f3466be4da28715128399fb125ccf",
+      "statuses": {
+        "Active": 8
+      },
+      "nullAssetIDs": 0,
+      "nativeAndGeoJSONResponses": 4,
+      "fields": [
+        "OBJECTID",
+        "AssetID",
+        "SIN",
+        "AssetStatus",
+        "EditedDate",
+        "GlobalID"
+      ],
+      "fetchedAt": "2026-09-29T22:54:37.982Z"
+    },
+    {
+      "name": "manhattan",
+      "bounds": {
+        "south": 40.702001691681964,
+        "west": -74.01985092819372,
+        "north": 40.71999830831803,
+        "east": -73.99614907180627
+      },
+      "records": 24,
+      "snapshotJSONBytes": 39332,
+      "snapshotSHA256": "11ff87757ee2c7f7086001c28de78567e6c30785cee8a2bf2786f15ae4880909",
+      "statuses": {
+        "Active": 21,
+        "Retired": 3
+      },
+      "nullAssetIDs": 1,
+      "nativeAndGeoJSONResponses": 4,
+      "fields": [
+        "OBJECTID",
+        "AssetID",
+        "SIN",
+        "AssetStatus",
+        "EditedDate",
+        "GlobalID"
+      ],
+      "fetchedAt": "2026-09-29T22:54:38.297Z"
+    }
+  ]
+}

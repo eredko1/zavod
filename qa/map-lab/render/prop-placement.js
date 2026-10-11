@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../../vendor/three/build/three.module.js';
 
 const SURFACE_PROPS=new Set(['bench','lamp','signal','pole','bin','bollard','gate']),CONTACT_EPSILON=1e-5;
 // Use walking surfaces at build/visibility changes; no per-frame placement work.
@@ -23,6 +23,7 @@ export function placeSurfaceProps(group,terrain,surfaces,issues) {
   for(const [f,{base,parts}] of props){
     if(base!==f.attributes.placement?.value)for(const {mesh,index,matrix} of parts){matrix.elements[13]+=base;if(mesh.isInstancedMesh)mesh.setMatrixAt(index,matrix);else matrix.decompose(mesh.position,mesh.quaternion,mesh.scale);changed.add(mesh);}
     f.attributes.placement={value:base,unit:'metres',source:'rendered walking surfaces',estimated:true,reason:'Highest surface at the mapped point and model foot contacts; terrain and curb offsets retain their source/rule estimates.'};
+    if(f.render)f.render.attributes.placement=f.attributes.placement;
     const message=`${f.rule} base=${base.toFixed(3)} m in local world coordinates; placed on visible rendered surfaces using model foot contacts (estimated).`;
     if(logs.has(f.id))logs.get(f.id).message=message;else issues.push({id:f.id,code:'surface-placement',severity:'info',message});
   }

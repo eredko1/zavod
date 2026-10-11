@@ -47,8 +47,8 @@ export function resolveTreePlacements(plan,suppressed,surfaceAt){
       if(surface||duplicate)removed.push({index,point,...surface?{surface:surface.id}:{representedBy:duplicate.id}});
       else{kept.push(point);points.push({point,id:`${row.id}#${index}`});}
     }
-    row.treePoints=kept;row.merge.attributes.treePlacement={rule:TREE_PLACEMENT_RULES,generated:kept.length+removed.length,kept:kept.length,excluded:removed};
-    if(removed.length){row.merge.evidence.push(`Excluded ${removed.length} generated trees on roads/walkways or near retained individual/row trees.`);plan.issues.push({id:row.id,code:'tree-row-placement',severity:'info',message:row.merge.evidence.at(-1)});}
+    row.treePoints=kept;row.render.attributes.treePlacement={rule:TREE_PLACEMENT_RULES,generated:kept.length+removed.length,kept:kept.length,excluded:removed};
+    if(removed.length){row.render.evidence.push(`Excluded ${removed.length} generated trees on roads/walkways or near retained individual/row trees.`);plan.issues.push({id:row.id,code:'tree-row-placement',severity:'info',message:row.render.evidence.at(-1)});}
   }
   return excluded;
 }

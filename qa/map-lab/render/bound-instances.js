@@ -1,4 +1,4 @@
-import {Box3,Matrix4,Mesh} from 'three';
+import {Box3,Matrix4,Mesh} from '../../../vendor/three/build/three.module.js';
 import {clipSolidGeometry} from './solid-clip.js';
 
 // Keep interior instances batched; only edge-crossing instances need clipped individual meshes.

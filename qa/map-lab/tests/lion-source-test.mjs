@@ -15,7 +15,15 @@ globalThis.fetch=async(url,options={})=>{
 };
 try{
   const snap=await fetchNYC(source,CONEY_BOUNDS);assert.deepEqual(batches.map(b=>b.length),[500,500,1]);assert.deepEqual(snap.data.features.map(f=>f.properties.OBJECTID),ids);
-  assert.equal(snap.requests.length,4);assert.equal(new URLSearchParams(snap.requests[1].body).get('objectIds'),ids.slice(0,500).join(','));
+  assert.equal(snap.requests.length,5);assert.equal(snap.raw.responses.length,4);assert.equal(snap.raw.metadata.name,'LION');assert.equal(new URLSearchParams(snap.requests[1].body).get('objectIds'),ids.slice(0,500).join(','));
   incomplete=true;await assert.rejects(fetchNYC(source,CONEY_BOUNDS),/incomplete records/);
-  console.log('PASS LION POST batches, complete ID coverage, request provenance and rejected missing records');
+  const record=id=>({type:'Feature',properties:{OBJECTID:id},geometry:{type:'LineString',coordinates:[[0,0],[1,1]]}});
+  const respond=(inventory,records)=>{globalThis.fetch=async(url,options={})=>{const query=options.body instanceof URLSearchParams?options.body:new URL(url).searchParams;return new Response(JSON.stringify(query.get('returnIdsOnly')==='true'?{objectIds:inventory}:query.has('objectIds')?{type:'FeatureCollection',features:records}:{name:'LION'}),{status:200});};};
+  for(const invalid of [[null],[false],[-1],[1.5],[0,0]]){respond(invalid,[]);await assert.rejects(fetchNYC(source,CONEY_BOUNDS),/invalid object ID list/);}
+  for(const identity of [null,'',false]){respond([0],[record(identity)]);await assert.rejects(fetchNYC(source,CONEY_BOUNDS),/feature identity/);}
+  respond([0],[record(0)]);assert.equal((await fetchNYC(source,CONEY_BOUNDS)).data.features[0].properties.OBJECTID,0,'explicit zero identity is valid');
+  respond([0],[record(0),record(0)]);await assert.rejects(fetchNYC(source,CONEY_BOUNDS),/duplicate LION feature identity/);
+  respond([0],[record(0),record(1)]);await assert.rejects(fetchNYC(source,CONEY_BOUNDS),/feature identity/);
+  respond([0],[{...record(0),properties:null}]);await assert.rejects(fetchNYC(source,CONEY_BOUNDS),/Missing LION feature properties/);
+  console.log('PASS LION POST batches, exact ID coverage, request provenance and rejected missing, duplicate or invalid records');
 }finally{globalThis.fetch=nativeFetch;}

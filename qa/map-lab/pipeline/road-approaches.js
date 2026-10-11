@@ -4,18 +4,13 @@ import {compatibleStructure,profileHeight,STRUCTURE_RULES} from './infrastructur
 import {GROUND_LEVEL_RULES} from './ground-levels.js';
 import {createShapeQuery,pointBounds} from './shape-query.js';
 import {isGroundLevel,isBridgeLevel} from './physical-level.js';
+import {pathPosition} from './geometry-distance.js';
+export {pathPosition} from './geometry-distance.js';
 
 export const APPROACH_RULES=Object.freeze({stationTolerance:.01,pointTolerance:1e-6});
 const ground=r=>isGroundLevel(r)&&r.tags.highway!=='steps';
 const inside=(point,feature)=>feature.shapes.some(s=>inShape(...point,s));
 const distance=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-export function pathPosition(points,point){
-  let station=0,best={distance:Infinity};
-  for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);if(!length)continue;
-    const t=Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dz)/(length*length))),p=[a[0]+dx*t,a[1]+dz*t],d=distance(p,point);
-    if(d<best.distance)best={distance:d,station:station+t*length,point:p,index:i-1,t};station+=length;
-  }return best;
-}
 function coveredIntervals(points,feature){
   const intervals=[];let station=0;
   for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],length=distance(a,b),cuts=segmentCuts(a,b,feature.shapes);for(let k=1;k<cuts.length;k++){const t=(cuts[k-1]+cuts[k])/2;if(inside([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],feature))intervals.push([station+length*cuts[k-1],station+length*cuts[k]]);}station+=length;}return intervals;
@@ -26,6 +21,7 @@ const deckAnchor=(deck,point,station)=>({kind:'deck',point,station,source:deck.i
 // a common terrain anchor; adjacent branches therefore keep their existing join.
 export function resolveRoadApproaches(plan,{note}){
   const network=[...(plan.roadNetwork||[])].sort((a,b)=>a.id.localeCompare(b.id)),roadByID=new Map(plan.roads.map(r=>[r.id,r])),decks=plan.details.filter(f=>f.sourceId==='nyc-transport'&&f.elevationProfile),ends=new Map(),adjacent=new Map(),edges=[];
+  const diagnosticByID=new Map([...network,...plan.roads].map(r=>[r.id,r]));
   for(const r of network){
     if(isBridgeLevel(r))for(const at of [0,r.nodes.length-1]){const matches=decks.filter(d=>compatibleStructure(r,d)&&inside(r.points[at],d));if(matches.length!==1)continue;const node=r.nodes[at];if(!ends.has(node))ends.set(node,[]);ends.get(node).push({deck:matches[0],road:r});}
     if(!ground(r))continue;
@@ -58,12 +54,12 @@ export function resolveRoadApproaches(plan,{note}){
     }
     chain.knots.sort((a,b)=>a.station-b.station||a.source.localeCompare(b.source));
     const conflicts=new Set();for(let i=0;i<chain.knots.length;){let end=i+1;while(end<chain.knots.length&&chain.knots[end].station-chain.knots[end-1].station<=APPROACH_RULES.stationTolerance)end++;const group=chain.knots.slice(i,end).filter(k=>k.kind==='sample');if(group.length>1&&Math.max(...group.map(k=>k.value))-Math.min(...group.map(k=>k.value))>STRUCTURE_RULES.conflictTolerance)for(const k of group)conflicts.add(k);i=end;}
-    if(conflicts.size){for(const id of chain.wayIDs)note(roadByID.get(id),'Conflicting projected approach observations; those stations are excluded and raw readings retained.','approach-sample-conflict');chain.knots=chain.knots.filter(k=>!conflicts.has(k));}
+    if(conflicts.size){for(const id of chain.wayIDs)note(diagnosticByID.get(id),'Conflicting projected approach observations; those stations are excluded and raw readings retained.','approach-sample-conflict');chain.knots=chain.knots.filter(k=>!conflicts.has(k));}
     for(const id of chain.wayIDs){
       const road=network.find(r=>r.id===id),matches=covered(road),ambiguous=new Set();
       for(let i=0;i<matches.length;i++)for(let j=i+1;j<matches.length;j++)if(matches[i].intervals.some(a=>matches[j].intervals.some(b=>Math.min(a[1],b[1])-Math.max(a[0],b[0])>APPROACH_RULES.stationTolerance))){ambiguous.add(matches[i]);ambiguous.add(matches[j]);}
       for(const match of matches)if(!ambiguous.has(match)){const f=match.feature;if(!providers.has(f))providers.set(f,new Set());providers.get(f).add(chain);}
-      if(ambiguous.size)note(roadByID.get(id),'Multiple roadbed polygons cover the same approach interval; ambiguous roadbeds retain terrain elevation.','ambiguous-approach-roadbed');
+      if(ambiguous.size)note(diagnosticByID.get(id),'Multiple roadbed polygons cover the same approach interval; ambiguous roadbeds retain terrain elevation.','ambiguous-approach-roadbed');
       // Uncovered OSM ribbons use the same connected profile as the measured outline.
       const f=roadByID.get(id);if(f){f.roadElevation??={chains:[],owners:[]};f.roadElevation.chains.push(chain);f.roadElevation.owners.push(road);f.surfaceHeight=STRUCTURE_RULES.deckOffset;f.groundSurface=true;f.mergeMasks=[...(f.mergeMasks||[]),...chain.knots.filter(k=>k.kind==='deck').flatMap(k=>k.shapes)];}
     }
@@ -73,8 +69,8 @@ export function resolveRoadApproaches(plan,{note}){
     const usedDecks=new Set([...assigned].flatMap(c=>c.knots.filter(k=>k.kind==='deck').map(k=>k.source)));feature.mergeMasks=decks.filter(d=>usedDecks.has(d.id)).flatMap(d=>d.shapes);
   }
   for(const f of [...plan.roads,...providers.keys()].filter(f=>f.roadElevation)){
-    f.merge.attributes.roadElevation={estimated:true,method:'Connected approach interpolation; measured spots and shared deck constraints, estimated terrain at network endpoints',parameters:APPROACH_RULES,chains:f.roadElevation.chains};
-    f.merge.evidence.push('Connected approach profile retained across OSM way splits; original footprint unchanged. Covered deck area is represented by its structure surface.');
+    f.render.attributes.roadElevation={estimated:true,method:'Connected approach interpolation; measured spots and shared deck constraints, estimated terrain at network endpoints',parameters:APPROACH_RULES,chains:f.roadElevation.chains};
+    f.render.evidence.push('Connected approach profile retained across OSM way splits; original footprint unchanged. Covered deck area is represented by its structure surface.');
     plan.issues.push({id:f.id,code:'estimated-road-approach',severity:'info',message:'Connected road grade uses measured spot heights where uniquely associated, deck endpoint constraints and estimated terrain at network endpoints. Crossfall and the connecting grade remain estimates.'});
   }
   plan.approaches=chains;
@@ -98,8 +94,9 @@ export function approachHeight(field,x,z,terrain){
 
 export function approachSeam(chain,anchor){
   const points=anchor.station===0?chain.points:[...chain.points].reverse();
+  let entered=points.length>0&&distanceToShapes(points[0],anchor.shapes)<=APPROACH_RULES.pointTolerance;
   for(let i=1;i<points.length;i++){
     const a=points[i-1],b=points[i],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),cuts=segmentCuts(a,b,anchor.shapes);if(!length)continue;
-    for(let k=1;k<cuts.length;k++){const middle=(cuts[k-1]+cuts[k])/2,p=[a[0]+dx*middle,a[1]+dz*middle];if(!anchor.shapes.some(s=>inShape(...p,s)))return {point:[a[0]+dx*cuts[k-1],a[1]+dz*cuts[k-1]],direction:[dx/length,dz/length]};}
+    for(let k=1;k<cuts.length;k++){const middle=(cuts[k-1]+cuts[k])/2,p=[a[0]+dx*middle,a[1]+dz*middle];if(anchor.shapes.some(s=>inShape(...p,s)))entered=true;else if(entered)return {point:[a[0]+dx*cuts[k-1],a[1]+dz*cuts[k-1]],direction:[dx/length,dz/length]};}
   }return null;
 }

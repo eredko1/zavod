@@ -1,0 +1,119 @@
+{
+  "file": "land-context-samples.json.gz",
+  "sha256": "4d43f9db2bbc64c36fcc6665ef358af87b93c91d3f1f3746a22041097d03761a",
+  "description": "One unmodified captured record and full layer metadata per original NYC land/context service. Offline tests construct an inventory for those selected records. Complete bounded area responses remain in ignored local evidence; no runtime fallback.",
+  "sources": [
+    {
+      "sourceId": "nyc-parking-2022",
+      "fetchedAt": "2026-09-29T01:24:39.579Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Parking_Lot_2022/FeatureServer/13",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 12025
+    },
+    {
+      "sourceId": "nyc-plazas-2022",
+      "fetchedAt": "2026-09-29T01:24:40.015Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Plaza_2022/FeatureServer/16",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 1276
+    },
+    {
+      "sourceId": "nyc-parks-2022",
+      "fetchedAt": "2026-09-29T01:24:41.237Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Park_2022/FeatureServer/12",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 7467
+    },
+    {
+      "sourceId": "nyc-open-space-2022",
+      "fetchedAt": "2026-09-29T01:24:42.023Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Open_Space_No_Park_2022/FeatureServer/11",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 10111
+    },
+    {
+      "sourceId": "nyc-sidewalk-lines-2022",
+      "fetchedAt": "2026-09-29T01:24:42.752Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Sidewalk_Line_2022/FeatureServer/23",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 28064
+    },
+    {
+      "sourceId": "nyc-pools-2022",
+      "fetchedAt": "2026-09-29T01:24:43.145Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Swimming_Pool_2022/FeatureServer/24",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 14722
+    },
+    {
+      "sourceId": "nyc-construction-2022",
+      "fetchedAt": "2026-09-29T01:24:43.522Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Under_Construction_Unknown_2022/FeatureServer/26",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID",
+      "objectId": 1089
+    },
+    {
+      "sourceId": "nyc-pavement-carto-2022",
+      "fetchedAt": "2026-09-29T01:24:44.282Z",
+      "bounds": {
+        "west": -73.99,
+        "south": 40.575,
+        "east": -73.96,
+        "north": 40.59
+      },
+      "sourceURL": "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/Pavement_Edge_Carto_2022/FeatureServer/15",
+      "attribution": "The New York City Office of Technology & Innovation funded and coordinated the MYCMap update project. The Sanborn Map Company Inc. produced the data, and CARSI (Center for Advanced Analysis of Spatial Information) at Hunter College managed the project and conducted quality assurance for the data product.",
+      "objectIdField": "OBJECTID_1",
+      "objectId": 20200
+    }
+  ]
+}

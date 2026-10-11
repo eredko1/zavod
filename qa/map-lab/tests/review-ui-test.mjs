@@ -9,7 +9,7 @@ try {
   const placement=await page.evaluate(async()=>{
     const g=window.__generator,bounds={south:0,west:0,north:.001,east:.001},ring=[[0,0],[.001,0],[.001,.001],[0,.001],[0,0]];
     g.load({bounds,data:{elements:[{type:'node',id:99,lat:.0005,lon:.0005,tags:{amenity:'bench'}}]},nyc:[{sourceId:'nyc-boardwalk',bounds,data:{type:'FeatureCollection',features:[{type:'Feature',properties:{source_id:1,feat_code:4300},geometry:{type:'Polygon',coordinates:[ring]}}]}}]});await g.generate();
-    const w=g.world,f=w.plan.details.find(f=>f.id==='node/99'),base=f.attributes.placement.value;
+    const w=g.world,f=w.plan.details.find(f=>f.id==='node/99'),base=f.attributes.placement.value;if(f.render.attributes.placement.value!==base)throw Error('Actual prop placement absent from render log');
     w.setSourceVisible('nyc-boardwalk',false);const hidden=f.attributes.placement.value,ground=w.groundAt(...f.point);w.setSourceVisible('nyc-boardwalk',true);
     return {base,hidden,ground,restored:f.attributes.placement.value};
   });
@@ -28,6 +28,14 @@ try {
     next.dispose();root.remove();return {afterDispose,calls,inert,zoom};
   });
   assert.deepEqual(lifecycle,{afterDispose:0,calls:1,inert:true,zoom:.75});assert.deepEqual(errors,[]);
+  const logRefresh=await page.evaluate(async()=>{
+    const {createMergeLog}=await import('/qa/map-lab/ui/live-merge-log.js'),root=document.getElementById('layout').cloneNode(true);document.body.append(root);const log=createMergeLog(root),record={canonicalId:'observation',status:'retained',ruleId:'unknown',members:[{id:'a'},{id:'b'}],attributes:{},conflicts:[],evidence:['original']},value={summary:{matched:0,suppressed:0,conflicts:0},decisions:[record]},selected=root.querySelector('#merge-selected');
+    log.update(value);const button=root.querySelector('#merge-results button');button.click();const original=JSON.parse(selected.textContent).evidence;
+    log.update({...value,decisions:[{...record,evidence:['replacement']}]});const replacement=JSON.parse(selected.textContent).evidence,callback=button.onclick;
+    const alternative={...record,members:[{id:'b'},{id:'a'}],evidence:['associated']};log.update({...value,decisions:[record,alternative]});root.querySelectorAll('#merge-results button')[1].click();log.update({...value,decisions:[{...alternative,evidence:['associated replacement']},record]});const associated=JSON.parse(selected.textContent).evidence;
+    log.update({...value,decisions:[]});const removed=selected.textContent;log.update(value);log.dispose();root.querySelector('#merge-results button').click();const disposed=selected.textContent;root.remove();return{original,replacement,associated,callback,removed,disposed};
+  });
+  assert.deepEqual(logRefresh,{original:['original'],replacement:['replacement'],associated:['associated replacement'],callback:null,removed:'Choose a result to inspect.',disposed:'Choose a result to inspect.'});
   const multipart=await page.evaluate(()=>{const g=window.__generator,bounds={south:0,west:0,north:.001,east:.001};g.load({bounds,nyc:[{sourceId:'nyc-elevation',bounds,data:{features:[{type:'Feature',properties:{source_id:1,sub_code:300000,elevation:10},geometry:{type:'MultiPoint',coordinates:[[.0002,.0002],[.0008,.0008]]}}]}}]});return {svg:[...document.querySelectorAll('[data-nyc-feature]')].map(p=>p.dataset.nycFeature).sort(),plan:g.previewPlan.details.map(f=>f.id).sort()};});
   assert.equal(multipart.svg.length,2);assert.deepEqual(multipart.svg,multipart.plan);
   const malformed=await page.evaluate(async()=>{

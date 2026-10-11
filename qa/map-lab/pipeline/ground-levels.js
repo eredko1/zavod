@@ -16,7 +16,7 @@ export function resolveGroundLevels(plan){
     }
     if(!bridge||bridge.distance>GROUND_LEVEL_RULES.centerlineDistance||ground&&ground.distance<=bridge.distance+GROUND_LEVEL_RULES.separation)continue;
     const decision={id:sample.id,status:'elevated-road',estimated:true,structure:structures[0].id,bridge,ground,rule:GROUND_LEVEL_RULES};decisions.push(decision);
-    sample.merge.attributes.groundEligibility=decision;
+    sample.render.attributes.groundEligibility=decision;
     plan.issues.push({id:sample.id,code:'spot-level-association',severity:'info',message:`Spot retained but excluded from bare-ground interpolation: within ${bridge.distance.toFixed(2)} m of elevated ${bridge.id} inside ${structures[0].id}; nearest ground road ${ground?.distance.toFixed(2)??'unavailable'} m. Inferred surface role, not a changed observation or a deck-height measurement.`});
   }
   plan.groundSampleDecisions=decisions;

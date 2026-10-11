@@ -6,27 +6,27 @@ const REFERENCE_OFFSET=.06, SURFACE_OFFSET=.04, DEFAULT_GAUGE=1.435;
 export const INFRASTRUCTURE_DEFAULTS=Object.freeze({wallHeight:1.5,wallWidth:.25,fenceHeight:1.2,fenceWidth:.08});
 
 // Source classifications are physical roles, not evidence of dimensions or deck elevation.
-export function infrastructureFeature(base,source,item,issues){
+export function infrastructureFeature(base,source,item,issues,measurementsOnly=false){
   const kind=source.kind,type=TYPES[kind][Number(base.tags.feat_code)];
   base.infrastructure=type||'unknown';base.rule='reference';base.reference=true;
-  const reference=message=>{base.surfaceHeight=REFERENCE_OFFSET;item.status='reference';item.reason=message;issues.push({id:base.id,dataset:source.dataset,code:'infrastructure-reference',severity:'warning',message});};
+  const reference=message=>{if(!measurementsOnly)base.surfaceHeight=REFERENCE_OFFSET;item.status='reference';item.reason=message;issues.push({id:base.id,dataset:source.dataset,code:'infrastructure-reference',severity:'warning',message});};
   if(!type){reference(`Unsupported ${kind} feature code ${base.tags.feat_code}; original geometry retained as an outline.`);return base;}
   if(kind==='transport'){
     base.requiresElevation=true;reference(`${type}: deck elevation must be resolved independently of ground. Unresolved structures remain outlines.`);
   }else if(kind==='railroad'&&!['rail-fence','abandoned-rail'].includes(type)){
-    base.rule='rail';base.dimensions={width:DEFAULT_GAUGE};base.attributes.width={value:DEFAULT_GAUGE,unit:'metres',estimated:true,source:'rail gauge default'};
+    base.rule='rail';if(!measurementsOnly){base.dimensions={width:DEFAULT_GAUGE};base.attributes.width={value:DEFAULT_GAUGE,unit:'metres',estimated:true,source:'rail gauge default'};}
     base.requiresElevation=type!=='rail'||String(base.tags.sub_code)!=='240000';base.reference=base.requiresElevation;
     if(base.requiresElevation)reference(`${type}: no measured height in the railroad response; needs an unambiguous structure/elevation association.`);
-    else{item.status='rendered';base.estimates.push('Rail elevation follows interpolated terrain; gauge uses the standard-gauge rule until matched to a tagged track.');}
+    else{item.status='rendered';if(!measurementsOnly)base.estimates.push('Rail elevation follows interpolated terrain; gauge uses the standard-gauge rule until matched to a tagged track.');}
   }else if(kind==='retaining-walls'||type==='rail-fence'){
-    const wall=kind==='retaining-walls';base.rule=wall?'wall':'fence';base.reference=false;base.dimensions={height:wall?INFRASTRUCTURE_DEFAULTS.wallHeight:INFRASTRUCTURE_DEFAULTS.fenceHeight,width:wall?INFRASTRUCTURE_DEFAULTS.wallWidth:INFRASTRUCTURE_DEFAULTS.fenceWidth};
-    base.estimates.push(`${type}: simple ${base.rule} on the mapped alignment; height=${base.dimensions.height} m and width=${base.dimensions.width} m are rule estimates. Ground placement does not establish the retaining wall's actual top or bottom.`);
+    const wall=kind==='retaining-walls';base.rule=wall?'wall':'fence';base.reference=false;if(!measurementsOnly){base.dimensions={height:wall?INFRASTRUCTURE_DEFAULTS.wallHeight:INFRASTRUCTURE_DEFAULTS.fenceHeight,width:wall?INFRASTRUCTURE_DEFAULTS.wallWidth:INFRASTRUCTURE_DEFAULTS.fenceWidth};
+    base.estimates.push(`${type}: simple ${base.rule} on the mapped alignment; height=${base.dimensions.height} m and width=${base.dimensions.width} m are rule estimates. Ground placement does not establish the retaining wall's actual top or bottom.`);}
   }else if(kind==='boardwalk'||type==='beach'||type==='wetland'||['ventilation-grate','emergency-exit','transit-entrance'].includes(type)){
-    base.rule='surface';base.reference=false;base.surface=true;base.surfaceKind=kind==='boardwalk'?'wood':type==='beach'?'sand':type==='wetland'?'land':'paved';base.surfaceHeight=SURFACE_OFFSET;
-    base.estimates.push(`${type} follows interpolated terrain with ${SURFACE_OFFSET} m display offset; no surveyed local surface height.`);
+    base.rule='surface';base.reference=false;base.surface=true;base.surfaceKind=kind==='boardwalk'?'wood':type==='beach'?'sand':type==='wetland'?'land':'paved';if(!measurementsOnly){base.surfaceHeight=SURFACE_OFFSET;
+    base.estimates.push(`${type} follows interpolated terrain with ${SURFACE_OFFSET} m display offset; no surveyed local surface height.`);}
   }else if(kind==='hydro-structures'){
     const elevation=sourceNumber(base.tags.elevation);
-    if(elevation!==null){base.rule='surface';base.reference=false;base.surface=true;base.surfaceKind='paved';base.surfaceHeight=0;base.absoluteElevation=elevation*.3048;base.attributes.elevation={value:base.absoluteElevation,unit:'metres',raw:base.tags.elevation,source:'NYC hydro structure elevation (feet)',estimated:false};base.estimates.push('Surface top only; thickness/supports are unknown. Elevation datum alignment with NYC ground samples is provisional.');}
+    if(elevation!==null){base.rule='surface';base.reference=false;base.surface=true;base.surfaceKind='paved';if(!measurementsOnly)base.surfaceHeight=0;base.absoluteElevation=elevation*.3048;base.attributes.elevation={value:base.absoluteElevation,unit:'metres',raw:base.tags.elevation,source:'NYC hydro structure elevation (feet)',estimated:false};if(!measurementsOnly)base.estimates.push('Surface top only; thickness/supports are unknown. Elevation datum alignment with NYC ground samples is provisional.');}
     else reference(`${type}: footprint retained; no usable surface elevation or structure height.`);
   }else if(kind==='hydrography'){
     base.requiresWaterElevation=true;reference(`${type}: water outline retained until a compatible water-level observation is available; no sloping water surface is inferred from ground.`);

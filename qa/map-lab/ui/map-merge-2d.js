@@ -9,7 +9,7 @@ export function display2DMerge(svg, plan) {
   for(const e of svg.querySelectorAll('[data-merge-hidden]')){e.style.display='';delete e.dataset.mergeHidden;}
   for(const e of svg.querySelectorAll('[data-merge-original]')){e.setAttribute('d',e.dataset.mergeOriginal);e.removeAttribute('mask');delete e.dataset.mergeOriginal;}
   if(!plan?.merge.enabled)return;
-  const suppressed=new Set(plan.merge.suppressed), pathsByID=new Map([...plan.roads.filter(r=>r.sourcePaths||r.mergeMasks),...(plan.details||[]).filter(f=>f.mergeMasks)].map(r=>[r.id,r]));
+  const suppressed=new Set([...plan.merge.suppressed,...(plan.render?.excluded||[])]), pathsByID=new Map([...plan.roads.filter(r=>r.sourcePaths||r.mergeMasks),...(plan.details||[]).filter(f=>f.mergeMasks)].map(r=>[r.id,r]));
   const defs=document.createElementNS(ns,'defs');defs.dataset.mergeDefs='';svg.prepend(defs);
   const outlines=new Map(),queries=new Map();let sequence=0;
   const element=(name,attrs,parent)=>{const e=document.createElementNS(ns,name);for(const [key,value] of Object.entries(attrs))e.setAttribute(key,value);parent.append(e);return e;};

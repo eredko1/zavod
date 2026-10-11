@@ -1,9 +1,10 @@
-import * as THREE from 'three';
+import * as THREE from '../../../vendor/three/build/three.module.js';
 import { clipSurfaceGeometry } from './map-merge-mesh.js';
 import { buildDetails } from './osm-detail-meshes.js';
 import { boundGeometry } from './bounded-geometry.js';
 import {clipSolidGeometry} from './solid-clip.js';
 import {rollbackMeshes} from './mesh-transaction.js';
+import {mapMaterial} from './map-material.js';
 
 function shapeOf(p) {
   const points = r => r.map(([x, z]) => new THREE.Vector2(x, -z));
@@ -14,14 +15,15 @@ function shapeOf(p) {
 }
 export function buildScene(plan) {
   const group = new THREE.Group(), selectable = [];
-  const solid = new THREE.MeshStandardMaterial({ color: 0xdce1df, roughness: 1 }), estimated = new THREE.MeshStandardMaterial({ color: 0xe5c394, roughness: 1 });
+  const solid = mapMaterial(0xdce1df), estimated = mapMaterial(0xe5c394);
   const asphalt = new THREE.MeshBasicMaterial({ color: 0x727d82, side: THREE.DoubleSide }), path = new THREE.MeshBasicMaterial({ color: 0xc2c5bc, side: THREE.DoubleSide });
   const edge = new THREE.LineBasicMaterial({ color: 0x84928f, transparent: true, opacity: 0.45 });
-  const add = (g, material, f, parent = group) => { g=f.height?clipSolidGeometry(g,f.clipBounds):boundGeometry(g,f.clipBounds);if (f.mergeMasks) g = clipSurfaceGeometry(g, f.mergeMasks); const m = new THREE.Mesh(g, material); m.userData.feature = f; parent.add(m); selectable.push(m); return m; };
+  const add = (g, material, f, parent = group) => { g=f.height&&(!f.mesh||f.mesh.topology.closed)?clipSolidGeometry(g,f.clipBounds):boundGeometry(g,f.clipBounds);if (f.mergeMasks) g = clipSurfaceGeometry(g, f.mergeMasks); const m = new THREE.Mesh(g, material); m.userData.feature = f; parent.add(m); selectable.push(m); return m; };
   for (const b of plan.buildings) {
     if (!b.extrude || b.suppressed || b.reference) continue;
     const building = new THREE.Group(); building.userData.building = b;
     try {
+      if(b.mesh){if(!b.mesh.topology)throw Error('Native geometry requires its render topology audit.');const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(b.mesh.positions,3));geometry.computeVertexNormals();add(geometry,solid,b,building);group.add(building);continue;}
       for (const p of b.shapes) {
         const geometry = new THREE.ExtrudeGeometry(shapeOf(p), { depth: b.height.top - b.height.bottom, bevelEnabled: false, steps: 1 });
         if (!geometry.attributes.position.count) { geometry.dispose(); throw new Error('Triangulation produced no faces.'); }
@@ -29,6 +31,8 @@ export function buildScene(plan) {
         const mesh=add(geometry, b.height.estimated ? estimated : solid, b, building);
         const outline=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), edge);outline.userData.feature=b;building.add(outline);
       }
+      let bottom=Infinity,top=-Infinity;for(const mesh of building.children)if(mesh.isMesh&&mesh.geometry.attributes.position.count){mesh.geometry.computeBoundingBox();bottom=Math.min(bottom,mesh.geometry.boundingBox.min.y);top=Math.max(top,mesh.geometry.boundingBox.max.y);}
+      if(Number.isFinite(bottom)&&Number.isFinite(top)){b.collisionBounds={bottom,top};if(b.render)b.render.attributes.collision={verticalBounds:b.collisionBounds,estimated:true,method:'Footprint extrusion collision; vertical bounds use the actual rendered Float32 geometry'};}
       group.add(building);
     } catch (e) { b.failed = true; dispose(building, false); plan.issues.push({ id: b.id, code: 'mesh-error', severity: 'error', message: `Skipped: ${e.message}` }); }
   }
@@ -50,7 +54,7 @@ export function buildScene(plan) {
       if (vertices.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); add(g, material, r); }
     } catch (e) { rollbackMeshes(selectable,start);r.failed = true; plan.issues.push({ id: r.id, code: 'road-mesh-error', severity: 'error', message: e.message }); }
   }
-  const details = buildDetails(plan, shapeOf, [...plan.roads,...plan.buildings].filter(f=>f.reference&&!f.suppressed)); group.add(details.group); selectable.push(...details.selectable);
+  const details = buildDetails(plan, shapeOf, [...plan.roads,...plan.buildings].filter(f=>f.reference&&!f.suppressed).concat(plan.roads.filter(f=>f.unresolvedPaths?.length).map(f=>({...f,paths:f.unresolvedPaths,shapes:[],reference:true,elevationProfile:null,groundSurface:false})))); group.add(details.group); selectable.push(...details.selectable);
   const failed = new Set([...plan.buildings, ...plan.roads, ...plan.details].filter(f => f.failed).map(f => f.id));
   for (const c of plan.coverage) if (failed.has(c.id)) { c.status = 'error'; c.reason = 'Mesh generation failed; see generation log.'; }
   // Own even unused materials so repeated rebuilds release all GPU resources.
