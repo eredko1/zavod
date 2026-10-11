@@ -18,6 +18,7 @@ await pg.evaluate(async (LINE) => {
   const THREE = await import('three'), { MeshBVH, acceleratedRaycast } = await import('three-mesh-bvh'), ctx = window.__ctx, U = window.__game.subway.line(LINE);
   const IN = 0.05, CELL = 16, hash = new Map(), key = (i, j) => i + ',' + j;
   ctx.colliders.forEach((bx, n) => { if (!bx?.isBox3 || bx.isEmpty()) return; const s = bx.max.clone().sub(bx.min); if (s.x > 200 || s.z > 200) return;   // ground / zone slabs
+    if (s.x > 30 && s.z > 30) return;   // a rotated building's conservative AABB (osmkit footprint), not drawn geometry: the Ocean Pkwy shop's reaches the el, its walls are 15 m off
     for (let i = Math.floor(bx.min.x / CELL); i <= Math.floor(bx.max.x / CELL); i++) for (let j = Math.floor(bx.min.z / CELL); j <= Math.floor(bx.max.z / CELL); j++) (hash.get(key(i, j)) || hash.set(key(i, j), []).get(key(i, j))).push(n); });
   const trees = []; ctx.scene.traverse((o) => { if (!o.isInstancedMesh || !/leaf|canopy|tree/i.test(o.name + '|' + (o.material?.name || ''))) return; if (/horizon/.test(o.name)) return;   // horizon: far backdrop, never near the el
     o.updateMatrixWorld(true); o.geometry.computeBoundingSphere(); const bs = o.geometry.boundingSphere, m = new THREE.Matrix4(), c = new THREE.Vector3();
@@ -70,6 +71,8 @@ const all = await pg.evaluate(async ({ cycle, DT }) => {
 
 const by = {}; for (const h of all) (by[h.kind] ||= []).push(h);
 for (const k of Object.keys(by)) { console.log(`  ${k}: ${by[k].length}`); for (const h of by[k].filter((_, i) => i % Math.ceil(by[k].length / 8) === 0)) console.log('   ', JSON.stringify(h)); }
+// where: clusters of hits 40 m across, with how many and what they hit (the box or tree)
+for (const k of ['collider', 'tree']) { const cl = []; for (const h of by[k] || []) { const c = cl.find((q) => Math.hypot(q.at[0] - h.at[0], q.at[2] - h.at[2]) < 40); if (c) c.n++; else cl.push({ at: h.at, n: 1, what: h.box || h.tree || '', name: h.name || '' }); } for (const c of cl) console.log(`  ${k} x${c.n} near ${c.at.join(',')} ${JSON.stringify(c.what)} ${c.name}`); }
 for (const k of ['collider', 'tree']) ok(!by[k], `no ${k} inside a ${LINE} car over the whole run`, by[k] ? `${by[k].length} hits, first at t ${by[k][0].t} s, car at ${by[k][0].at}` : '');
 const off = [...(by['no deck'] || []), ...(by['over deck'] || []), ...(by['sunk in deck'] || [])];
 ok(!off.length, `every ${LINE} truck rides on a deck just under its rails`, off.length ? `${off.length} off-deck samples, first ${JSON.stringify(off[0])}` : '');

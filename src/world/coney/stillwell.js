@@ -31,7 +31,6 @@ export const STILLWELL = { x0: -88, x1: -24, zS: -258, zC: -300, zP0: -266, zP1:
 const ISLANDS = [[-82, -74], [-68, -60], [-53, -46], [-38, -29]];
 const TRACKS = [   // track 2 was an 'F' too: its shuttle train (not rideable) sent players to the wrong island — the rideable F is x −54.8 (coney/subway.js)
   { x: -83.8, r: 'D' }, { x: -71, r: 'D' }, { x: -58.2, r: 'D' }, { x: -54.8, r: 'F' }, { x: -44, r: 'Q' }, { x: -40, r: 'Q' }, { x: -27.2, r: 'N' }];
-const PORTAL_HW = 2.0;   // half width of the facade openings the F and Q run out through (an R160 is 3.0 m wide)
 const ROUTE = { D: '#ff6319', F: '#ff6319', N: '#fccc0a', Q: '#fccc0a' };
 const STAIR = { z0: -276, run: 13.4, w: 3.0 }, CAR = 18.4, NCAR = 8;
 
@@ -52,7 +51,7 @@ export function buildStillwell(world, M) {
   const DOORS = [[-72, -67], [-58.5, -53.5], [-45, -40]], FT = 0.8, fz = S.zS;
   // the F and the Q run out of the terminal's south end over the head house: the facade is open above the deck where their tracks
   // pass (a solid facade up to 11.8 m stood across both, and the trains drove through it)
-  const PORTALS = TRACKS.filter((t) => t.x === -54.8 || t.x === -40).map((t) => [t.x - PORTAL_HW, t.x + PORTAL_HW]);
+  const PORTALS = [[-60.5, -33.5]];   // one opening over the F and Q tracks both ways (out on −54.8 / −44, back keeping right 4 m over)
   const fbox = (key, a, b) => { if (b[1] <= S.DECK_B) return B.box(key, a, b); if (a[1] < S.DECK_B) B.box(key, a, [b[0], S.DECK_B, b[2]]);
     let x = a[0]; for (const [p0, p1] of [...PORTALS, [b[0], b[0]]]) { const x1 = Math.min(p0, b[0]); if (x1 > x) B.box(key, [x, Math.max(a[1], S.DECK_B), a[2]], [x1, b[1], b[2]]); x = Math.max(x, p1); } };
   { let x = S.x0; for (const [a, b] of [...DOORS, [S.x1, S.x1]]) { if (a > x) fbox('terracotta', [x, 0, fz - FT], [a, 11, fz]); x = b; }
