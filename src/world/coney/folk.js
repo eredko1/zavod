@@ -20,6 +20,7 @@ import { STILLWELL } from './stillwell.js';
 import { BW } from './shore.js';
 import { buildHustlers, hustlerTaken } from './hustlers.js';
 import { streetAt } from './fronts.js';
+import { solidAt, lineClear, pushOut } from '../../player/collision.js';
 
 const hash = (x, z, k = 0) => { const v = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
 const pick = (a, h = Math.random()) => a[Math.floor(h * a.length) % a.length];
@@ -152,6 +153,7 @@ function disposeFig(f) { f.group.traverse((o) => { if (o.material?.userData?.tin
 function activate(s) {
   const { world, ctx } = F; const p = persona(s);
   const mode = s.pose === 'lie' ? 'lie' : s.pose === 'sit' ? 'sit' : s.pose === 'walk' ? 'walk' : 'stand';
+  if (!s.E && spotInSolid(s)) { retireSpot(s); return; }   // something solid went up on the spot since the crowd was built
   let E = F.cache.find((e) => e.s === s); if (E) F.cache.splice(F.cache.indexOf(E), 1);
   if (!E) {
     const fig = makeFig(s, mode === 'sit');
@@ -185,16 +187,24 @@ function deactivate(E, keep = true) {
 /** walkers ping-pong along their heading (boardwalk strollers along the deck, bathers along the waterline), clear of colliders */
 function planLeg(E) {
   const s = E.s; let yaw = s.ry || 0;
-  if (s.cross) { E.leg = { ...s.cross.leg }; E.atEnd = true; return; }
-  if (s.leg) { E.leg = { ...s.leg }; return; }   // a set path: in and out of a shop door, up an aisle
+  if (s.cross) { E.leg = clearLeg(s.cross.leg, s.y || 0); E.atEnd = true; if (!E.leg) E.mode = 'stand'; return; }
+  if (s.leg) { E.leg = clearLeg(s.leg, s.y || 0); if (!E.leg) E.mode = 'stand'; return; }   // a set path: in and out of a shop door, up an aisle
   if (s.zone === 'water' || s.zone === 'bw') yaw = Math.sin(yaw) >= 0 ? Math.PI / 2 : -Math.PI / 2;
   if (s.zone === 'subway') yaw = 0;   // pace along the platform (they face the tracks: walking that way took them off the edge)
-  const fx = Math.sin(yaw), fz = Math.cos(yaw), cols = F.ctx.colliders, L = 7 + hash(s.x, s.z, 40) * 7;
-  const free = (x, z) => !cols.some((b) => x > b.min.x - 0.4 && x < b.max.x + 0.4 && z > b.min.z - 0.4 && z < b.max.z + 0.4 && b.max.y > (s.y || 0) + 0.3 && b.min.y < (s.y || 0) + 1.8);
+  const fx = Math.sin(yaw), fz = Math.cos(yaw), G = F.ctx.player.solids(), L = 7 + hash(s.x, s.z, 40) * 7;
+  const free = (x, z) => !solidAt(G, x, s.y || 0, z, 0.4, 0.3, 1.8);
   let a = 0, b = 0; while (a < L && free(s.x - fx * (a + 1), s.z - fz * (a + 1))) a += 1; while (b < L && free(s.x + fx * (b + 1), s.z + fz * (b + 1))) b += 1;
   if (a + b < 3) { E.mode = 'stand'; return; }
   E.leg = { ax: s.x - fx * a, az: s.z - fz * a, bx: s.x + fx * b, bz: s.z + fz * b, yaw };
 }
+/** a set path (crosswalk, shop door) can have a hydrant, a bin or a parked car on it: shift it sideways onto clear ground, or null */
+function clearLeg(L, y) {
+  const G = F.ctx.player.solids(), dx = L.bx - L.ax, dz = L.bz - L.az, len = Math.hypot(dx, dz) || 1, nx = -dz / len, nz = dx / len;
+  for (const o of [0, 0.5, -0.5, 1, -1, 1.5, -1.5]) { const ax = L.ax + nx * o, az = L.az + nz * o, bx = L.bx + nx * o, bz = L.bz + nz * o; if (lineClear(G, ax, az, bx, bz, y)) return { ...L, ax, az, bx, bz }; }
+  return null;
+}
+/** a standing / walking spot inside something solid (a planter, a bench, a wall, a parked car): nobody can stand there */
+function spotInSolid(sp) { return sp.pose !== 'lie' && sp.pose !== 'sit' && !sp.sub && !sp.train && !!F.ctx.player?.solids && !!solidAt(F.ctx.player.solids(), sp.x, sp.y || 0, sp.z, 0.15); }
 // ---- witnesses phone the cops (GTA): the nearest local who saw it pulls out a phone; ~6 s later the stars come, unless you stop them
 const _ray = new THREE.Raycaster();
 function sees(E, pos) {
@@ -229,8 +239,9 @@ function nightPeople() {
   }
 }
 /** more spots, added after the crowd is built (coney/street.js: crosswalk walkers, the sellers at the vendor tables): live only */
-/** a spot can have someone in it if nobody else stands within 0.7 m of it and it's not inside a parked car's footprint */
+/** a spot can have someone in it if nobody else stands within 0.7 m of it and it's not inside a parked car's footprint or a collider */
 function claimSpot(sp) {
+  if (spotInSolid(sp)) return false;
   const gx = Math.round(sp.x / 0.7), gz = Math.round(sp.z / 0.7), y = sp.y || 0;
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of F.taken.get(`${gx + i},${gz + j}`) || []) if (Math.abs((q.y || 0) - y) < 1 && Math.hypot(q.x - sp.x, q.z - sp.z) < 0.7) return false;
   for (const c of F.world.parkedCars || []) { if (c.gone || Math.abs(c.x - sp.x) > 3 || Math.abs(c.z - sp.z) > 3 || y > 1.5) continue; const fx = Math.cos(c.ry || 0), fz = -Math.sin(c.ry || 0), dx = sp.x - c.x, dz = sp.z - c.z;
@@ -334,6 +345,7 @@ function update(dt) {
   F.pspeed = F.pspeed * 0.8 + (Math.hypot(P.x - F.lastP.x, P.z - F.lastP.z) / Math.max(dt, 1e-3)) * 0.2; F.lastP.copy(P);
   F.tickT -= dt; if (F.tickT <= 0) { F.tickT = 0.25; tick(); }
   const cam = ctx.camera; if (F.frame % 8 === 0) { _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm); for (const E of F.active) E.inView = _fr.intersectsSphere(_sp.set(_v.set(E.pos.x, E.pos.y + 0.9, E.pos.z), 1.6)); }
+  const G = me.solids();   // walls, benches, parked cars: walkers turn back, runners slide along them
   const veh = ctx.vehicles?.mounted, car = veh?.spec?.car && veh.pos ? veh : null, cv = car ? Math.hypot(car.vel?.x || 0, car.vel?.z || 0) : 0, cfx = cv > 0.5 ? car.vel.x / cv : 0, cfz = cv > 0.5 ? car.vel.z / cv : 0;
   for (const E of F.active) {
     let speed = 0;
@@ -344,7 +356,7 @@ function update(dt) {
     }
     if (E.dive) {   // the dive: 2.5 m sideways in 0.35 s, down on the ground for 1.2 s, back up swearing
       E.dive.t += dt; const d = E.dive;
-      if (d.t < 0.35) { E.pos.x += d.x * 2.5 / 0.35 * dt; E.pos.z += d.z * 2.5 / 0.35 * dt; E.fig.group.rotation.x = -Math.min(1.35, d.t / 0.35 * 1.35); }
+      if (d.t < 0.35) { E.pos.x += d.x * 2.5 / 0.35 * dt; E.pos.z += d.z * 2.5 / 0.35 * dt; pushOut(G, E.pos); E.fig.group.rotation.x = -Math.min(1.35, d.t / 0.35 * 1.35); }
       else if (d.t > 1.55) { E.fig.group.rotation.x = 0; E.dive = null; say(E, pick(BARK.bump)); if (E.p.temper === 'soft') { E.panic = 6; E.panicYaw = Math.atan2(E.pos.x - P.x, E.pos.z - P.z); } }
       E.holder.position.copy(E.pos); continue;
     }
@@ -353,7 +365,7 @@ function update(dt) {
     if (E.angry > 0) { E.angry -= dt; E.strikeT -= dt; if (E.strikeT <= 0 && Math.hypot(P.x - E.pos.x, P.z - E.pos.z) < 2.1) strike(E); }
     if (E.panic > 0) {   // something happened: leg it away from it for a few seconds
       E.panic -= dt; speed = 4.2; const fx = Math.sin(E.panicYaw), fz = Math.cos(E.panicYaw);
-      E.pos.x += fx * speed * dt; E.pos.z += fz * speed * dt; E.yaw += Math.atan2(Math.sin(E.panicYaw - E.yaw), Math.cos(E.panicYaw - E.yaw)) * Math.min(1, dt * 8);
+      E.pos.x += fx * speed * dt; E.pos.z += fz * speed * dt; pushOut(G, E.pos); E.yaw += Math.atan2(Math.sin(E.panicYaw - E.yaw), Math.cos(E.panicYaw - E.yaw)) * Math.min(1, dt * 8);
       if (F.world.W.sandAt(E.pos.x, E.pos.z)) { const gy = F.world.W.groundHeight?.(E.pos.x, E.pos.z); if (Number.isFinite(gy)) E.pos.y = gy; }
     } else if (E.mode === 'walk' && E.leg) {
       const L = E.leg, tx = E.dir > 0 ? L.bx : L.ax, tz = E.dir > 0 ? L.bz : L.az, dx = tx - E.pos.x, dz = tz - E.pos.z, d = Math.hypot(dx, dz);
@@ -361,7 +373,7 @@ function update(dt) {
       const wait = (E.s.cross && E.atEnd && !crossOK(E)) || !!E.call;   // at the kerb: the hand is up
       if (E.s.cross && E.atEnd && !wait && !E.call) { E.atEnd = false; F.stats.crossStarts = (F.stats.crossStarts || 0) + 1; }
       if (wait && !E.call) { const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 3); }
-      else if (d < 0.3) { E.dir = -E.dir; if (E.s.cross) E.atEnd = true; } else if (!nearMe && !E.fig.hands) { speed = E.p.speed; E.pos.x += dx / d * speed * dt; E.pos.z += dz / d * speed * dt; const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 5); }
+      else if (d < 0.3) { E.dir = -E.dir; if (E.s.cross) E.atEnd = true; } else if (!nearMe && !E.fig.hands) { speed = E.p.speed; E.pos.x += dx / d * speed * dt; E.pos.z += dz / d * speed * dt; if (!E.s.sub && pushOut(G, E.pos)) E.dir = -E.dir; const want = Math.atan2(dx, dz); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 5); }
       if (E.s.zone === 'water' || F.world.W.sandAt(E.pos.x, E.pos.z)) { const gy = F.world.W.groundHeight?.(E.pos.x, E.pos.z); if (Number.isFinite(gy)) E.pos.y = gy - (E.s.zone === 'water' ? 0.2 : 0); }
     }
     if (E.call) { E.call.t -= dt; const want = Math.atan2(E.pos.x - P.x, E.pos.z - P.z); E.yaw += Math.atan2(Math.sin(want - E.yaw), Math.cos(want - E.yaw)) * Math.min(1, dt * 3); if (E.call.t <= 0) endCall(E, true); }

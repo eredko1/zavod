@@ -153,7 +153,7 @@ export function buildBrighton(world) {
     for (let x = x0 + 4; x < x1 - 4; x += 3.9) { if (((x - x0) % 110) < 8) continue; box(M.rail, x - 0.05, 0, BW.z1 - 0.1, x + 0.05, 1.0, BW.z1, 0x2d4a3a); }
     for (let x = x0; x < x1; x += 110) { box(M.rail, x + 8, 0.95, BW.z1 - 0.12, Math.min(x1, x + 110), 1.05, BW.z1, 0x2d4a3a); wbox(x + 8, 0, BW.z1 - 0.2, Math.min(x1, x + 110), 1.05, BW.z1 + 0.1); }
     for (let x = x0 + 12; x < x1; x += 30) { box(M.steel, x - 0.08, 0, BW.z0 + 0.8 - 0.08, x + 0.08, 4.6, BW.z0 + 0.8 + 0.08, 0x2d4a3a); const gl = new THREE.SphereGeometry(0.28, 10, 8); gl.translate(x, 4.8, BW.z0 + 0.8); put(M.globe, gl); }
-    for (let x = x0 + 20; x < x1; x += 21) for (const z of [BW.z0 + 1.6, BW.z1 - 1.6]) { box(M.bench, x - 1.1, 0.42, z - 0.25, x + 1.1, 0.5, z + 0.25, 0x6b4f35); box(M.bench, x - 1.1, 0.5, z + (z < BW.z0 + 5 ? -0.28 : 0.2), x + 1.1, 0.95, z + (z < BW.z0 + 5 ? -0.2 : 0.28), 0x6b4f35); } }
+    for (let x = x0 + 20; x < x1; x += 21) for (const z of [BW.z0 + 1.6, BW.z1 - 1.6]) { box(M.bench, x - 1.1, 0.42, z - 0.25, x + 1.1, 0.5, z + 0.25, 0x6b4f35); box(M.bench, x - 1.1, 0.5, z + (z < BW.z0 + 5 ? -0.28 : 0.2), x + 1.1, 0.95, z + (z < BW.z0 + 5 ? -0.2 : 0.28), 0x6b4f35); wbox(x - 1.1, 0, z - 0.3, x + 1.1, 0.5, z + 0.3); } }   // benches are solid (sat on, not walked through)
   // the sand past the bulkhead, down into the water (the same profile as Coney's)
   { const x0 = 900, x1 = BR.x1, sx = lite ? 12 : 6, zs = []; for (let z = BW.z1; z < 430; z += z < 330 ? 4 : 10) zs.push(z); const nx = Math.ceil((x1 - x0) / sx), pos = [], uv = [], idx = [];
     for (let j = 0; j < zs.length; j++) for (let i = 0; i <= nx; i++) { const x = x0 + i * sx; pos.push(x, sandHeight(x, zs[j]), zs[j]); uv.push(x / 6, zs[j] / 6); }

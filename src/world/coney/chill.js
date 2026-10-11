@@ -11,6 +11,8 @@ import { hideFolkSpot } from './folk.js';
 import { hangkit as K } from '../hangkit.js';
 import { buildFigure, nameTag } from '../deli.js';
 import { chaseQA } from './chase.js';
+import { pushOut } from '../../player/collision.js';
+const _pv = new THREE.Vector3();
 
 // crews: Russian gopniks and neighborhood hustlers. Some just roll up and talk trash, some shake you down together.
 const CREWS = {
@@ -186,7 +188,7 @@ function hurt(t, dmg, dir, by = null, hs = false) {   // by: the friend's net id
   if (t.st === 'dead') return;
   const { ctx } = C; if (!by && performance.now() < (C.counterUntil || 0)) { dmg *= 2; C.counterUntil = 0; K.toast('COUNTER', 700); }   // the hit after a parry lands double
   t.hp -= dmg;
-  if (dir) { t.pos.x += dir.x * 0.45; t.pos.z += dir.z * 0.45; }   // rocked back by the blow
+  if (dir) { t.pos.x += dir.x * 0.45; t.pos.z += dir.z * 0.45; const G = C.ctx.player?.solids?.(); if (G) pushOut(G, t.pos); }   // rocked back by the blow (not into the wall behind him)
   ctx.ai?.blood?.(t.pos.x, t.pos.z, 0.3 + Math.random() * 0.2, t.pos.y + 0.5);
   if (t.hp <= 0) {
     t.st = 'dead'; t.t = 0; t.fallK = 0; t.m.f.guard = false; t.m.f.hands = false; K.toast(`${t.name} is down`, 1200);
@@ -320,6 +322,7 @@ function update(dt, playing) {
       if (!t.path || now - t.pathT > 1500) { t.pathT = now; try { t.path = ctx.ai?.nav?.findPath?.(t.pos, goal instanceof THREE.Vector3 ? goal : new THREE.Vector3(goal.x, goal.y, goal.z), { maxExpand: 6000 }) || null; } catch { t.path = null; } if (t.path && t.path.length < 2) t.path = null; t.pi = 0; }
       let w = goal; if (t.path && t.path.length) { while (t.pi < t.path.length - 1 && Math.hypot(t.path[t.pi].x - t.pos.x, t.path[t.pi].z - t.pos.z) < 0.6) t.pi++; w = t.path[Math.min(t.pi, t.path.length - 1)]; }
       const wx = w.x - t.pos.x, wz = w.z - t.pos.z, wl = Math.hypot(wx, wz) || 1; t.pos.x += wx / wl * Math.min(wl, speed * dt); t.pos.z += wz / wl * Math.min(wl, speed * dt); if (Number.isFinite(w.y)) t.pos.y += (w.y - t.pos.y) * Math.min(1, dt * 6);
+      { const G = ctx.player?.solids?.(); if (G) { _pv.set(t.pos.x, Number.isFinite(w.y) ? Math.max(t.pos.y, w.y) : t.pos.y, t.pos.z); pushOut(G, _pv); t.pos.x = _pv.x; t.pos.z = _pv.z; } }   // the path or the straight line across a wall, a bench, a parked car: slide along it (judged from the floor he's stepping up to, so stairs still climb)
       const want = Math.atan2(wx, wz); t.yaw += Math.atan2(Math.sin(want - t.yaw), Math.cos(want - t.yaw)) * Math.min(1, dt * 8);
       if (t.folk && C.world.W.sandAt?.(t.pos.x, t.pos.z)) { const gy = C.world.W.groundHeight(t.pos.x, t.pos.z); if (Number.isFinite(gy)) t.pos.y += (gy - t.pos.y) * Math.min(1, dt * 8); }   // out on the sand
     } else if (t.st === 'rob') t.yaw = Math.atan2(dx, dz);

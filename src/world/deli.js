@@ -4,6 +4,7 @@ import { buildPerson, peopleReady } from './people.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { sell } from './hangkit.js';
+import { dropParkedCarBoxes } from './carkit.js';
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // people
@@ -354,7 +355,7 @@ export function findDeliSpot(world, candidates, reach = 40, { exclude = [], fall
   if (best) bump(best.x, best.z, best.yaw);
   return best;
 }
-function hideCar(world, car) { car.gone = true; for (const { im, i } of car.refs || []) { im.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0)); im.instanceMatrix.needsUpdate = true; } if (car.box) { const k = world.ctx.colliders.indexOf(car.box); if (k > -1) world.ctx.colliders.splice(k, 1); } }
+function hideCar(world, car) { car.gone = true; for (const { im, i } of car.refs || []) { im.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0)); im.instanceMatrix.needsUpdate = true; } dropParkedCarBoxes(world.ctx, car); }
 
 /** A vendor who walks a loop of waypoints (stops and turns to face anyone who comes close). Registers with the hangkit. */
 export function buildWalker(world, K, o) {
