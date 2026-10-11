@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export const BUS = { len: 12.2, w: 2.59, h: 3.3, floor: 0.38, deck: 0.72, axleF: 3.6, axleR: -2.95, wheelR: 0.5, doorF: [4.45, 5.6], doorR: [-1.6, -0.4], eye: { x: 5.2, y: 2.08, z: -0.72 } };
+export const BUS = { len: 12.2, w: 2.59, h: 3.3, floor: 0.38, deck: 0.72, axleF: 3.6, axleR: -2.95, wheelR: 0.5, doorF: [4.45, 5.6], doorR: [-1.6, -0.4], eye: { x: 5.2, y: 1.74, z: -0.72 } };   // eye: the seated driver's (seat top F + 0.52, head ~0.8 above it), wheel and dash in view
 const L = BUS.len, HW = BUS.w / 2, XF = L / 2, XR = -L / 2, TOP = 2.85, BELT = 1.05, WIN = 2.5, TH = 3.2;
 
 let MATS = null;
@@ -143,8 +143,10 @@ export function buildBus(o = {}) {
     paint(box(-5.6, 3.02, -0.95, -3.2, 3.36, 0.95), 'w'); paint(box(-2.9, 3.02, -0.82, 3.9, 3.27, 0.82), 'w');   // HVAC pod, battery/CNG fairing
     P.trim.push(strip(box(-5.5, 3.35, -0.8, -3.3, 3.37, 0.8))); for (let x = -5.2; x < -3.4; x += 0.45) P.trim.push(strip(box(x, 3.34, 0.96, x + 0.3, 3.1, 0.97))); }
   // front: rounded corners, lower panel, raked windshield, the sign header, bumper, lamps, mirrors, bike rack
-  for (const sz of [1, -1]) { const g = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? 0 : -Math.PI / 2, Math.PI / 2); g.translate(XF - 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(g, 'w');
-    const r = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? Math.PI / 2 : Math.PI, Math.PI / 2); r.translate(XR + 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(r, 'w'); }
+  // (theta runs from +z toward +x: front corners bulge to +x, rear ones to -x, each to its own side; the front-left and rear-right
+  // quarters used to face into the bus, a white post right in front of the driver)
+  for (const sz of [1, -1]) { const g = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? 0 : Math.PI / 2, Math.PI / 2); g.translate(XF - 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(g, 'w');
+    const r = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? -Math.PI / 2 : Math.PI, Math.PI / 2); r.translate(XR + 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(r, 'w'); }
   paint(box(XF - 0.05, 0.3, -HW + 0.16, XF, 1.02, HW - 0.16), 'b');
   { const g = new THREE.PlaneGeometry(BUS.w - 0.36, 1.62); g.rotateY(Math.PI / 2); g.rotateZ(0.07); g.translate(XF - 0.07, 1.84, 0); P.glass.push(strip(g)); }
   P.trim.push(strip(box(XF - 0.2, 2.62, -HW + 0.14, XF - 0.1, TOP + 0.05, HW - 0.14)), strip(box(XF - 0.08, 1.0, -HW + 0.14, XF + 0.01, 1.08, HW - 0.14)));

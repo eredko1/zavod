@@ -75,6 +75,8 @@ export async function init(ctx) {
     heal(amount = p.maxHealth) { if (p.dead) return; p.health = Math.min(p.maxHealth, p.health + Math.max(0, amount)); },
     respawn() { respawn(); },
     rebuildColliders() { grid.build(ctx.colliders); },
+    /** the collider broadphase (4 m buckets), shared with NPC movement so nobody scans every box: query(minX, minZ, maxX, maxZ) */
+    solids() { grid.sync(ctx.colliders); return grid; },
     /** QA: drive movement for `seconds`. dir = {x:strafe(+right), y:forward(+fwd)} or [x,y]; opts {sprint,crouch,jump,jumpAt}. Resolves when done. */
     qaWalk(dir = { x: 0, y: 1 }, seconds = 1, opts = {}) {
       // also accepts an array of segments [{dir, t, opts}] executed back-to-back without input gaps

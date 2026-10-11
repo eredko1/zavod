@@ -53,6 +53,7 @@ function cleanClip(c) {
   return new THREE.AnimationClip(c.name, c.duration, tracks);
 }
 const TAN = new THREE.Color(0xf4e0cc);
+const _ws = new THREE.Vector3(), _gs = new THREE.Vector3();
 function prepAvatar(gltf, ctx) {
   const root = gltf.scene;
   root.traverse((o) => {
@@ -124,7 +125,11 @@ export function buildPerson(o = {}) {
   const group = new THREE.Group(); group.name = 'person';
   const inner = new THREE.Group(); inner.rotation.y = -A.yawFix; inner.position.y = -A.footY; group.add(inner);
   const model = SkeletonUtils.clone(A.root); inner.add(model);
-  model.traverse((o) => { if (o.isSkinnedMesh) { try { o.computeBoundingSphere(); o.boundingSphere.radius = Math.max(1.4, o.boundingSphere.radius * 1.6); } catch { o.frustumCulled = false; } } });   // animated limbs stay inside
+  // cull sphere: posed (bone matrices filled first: on a fresh clone they're zero, every vertex skins to the origin and the sphere
+  // was a point) and padded so animated limbs stay inside; the 1.4 m floor is in metres (the meshes are in centimetres under a
+  // 0.01 scale: it was a 1.4 cm sphere at the hips, so a person popped out whenever their hips left the screen)
+  model.updateMatrixWorld(true);
+  model.traverse((o) => { if (o.isSkinnedMesh) { try { o.skeleton.update(); o.computeBoundingSphere(); const ws = o.getWorldScale(_ws).x / (group.getWorldScale(_gs).x || 1) || 1; o.boundingSphere.radius = Math.max(1.4 / ws, o.boundingSphere.radius * 1.6); } catch { o.frustumCulled = false; } } });
   const bones = {}; model.traverse((b) => { if (b.isBone) bones[b.name.replace(/^Bip01_?/, '').replace(/_/g, ' ').trim()] = b; });
   const B = (n) => bones[n] || bones[n.replace(/ /g, '')];
   const arm = (s) => ({ up: B(`${s} UpperArm`), fore: B(`${s} Forearm`), hand: B(`${s} Hand`), cl: B(`${s} Clavicle`) });
@@ -192,7 +197,7 @@ export function buildPerson(o = {}) {
   if (o.tam) { [0x1f7a33, 0xe0b422, 0xb4221c].forEach((c, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.125 - i * 0.01, 0.13 - i * 0.01, 0.05, 16), mat(c)); m.position.set(0, -0.03 + i * 0.042, -0.03); head.add(m); });
     const top = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), mat(0x1f7a33)); top.scale.set(1.05, 0.7, 1.1); top.position.set(0, 0.14, -0.02); head.add(top); }
   if (o.glasses) {   // thin dark rims: two lens frames, a bridge, temples back to the ears (o.glasses === 'clear' → see-through lenses)
-    const gm = mat(0x151515, 0.3), lens = new THREE.MeshStandardMaterial({ color: o.glasses === 'clear' ? 0xdfe8ee : 0x0a0a0a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: o.glasses === 'clear' ? 0.18 : 0.85 });
+    const gm = mat(0x151515, 0.3), lens = new THREE.MeshStandardMaterial({ color: o.glasses === 'clear' ? 0xdfe8ee : 0x0a0a0a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: o.glasses === 'clear' ? 0.18 : 0.85 }); lens.name = 'lens';
     // on the measured eye line, just proud of the brow; lenses spaced and temples run back to the ears for this head (the hand-tuned offsets only for an unmeasured one)
     const fit = F.fit, measured = fit !== FIT0, G = new THREE.Group(); G.position.set(0, fit.eyeY + (measured ? 0 : o.glassesY || 0), fit.front + 0.006 + (measured ? 0 : o.glassesZ || 0)); head.add(G);
     const k = THREE.MathUtils.clamp(fit.halfW / 0.075, 0.9, 1.08) * 0.82, tl = Math.max(0.06, (fit.front - (fit.back + fit.front) / 2) * 0.95);

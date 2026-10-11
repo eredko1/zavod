@@ -4,7 +4,7 @@
 // cash dropped by mercenaries you kill, "respawn at <spot>" on the death screen. Maps configure it (coney/hangout.js,
 // wsp + sbu hangouts); everything online rides net.js events: elev / steal / smoke / drink / buy.
 import * as THREE from 'three';
-import { hideParkedCar, carEye } from './carkit.js';
+import { hideParkedCar, carEye, dropParkedCarBoxes } from './carkit.js';
 
 const RIDE_T = 4.2, STAIRS_T = 5.2, FADE = 0.45, MAX_INV = 12, SHARE_R = 4;
 // kind: 'smoke' | 'booze' | 'drink' | 'food' | 'loot' | 'misc' (inventory categories); effects: drunk/dur, food (HP), cig (smokes per pack, no high), magic, keep (not for B), melt
@@ -618,7 +618,7 @@ function swipeGps(c) {
 function stealLocal(i, mine) {
   const c = (V.world.parkedCars || [])[i]; if (!c || c.gone) return; const { ctx } = V; void mine;
   hideParkedCar(c);
-  if (c.box) { const k = ctx.colliders.indexOf(c.box); if (k > -1) ctx.colliders.splice(k, 1); try { ctx.player?.rebuildColliders?.(); } catch {} }
+  dropParkedCarBoxes(ctx, c); try { ctx.player?.rebuildColliders?.(); } catch {}
 }
 function nearestFriendCar(r) {
   const net = V.ctx.net; if (!net?.list) return null; const p = V.ctx.player.position; let best = null, bd = r;

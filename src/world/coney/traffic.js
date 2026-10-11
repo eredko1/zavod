@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { OSM } from './osm.js';
 import { BW } from './shore.js';
-import { carGeometries, carMaterials, carSpec, carEye, carInterior, wheelGeometry, wheelLayout, CAR_COLORS, hideParkedCar } from '../carkit.js';
+import { carGeometries, carMaterials, carSpec, carEye, carInterior, wheelGeometry, wheelLayout, CAR_COLORS, hideParkedCar, carBoxes } from '../carkit.js';
 import { hasCarModel, carModel } from '../carmodels.js';
 import { buildPerson, peopleReady } from '../people.js';
 import { BoxGrid, rectBlocked } from '../../vehicles/collide.js';
@@ -61,7 +61,7 @@ function laneBlocked(grid, ax, az, bx, bz, w) {
 }
 function buildGraph(world) {
   const { ctx, W } = world, b = W.bounds, M = 8, zMax = BW.z0 - 4;
-  const parked = new Set((world.parkedCars || []).map((c) => c.box).filter(Boolean));
+  const parked = new Set((world.parkedCars || []).flatMap(carBoxes));
   const grid = new BoxGrid(4); grid.build(ctx.colliders.filter((c) => !parked.has(c) && c.max.y > 0.35 && (c.max.x - c.min.x) < 400 && ((c.max.x - c.min.x) > 0.8 || (c.max.z - c.min.z) > 0.8)));   // el columns / poles / hydrants don't close a street
   const inB = (x, z) => x > b.min.x + M && x < b.max.x - M && z > b.min.z + M && z < zMax;
   const nodes = [], idx = new Map(); let dropped = 0;
@@ -739,7 +739,7 @@ function buildRoute(R) {
       if (d < 12 && (!best || d < best.d)) { const L = Math.sqrt(L2), e = edge(nodes[i], nodes[(i + 1) % nodes.length]); best = { d, name, rs: cum[i] + t * L, x: px, z: pz, dx: dx / L, dz: dz / L, w: e?.w || 10 }; } }
     if (best) { const kerb = best.w / 2 - 1.6, sh = Math.max(0, kerb - laneOff(best.w, 1)); stops.push({ ...best, shift: sh, px: best.x - best.dz * (best.w / 2 + 1.2), pz: best.z + best.dx * (best.w / 2 + 1.2) }); }
     // the bus pulls in to the kerb here: no car parked in its way (they're placed before the stops are known)
-    if (best) for (const c of T?.world?.parkedCars || []) if (!c.gone && Math.hypot(c.x - best.x, c.z - best.z) < 30) { hideParkedCar(c); c.gone = true; if (c.box) { c.box.min.set(0, -9999, 0); c.box.max.set(0.001, -9998, 0.001); } }
+    if (best) for (const c of T?.world?.parkedCars || []) if (!c.gone && Math.hypot(c.x - best.x, c.z - best.z) < 30) { hideParkedCar(c); c.gone = true; for (const b of carBoxes(c)) { b.min.set(0, -9999, 0); b.max.set(0.001, -9998, 0.001); } }
   }
   stops.sort((a, b) => a.rs - b.rs);
   // timetable: run at BUS_V between stops, DWELL at each → position on the loop at any wall-clock second

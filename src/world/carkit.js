@@ -280,6 +280,26 @@ function carLod(world, L) {
   });
 }
 
+/**
+ * Colliders for a parked car that match its body (a 3.2 m square let you walk into the nose and bumped you off thin air at
+ * the doors): one exact box when it sits square to the grid, else a row of small AABB cells along its length (colliders are
+ * axis-aligned; rotated things are built from cells). Sets c.boxes; c.box stays the first for older callers.
+ */
+export function parkedCarBoxes(world, c) {
+  const K = KINDS[c.kind] || KINDS.sedan, L = K.len / 2, W = K.w / 2, y = c.y || 0, H = y + K.roof;
+  const fx = Math.cos(c.ry || 0), fz = -Math.sin(c.ry || 0), ax = Math.abs(fx), az = Math.abs(fz);
+  if (Math.min(ax, az) < 0.06) { const hx = ax > az ? L : W, hz = ax > az ? W : L; c.boxes = [world.box([c.x - hx, y, c.z - hz], [c.x + hx, H, c.z + hz])]; }
+  else {
+    const r = W * 0.9, n = Math.max(2, Math.ceil((L - r) / (r * 0.6)) + 1), e = r * (ax + az) * 0.85;   // 0.85: the cell corners stick out past the paint
+    c.boxes = []; for (let k = 0; k < n; k++) { const t = -(L - r) + 2 * (L - r) * k / (n - 1), cx = c.x + fx * t, cz = c.z + fz * t; c.boxes.push(world.box([cx - e, y, cz - e], [cx + e, H, cz + e])); }
+  }
+  c.box = c.boxes[0]; return c.boxes;
+}
+/** A parked car's colliders (parkedCarBoxes, or the single box older maps set). */
+export const carBoxes = (c) => c.boxes || (c.box ? [c.box] : []);
+/** Take a parked car's colliders out of the world (stolen / cleared for a scene). */
+export function dropParkedCarBoxes(ctx, c) { for (const b of carBoxes(c)) { const k = ctx.colliders.indexOf(b); if (k > -1) ctx.colliders.splice(k, 1); } }
+
 /** Remove one parked car from its instanced meshes (hangout: stolen). */
 export function hideParkedCar(c) { const z = new THREE.Matrix4().makeScale(0, 0, 0); for (const { im, i } of c.refs || []) { im.setMatrixAt(i, z); im.instanceMatrix.needsUpdate = true; } c.gone = true; }
 
@@ -311,8 +331,8 @@ export function carInterior(kind = 'sedan', geos = null) {
   add(new THREE.BoxGeometry(dx1 - dx0, 0.36, K.w * 0.9), I.dash, (dx0 + dx1) / 2, dTop - 0.18, 0);
   add(new THREE.BoxGeometry(0.2, 0.05, K.w * 0.88), I.dash, dx0 + 0.02, dTop - 0.21, 0, 0, 0, 0.5);          // lower lip, rounded read
   // binnacle hood + gauges in front of the driver
-  add(new THREE.BoxGeometry(0.2, 0.07, 0.34), I.dash, dx0 + 0.04, dTop + 0.025, eye.z);
-  add(new THREE.PlaneGeometry(0.26, 0.06), I.gauge, dx0 - 0.004, dTop - 0.05, eye.z, 0, -Math.PI / 2, 0);
+  add(new THREE.BoxGeometry(0.2, 0.16, 0.34), I.dash, dx0 + 0.04, dTop + 0.04, eye.z);   // tall enough that the dials show through the top of the wheel
+  add(new THREE.PlaneGeometry(0.26, 0.06), I.gauge, dx0 - 0.064, dTop + 0.03, eye.z, 0, -Math.PI / 2, 0);
   // centre stack + console
   add(new THREE.BoxGeometry(0.16, 0.3, 0.3), I.trim, dx0 - 0.05, dTop - 0.25, 0);
   add(new THREE.PlaneGeometry(0.18, 0.1), I.screen, dx0 - 0.135, dTop - 0.12, 0, 0, -Math.PI / 2, 0);
@@ -324,7 +344,7 @@ export function carInterior(kind = 'sedan', geos = null) {
     add(new THREE.BoxGeometry(0.1, 0.18, 0.26), I.seat, eye.x - 0.44, K.clr + 1.14, sz, 0, 0, 0.2);
   }
   // steering wheel on a raked column
-  const col = new THREE.Group(); col.position.set(eye.x + 0.4, eye.y - 0.33, eye.z); col.rotation.z = -0.42; g.add(col);   // tilt: top leans toward the driver
+  const col = new THREE.Group(); col.position.set(eye.x + 0.43, eye.y - 0.27, eye.z); col.rotation.z = -0.42; g.add(col);   // tilt: top leans toward the driver; high enough that the top of the rim shows looking ahead
   const wheel = new THREE.Group(); col.add(wheel);
   const rim = new THREE.TorusGeometry(0.18, 0.02, 8, 28); rim.rotateY(Math.PI / 2); add(rim, I.wheel, 0, 0, 0, 0, 0, 0, wheel);
   for (const a of [0, Math.PI * 0.62, -Math.PI * 0.62]) { const sp = new THREE.BoxGeometry(0.02, 0.17, 0.03); sp.translate(0, -0.085, 0); add(sp, I.wheel, 0, 0, 0, a, 0, 0, wheel); }
