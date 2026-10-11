@@ -513,6 +513,9 @@ function arrive(how) {
   if (how === 'bus') { fade(['THE BUS RUNS ON · BELT PKWY', '8 AV · SUNSET PARK'], () => { moveTo(-16, SW, TZ.oz + ROAD + 1.6, Math.PI / 2, 0);
       K.toast('8th Ave & 60th, Sunset Park — last stop. Soccer Tavern is up the block: green door, three flags. The N home is across the avenue.', 5200); }, 1000);
     return true; }
+  if (how === 'ferry') { fade(['NYC FERRY · 69 ST · BAY RIDGE', 'THE B70 UP 8TH AVE', '8 AV · SUNSET PARK'], () => { moveTo(-16, SW, TZ.oz + ROAD + 1.6, Math.PI / 2, 0);
+      K.toast('8th Ave & 60th, Sunset Park — off the ferry, up on the B70. Soccer Tavern is up the block: green door, three flags. F at this stop for the ferry back to Coney.', 5600); }, 1000);
+    return true; }
   if (how === 'Nx') { try { pa(ctx, 'This is 8th Avenue. Stand clear of the closing doors, please.'); } catch {}   // the N express, straight here
     fade(['N EXPRESS', '8 AV · SUNSET PARK'], () => { const yaw = Math.atan2(-(-2 - NSTAT.x), -(WALK - 2 - NSTAT.z)); moveTo(NSTAT.x, SW, TZ.oz + NSTAT.z + 1.8, yaw, 0);
       K.toast('8th Ave & 61st, Sunset Park — Soccer Tavern is across the street: green door, three flags. The N back to Coney is right here (F).', 5200); }, 1000);
