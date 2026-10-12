@@ -43,9 +43,14 @@ export function createCtx() {
   // (small textures, fewer people, no shadows, lower render scale) without the touch controls. ?low=1 forces it, ?low=0 turns it off.
   const lowPower = qs.get('low') === '1' || (qs.get('low') !== '0' && !isTouch && (xrDevice || weakGPU()));
   const lite = isTouch || lowPower; if (typeof window !== 'undefined') window.__zavodLite = lite;
+  // crash guard: iOS kills a tab that runs out of memory without any error. Each load marks itself booting until it has played
+  // 20 s (main.js clears it); a phone that finds the mark still set crashed last time, so this load runs in safe mode
+  // (small textures, low quality). ?safe=1 forces it, ?safe=0 turns it off.
+  let safeMode = qs.get('safe') === '1';
+  try { if (!safeMode && qs.get('safe') !== '0' && isTouch && !qa && localStorage.getItem('zavod.booting')) safeMode = true; localStorage.setItem('zavod.booting', String(Date.now())); } catch {}
   const ctx = {
     THREE,
-    qs, qa, isTouch, lowPower, lite, mode, xrDevice,
+    qs, qa, isTouch, lowPower, lite, safeMode, mode, xrDevice,
     seed,
     rng: mulberry32(seed),
     bus: new Bus(),
@@ -57,11 +62,11 @@ export function createCtx() {
     time: { dt: 0, elapsed: 0, frame: 0, scale: 1 },
     perf: { fps: 60, frameMs: 16, drawCalls: 0, triangles: 0 },
     settings: {
-      quality: qs.get('quality') || (isTouch ? 'medium' : lowPower ? 'low' : 'high'), // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
+      quality: qs.get('quality') || (safeMode ? 'low' : isTouch ? 'medium' : lowPower ? 'low' : 'high'), // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
       fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6,
       shadows: qs.get('shadows') ? qs.get('shadows') === '1' : !lite, rain: qs.get('rain') === '1',   // phones: no shadow pass by default (it re-renders every caster) // rain off by default (toggle in Settings)
       renderScale: +(qs.get('scale') || (lowPower ? 0.75 : 1)),
-      texMax: +(qs.get('texmax') || (lite ? 512 : 4096)), // mobile GPUs: cap texture edge (VRAM), see assets.js fit()
+      texMax: +(qs.get('texmax') || (safeMode ? 256 : lite ? 512 : 4096)), // mobile GPUs: cap texture edge (VRAM), see assets.js fit()
       shadowMax: lite ? 2048 : 4096, // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
       // audio mix (persisted per device, see saveAudio): effects = weapons/enemies/UI, footsteps = the foley bus (quieter by
       // default so the radio carries), ambience; radio = coney's Luna Park Radio: 'off' | 'car' | 'always'

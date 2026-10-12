@@ -154,6 +154,7 @@ async function boot() {
   ctx.bus.emit('boot');
   const pose = ctx.qs.get('pose'); if (pose && ctx.world?.poses?.[pose]) window.__game.teleport(...ctx.world.poses[pose]);
   window.__game.ready = true;
+  setTimeout(() => { try { localStorage.removeItem('zavod.booting'); } catch {} }, 20000);   // ctx.js crash guard: this load survived
   last = performance.now(); renderer.setAnimationLoop(frame);   // the renderer's loop: it switches to the headset's frame clock in VR
 }
 
