@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { addFolkSpots } from './folk.js';
+import { strips } from './fronts.js';
 
 const NEAR = 40, FAR = 60, DOOR_H = 2.92;   // the doorway: fronts.js shopUnit, up to the transom rail (SIGN_Y0 - 0.35)
 const FLOOR = { grocery: 0xd8d4c8, food: 0xc8b8a0, pizza: 0xb84a3a, bar: 0x5a3a24, candy: 0xf2e6f0, service: 0xcfd4d8, bank: 0xcfd4d8, salon: 0xe8e4ea, laundry: 0xd8dce0, phone: 0x2a2c30, pharmacy: 0xeef0f2, russian: 0x8a6a4a };
@@ -39,15 +40,23 @@ export function buildShops(world) {
     U.toW = toW;
   }
   try { addFolkSpots(world, spots); } catch (e) { console.warn('[shops] folk', e); }
+  // the counters, shelves, coolers and cases are solid from the start (the interior meshes come and go, their colliders stay): each
+  // one's footprint as AABB strips (shop rooms sit at any angle), the aisles between and the way in from the door left clear
+  let nCol = 0; for (const U of units) for (const [u0, u1, y0, y1, w0, w1] of build(U, true)) {
+    const pts = [[u0, w0], [u1, w0], [u1, w1], [u0, w1]].map(([u, w]) => { const v = U.toW(u, 0, w); return [v.x, v.z]; });
+    for (const c of strips(pts, y0, y1)) { world.box(c.min.toArray(), c.max.toArray()); nCol++; } }
 
   // ---- interiors, on demand --------------------------------------------------------------------------------------------------
-  function build(U) {
+  /** the room's meshes, or with dry the solid fixtures' boxes only ([u0, u1, y0, y1, w0, w1] in the unit's frame) */
+  function build(U, dry = false) {
+    const solid = []; let S = false;
     const g = [], gl = [], _c = new THREE.Color(), H = U.H, uL = U.u0 + 0.38, uR = U.u1 - 0.38, wB = -U.rd + 0.05, rnd = (k) => hash(U.i * 7.1 + k, k * 3.3);
-    const box = (u0, u1, y0, y1, w0, w1, color, lit = false) => { const a = Math.min(u0, u1), b = Math.max(u0, u1), x0 = U.flip ? U.L - b : a, x1 = U.flip ? U.L - a : b;
+    const box = (u0, u1, y0, y1, w0, w1, color, lit = false) => { if (S) solid.push([Math.min(u0, u1), Math.max(u0, u1), y0, y1, Math.min(w0, w1), Math.max(w0, w1)]); if (dry) return; const a = Math.min(u0, u1), b = Math.max(u0, u1), x0 = U.flip ? U.L - b : a, x1 = U.flip ? U.L - a : b;
       const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, Math.abs(w1 - w0)); geo.translate((x0 + x1) / 2, (y0 + y1) / 2, (w0 + w1) / 2); const ng = geo.toNonIndexed(); ng.deleteAttribute('uv'); ng.applyMatrix4(U.M);
       const p = ng.attributes.position, n = ng.attributes.normal, col = new Float32Array(p.count * 3); _c.set(color);
       for (let i = 0; i < p.count; i++) { const k = lit ? 1 : (0.72 + 0.22 * Math.max(0, n.getY(i)) + 0.06 * Math.abs(n.getX(i))) * (0.82 + 0.18 * Math.min(1, p.getY(i) / H)); col[i * 3] = _c.r * k; col[i * 3 + 1] = _c.g * k; col[i * 3 + 2] = _c.b * k; }
       ng.setAttribute('color', new THREE.BufferAttribute(col, 3)); (lit ? gl : g).push(ng); };
+    const sbox = (...a) => { S = true; box(...a); S = false; };   // a box you can't walk through: counters, shelves, coolers, cases
     // the room: floor tiles, walls, ceiling with light panels, the inside of the window wall
     const name = U.name || '', kind = /BANK|CHECK CASH/.test(name) ? 'bank' : /NAIL|SALON|BARBER/.test(name) ? 'salon' : /LAUNDR/.test(name) ? 'laundry' : U.kind;
     const floorC = FLOOR[kind] || FLOOR.grocery, wallC = WALL[kind] || WALL.grocery;
@@ -57,41 +66,41 @@ export function buildShops(world) {
     box(uL, uR, 2.95, H, -0.12, -0.05, wallC);   // the wall over the window, inside
     // fixtures by kind
     const cU = U.dx < (U.u0 + U.u1) / 2 ? uR - 1.6 : uL + 1.6, cS = U.dx < (U.u0 + U.u1) / 2 ? -1 : 1;   // the counter sits on the side away from the door
-    const shelfRun = (u, w0, w1, both = true, frame = 0xb8bcc2, ledge = 0x8a8f94) => { box(u - 0.25, u + 0.25, 0, 1.75, w0, w1, frame); for (let lv = 0; lv < 4; lv++) { const y = 0.25 + lv * 0.4; box(u - 0.3, u + 0.3, y - 0.03, y, w0, w1, ledge);
+    const shelfRun = (u, w0, w1, both = true, frame = 0xb8bcc2, ledge = 0x8a8f94) => { sbox(u - 0.25, u + 0.25, 0, 1.75, w0, w1, frame); for (let lv = 0; lv < 4; lv++) { const y = 0.25 + lv * 0.4; box(u - 0.3, u + 0.3, y - 0.03, y, w0, w1, ledge);
       for (const sd of both ? [-1, 1] : [1]) for (let w = w0 + 0.1, k = 0; w < w1 - 0.15; w += 0.2 + rnd(k) * 0.1, k++) { const h = 0.12 + rnd(k + lv * 31 + sd * 7) * 0.22; box(u + sd * 0.22 - 0.07, u + sd * 0.22 + 0.07, y, y + h, w, w + 0.14, PRODUCT[(k * 3 + lv + (sd > 0 ? 5 : 0) + U.i) % PRODUCT.length]); } } };
-    const counter = (u, w, len = 1.8) => { box(u - 0.35, u + 0.35, 0, 1.0, w - len / 2, w + len / 2, 0x6b4a2a); box(u - 0.4, u + 0.4, 1.0, 1.05, w - len / 2 - 0.05, w + len / 2 + 0.05, 0xd8d4c8); box(u - 0.15, u + 0.15, 1.05, 1.3, w - 0.2, w + 0.15, 0x2a2c30); box(u - 0.12, u + 0.12, 1.3, 1.38, w - 0.18, w + 0.05, 0x3a8a4a, true); };
+    const counter = (u, w, len = 1.8) => { sbox(u - 0.35, u + 0.35, 0, 1.0, w - len / 2, w + len / 2, 0x6b4a2a); box(u - 0.4, u + 0.4, 1.0, 1.05, w - len / 2 - 0.05, w + len / 2 + 0.05, 0xd8d4c8); box(u - 0.15, u + 0.15, 1.05, 1.3, w - 0.2, w + 0.15, 0x2a2c30); box(u - 0.12, u + 0.12, 1.3, 1.38, w - 0.18, w + 0.05, 0x3a8a4a, true); };
     const aisles = (frame, ledge) => { const n = Math.max(1, Math.floor((uR - uL - 2.6) / 1.9)); for (let k = 0; k < n; k++) shelfRun(uL + 1.6 + k * 1.9 + (cS < 0 ? 0 : 1.0), wB + 1.6, -3.2, true, frame, ledge); };
     if (kind === 'pharmacy') {   // white aisles, the Rx counter across the back under its green sign, the register by the door
-      aisles(0xf4f4f0, 0xd8dce0); box(uL + 0.3, uR - 0.3, 0, 1.05, wB + 0.6, wB + 1.1, 0xf4f4f0); box(uL + 0.3, uR - 0.3, 1.05, 1.1, wB + 0.55, wB + 1.15, 0x1a7a4a);
+      aisles(0xf4f4f0, 0xd8dce0); sbox(uL + 0.3, uR - 0.3, 0, 1.05, wB + 0.6, wB + 1.1, 0xf4f4f0); box(uL + 0.3, uR - 0.3, 1.05, 1.1, wB + 0.55, wB + 1.15, 0x1a7a4a);
       for (let lv = 0; lv < 4; lv++) box(uL + 0.3, uR - 0.3, 1.3 + lv * 0.35, 1.33 + lv * 0.35, wB + 0.05, wB + 0.4, 0xd8dce0);
       for (let u = uL + 0.4, k = 0; u < uR - 0.5; u += 0.18, k++) for (let lv = 0; lv < 3; lv++) box(u, u + 0.12, 1.33 + lv * 0.35, 1.5 + lv * 0.35, wB + 0.1, wB + 0.3, [0xf4f4f0, 0xff7a1a, 0x2a62c8, 0xf4f4f0][(k + lv) % 4]);   // prescription bags, pill bottles
       box((uL + uR) / 2 - 0.9, (uL + uR) / 2 + 0.9, 2.55, 2.95, wB + 0.02, wB + 0.08, 0x1aa060, true); counter(cU, -1.6);
     } else if (kind === 'phone') {   // lit wall displays of phones and cases down both walls, a glass case counter, the poster at the back
       for (const side of [uL, uR]) { const s = side === uL ? 1 : -1; box(side, side + s * 0.08, 0.9, 2.5, wB + 0.6, -1.4, 0xe8f0ff, true);
         for (let w = wB + 0.75, k = 0; w < -1.6; w += 0.32, k++) for (let lv = 0; lv < 4; lv++) box(side + s * 0.08, side + s * 0.12, 1.0 + lv * 0.38, 1.0 + lv * 0.38 + 0.28, w, w + 0.15, (k + lv) % 3 ? 0x1a1a1a : PRODUCT[(k + lv + U.i) % PRODUCT.length]); }
-      const cw = (wB + -1.4) / 2; box(uL + 1.4, uR - 1.4, 0, 0.9, cw - 0.35, cw + 0.35, 0x2a2c30); box(uL + 1.45, uR - 1.45, 0.9, 1.15, cw - 0.3, cw + 0.3, 0xaad8f0, true);
+      const cw = (wB + -1.4) / 2; sbox(uL + 1.4, uR - 1.4, 0, 0.9, cw - 0.35, cw + 0.35, 0x2a2c30); box(uL + 1.45, uR - 1.45, 0.9, 1.15, cw - 0.3, cw + 0.3, 0xaad8f0, true);
       for (let u = uL + 1.6; u < uR - 1.6; u += 0.3) box(u, u + 0.12, 0.92, 0.94, cw - 0.12, cw + 0.08, 0x1a1a1a);
       box((uL + uR) / 2 - 1.1, (uL + uR) / 2 + 1.1, 1.0, 2.6, wB + 0.02, wB + 0.07, 0x36c0ff, true); counter(cU, -1.6);
     } else if (kind === 'russian') {   // the gastronom: dark wood shelves of jars and tins, the deli case of cheeses and fish along the back, kolbasa hanging over it, a bread rack
-      aisles(0x5a3a24, 0x3a2414); const dw0 = wB + 0.9; box(uL + 0.3, uR - 0.3, 0, 0.95, dw0, dw0 + 0.7, 0xd8d4c8); box(uL + 0.35, uR - 0.35, 0.95, 1.35, dw0 + 0.05, dw0 + 0.65, 0xaad8f0, true);
+      aisles(0x5a3a24, 0x3a2414); const dw0 = wB + 0.9; sbox(uL + 0.3, uR - 0.3, 0, 0.95, dw0, dw0 + 0.7, 0xd8d4c8); box(uL + 0.35, uR - 0.35, 0.95, 1.35, dw0 + 0.05, dw0 + 0.65, 0xaad8f0, true);
       for (let u = uL + 0.5, k = 0; u < uR - 0.7; u += 0.42, k++) box(u, u + 0.34, 0.98, 1.1, dw0 + 0.15, dw0 + 0.5, [0xf2c418, 0xff7a5a, 0xe8e0c8, 0xc87a3a, 0xd8301e][k % 5]);
       box(uL + 0.3, uR - 0.3, 2.35, 2.38, wB + 0.35, wB + 0.4, 0x6b6f75); for (let u = uL + 0.5, k = 0; u < uR - 0.5; u += 0.22, k++) box(u, u + 0.08, 1.75 + (k % 3) * 0.1, 2.35, wB + 0.33, wB + 0.42, k % 2 ? 0x8a2a1a : 0x6b3a1a);   // kolbasa on the rail
       const bu = cS < 0 ? uL + 0.5 : uR - 0.5; for (let lv = 0; lv < 4; lv++) { box(bu - 0.3, bu + 0.3, 0.3 + lv * 0.4, 0.33 + lv * 0.4, -3.6, -2.4, 0xb8a888); for (let w = -3.5; w < -2.5; w += 0.3) box(bu - 0.18, bu + 0.18, 0.33 + lv * 0.4, 0.5 + lv * 0.4, w, w + 0.22, lv % 2 ? 0x6b3a1a : 0xc8904a); }   // the bread rack
       counter(cU, -1.6);
     } else if (kind === 'grocery') {
       const n = Math.max(1, Math.floor((uR - uL - 2.6) / 1.9)); for (let k = 0; k < n; k++) shelfRun(uL + 1.6 + k * 1.9 + (cS < 0 ? 0 : 1.0), wB + 1.6, -3.2);
-      for (let u = uL + 0.2; u < uR - 0.9; u += 0.95) { box(u, u + 0.9, 0, 2.1, wB, wB + 0.8, 0xd8dce0); box(u + 0.05, u + 0.85, 0.15, 2.0, wB + 0.78, wB + 0.8, 0x9ad0f0, true); for (let lv = 0; lv < 4; lv++) for (let b = 0; b < 4; b++) box(u + 0.1 + b * 0.19, u + 0.22 + b * 0.19, 0.2 + lv * 0.45, 0.48 + lv * 0.45, wB + 0.35, wB + 0.6, PRODUCT[(b + lv * 2 + U.i) % PRODUCT.length]); }
+      for (let u = uL + 0.2; u < uR - 0.9; u += 0.95) { sbox(u, u + 0.9, 0, 2.1, wB, wB + 0.8, 0xd8dce0); box(u + 0.05, u + 0.85, 0.15, 2.0, wB + 0.78, wB + 0.8, 0x9ad0f0, true); for (let lv = 0; lv < 4; lv++) for (let b = 0; b < 4; b++) box(u + 0.1 + b * 0.19, u + 0.22 + b * 0.19, 0.2 + lv * 0.45, 0.48 + lv * 0.45, wB + 0.35, wB + 0.6, PRODUCT[(b + lv * 2 + U.i) % PRODUCT.length]); }
       counter(cU, -1.6); box(cU - 0.2, cU + 0.2, 1.05, 1.18, -0.9, -0.55, 0xd8a050); box(cU - 0.08, cU + 0.08, 1.18, 1.26, -0.88, -0.78, 0xd8a050);   // the bodega cat
       box(cU + cS * 0.5 - 0.05, cU + cS * 0.5 + 0.05, 1.2, 2.2, -2.6, -0.6, 0x1a1a1a); box(cU + cS * 0.5 - 0.06, cU + cS * 0.5 + 0.06, 1.3, 2.1, -2.5, -0.7, 0xff3060, true);   // the lotto / cigarette rack
     } else if (kind === 'food' || kind === 'pizza') {
-      const wc = -Math.min(4.2, U.rd * 0.55); box(uL, uR, 0, 1.05, wc - 0.6, wc, 0xc8c0b0); box(uL + 0.3, uR - 0.3, 1.05, 1.45, wc - 0.5, wc - 0.05, 0xaad8f0, true); if (kind === 'food') for (let u = uL + 0.5; u < uR - 0.6; u += 0.55) box(u, u + 0.4, 1.08, 1.2, wc - 0.45, wc - 0.15, [0xf2c418, 0xd8301e, 0xe8c890, 0x6b3a1a][Math.floor(u * 3) % 4]);
+      const wc = -Math.min(4.2, U.rd * 0.55); sbox(uL, uR, 0, 1.05, wc - 0.6, wc, 0xc8c0b0); box(uL + 0.3, uR - 0.3, 1.05, 1.45, wc - 0.5, wc - 0.05, 0xaad8f0, true); if (kind === 'food') for (let u = uL + 0.5; u < uR - 0.6; u += 0.55) box(u, u + 0.4, 1.08, 1.2, wc - 0.45, wc - 0.15, [0xf2c418, 0xd8301e, 0xe8c890, 0x6b3a1a][Math.floor(u * 3) % 4]);
       box(uL + 0.4, uR - 0.4, 2.0, 2.8, wB + 0.02, wB + 0.08, 0x1a1a1a, true); for (let k = 0; k < 9; k++) box(uL + 0.6 + (k % 3) * ((uR - uL - 1.2) / 3), uL + 0.6 + (k % 3) * ((uR - uL - 1.2) / 3) + 1.0, 2.6 - Math.floor(k / 3) * 0.2, 2.68 - Math.floor(k / 3) * 0.2, wB + 0.08, wB + 0.1, 0xffe8a0, true);   // menu board
       if (kind === 'pizza') { for (let u = uL + 0.4; u < uR - 1.6; u += 1.6) for (const y of [0.5, 1.2]) { box(u, u + 1.4, y, y + 0.55, wB + 0.1, wB + 1.0, 0xb8bcc2); box(u + 0.15, u + 1.25, y + 0.15, y + 0.3, wB + 1.0, wB + 1.02, 0xff7a1a, true); }   // deck ovens, glowing
         for (let u = uL + 0.6; u < uR - 0.8; u += 0.6) { box(u, u + 0.45, 1.08, 1.11, wc - 0.5, wc - 0.1, 0xe8b860); box(u + 0.05, u + 0.4, 1.11, 1.12, wc - 0.45, wc - 0.15, 0xc8301e); } }   // pies in the case
       else { for (let u = uL + 0.4; u < uR - 0.8; u += 1.3) box(u, u + 1.1, 0, 0.95, wB + 0.1, wB + 0.8, 0x9aa0a6); box(uL + 0.4, uL + 1.6, 0.95, 1.1, wB + 0.1, wB + 0.8, 0x2a2c30); }   // the kitchen line, a griddle
       for (let w = -1.4; w > wc + 1.2; w -= 1.6) { const u = (uL + uR) / 2 + (U.dx < (U.u0 + U.u1) / 2 ? 1 : -1) * 0.8; box(u - 0.35, u + 0.35, 0.72, 0.76, w - 0.35, w + 0.35, 0xe8e4da); box(u - 0.04, u + 0.04, 0, 0.72, w - 0.04, w + 0.04, 0x2a2c30); for (const s of [-1, 1]) box(u + s * 0.6 - 0.2, u + s * 0.6 + 0.2, 0.44, 0.48, w - 0.2, w + 0.2, 0xc8202a); }
     } else if (kind === 'bar') {
-      const bu = cS < 0 ? uR - 0.9 : uL + 0.9; box(bu - 0.35, bu + 0.35, 0, 1.08, wB + 1.0, -1.4, 0x3a2414); box(bu - 0.42, bu + 0.42, 1.08, 1.14, wB + 0.95, -1.35, 0x5a3a24);
+      const bu = cS < 0 ? uR - 0.9 : uL + 0.9; sbox(bu - 0.35, bu + 0.35, 0, 1.08, wB + 1.0, -1.4, 0x3a2414); box(bu - 0.42, bu + 0.42, 1.08, 1.14, wB + 0.95, -1.35, 0x5a3a24);
       for (let w = wB + 1.4; w < -1.6; w += 0.8) { const su = bu - cS * 0.75; box(su - 0.18, su + 0.18, 0.72, 0.78, w - 0.18, w + 0.18, 0x1a1a1a); box(su - 0.03, su + 0.03, 0, 0.72, w - 0.03, w + 0.03, 0x6b6f75); }
       const wall = cS < 0 ? uR : uL; for (let lv = 0; lv < 3; lv++) { box(wall - cS * 0.3, wall, 1.3 + lv * 0.45, 1.33 + lv * 0.45, wB + 1.0, -1.4, 0x5a3a24); for (let w = wB + 1.1, k = 0; w < -1.5; w += 0.16, k++) box(wall - cS * 0.2 - 0.04, wall - cS * 0.2 + 0.04, 1.33 + lv * 0.45, 1.6 + lv * 0.45, w, w + 0.08, [0x6a3a1a, 0x2a6a3a, 0xd8d4c8, 0x8a1a1a, 0xc8a050][(k + lv) % 5]); }
       box((uL + uR) / 2 - 1.0, (uL + uR) / 2 + 1.0, 2.3, 2.6, wB + 0.02, wB + 0.06, 0xff3060, true);   // the neon over the back
@@ -99,15 +108,16 @@ export function buildShops(world) {
       for (const side of [uL, uR]) for (let w = wB + 0.4; w < -1.2; w += 0.7) for (let lv = 0; lv < 3; lv++) { const s = side === uL ? 1 : -1; box(side, side + s * 0.6, 0.3 + lv * 0.6, 0.35 + lv * 0.6, w, w + 0.6, 0xf4f4f0); box(side + s * 0.05, side + s * 0.5, 0.35 + lv * 0.6, 0.62 + lv * 0.6, w + 0.05, w + 0.55, PRODUCT[(Math.round(w * 3) + lv) % PRODUCT.length], true); }
       counter(cU, -1.5); const lu = (uL + uR) / 2; box(lu - 0.04, lu + 0.04, 0, 1.8, wB + 1.5, wB + 1.58, 0xf4f4f0); box(lu - 0.5, lu + 0.5, 1.8, 2.8, wB + 1.5, wB + 1.6, 0xff4fa0, true);
     } else if (kind === 'bank') {
-      box(uL, uR, 0, 1.15, wB + 2.2, wB + 2.8, 0xb8a888); box(uL, uR, 1.15, 2.4, wB + 2.45, wB + 2.5, 0xaad8f0, true); for (let u = uL + 1.2; u < uR - 0.5; u += 1.8) box(u, u + 0.06, 1.15, 2.4, wB + 2.4, wB + 2.55, 0x8a8f94);
+      sbox(uL, uR, 0, 1.15, wB + 2.2, wB + 2.8, 0xb8a888); box(uL, uR, 1.15, 2.4, wB + 2.45, wB + 2.5, 0xaad8f0, true); for (let u = uL + 1.2; u < uR - 0.5; u += 1.8) box(u, u + 0.06, 1.15, 2.4, wB + 2.4, wB + 2.55, 0x8a8f94);
       box(cU - 0.4, cU + 0.4, 0, 1.7, -1.2, -0.7, 0x2a3a5a); box(cU - 0.3, cU + 0.3, 1.1, 1.45, -0.72, -0.68, 0x3aa0ff, true);   // the ATM
     } else if (kind === 'salon') {
       for (let w = wB + 1.0; w < -1.8; w += 1.5) { const u = cS < 0 ? uL + 0.7 : uR - 0.7; box(u - 0.3, u + 0.3, 0.4, 0.95, w - 0.3, w + 0.3, 0x2a2c30); box(u - 0.06, u + 0.06, 0, 0.4, w - 0.06, w + 0.06, 0x9aa0a6); const mw = cS < 0 ? uL : uR; box(mw - 0.03, mw + 0.03, 1.1, 2.1, w - 0.4, w + 0.4, 0xcfe8f4, true); }
       counter(cU, -1.4);
     } else if (kind === 'laundry') {
-      for (let w = wB + 0.4; w < -1.6; w += 0.8) for (const side of [uL, uR]) { const s = side === uL ? 1 : -1; box(side, side + s * 0.75, 0, 0.9, w, w + 0.7, 0xf4f4f0); box(side + s * 0.76, side + s * 0.78, 0.25, 0.75, w + 0.12, w + 0.58, 0x6a8090, true); box(side, side + s * 0.75, 0.95, 1.85, w, w + 0.7, 0xe0e4e8); }
-      box((uL + uR) / 2 - 0.5, (uL + uR) / 2 + 0.5, 0, 0.9, wB + 1.0, -2.5, 0xb8a888); counter(cU, -1.4, 1.0);   // the folding table, the attendant's change counter
+      for (let w = wB + 0.4; w < -1.6; w += 0.8) for (const side of [uL, uR]) { const s = side === uL ? 1 : -1; sbox(side, side + s * 0.75, 0, 0.9, w, w + 0.7, 0xf4f4f0); box(side + s * 0.76, side + s * 0.78, 0.25, 0.75, w + 0.12, w + 0.58, 0x6a8090, true); box(side, side + s * 0.75, 0.95, 1.85, w, w + 0.7, 0xe0e4e8); }
+      sbox((uL + uR) / 2 - 0.5, (uL + uR) / 2 + 0.5, 0, 0.9, wB + 1.0, -2.5, 0xb8a888); counter(cU, -1.4, 1.0);   // the folding table, the attendant's change counter
     } else { counter(cU, -1.6); for (let w = wB + 0.8; w < -2.5; w += 2.0) { const u = (uL + uR) / 2; box(u - 0.7, u + 0.7, 0, 0.75, w - 0.4, w + 0.4, 0x8a6a4a); box(u - 0.25, u + 0.25, 0.75, 1.1, w - 0.2, w + 0.1, 0x1a1a1a); } }
+    if (dry) return solid;
     const grp = new THREE.Group(); grp.name = 'shop:' + U.i;
     if (g.length) grp.add(new THREE.Mesh(mergeGeometries(g, false), mat)); if (gl.length) grp.add(new THREE.Mesh(mergeGeometries(gl, false), glow));
     for (const o of grp.children) o.renderOrder = -2;   // the room first, then
@@ -125,7 +135,7 @@ export function buildShops(world) {
     const byD = units.map((U) => [Math.hypot(U.c[0] - P.x, U.c[2] - P.z), U]).sort((a, b) => a[0] - b[0]);
     for (const [d, U] of byD) { const g = live.get(U); if (g && (d > FAR || [...live.keys()].indexOf(U) >= maxLive + 1)) { scene.remove(g); g.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (o.material !== mat && o.material !== glow && o.material !== paneM && o.material !== holeM) o.material.dispose(); } }); live.delete(U); } }
     let built = 0; for (const [d, U] of byD) { if (d > NEAR || live.size >= maxLive || built) break; if (!live.has(U)) { const g = build(U); scene.add(g); live.set(U, g); built++; } } });
-  console.log('[shops]', units.length, 'shops you can walk into ·', spots.length, 'people in and around them');
+  console.log('[shops]', units.length, 'shops you can walk into ·', spots.length, 'people in and around them ·', nCol, 'fixture colliders');
   if (typeof window !== 'undefined' && window.__game) window.__game.shops = { list: () => units.map((U) => ({ name: U.name, kind: U.kind, street: U.street || null, c: U.c.map(Math.round), rd: U.rd, hw: (U.u1 - U.u0) / 2, mid: U.toW((U.u0 + U.u1) / 2, 0, 0).toArray(), door: U.toW(U.dx + U.dw / 2, 0, 1.5).toArray().map((v) => +v.toFixed(1)), inside: U.toW(U.dx + U.dw / 2, 0, -2.5).toArray().map((v) => +v.toFixed(1)) })), live: () => live.size, liveNames: () => [...live.keys()].map((U) => U.name) };
   return units.length;
 }
