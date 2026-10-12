@@ -7,7 +7,9 @@
 //  · Mermaid Ave / W 8th / W 12th / Neptune / Stillwell walk-ups: ground-floor shops on every street face (procedural names:
 //    delis, 99¢ stores, nail salons, check cashing …), bracketed cornices, black fire escapes;
 //  · Surf Ave north side: white stucco with a row of arched windows upstairs, billboards on the roofs.
-// Everything is overlay geometry a few cm proud of the walls city.js built (no colliders, no new raycast targets): one
+// WALKIN_SHARE of each street's storefronts are walk-ins: a doorway, the room carved out of the building's colliders and a front
+// wall either side of the door (coney/shops.js fills the room); the rest stay shut behind glass or a roll-down gate.
+// Everything else is overlay geometry a few cm proud of the walls city.js built (no colliders, no new raycast targets): one
 // vertex-coloured mesh, one glass mesh, one sign atlas, a handful of landmark textures. CONEY agent.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -20,15 +22,21 @@ import { isSchool } from './school.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const SIGN_Y0 = 3.3, SIGN_Y1 = 4.5;                          // the sign band over the shop (city.js keeps its own boards at 3.36-4.44)
-const GENERIC = [   // procedural ground-floor shops on the walk-up streets
-  ['DELI & GROCERY', 'COLD BEER · LOTTO', '#2a8a3a', '#ffffff', '#2a8a3a'], ['99¢ & UP', 'EVERYTHING', '#f2c418', '#c8202a', null], ['NAIL SALON', 'MANI · PEDI · WAX', '#f7d6e4', '#c2185b', null],
-  ['PHARMACY', 'Rx', '#ffffff', '#1a7a4a', null], ['BARBER SHOP', 'WALK-INS WELCOME', '#1a1a1a', '#ffffff', '#c8202a'], ['LAUNDROMAT', 'WASH · DRY · FOLD', '#1f6fb8', '#ffffff', null],
-  ['CELL PHONES', 'REPAIR · ACCESSORIES', '#111111', '#36c0ff', null], ['ПРОДУКТЫ', 'EUROPEAN GROCERY', '#7a1a1a', '#ffd23a', '#7a1a1a'], ['CHECK CASHING', 'MONEY ORDERS · BILL PAY', '#ffd23a', '#1a3a7a', null],
-  ['PIZZA', 'SLICES · HEROES', '#c8202a', '#ffffff', '#2a8a3a'], ['CHINESE FOOD', 'TAKE OUT', '#c8202a', '#ffd23a', null], ['HALAL', 'GYRO · PLATTERS', '#1d6b34', '#ffffff', null],
-  ['LIQUORS', 'WINE & SPIRITS', '#1a1a1a', '#ffd23a', null], ['TAX SERVICE', 'INSURANCE · NOTARY', '#ffffff', '#1a3a7a', null], ['BAKERY', 'ХЛЕБ · CAKES', '#f2e6c8', '#7a3a1a', '#7a3a1a'],
-  ['OPTICAL', 'EYE EXAMS', '#ffffff', '#1f4fa8', null], ['URGENT CARE', 'WALK-IN', '#ffffff', '#d8201e', null], ['DOLLAR STORE', '', '#2a8a3a', '#ffd23a', null],
-  ['TRAVEL AGENCY', 'ПУТЕШЕСТВИЯ', '#1aa0d8', '#ffffff', null], ['LAWYER', 'ACCIDENTS · IMMIGRATION', '#1a2a4a', '#f2e6c8', null],
+const GENERIC = [   // procedural ground-floor shops on the walk-up streets: [name, sub, bg, fg, awning, OSM-ish kind (the room's interior)]
+  ['DELI & GROCERY', 'COLD BEER · LOTTO', '#2a8a3a', '#ffffff', '#2a8a3a', 'convenience'], ['99¢ & UP', 'EVERYTHING', '#f2c418', '#c8202a', null, 'variety_store'], ['NAIL SALON', 'MANI · PEDI · WAX', '#f7d6e4', '#c2185b', null, 'beauty'],
+  ['PHARMACY', 'Rx', '#ffffff', '#1a7a4a', null, 'chemist'], ['BARBER SHOP', 'WALK-INS WELCOME', '#1a1a1a', '#ffffff', '#c8202a', 'hairdresser'], ['LAUNDROMAT', 'WASH · DRY · FOLD', '#1f6fb8', '#ffffff', null, 'laundry'],
+  ['CELL PHONES', 'REPAIR · ACCESSORIES', '#111111', '#36c0ff', null, 'mobile_phone'], ['ПРОДУКТЫ', 'EUROPEAN GROCERY', '#7a1a1a', '#ffd23a', '#7a1a1a', 'deli'], ['CHECK CASHING', 'MONEY ORDERS · BILL PAY', '#ffd23a', '#1a3a7a', null, 'bank'],
+  ['PIZZA', 'SLICES · HEROES', '#c8202a', '#ffffff', '#2a8a3a', 'pizza'], ['CHINESE FOOD', 'TAKE OUT', '#c8202a', '#ffd23a', null, 'fast_food'], ['HALAL', 'GYRO · PLATTERS', '#1d6b34', '#ffffff', null, 'fast_food'],
+  ['LIQUORS', 'WINE & SPIRITS', '#1a1a1a', '#ffd23a', null, 'alcohol'], ['TAX SERVICE', 'INSURANCE · NOTARY', '#ffffff', '#1a3a7a', null, 'office'], ['BAKERY', 'ХЛЕБ · CAKES', '#f2e6c8', '#7a3a1a', '#7a3a1a', 'bakery'],
+  ['OPTICAL', 'EYE EXAMS', '#ffffff', '#1f4fa8', null, 'office'], ['BAR · КАРАОКЕ', 'COCKTAILS · BEER', '#1a1a2a', '#ff4fa0', null, 'bar'], ['DOLLAR STORE', '', '#2a8a3a', '#ffd23a', null, 'variety_store'],
+  ['TRAVEL AGENCY', 'ПУТЕШЕСТВИЯ', '#1aa0d8', '#ffffff', null, 'office'], ['GASTRONOM', 'КОЛБАСА · СЫР · ИКРА', '#1a3a7a', '#f2e6c8', '#1a3a7a', 'deli'],
 ];
+/** the walk-in share of each street's storefronts (Surf / Mermaid / Stillwell / the side streets alike); phones get fewer */
+export const WALKIN_SHARE = 0.3, WALKIN_SHARE_LITE = 0.18;
+const WALKIN_MIX = ['DELI & GROCERY', 'PIZZA', 'LAUNDROMAT', 'CELL PHONES', 'PHARMACY', 'BAR · КАРАОКЕ', 'ПРОДУКТЫ'];   // the procedural walk-ins, in turn (GENERIC names)
+const MAIN_STREETS = new Set(['surf', 'mermaid', 'stillwell']);   // the mix goes to these first
+const SHUTTER_SHARE = 0.3;  // of the closed procedural fronts, the ones with the roll-down gate down
+const hash2 = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
 const ADS = [   // rooftop billboards on Surf Ave (parodies)
   ['HORIZON', 'Stop schlepping. 5G on the whole boardwalk.', '#1f5fae', '#ffffff', '#ffd23a'], ['INJURED?', 'CALL ALEX & ALEX  1-800-HURT-NOW', '#ffd23a', '#111111', '#c8202a'],
   ['MORPHEUS8', 'sleep like you mean it', '#2a1a3a', '#ffffff', '#ff7ab0'], ['CONEY CYCLONES', 'BASEBALL · TONIGHT 7PM', '#0d3b66', '#ffffff', '#ff9a1f'],
@@ -152,33 +160,71 @@ function shopUnit(K, F, u, w, s, signs, o = {}) {
   if (s.aw) awning(K, F, u0 + 0.1, u1 - 0.1, sy0 - 0.12, s.aw, o.stripe);
   return { u0, u1, dx, dw, sy0 };
 }
+/** a closed front: the roll-down gate over the glass and door, its housing box under the sign, the grooves, a padlock */
+function shutter(K, F, unit) {
+  const a = unit.u0 + 0.32, b = unit.u1 - 0.32, top = unit.sy0 - 0.2;
+  K.box(F, a, b, 0.02, top, 0.22, 0.25, 0x8c9094); K.box(F, a - 0.05, b + 0.05, top - 0.05, top + 0.25, 0.2, 0.36, 0x6a6e72);
+  for (let y = 0.3; y < top - 0.1; y += 0.28) K.box(F, a, b, y, y + 0.04, 0.25, 0.265, 0x70747a);
+  K.box(F, (a + b) / 2 - 0.06, (a + b) / 2 + 0.06, 0.05, 0.2, 0.25, 0.3, 0x2a2c30);
+}
 /** after dark, a few people out front of the bars and restaurants (folk.js shows them at night) */
 function nightOut(world, F, K, u, w) { const L = world.W.nightSpots || (world.W.nightSpots = []); if (L.length > 60) return;
   for (let k = 0; k < 3; k++) { const p = new THREE.Vector3(K.U(F, u + (k - 1) * w * 0.3), 0, 2.2 + (k % 2) * 0.8).applyMatrix4(F.m), c = new THREE.Vector3(K.U(F, u), 0, 2.6).applyMatrix4(F.m);
     L.push({ x: p.x, y: 0, z: p.z, ry: Math.atan2(c.x - p.x, c.z - p.z), pose: k === 1 ? 'phone' : 'stand', zone: 'nightlife' }); } }
 // ---- enterable shops: the room behind the storefront is carved out of the building's colliders (AABBs, so square-on faces
 // only), a front wall either side of the doorway; coney/shops.js builds the interior when you come near and puts people in it
-const KIND = (k) => /restaurant|fast_food|cafe|pizza/.test(k) ? 'food' : /ice_cream|confectionery/.test(k) ? 'candy' : /bar|pub/.test(k) ? 'bar' : /bank|beauty|hairdresser|laundry|clinic|dancing|nail/.test(k) ? 'service' : 'grocery';
+const KIND = (k, n = '') => /pizza/.test(k) || /PIZZ/.test(n) ? 'pizza' : /restaurant|fast_food|cafe|bakery/.test(k) ? 'food' : /ice_cream|confectionery/.test(k) ? 'candy' : /bar|pub/.test(k) ? 'bar'
+  : /mobile_phone|electronics/.test(k) ? 'phone' : /chemist|pharmacy|medical/.test(k) ? 'pharmacy' : /laundry|dry_cleaning/.test(k) ? 'laundry'
+  : /bank|beauty|hairdresser|clinic|dancing|nail|office/.test(k) ? 'service' : /ПРОДУКТЫ|GASTRONOM|ГАСТРОНОМ|EUROPEAN|RUSSIAN/.test(n) ? 'russian' : 'grocery';
+const NOT_A_SHOP = /police|fire_station|events_venue/;   // their fronts stay shut
 function depthBehind(f, u) { const px = f.A[0] + f.tx * u, pz = f.A[1] + f.tz * u; let d = 0.5; while (d < 14 && pip(px - f.nx * d, pz - f.nz * d, f.b.p)) d += 0.5; return d - 0.5; }
-function carve(ctx, box) {
-  const out = []; for (const C of ctx.colliders) {
-    if (!(C.max.x > box.min.x && C.min.x < box.max.x && C.max.z > box.min.z && C.min.z < box.max.z && C.max.y > box.min.y && C.min.y < box.max.y)) { out.push(C); continue; }
+/** cut AABBs out of the colliders (each hit box splits into up to six around the cut), one pass over the list */
+function carve(ctx, cuts) {
+  const hit = (C, B) => C.max.x > B.min.x && C.min.x < B.max.x && C.max.z > B.min.z && C.min.z < B.max.z && C.max.y > B.min.y && C.min.y < B.max.y;
+  const sub = (C, B, out) => {
     const P = (ax, ay, az, bx, by, bz) => { if (bx - ax > 0.01 && by - ay > 0.01 && bz - az > 0.01) out.push(new THREE.Box3(new THREE.Vector3(ax, ay, az), new THREE.Vector3(bx, by, bz))); };
-    const x0 = Math.max(C.min.x, box.min.x), x1 = Math.min(C.max.x, box.max.x), z0 = Math.max(C.min.z, box.min.z), z1 = Math.min(C.max.z, box.max.z);
-    P(C.min.x, C.min.y, C.min.z, box.min.x, C.max.y, C.max.z); P(box.max.x, C.min.y, C.min.z, C.max.x, C.max.y, C.max.z);
-    P(x0, C.min.y, C.min.z, x1, C.max.y, box.min.z); P(x0, C.min.y, box.max.z, x1, C.max.y, C.max.z);
-    P(x0, box.max.y, z0, x1, C.max.y, z1); P(x0, C.min.y, z0, x1, box.min.y, z1);
+    const x0 = Math.max(C.min.x, B.min.x), x1 = Math.min(C.max.x, B.max.x), z0 = Math.max(C.min.z, B.min.z), z1 = Math.min(C.max.z, B.max.z);
+    P(C.min.x, C.min.y, C.min.z, B.min.x, C.max.y, C.max.z); P(B.max.x, C.min.y, C.min.z, C.max.x, C.max.y, C.max.z);
+    P(x0, C.min.y, C.min.z, x1, C.max.y, B.min.z); P(x0, C.min.y, B.max.z, x1, C.max.y, C.max.z);
+    P(x0, B.max.y, z0, x1, C.max.y, z1); P(x0, C.min.y, z0, x1, B.min.y, z1);
+  };
+  const all = cuts.reduce((u, B) => u.union(B), new THREE.Box3()), out = [];
+  for (const C of ctx.colliders) {
+    if (!hit(C, all)) { out.push(C); continue; }
+    let parts = [C]; for (const B of cuts) { const next = []; for (const q of parts) { if (hit(q, B)) sub(q, B, next); else next.push(q); } parts = next; }
+    out.push(...parts);
   }
   ctx.colliders.length = 0; ctx.colliders.push(...out);
 }
+const DOOR_CLEAR = 2.5;   // m out from the facade kept free of building colliders in front of a walk-in's door
+const SLICE = 0.4;   // a room on a face that isn't square to the grid is carved as AABB strips this wide (≤ 0.4·tan θ over-cut at its edges)
+/** the AABB strips covering the quad pts ([[x, z] x4]) in y0..y1: one box when it's square-on, else slices across its long axis */
+function strips(pts, y0, y1) {
+  const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]), bx = [Math.min(...xs), Math.max(...xs)], bz = [Math.min(...zs), Math.max(...zs)];
+  const e = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]), square = Math.abs(pts[1][0] - pts[0][0]) / e > 0.995 || Math.abs(pts[1][1] - pts[0][1]) / e > 0.995;
+  const B = (x0, x1, z0, z1) => new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));
+  if (square) return [B(bx[0], bx[1], bz[0], bz[1])];
+  const alongX = bx[1] - bx[0] >= bz[1] - bz[0], a = alongX ? 0 : 1, o = 1 - a, lo = alongX ? bx[0] : bz[0], hi = alongX ? bx[1] : bz[1], out = [];
+  for (let s0 = lo; s0 < hi - 1e-3; s0 += SLICE) { const s1 = Math.min(hi, s0 + SLICE); let m0 = Infinity, m1 = -Infinity;
+    for (let i = 0; i < 4; i++) { const p = pts[i], q = pts[(i + 1) % 4];
+      if (p[a] >= s0 && p[a] <= s1) { m0 = Math.min(m0, p[o]); m1 = Math.max(m1, p[o]); }
+      for (const c of [s0, s1]) if ((p[a] - c) * (q[a] - c) < 0) { const t = (c - p[a]) / (q[a] - p[a]), v = p[o] + t * (q[o] - p[o]); m0 = Math.min(m0, v); m1 = Math.max(m1, v); } }
+    if (m1 > m0) out.push(alongX ? B(s0, s1, m0, m1) : B(m0, m1, s0, s1)); }
+  return out;
+}
+/** the quad u a..b, w w0..w1 of a face frame, as world [x, z] corners (for strips) */
+const faceQuad = (K, F, a, b, w0, w1) => [[a, w0], [b, w0], [b, w1], [a, w1]].map(([u, w]) => { const v = new THREE.Vector3(K.U(F, u), 0, w).applyMatrix4(F.m); return [v.x, v.z]; });
 function makeEnterable(world, K, f, F, unit, s) {
   const rd = Math.min(9, depthBehind(f, (unit.u0 + unit.u1) / 2) - 0.6); if (rd < 4.5) return null;
-  const toW = (u, y, w) => new THREE.Vector3(K.U(F, u), y, w).applyMatrix4(F.m), H = 3.3;
-  const corners = [toW(unit.u0 + 0.35, 0.05, -rd), toW(unit.u1 - 0.35, H, 0.45)], box = new THREE.Box3().setFromPoints(corners);
-  carve(world.ctx, box);
-  for (const [a, b] of [[unit.u0, unit.dx], [unit.dx + unit.dw, unit.u1]]) { if (b - a < 0.05) continue; const p = toW(a, 0, -0.2), q = toW(b, H, 0.05);   // the front wall either side of the doorway
-    world.box([Math.min(p.x, q.x), 0, Math.min(p.z, q.z)], [Math.max(p.x, q.x), H, Math.max(p.z, q.z)]); }
-  return { m: F.m.elements.slice(), flip: F.flip, L: F.L, u0: unit.u0, u1: unit.u1, dx: unit.dx, dw: unit.dw, rd, H, kind: KIND(s.k || ''), name: s.n, bg: s.bg, fg: s.fg, c: toW((unit.u0 + unit.u1) / 2, 0, -rd / 2).toArray() };
+  const toW = (u, y, w) => new THREE.Vector3(K.U(F, u), y, w).applyMatrix4(F.m), H = 3.3, quad = (a, b, w0, w1) => faceQuad(K, F, a, b, w0, w1);
+  // the room, out through the old facade, and a clear way up to the door: a rotated building's conservative AABB colliders can
+  // bulge a metre or two past its wall (osmkit footprint), which would leave the doorway blocked from the sidewalk. Square ones
+  // don't bulge, and may already have a bench or a pole out front (8th Ave, Brighton), so theirs is left alone
+  const square = Math.abs(f.tx) > 0.995 || Math.abs(f.tz) > 0.995;
+  carve(world.ctx, [...strips(quad(unit.u0 + 0.35, unit.u1 - 0.35, -rd, 0.45), 0.05, H), ...(square ? [] : strips(quad(unit.dx, unit.dx + unit.dw, -1, DOOR_CLEAR), 0.05, H))]);
+  for (const [a, b] of [[unit.u0, unit.dx], [unit.dx + unit.dw, unit.u1]]) { if (b - a < 0.05) continue;   // the front wall either side of the doorway
+    for (const c of strips(quad(a, b, -0.2, 0.05), 0, H)) world.box(c.min.toArray(), c.max.toArray()); }
+  return { m: F.m.elements.slice(), flip: F.flip, L: F.L, u0: unit.u0, u1: unit.u1, dx: unit.dx, dw: unit.dw, rd, H, kind: KIND(s.k || '', `${s.n} ${s.s || ''}`), name: s.n, bg: s.bg, fg: s.fg, c: toW((unit.u0 + unit.u1) / 2, 0, -rd / 2).toArray() };
 }
 /** awning: 1.5 m out, 0.55 m fall, a 0.3 m valance; striped = alternating with white every 0.35 m */
 function awning(K, F, u0, u1, yTop, color, stripe = false) {
@@ -296,6 +342,22 @@ function adsTex(lite) {
   });
 }
 
+/** shop glass: dark and glossy, with a dim shop behind it painted in (shelves, a counter, the ceiling lights) so a closed front reads
+ *  as a shop you just can't get into, never a hole. One texture, one material for every pane (each glass quad is UV 0..1). */
+let glassM = null;
+function shopGlass(lite) {
+  if (glassM) return glassM;
+  const tex = bandTex(lite ? 128 : 256, lite ? 64 : 128, (g, W, H) => {
+    const back = g.createLinearGradient(0, 0, 0, H); back.addColorStop(0, '#4a4438'); back.addColorStop(1, '#2a2620'); g.fillStyle = back; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#f2ead0'; for (let x = W * 0.08; x < W; x += W * 0.28) g.fillRect(x, H * 0.04, W * 0.16, H * 0.03);   // ceiling panels
+    const C = ['#a83a2a', '#3a5a9a', '#c8a030', '#3a8a5a', '#d8d4c8', '#7a4a9a'];
+    g.globalAlpha = 0.55; for (let r = 0; r < 4; r++) for (let x = W * 0.04; x < W * 0.96; x += W * 0.03) { g.fillStyle = C[(Math.floor(x / 7) + r * 3) % C.length]; g.fillRect(x, H * (0.2 + r * 0.13), W * 0.022, H * 0.08); }   // stocked shelves at the back
+    g.globalAlpha = 1; g.fillStyle = '#1e1a16'; g.fillRect(0, H * 0.72, W, H * 0.28); g.fillStyle = '#5a4a3a'; g.fillRect(W * 0.55, H * 0.6, W * 0.4, H * 0.14);   // floor, the counter
+    const sh = g.createLinearGradient(0, 0, W, H); sh.addColorStop(0, 'rgba(255,255,255,0.10)'); sh.addColorStop(0.5, 'rgba(255,255,255,0)'); g.fillStyle = sh; g.fillRect(0, 0, W, H); });   // the street's sheen
+  glassM = new THREE.MeshStandardMaterial({ color: 0x8a96a2, map: tex, roughness: 0.08, metalness: 0.55, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3 });
+  return glassM;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------
 /** storefronts on faces given from outside (8th Ave by Soc Tav: its painted fronts have no real doors). items:
  *  [{ A: [x, z], B: [x, z], poly: [[x, z] …] (the building, for the room depth), store: {n, s, st, bg, fg, aw, k}, enter }]; the
@@ -313,7 +375,7 @@ export function extraFronts(world, items) {
   }
   if (signs.length) { const tex = atlasOf(signs, lite); for (const sg of signs) sg.place(); const me = new THREE.Mesh(mergeGeometries(K.sign, false), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3 })); me.name = 'fronts:extraSigns'; scene.add(me); }
   if (K.col.length) { const me = new THREE.Mesh(mergeGeometries(K.col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.15 })); me.name = 'fronts:extraKit'; me.receiveShadow = true; scene.add(me); }
-  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), new THREE.MeshStandardMaterial({ color: 0x24303c, roughness: 0.08, metalness: 0.75, emissive: 0x3a2e1c, emissiveIntensity: 0.35 })); me.name = 'fronts:extraGlass'; scene.add(me); }
+  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), shopGlass(lite)); me.name = 'fronts:extraGlass'; scene.add(me); }
   (world.W.shopUnits || (world.W.shopUnits = [])).push(...out);
   return out;
 }
@@ -325,7 +387,7 @@ export function buildFronts(world, M) {
   const mats = [];
   // 1) the mapped businesses: the street face of their building nearest the point, the unit centred on the point
   const NORM = STORES.find((s) => s.st === 'landmark');
-  const ENTER_MAX = lite ? 6 : 14, shopUnits = []; let enterN = 0;
+  const shopUnits = [], plans = [];   // every storefront, emitted once the walk-in ones are picked (below)
   for (const s of STORES) {
     if (s === NORM) continue;
     let best = null, bd = 18;
@@ -337,10 +399,8 @@ export function buildFronts(world, M) {
     for (const [a, b] of best.used) { if (u + w / 2 > a && u - w / 2 < b) { u = u < (a + b) / 2 ? a - w / 2 - 0.1 : b + w / 2 + 0.1; } }
     if (u - w / 2 < 0.1 || u + w / 2 > best.L - 0.1 || best.used.some(([a, b]) => u + w / 2 > a && u - w / 2 < b)) continue;
     best.used.push([u - w / 2, u + w / 2]); best.store = true;
-    const square = Math.abs(best.tx) > 0.995 || Math.abs(best.tz) > 0.995, F = K.frame(best), enter = square && enterN < ENTER_MAX && !big && w >= 4.5;
-    const unit = shopUnit(K, F, u, w, s, signs, { ...(big ? { sy1: SIGN_Y1 + 0.5 } : {}), enter }); st.stores++;
-    if (/bar|restaurant|fast_food/.test(s.k || '')) nightOut(world, F, K, u, w);   // a crowd out front after dark
-    if (enter) { const e = makeEnterable(world, K, best, F, unit, s); if (e) { shopUnits.push(e); enterN++; } }
+    plans.push({ f: best, u, w, s, o: big ? { sy1: SIGN_Y1 + 0.5 } : {}, big });
+    if (/bar|restaurant|fast_food/.test(s.k || '')) nightOut(world, K.frame(best), K, u, w);   // a crowd out front after dark
   }
   // NORMAN'S: every street face of its building
   if (NORM) { let b = null, bd = 25; for (const f of all) { if (!f.street) continue; const d = segD(NORM.x, NORM.z, f.A, f.B); if (d < bd) { bd = d; b = f.b; } }
@@ -354,11 +414,31 @@ export function buildFronts(world, M) {
       if (f.b.s !== 'rowhouse' || f.street !== 'side') {
         const n = Math.floor(f.L / 6.5);
         for (let k = 0; k < n; k++) { const u = f.L * (k + 0.5) / n, w = Math.min(6, f.L / n - 0.4); if (R() < 0.28 || f.used.some(([a, b]) => u + w / 2 > a && u - w / 2 < b)) continue;
-          const [nm, sub, bg, fg, aw] = GENERIC[(R() * GENERIC.length) | 0]; shopUnit(K, K.frame(f), u, w, { n: nm, s: sub, st: R() < 0.2 ? 'chan' : 'box', bg, fg, aw: R() < 0.5 ? aw : null }, signs, { doorLeft: R() < 0.5 }); f.used.push([u - w / 2, u + w / 2]); st.generic++; }
+          const [nm, sub, bg, fg, aw, kind] = GENERIC[(R() * GENERIC.length) | 0]; plans.push({ f, u, w, s: { n: nm, s: sub, st: R() < 0.2 ? 'chan' : 'box', bg, fg, aw: R() < 0.5 ? aw : null, k: kind }, o: { doorLeft: R() < 0.5 }, generic: true }); f.used.push([u - w / 2, u + w / 2]); st.generic++; }
       }
     }
   }
-  // 3) Surf Ave north side: arched upper storeys and a few billboards on the roofs
+  // 3) the walk-in share: on each street, WALKIN_SHARE of its storefronts get a doorway and a room (fewer on phones: every room is
+  // colliders, people and, while you're near, an interior). Only a front with a deep enough building behind it (and a real shop)
+  // can take one, so the share is filled from those; the rest stay closed (glass with a shop painted behind it, or the roll-down
+  // shutter).
+  const share = lite ? WALKIN_SHARE_LITE : WALKIN_SHARE, byStreet = new Map();
+  for (const p of plans) { (byStreet.get(p.f.street) || byStreet.set(p.f.street, []).get(p.f.street)).push(p);
+    const ends = [p.u - p.w / 2, p.u + p.w / 2].map((u) => p.f.A[0] + p.f.tx * u), inX = Math.min(...ends) > PLAY.x0 + 2 && Math.max(...ends) < Math.max(PLAY.x1, 440) - 2;   // inside the map bounds (coney.js W.bounds)
+    p.can = inX && !p.big && !NOT_A_SHOP.test(p.s.k || '') && p.w >= 4.5 && Math.min(9, depthBehind(p.f, p.u) - 0.6) >= 4.5; }
+  for (const L of byStreet.values()) { const want = Math.round(L.length * share), pick = L.filter((p) => p.can).sort((a, b) => hash2(a.f.mx + a.u, a.f.mz) - hash2(b.f.mx + b.u, b.f.mz)).slice(0, want); for (const p of pick) p.enter = true; }
+  { let j = 0; for (const p of [...plans.filter((q) => MAIN_STREETS.has(q.f.street)), ...plans.filter((q) => !MAIN_STREETS.has(q.f.street))]) if (p.enter && p.generic) { const want = WALKIN_MIX[j++ % WALKIN_MIX.length], g = GENERIC.find((q) => q[0] === want);   // the procedural walk-ins cycle through the mix
+    p.s = { ...p.s, n: g[0], s: g[1], bg: g[2], fg: g[3], aw: p.s.aw ? g[4] : null, k: g[5] }; } }
+  st.walkin = {}; const closed = [];   // the shut fronts (qa: you can't walk through them)
+  for (const p of plans) {
+    const F = K.frame(p.f), unit = shopUnit(K, F, p.u, p.w, p.s, signs, { ...p.o, enter: !!p.enter }); if (!p.generic) st.stores++;
+    const ws = st.walkin[p.f.street] || (st.walkin[p.f.street] = { fronts: 0, walkin: 0 }); ws.fronts++;
+    if (p.enter) { const e = makeEnterable(world, K, p.f, F, unit, p.s); if (e) { e.street = p.f.street; shopUnits.push(e); ws.walkin++; } }
+    else { if (p.generic && hash2(p.f.mx + p.u, p.f.mz + 7) < SHUTTER_SHARE) shutter(K, F, unit);   // closed for good / not open yet
+      for (const c of strips(faceQuad(K, F, unit.u0 + 0.3, unit.u1 - 0.3, -0.3, 0.2), 0, unit.sy0)) world.box(c.min.toArray(), c.max.toArray());   // solid at the glass: city.js's own box can sit a little behind the wall
+      const at = (w) => new THREE.Vector3(K.U(F, p.u), 0, w).applyMatrix4(F.m); closed.push({ name: p.s.n, street: p.f.street, out: at(1.5).toArray(), in: at(-1).toArray() }); }
+  }
+  // 4) Surf Ave north side: arched upper storeys and a few billboards on the roofs
   const arches = [], boards = [];
   for (const f of all) {
     if (!inMap(f) || f.street !== 'surf' || f.landmark || f.nz < 0.45) continue;
@@ -372,12 +452,12 @@ export function buildFronts(world, M) {
     const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3 }); mats.push(m); glow(world, m, 6);
     const me = new THREE.Mesh(mergeGeometries(K.sign, false), m); me.name = 'fronts:signs'; me.receiveShadow = true; scene.add(me); }
   if (K.col.length) { const me = new THREE.Mesh(mergeGeometries(K.col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.15 })); me.name = 'fronts:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }
-  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), new THREE.MeshStandardMaterial({ color: 0x24303c, roughness: 0.08, metalness: 0.75, emissive: 0x3a2e1c, emissiveIntensity: 0.35 })); me.name = 'fronts:glass'; scene.add(me); glow(world, me.material, 5); }
+  if (K.glass.length) { const me = new THREE.Mesh(mergeGeometries(K.glass, false), shopGlass(lite)); me.name = 'fronts:glass'; scene.add(me); glow(world, me.material, 5); }
   if (arches.length) { const me = new THREE.Mesh(mergeGeometries(arches, false), new THREE.MeshStandardMaterial({ map: archTexture(), roughness: 0.85 })); me.name = 'fronts:arches'; me.receiveShadow = true; scene.add(me); }
   if (boards.length) { const tex = adsTex(lite), list = []; for (const b of boards) { const i = ADS.indexOf(b.ad); list.push(K.quad(b.F, [], b.u0, b.u1, b.y0, b.y1, b.w, [(i % 2) / 2, 1 - (Math.floor(i / 2) + 1) / 2, 0.5, 0.5])); }
     const me = new THREE.Mesh(mergeGeometries(list, false), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 })); me.name = 'fronts:billboards'; scene.add(me); glow(world, me.material, 8); }
   console.log('[fronts]', st.stores, 'mapped stores ·', st.generic, 'procedural shops ·', st.walkups, 'walk-up faces ·', st.arches, 'arched upper storeys ·', st.boards, 'billboards');
   st.enterable = shopUnits.length; world.W.shopUnits = shopUnits;
-  world.W.fronts = { stats: st, faces: all.filter((f) => f.store).length };
+  world.W.fronts = { stats: st, faces: all.filter((f) => f.store).length, closed };
   return st;
 }
