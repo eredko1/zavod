@@ -1,4 +1,4 @@
-// Shared parked-car kit (sedan / cab / hatch / van / suv). Owned by: main (integration); used by wsp, terminal, sbu.
+// Shared car kit (sedan / cab / hatch / suv / e34 / van, the sports and Soviet kinds; see KINDS). Owned by: main (integration); used by wsp, terminal, sbu.
 // The old cars were extruded side profiles: slab sides, square section, glass as a separate band — a PS1 read up close.
 // These are lofted: ~40 cross-sections along the length, each a rounded section with tumblehome (the greenhouse leans
 // in), plan-view taper at nose and tail, real wheel arches cut into the sills, a greenhouse with A/B/C pillars, and
@@ -10,10 +10,12 @@ import { hasCarModel, instanceCarModel } from './carmodels.js';
 
 const KINDS = {
   //         len   w     clear belt  roof  hood   nose(x of windshield base, top), rear(top, base), wheel x, B-pillar x, tail height
-  sedan: { len: 4.7, w: 1.8, clr: 0.2, belt: 0.93, roof: 1.43, hood: 0.86, ws: [0.95, 0.12], rs: [-0.72, -1.45], wheels: [1.42, -1.38], b: [0.05], trunk: 0.97 },
-  cab:   { len: 4.8, w: 1.82, clr: 0.2, belt: 0.95, roof: 1.47, hood: 0.88, ws: [0.92, 0.1], rs: [-0.8, -1.5], wheels: [1.45, -1.42], b: [0.02], trunk: 0.99, sign: true },
+  sedan: { len: 4.75, w: 1.82, clr: 0.19, belt: 0.95, roof: 1.44, hood: 0.86, ws: [1.02, 0.05], rs: [-0.55, -1.5], wheels: [1.43, -1.4], b: [0.02], trunk: 1.0 },   // modern Camry-style: fast windshield, sloped backlight, short deck
+  cab:   { len: 4.9, w: 1.84, clr: 0.2, belt: 0.95, roof: 1.5, hood: 0.88, ws: [0.86, 0.22], rs: [-0.92, -1.38], wheels: [1.47, -1.45], b: [0.0], trunk: 1.0, sign: true },   // Crown Vic-style formal roof, long trunk
   hatch: { len: 4.2, w: 1.76, clr: 0.19, belt: 0.95, roof: 1.46, hood: 0.84, ws: [0.9, 0.18], rs: [-1.25, -1.85], wheels: [1.3, -1.28], b: [0.1], trunk: 1.0 },
-  suv:   { len: 4.75, w: 1.9, clr: 0.28, belt: 1.12, roof: 1.74, hood: 1.04, ws: [1.05, 0.35], rs: [-1.9, -2.15], wheels: [1.45, -1.42], b: [0.2, -0.95], trunk: 1.12 },
+  suv:   { len: 4.8, w: 1.92, clr: 0.28, belt: 1.13, roof: 1.78, hood: 1.06, ws: [1.1, 0.42], rs: [-2.02, -2.2], wheels: [1.47, -1.44], b: [0.2, -0.95], trunk: 1.14, square: true, rack: true, clad: true },   // two-box, upright tail, roof rack, black arch cladding
+  // BMW E34-style saloon: long hood, low belt, tall thin-pillared glasshouse, upright flat trunk, kidney grille, quad round lamps
+  e34:   { len: 4.72, w: 1.75, clr: 0.17, belt: 0.86, roof: 1.41, hood: 0.8, ws: [0.72, 0.16], rs: [-0.86, -1.36], wheels: [1.42, -1.34], b: [-0.17], trunk: 0.9, square: true, kidney: true },
   coupe: { len: 4.45, w: 1.94, clr: 0.14, belt: 0.78, roof: 1.22, hood: 0.72, ws: [0.55, -0.35], rs: [-0.95, -1.7], wheels: [1.33, -1.3], b: [-0.35], trunk: 0.84, sport: true, eye: { x: 0.05, y: 1.02, z: -0.36 } },   // mid-engine supercar (Ferrari model: cockpit ahead of the engine)
   muscle: { len: 4.8, w: 1.9, clr: 0.16, belt: 0.86, roof: 1.33, hood: 0.84, ws: [0.75, -0.1], rs: [-0.75, -1.6], wheels: [1.45, -1.4], b: [-0.1], trunk: 0.88, sport: true },   // Camaro-ish
   // Soviet classics: boxy three-box sedans, narrow track, chrome bumpers
@@ -25,6 +27,8 @@ const KINDS = {
 export const CAR_KINDS = Object.keys(KINDS);
 export function carSpec(kind) { return KINDS[kind]; }
 
+// plan-view half width at x: boxy / square bodies keep square corners, the rest taper at nose and tail
+const halfWOf = (K) => { const HW = K.w / 2, xf = K.len / 2, xr = -xf; return (x) => { const u = x > 0 ? x / xf : x / xr; return K.boxy || K.square ? HW * (1 - 0.04 * Math.pow(u, 12)) : HW * (1 - 0.1 * Math.pow(u, 6)); }; };
 const smooth = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
 
 export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
@@ -47,7 +51,7 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
     return K.roof + 0.02 * Math.cos(((x - (wsTop + rsTop) / 2) / (wsTop - rsTop)) * Math.PI);
   };
   const bottomAt = (x) => { let y = K.clr + 0.02; for (const wx of K.wheels) { const d = Math.abs(x - wx); if (d < archR) y = Math.max(y, 0.33 + Math.sqrt(archR * archR - d * d) * 0.98); } return y; };
-  const halfW = (x) => { const u = x > 0 ? x / xf : x / xr; return K.boxy ? HW * (1 - 0.04 * Math.pow(u, 12)) : HW * (1 - 0.1 * Math.pow(u, 6)); };   // boxy: square corners
+  const halfW = halfWOf(K);
   // cross-section ring: [z/halfW, y-param] from bottom-right around the top to bottom-left.
   // y-param: 'b' bottom, 'r' rocker, 's' shoulder, 'e' belt edge, 'g' glass (lerp belt→roof), 'R' roof edge, 'C' roof centre
   const ring = [[0.86, 'b'], [0.985, 'r'], [1.0, 's'], [0.975, 'e'], [0.9, 'g1'], [0.8, 'g2'], [0.74, 'R'], [0.4, 'C'], [0.0, 'C0']];
@@ -144,9 +148,20 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   // lamps: headlamps wrap the nose corners, tail lamps across the tail corners
   const hlY = K.hood - 0.13, tlY = K.trunk - 0.12;
   for (const sz of [1, -1]) {
-    box(parts.lampW, 0.05, 0.09, 0.36, xf - 0.035, hlY, sz * (halfW(xf - 0.1) - 0.3), 0, sz * 0.22);
-    box(parts.lampW, 0.03, 0.018, 0.34, xf - 0.02, hlY - 0.075, sz * (halfW(xf - 0.1) - 0.3), 0, sz * 0.22);   // DRL strip
-    box(parts.lampR, 0.035, 0.08, 0.36, xr + 0.03, tlY, sz * (halfW(xr + 0.1) - 0.27), 0, -sz * 0.18);
+    if (K.kidney) {   // E34: a black panel across the nose carrying two round lamps a side, wide wrap-around tail clusters
+      box(parts.trim, 0.04, 0.17, 0.5, xf - 0.03, hlY, sz * 0.43);
+      for (const lz of [0.31, 0.53]) { const l = new THREE.CylinderGeometry(0.068, 0.068, 0.04, 14); l.rotateZ(Math.PI / 2); l.translate(xf - 0.005, hlY, sz * lz); parts.lampW.push(l); }
+      box(parts.lampR, 0.035, 0.13, 0.46, xr + 0.03, tlY, sz * (halfW(xr + 0.1) - 0.24), 0, -sz * 0.1);
+    } else {
+      const hz = sz * (halfW(xf - 0.1) - 0.3);
+      box(parts.trim, 0.05, 0.13, 0.42, xf - 0.045, hlY, hz, 0, sz * 0.22);   // dark housing: the lens reads as a cluster, not a sticker
+      box(parts.lampW, 0.05, 0.09, 0.36, xf - 0.035, hlY, hz, 0, sz * 0.22);
+      box(parts.lampW, 0.03, 0.018, 0.34, xf - 0.02, hlY - 0.075, hz, 0, sz * 0.22);   // DRL strip
+      const tz = sz * (halfW(xr + 0.1) - 0.27);
+      box(parts.trim, 0.04, 0.11, 0.42, xr + 0.04, tlY, tz, 0, -sz * 0.18);
+      box(parts.lampR, 0.035, 0.08, 0.36, xr + 0.03, tlY, tz, 0, -sz * 0.18);
+      box(parts.lampW, 0.036, 0.03, 0.1, xr + 0.03, tlY - 0.02, tz - sz * 0.08, 0, -sz * 0.18);   // reversing lamp
+    }
     // mirrors (paint) on a dark stalk
     const mx = wsBase - 0.2; box(parts.paintX, 0.1, 0.12, 0.2, mx, K.belt + 0.08, sz * (HW + 0.1)); box(parts.trim, 0.05, 0.04, 0.12, mx, K.belt + 0.04, sz * (HW + 0.02));
     // door handles + shut lines
@@ -156,14 +171,46 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
     // black window surround / B-pillar applique
     for (const bx of K.b) box(parts.trim, 0.12, (roofAt(bx) - K.belt) * 0.8, 0.012, bx, (roofAt(bx) + K.belt) / 2, sz * (halfW(bx) * 0.88 + 0.004), sz * 0.14);
   }
-  // grille + lower intake, bumpers' dark lower lip, plates
-  box(parts.trim, 0.05, 0.16, K.w * 0.5, xf - 0.02, hlY - 0.02, 0);
+  // wheel-arch flares (black cladding on the SUV), a shoulder crease, the drip rail round the glasshouse, bumpers, kind extras
+  for (const wx of K.wheels) for (const sz of [1, -1]) { const f = new THREE.TorusGeometry(archR + 0.012, K.clad ? 0.05 : 0.03, 5, 14, Math.PI); f.scale(1, 1, 0.7); f.translate(wx, 0.33, sz * (halfW(wx) - 0.006)); (K.clad ? parts.trim : parts.paintX).push(f); }
+  { const T = [], tri = (a, b, c, o) => { const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)), m = new THREE.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3).sub(o); for (const v of n.dot(m) >= 0 ? [a, b, c] : [a, c, b]) T.push(v.x, v.y, v.z); };
+    // strip: rows of 3-point profiles along x, swept into an open ridge, wound both ways (seen through the glass from the cabin too)
+    const strip = (rows) => { for (let i = 0; i < rows.length - 1; i++) { const A = rows[i], B = rows[i + 1]; for (let k = 0; k < 2; k++) for (const s of [1, -1]) { const o = new THREE.Vector3().subVectors(A[k + 1], A[k]).cross(new THREE.Vector3().subVectors(B[k], A[k])).multiplyScalar(-1e3 * s).add(A[k]); tri(A[k], B[k], A[k + 1], o); tri(B[k], B[k + 1], A[k + 1], o); } } };
+    const flush = () => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(T.splice(0), 3)); g.computeVertexNormals(); return g; };
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    for (const sz of [1, -1]) {   // shoulder crease: a 1 cm ridge below the belt, broken where it would cross an arch
+      let run = []; const end = () => { if (run.length > 1) strip(run); run = []; };
+      for (const x of xs) { const y = Math.min(K.belt - 0.14, beltAt(x) - 0.11), hw = halfW(x);
+        if (x < xr + 0.22 || x > xf - 0.28 || y - 0.03 < bottomAt(x)) { end(); continue; }
+        run.push([V(x, y + 0.022, sz * hw), V(x, y, sz * (hw + 0.011)), V(x, y - 0.022, sz * hw)]); }
+      end(); }
+    parts.paintX.push(flush());
+    const jR = full.findIndex((r) => r[1] === 'R'), jG = full.findIndex((r) => r[1] === 'g2');   // +z side; the -z side mirrors
+    for (const [jr, jg] of [[jR, jG], [M - 1 - jR, M - 1 - jG]]) {   // drip rail / dark window frame along the roof edge, A to C pillar
+      const rows = []; xs.forEach((x, i) => { if (roofAt(x) <= beltAt(x) + 0.05) return; const P = (j) => V(pos[(i * M + j) * 3], pos[(i * M + j) * 3 + 1], pos[(i * M + j) * 3 + 2]), r = P(jr), g = P(jg), mid = r.clone().lerp(g, 0.14);
+        mid.z += Math.sign(r.z) * 0.008; rows.push([r.clone().lerp(V(r.x, r.y + 0.02, r.z * 0.97), 0.5), mid, r.clone().lerp(g, 0.28)]); });
+      strip(rows); }
+    parts.trim.push(flush()); }
+  const bw = 2 * halfW(xf - 0.08) * 0.96, bwr = 2 * halfW(xr + 0.08) * 0.96;
+  if (!K.boxy) {   // bumpers: a full-width bar wrapping the nose / tail, body colour (black plastic on the SUV), lower intake in it
+    const bm = K.clad ? parts.trim : parts.paintX;
+    box(bm, 0.12, 0.2, bw, xf - 0.02, K.clr + 0.33, 0); box(bm, 0.12, 0.22, bwr, xr + 0.02, K.clr + 0.34, 0);
+    box(parts.trim, 0.02, 0.08, K.w * 0.46, xf + 0.045, K.clr + 0.29, 0);
+    if (K.clad) { box(parts.rim, 0.05, 0.07, K.w * 0.5, xf + 0.03, K.clr + 0.17, 0); box(parts.rim, 0.05, 0.07, K.w * 0.5, xr - 0.03, K.clr + 0.17, 0); }   // skid plates
+  }
+  if (K.kidney) for (const kz of [0.085, -0.085]) { box(parts.rim, 0.03, 0.2, 0.15, xf - 0.0, hlY - 0.005, kz); box(parts.trim, 0.03, 0.17, 0.12, xf + 0.006, hlY - 0.005, kz); }   // twin kidneys, chrome surround
+  else box(parts.trim, 0.05, 0.16, K.w * 0.5, xf - 0.02, hlY - 0.02, 0);   // grille
+  if (K.kidney || K.sign) for (const sz of [1, -1]) box(parts.trim, Math.abs(K.wheels[0] - K.wheels[1]) - 2 * archR - 0.12, 0.045, 0.02, (K.wheels[0] + K.wheels[1]) / 2, K.clr + 0.33, sz * (halfW(0) + 0.006));   // side rub strips
+  if (K.rack) { const rx = (wsTop + rsTop) / 2, rl = wsTop - rsTop + 0.3;
+    for (const sz of [1, -1]) { box(parts.trim, rl, 0.035, 0.04, rx, K.roof + 0.085, sz * HW * 0.62); for (const fx of [rx - rl / 2 + 0.06, rx + rl / 2 - 0.06]) box(parts.trim, 0.07, 0.07, 0.05, fx, K.roof + 0.045, sz * HW * 0.62); }
+    for (const cx of [rx - rl * 0.28, rx + rl * 0.22]) box(parts.rim, 0.04, 0.025, HW * 1.3, cx, K.roof + 0.11, 0); }   // roof rails + crossbars
+  // lower intake, bumpers' dark lower lip, plates
   box(parts.trim, 0.06, 0.1, K.w * 0.78, xf - 0.04, K.clr + 0.16, 0);
   box(parts.trim, 0.06, 0.1, K.w * 0.8, xr + 0.04, K.clr + 0.16, 0);
   if (K.boxy) { box(parts.rim, 0.07, 0.09, K.w * 0.98, xf + 0.02, K.clr + 0.3, 0); box(parts.rim, 0.07, 0.09, K.w * 0.98, xr - 0.02, K.clr + 0.34, 0); box(parts.rim, 0.03, 0.14, K.w * 0.52, xf - 0.01, hlY - 0.01, 0); }   // chrome bumpers + grille
   else box(parts.lampR, 0.02, 0.022, K.w * 0.55, xr + 0.012, tlY + 0.045, 0);   // light bar across the tail
   if (K.sport) { box(parts.trim, 0.3, 0.03, K.w * 0.82, xr + 0.25, K.trunk + 0.09, 0); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, 0.55); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, -0.55); }   // spoiler
-  box(parts.plate, 0.012, 0.11, 0.36, xf + 0.005, K.clr + 0.3, 0);
+  box(parts.plate, 0.012, 0.11, 0.36, K.boxy ? xf + 0.005 : xf + 0.062, K.clr + 0.3, 0);   // kit bumpers stand 4 cm proud of the nose
   box(parts.plate, 0.012, 0.11, 0.36, xr - 0.005, tlY - 0.2, 0);
   if (K.sign) { box(parts.trim, 0.2, 0.05, 0.5, 0.1, K.roof + 0.03, 0); box(parts.lampW, 0.16, 0.16, 0.48, 0.1, K.roof + 0.13, 0); }
   const merge = (arr) => arr.length ? mergeGeometries(arr.map(g => g.index ? g.toNonIndexed() : g).map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g; }), false) : null;
@@ -204,8 +251,8 @@ export function wheelInstances(parent, count, name = 'wheels', shadows = false) 
 }
 /** wheel centres of a kind in the kit frame: [{ x, y, z, side }] (side +1 = +z / right) and the tyre radius */
 export function wheelLayout(kind = 'sedan') {
-  const K = KINDS[kind] || KINDS.sedan, HW = K.w / 2, xf = K.len / 2, xr = -K.len / 2, r = K.clr > 0.25 ? 0.37 : 0.33;
-  const halfW = (x) => { const u = x > 0 ? x / xf : x / xr; return K.boxy ? HW * (1 - 0.04 * Math.pow(u, 12)) : HW * (1 - 0.1 * Math.pow(u, 6)); };
+  const K = KINDS[kind] || KINDS.sedan, r = K.clr > 0.25 ? 0.37 : 0.33;
+  const halfW = halfWOf(K);
   const out = []; for (const wx of K.wheels) for (const sz of [1, -1]) out.push({ x: wx, y: r, z: sz * (halfW(wx) - 0.13), side: sz });
   return { r, wheels: out };
 }
@@ -249,6 +296,7 @@ export function placeCars(world, list, { raycast = true } = {}) {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0);
   const reg = world.parkedCars || (world.parkedCars = []);
   if (world.W && !world.W.parkedCars) world.W.parkedCars = reg;   // vehicles.js reads ctx.world.parkedCars (touch STEAL button)
+  if (world.W && !world.W.carLampsGlow) { world.W.carLampsGlow = true; const g = world.W.nightGlow || (world.W.nightGlow = []); g.push({ m: CM.lampW, e0: CM.lampW.emissiveIntensity, f: 1.5 }, { m: CM.lampR, e0: CM.lampR.emissiveIntensity, f: 2.5 }); }   // kit lamps brighten after dark (coney horizon.js drives nightGlow)
   for (const c of list) { c.refs = []; if (c.color == null) c.color = null; reg.push(c); }
   for (const kind of CAR_KINDS) {
     const P = list.filter((c) => c.kind === kind); if (!P.length) continue;

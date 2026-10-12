@@ -111,7 +111,7 @@ if (what === 'player' || what === 'all') {
 
 if (what === 'car' || what === 'all') {
   const pg = await open('&ai=0&folk=0');
-  const kinds = ['sedan', 'suv', 'cab', 'van', 'hatch', 'coupe', 'muscle', 'bus'];
+  const kinds = ['sedan', 'suv', 'cab', 'van', 'hatch', 'coupe', 'muscle', 'e34', 'bus'];
   await pg.evaluate(async () => { const ctx = window.__ctx, me = ctx.player.position, car = ctx.vehicles.spawnCar(me.x, me.z, 0, 'sedan', 0x333333, me.y); ctx.vehicles.mount(car); await new Promise((r) => setTimeout(r, 2000)); ctx.vehicles.dismount(); });   // warm-up: the first mount of a session settles late
   for (const kind of kinds) {
     const r = await pg.evaluate(async (kind) => {
