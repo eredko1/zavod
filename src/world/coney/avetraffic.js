@@ -15,7 +15,7 @@ export function buildAveTraffic(world) {
   const { scene, ctx, W } = world; if (!W.tavern) return null; const lite = !!ctx.lite, A = AVE8, OZ = A.ZC;
   let seed = 6004; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const CM = carMaterials(), ims = {}, ZERO = new THREE.Matrix4().makeScale(0, 0, 0), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _e = new THREE.Euler(), ONE = new THREE.Vector3(1, 1, 1);
-  const n = lite ? 6 : 14, cars = [];
+  const n = ctx.safeMode ? 3 : lite ? 6 : 14, cars = [];
   // the cars: each lane gets its share, spaced out along the avenue
   for (let i = 0; i < n; i++) { const dir = i % 2 ? -1 : 1, k = R(), kind = k < 0.4 ? 'sedan' : k < 0.6 ? 'suv' : k < 0.82 ? 'cab' : 'van';
     const color = kind === 'cab' ? new THREE.Color(R() < 0.45 ? 0x8cd04a : 0xf2b820) : kind === 'van' ? new THREE.Color(0xf2f2ee) : CAR_COLORS[(R() * CAR_COLORS.length) | 0];

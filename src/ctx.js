@@ -24,6 +24,7 @@ export const lerp = (a, b, t) => a + (b - a) * t;
 export const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
 export const deg = (d) => d * Math.PI / 180;
 
+const SAFE_SCALE = 0.6;   // safe mode (after a crashed load): render at 0.6x, a smaller framebuffer and post chain
 export function createCtx() {
   const qs = new URLSearchParams(location.search);
   // ?mode=chill (coney): no mercs — knives, street fights, robbing / getting robbed, cops on muggings, get wasted (coney/chill.js)
@@ -65,7 +66,7 @@ export function createCtx() {
       quality: qs.get('quality') || (safeMode ? 'low' : isTouch ? 'medium' : lowPower ? 'low' : 'high'), // 'ultra' costs ~3x at retina scale until post/world are optimized // 'ultra' | 'high' | 'medium' | 'low'
       fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6,
       shadows: qs.get('shadows') ? qs.get('shadows') === '1' : !lite, rain: qs.get('rain') === '1',   // phones: no shadow pass by default (it re-renders every caster) // rain off by default (toggle in Settings)
-      renderScale: +(qs.get('scale') || (lowPower ? 0.75 : 1)),
+      renderScale: +(qs.get('scale') || (safeMode ? SAFE_SCALE : lowPower ? 0.75 : 1)),
       texMax: +(qs.get('texmax') || (safeMode ? 256 : lite ? 512 : 4096)), // mobile GPUs: cap texture edge (VRAM), see assets.js fit()
       shadowMax: lite ? 2048 : 4096, // max device pixel ratio actually rendered (retina 2x → 4x pixels was halving fps) motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true,
       // audio mix (persisted per device, see saveAudio): effects = weapons/enemies/UI, footsteps = the foley bus (quieter by

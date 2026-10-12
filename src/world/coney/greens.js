@@ -124,8 +124,9 @@ export function buildGreens(world, M) {
       for (const xx of [-0.7, 0, 0.7]) { const [cx, cz] = at(P, xx, 0); world.box([cx - 0.3, 0, cz - 0.3], [cx + 0.3, 0.5, cz + 0.3]); }
       benches.push({ x, z, face: Math.atan2(f.n[0], f.n[1]) }); nb++; }
   }
+  grid.clear();   // placement is done: the updaters below share this scope and would keep the collider index (~5 MB) alive
   const babs = [];
-  if (peopleReady()) { const want = ctx.lite ? 14 : 45, step = Math.max(1, Math.floor(benches.length / want));
+  if (peopleReady()) { const want = ctx.safeMode ? 4 : ctx.lite ? 14 : 45, step = Math.max(1, Math.floor(benches.length / want));
     for (let i = 3; i < benches.length && babs.length < want; i += step) { const b = benches[i];
       for (const off of Math.random() < 0.6 ? [-0.45, 0.45] : [0]) { const fig = buildPerson({ avatar: 'f09', pose: 'sit', seed: 40 + babs.length }); if (!fig) continue;
         const ax = Math.cos(b.face), az = -Math.sin(b.face); fig.group.position.set(b.x + ax * off, 0, b.z + az * off); fig.group.rotation.y = b.face; scene.add(fig.group);

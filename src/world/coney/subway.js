@@ -48,7 +48,7 @@ export function buildSubway(world) {
     R = { world, ctx, W, cfg, id: cfg.id, off: cfg.off, li: LINES.length, aboard: null, lastAnn: '', t: 0 }; let first = null;
     try { if (buildLine()) { LINES.push(R); first = R; } } catch (e) { console.warn('[subway] line', cfg.id, e); }
     // more trains on the line: a train every HEADWAY s (up to the cap), each a share of the cycle later, nudged so two never share a track
-    if (!first) continue; const k = Math.min(ctx.lite ? TRAINS_LITE : TRAINS_MAX, Math.ceil(first.cycle / HEADWAY)); first.k = k;
+    if (!first) continue; const k = Math.min(ctx.safeMode ? 1 : ctx.lite ? TRAINS_LITE : TRAINS_MAX, Math.ceil(first.cycle / HEADWAY)); first.k = k;
     const offs = spacing(first, k); first.k = offs.length;
     for (let j = 1; j < offs.length; j++) { R = { world, ctx, W, cfg, id: cfg.id, off: cfg.off + offs[j], li: LINES.length, aboard: null, lastAnn: '', t: 0, extraOf: first }; try { if (buildLine()) LINES.push(R); } catch (e) { console.warn('[subway] extra train', cfg.id, e); } }
     if (offs.length > 1) console.log(`[subway] ${cfg.id}: ${offs.length} trains, every ~${Math.round(first.cycle / offs.length)} s`);
@@ -243,6 +243,7 @@ function headAt(t) {
 // the R160 cars come from coney/r160.js; here every static piece is baked into one mesh per material and the door leaves into
 // sliding groups (side × direction × material)
 // (each leaf's userData carries sx / dir / z for update(); without them the leaves sat at NaN and never drew)
+function dropArray() { this.array = null; }   // BufferAttribute.onUpload: free the JS copy once it's on the GPU
 function buildTrain(scene) {
   const kit = makeR160(scene, { CAR, NCAR, FLOOR, DOORZ, lite: !!R.ctx.lite, route: R.cfg }); R.kit = kit;
   for (const g of kit.cars) {
@@ -259,6 +260,10 @@ function buildTrain(scene) {
   const M = kit.M, skip = new Set([M.int, M.floor, M.lamp, M.led, M.ind]), mid = kit.cars.length > 2 ? carProxy(kit.cars[1], skip) : null;
   kit.cars.forEach((g, c) => { const geo = c === 0 || c === kit.cars.length - 1 || !mid ? carProxy(g, skip) : mid; if (!geo) return;
     g.userData.lod = g.children.filter((ch) => ch.isMesh); const far = new THREE.Mesh(geo, proxyMaterial()); far.name = 'r160:far'; far.castShadow = true; far.visible = false; g.add(far); g.userData.far = far; g.userData.near = true; });
+  // phones: the baked car meshes (~20 MB over every train) are only drawn from here on: the stand-ins above are built and nothing
+  // raycasts them (the yard and a laid-up train share the geometry, never its arrays), so each copy goes once it's on the GPU
+  if (R.ctx.lite) for (const g of kit.cars) for (const ch of g.children) { if (!ch.isMesh || ch === g.userData.far) continue; const geo = ch.geometry; geo.computeBoundingSphere(); geo.computeBoundingBox();
+    for (const a of Object.values(geo.attributes)) a.onUpload(dropArray); if (geo.index) geo.index.onUpload(dropArray); }
   return kit.cars;
 }
 function destTex() {

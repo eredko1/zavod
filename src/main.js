@@ -218,6 +218,16 @@ if (PROF) { ctx.prof = PROF; window.__prof = PROF; }
 // GPU time per frame (EXT_disjoint_timer_query_webgl2): queries resolve a few frames later and are written back onto their frame
 const GL = renderer.getContext(), TQ = PROF && GL.getExtension('EXT_disjoint_timer_query_webgl2'), gpuQ = [];
 function pollGpu() { while (gpuQ.length && GL.getQueryParameter(gpuQ[0][0], GL.QUERY_RESULT_AVAILABLE)) { const [q, c] = gpuQ.shift(); if (!GL.getParameter(TQ.GPU_DISJOINT_EXT)) c.gpu = GL.getQueryParameter(q, GL.QUERY_RESULT) / 1e6; GL.deleteQuery(q); } }
+// phones: people, bikes and jet skis far off are a few pixels but 3-16 draw calls each; the spawn view could take in 400 m of
+// beach crowds and the jet ski rental, so the draw count swung 700-1700 between loads. Hidden for the render only, so their
+// modules (and QA probes) see them as they left them. The list is rebuilt every LITE_CULL_EVERY frames (spawns, despawns).
+const LITE_CULL = { person: 140, bike: 140, jetski: 160 }, LITE_CULL_EVERY = 90, liteCull = [], liteHid = [];
+function liteCullHide() {
+  if (ctx.time.frame % LITE_CULL_EVERY === 1) { liteCull.length = 0; scene.traverse((o) => { const r = LITE_CULL[o.name]; if (r) liteCull.push([o, r * r]); }); }
+  const cx = camera.position.x, cz = camera.position.z;
+  for (const [o, r2] of liteCull) { if (!o.visible || !o.parent) continue; const e = o.matrixWorld.elements; if ((e[12] - cx) ** 2 + (e[14] - cz) ** 2 > r2) { o.visible = false; liteHid.push(o); } }
+}
+function liteCullShow() { for (const o of liteHid) o.visible = true; liteHid.length = 0; }
 function frame(now) {
   const f0 = PROF ? performance.now() : 0; if (PROF) PROF.cur = { t: now, dt: now - last, parts: {} };
   let dt = (now - last) / 1000; last = now;
@@ -233,8 +243,10 @@ function frame(now) {
   // and roofs z-fought ("pulsating"). 4x the near plane up there; ≤ 0.15 leaves the hip/ADS viewmodels unclipped.
   if (!ctx.xr?.presenting) { const nr = camera.position.y > 12 ? 0.12 : 0.03; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }
   const r0 = PROF ? performance.now() : 0; let gq = null; if (TQ && !ctx.post?._S?.profiling) { pollGpu(); gq = GL.createQuery(); GL.beginQuery(TQ.TIME_ELAPSED_EXT, gq); }
+  if (ctx.lite) liteCullHide();
   if (ctx.xr?.presenting) vr.render(ctx);   // the headset: straight to the eyes (the post chain is screen-space, one view)
   else if (ctx.post && ctx.post.render) ctx.post.render(dt, ctx); else renderer.render(scene, camera);
+  if (ctx.lite) liteCullShow();
   if (gq) { GL.endQuery(TQ.TIME_ELAPSED_EXT); gpuQ.push([gq, PROF.cur]); }
   if (PROF) { const c = PROF.cur, I = renderer.info; c.parts.render = performance.now() - r0; c.cpu = performance.now() - f0; c.progs = I.programs?.length || 0; c.tex = I.memory.textures; c.geo = I.memory.geometries; c.calls = I.render.calls; c.tris = I.render.triangles; PROF.frames.push(c); if (PROF.frames.length > 20000) PROF.frames.splice(0, 5000); PROF.cur = null; }
   // perf

@@ -95,10 +95,14 @@ if (A.cerrs.length) find('errors', 'console / update errors', 'solo', [...new Se
 await A.close();
 
 // ---- B: phone weight ------------------------------------------------------------------------------------------------------------
+// the budget is the heap after a forced GC: what the page really holds (iOS kills the tab near its ceiling; the raw reading swings
+// 30 MB with GC timing). Kept under PHONE_HEAP_MB so it can't creep back.
+const PHONE_HEAP_MB = 400;
 { const T = await page('?qa=1&map=coney&mode=chill&time=day&touch=1', 'phone', { touch: true }); await sleep(3000);
+  { const cdp = await T.context().newCDPSession(T); await cdp.send('HeapProfiler.collectGarbage'); await cdp.detach(); }
   const m = await T.evaluate(() => ({ heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null, perf: { frameMs: +(+window.__ctx.perf.frameMs).toFixed(1), drawCalls: window.__ctx.perf.drawCalls, tris: window.__ctx.perf.triangles } }));
   report.phone = { load: T.loadS, ...m }; console.log('phone', JSON.stringify(report.phone));
-  if (m.heap > 450) find('phone', 'JS heap over budget', 'touch=1', `${m.heap} MB`); if (m.perf.drawCalls > 1200) find('phone', 'too many draw calls for a phone', 'touch=1', `${m.perf.drawCalls}`);
+  if (m.heap > PHONE_HEAP_MB) find('phone', 'JS heap over budget (after GC)', 'touch=1', `${m.heap} MB > ${PHONE_HEAP_MB}`); if (m.perf.drawCalls > 1200) find('phone', 'too many draw calls for a phone', 'touch=1', `${m.perf.drawCalls}`);
   if (T.errs.length) find('errors', 'page errors (phone)', 'touch=1', T.errs.slice(0, 3).join(' | ')); await T.close(); }
 
 // ---- C: two players online ------------------------------------------------------------------------------------------------------

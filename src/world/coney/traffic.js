@@ -234,7 +234,7 @@ const SKINS = [0xe6c3a2, 0xd9a882, 0xb07a55, 0x8a5a3c, 0x5e3b27].map((c) => new 
 export function buildTraffic(world) {
   const { ctx, W } = world;
   const want = ctx.qs?.get?.('traffic'); if (want === '0') return null;
-  const lite = !!ctx.lite, budget = want ? Math.max(1, Math.min(60, +want | 0)) : lite ? 10 : 24;
+  const lite = !!ctx.lite, budget = want ? Math.max(1, Math.min(60, +want | 0)) : ctx.safeMode ? 5 : lite ? 10 : 24;
   T = { world, ctx, W, lite, budget, ring: lite ? 150 : 250, cars: [], kinds: {}, t: 0, frame: 0, spawnN: 0, spawnCool: 0, people: [], peopleT: 0, spot: null, jackable: null, stats: { jacked: 0, crashes: 0, honks: 0 }, obs: [], fz: false };
   T.G = buildGraph(world); if (!T.G.segs.length) { console.warn('[traffic] no roads'); return null; }
   // the signalised junctions for the street kit (coney/street.js draws the heads, folk.js crosses on the WALK): where they are, the
@@ -779,6 +779,7 @@ function buildBuses(world) {
     for (const S of r.stops) if (!stopGeo.some((q) => Math.hypot(q.px - S.px, q.pz - S.pz) < 6)) stopGeo.push(S);
   }
   try { busStopProps(world, stopGeo); } catch (e) { console.warn('[traffic] stops', e); }
+  T.G.grid = null;   // the road graph and the stops are placed: its collider index (~5 MB) is done
   if (!T.lite && peopleReady()) { T.busPeople = []; for (let i = 0; i < 4; i++) { try { const f = buildPerson({ seed: 700 + i * 53, pose: 'sit', female: i === 2 }); f.update(0.016); f.group.updateMatrixWorld(true); f.group.userData.sit = true;   // seated riders: side seats are 0.48 m apart, shoulder to shoulder (qa/sweep.mjs skips sitters)
     const hp = f.head.getWorldPosition(new THREE.Vector3()); f.group.visible = false; f.group.matrixAutoUpdate = false; world.scene.add(f.group); T.busPeople.push({ f, hx: hp.x, hy: hp.y, hz: hp.z }); } catch { break; } } }
   try { HK.spot({ pos: T.boardPos, r: 2.4, dy: 1.6, when: () => !!T.board, prompt: () => `F — BOARD THE ${T.board?.route.id} · ${T.board?.route.sign.split('|')[1]}`, act: () => { if (T.board) boardBus(T.board); } }); } catch {}

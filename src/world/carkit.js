@@ -292,6 +292,22 @@ export function carMaterials() {
 }
 export const CAR_COLORS = [0x1a1a1c, 0x9a9ea3, 0x5f656b, 0x22305c, 0x6a1c1c, 0xb4b2ab, 0x33383c, 0x16181a, 0x7b8086, 0x1a4433, 0x4a4036, 0x2d4a55, 0xd8d6cf, 0x0f1e3a].map(c => new THREE.Color(c));
 
+// phones: a parked row's tyres, dark trim and calipers become one vertex-coloured slot ('dark'), one draw call per kind per row
+// instead of three (~30 fewer in a street view). All three are near-black or tiny, so the shared roughness doesn't show.
+const DARK_SLOTS = ['rubber', 'trim', 'caliper'];
+let DARK = null;
+const darkMat = () => DARK || (DARK = new THREE.MeshStandardMaterial({ name: 'car_dark', vertexColors: true, roughness: 0.85, metalness: 0.15 }));
+function parkedGeos(ctx, kind) {
+  const G = { ...carGeometries(kind).geos }; if (!ctx?.lite) return G;
+  const CM = carMaterials(), parts = [];
+  for (const s of DARK_SLOTS) { const g0 = G[s]; delete G[s]; if (!g0) continue; const g = g0.index ? g0.toNonIndexed() : g0.clone();
+    for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+    const c = CM[s].color, n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); }
+  if (parts.length) G.dark = mergeGeometries(parts);
+  return G;
+}
+
 /** Instances parked cars: list of { x, y?, z, ry, kind, color? } → one InstancedMesh per kind × slot. No colliders (callers add them). */
 export function placeCars(world, list, { raycast = true } = {}) {
   const { scene, ctx, R } = world; const CM = carMaterials();
@@ -309,9 +325,9 @@ export function placeCars(world, list, { raycast = true } = {}) {
       // LOD: the real model is ~450k triangles a car, so only the nearest few get it; the rest wear the kit's light body
       const hi = ims.map((im) => ({ im, M: P.map((_, i) => { const a = new THREE.Matrix4(); im.getMatrixAt(i, a); return a; }) }));
       for (const h of hi) h.im.count = Math.min(1, P.length);   // one instance until the first LOD pass: the boot pre-warm still compiles its shaders
-      const G = carGeometries(kind).geos, lo = [];
+      const G = parkedGeos(ctx, kind), lo = [];
       for (const slot of Object.keys(G)) { if (!G[slot]) continue;
-        const im = new THREE.InstancedMesh(G[slot], CM[slot], P.length); im.name = `cars:${kind}:lo:${slot}`;
+        const im = new THREE.InstancedMesh(G[slot], slot === 'dark' ? darkMat() : CM[slot], P.length); im.name = `cars:${kind}:lo:${slot}`;
         P.forEach((c, i) => { im.setMatrixAt(i, T[i]); if (slot === 'paint') im.setColorAt(i, cols[i]); });
         im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
         im.castShadow = slot === 'paint'; im.receiveShadow = true; im.userData.surface = 'metal'; scene.add(im); lo.push(im);
@@ -320,10 +336,10 @@ export function placeCars(world, list, { raycast = true } = {}) {
       carLod(world, { P, T, cols, hi, lo, cur: '' });
       continue;
     }
-    const G = carGeometries(kind).geos;
+    const G = parkedGeos(ctx, kind);
     for (const slot of Object.keys(G)) {
       if (!G[slot]) continue;
-      const im = new THREE.InstancedMesh(G[slot], CM[slot], P.length); im.name = `cars:${kind}:${slot}`;
+      const im = new THREE.InstancedMesh(G[slot], slot === 'dark' ? darkMat() : CM[slot], P.length); im.name = `cars:${kind}:${slot}`;
       P.forEach((c, i) => { q.setFromAxisAngle(up, c.ry || 0); p.set(c.x, c.y || 0, c.z); im.setMatrixAt(i, m4.compose(p, q, one)); c.refs.push({ im, i }); if (slot === 'paint') { const col = c.color != null ? new THREE.Color(c.color) : (kind === 'cab' ? new THREE.Color(0xf2b820) : CAR_COLORS[((R ? R() : Math.random()) * CAR_COLORS.length) | 0]); c.color = col.getHex(); im.setColorAt(i, col); } });
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
       im.castShadow = slot === 'paint'; im.receiveShadow = true; im.userData.surface = 'metal'; scene.add(im);
@@ -333,7 +349,7 @@ export function placeCars(world, list, { raycast = true } = {}) {
 }
 
 // parked real-model cars: every ~0.3 s the nearest few (in range) get the full model, packed into the first instances (count =
-// how many, so the rest cost nothing), and their light kit body is hidden; stolen ones (gone) get neither
+// how many, hidden when none: a zero-count part still costs a draw call), and their light kit body is hidden; stolen ones (gone) get neither
 const LOD_ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 function carLod(world, L) {
   const lists = world.carLods || (world.carLods = []); lists.push(L);
@@ -345,7 +361,7 @@ function carLod(world, L) {
       const near = []; L.P.forEach((c, i) => { if (c.gone) return; const d = (c.x - cam.x) ** 2 + (c.z - cam.z) ** 2; if (d < R2) near.push([d, i]); });
       near.sort((a, b) => a[0] - b[0]); const pick = near.slice(0, MAX).map((n) => n[1]), key = pick.join(',') + '|' + L.P.filter((c) => c.gone).length;
       if (key === L.cur) continue; L.cur = key; const set = new Set(pick);
-      for (const h of L.hi) { pick.forEach((i, j) => { h.im.setMatrixAt(j, h.M[i]); if (h.im.instanceColor) h.im.setColorAt(j, L.cols[i]); }); h.im.count = pick.length; h.im.instanceMatrix.needsUpdate = true; if (h.im.instanceColor) h.im.instanceColor.needsUpdate = true; }
+      for (const h of L.hi) { pick.forEach((i, j) => { h.im.setMatrixAt(j, h.M[i]); if (h.im.instanceColor) h.im.setColorAt(j, L.cols[i]); }); h.im.count = pick.length; h.im.visible = pick.length > 0; h.im.instanceMatrix.needsUpdate = true; if (h.im.instanceColor) h.im.instanceColor.needsUpdate = true; }
       for (const im of L.lo) { L.P.forEach((c, i) => im.setMatrixAt(i, c.gone || set.has(i) ? LOD_ZERO : L.T[i])); im.instanceMatrix.needsUpdate = true; im.boundingSphere = null; }
     }
   });
