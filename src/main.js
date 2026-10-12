@@ -92,7 +92,9 @@ addEventListener('mouseup', e => { const b = btnOf(e); input.mouse.buttons &= ~(
 addEventListener('contextmenu', e => { if (input.locked || ctx.state === 'playing') e.preventDefault(); });   // never let a menu steal the pointer lock mid-fight
 addEventListener('wheel', e => { input.mouse.wheel += Math.sign(e.deltaY); }, { passive: true });
 addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('pointerlockchange', () => { input.locked = document.pointerLockElement === renderer.domElement; ctx.bus.emit('pointerlock', input.locked); if (!input.locked && ctx.state === 'playing' && !ctx.xr?.presenting) setState('paused'); });
+// the game freeing the cursor for its own overlay (the bag, the phone, darts, durak) is not the player pressing Esc: no pause menu
+{ const exitPL = document.exitPointerLock.bind(document); document.exitPointerLock = () => { ctx.cursorFreedAt = performance.now(); try { exitPL(); } catch {} }; }
+document.addEventListener('pointerlockchange', () => { input.locked = document.pointerLockElement === renderer.domElement; ctx.bus.emit('pointerlock', input.locked); if (!input.locked && ctx.state === 'playing' && !ctx.xr?.presenting && !(performance.now() - (ctx.cursorFreedAt || -1e9) < 600)) setState('paused'); });
 ctx.requestPointerLock = () => { const q = (o) => { try { const r = renderer.domElement.requestPointerLock(o); r?.catch?.(() => { if (o) q(); }); } catch { if (o) q(); } }; q({ unadjustedMovement: true }); };   // promise rejections (no user gesture, headless) are harmless
 
 // ---------- state ----------
