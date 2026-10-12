@@ -57,6 +57,7 @@ import * as UI from './netui.js';
 const ALL_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081'];
 const MQTT_LIBS = ['https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.esm.js', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.esm.js'];
 const PROTO = 'zv3';
+const SHOT_MIN_MS = 66;   // friends see your shots (tracer + flash + sound): at most one event per ~4 frames, a 900 rpm SMG still reads as auto fire
 const SEND_HZ = 15, HEARTBEAT_MS = 480, TIMEOUT = 10000, BYE_GRACE = 1500, RESPAWN = 4, PROTECT = 3;
 const MAX_MSG = 4096, TELEPORT = 15, EXTRAP_MS = 150, DELAY_MIN = 90, DELAY_MAX = 400, WATCHDOG = 6000;
 const F_DEAD = 1, F_CROUCH = 2, F_ADS = 4, F_AFK = 8;
@@ -107,7 +108,7 @@ export async function init(ctx) {
     }
     try { ctx.player.teleport(at[0], at[1], at[2], yaw, 0); } catch {}
   }
-  ctx.bus.on('shot', (e) => { if (!e || e.who !== 'player') return; const o = e.muzzle || e.origin; if (!o || !e.dir) return; send({ t: 'shot', o: v3(o), d: v3(e.dir), w: String(e.id || '').slice(0, 12) }); });
+  ctx.bus.on('shot', (e) => { if (!e || e.who !== 'player') return; const o = e.muzzle || e.origin; if (!o || !e.dir) return; const now = performance.now(); if (now - (S.shotAt || 0) < SHOT_MIN_MS) return; S.shotAt = now; send({ t: 'shot', o: v3(o), d: v3(e.dir), w: String(e.id || '').slice(0, 12) }); });
   ctx.bus.on('playerDied', () => { const a = S.lastAttacker && performance.now() - S.lastAttacker.at < 8000 ? S.lastAttacker : null; send({ t: 'kill', k: a?.id || null, v: S.id, hs: !!a?.hs }, true); onKill(a?.id || null, S.id, !!a?.hs); S.respawnT = RESPAWN; });
   ctx.bus.on('explosion', (e) => { if (e && !e.remote && e.position) send({ t: 'boom', p: v3(e.position), r: Math.min(12, e.radius || 6) }); });
   ctx.bus.on('playerRespawn', () => { S.protectT = PROTECT; S.lastAttacker = null; });

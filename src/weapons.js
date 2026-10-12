@@ -27,6 +27,8 @@ const DEG = Math.PI / 180;
 const VM_FOV = 50;                // vertical fov the viewmodel is authored for (x/y-scale trick emulates it under the world fov)
 const ADS_FOV_MUL = 0.7;
 const GRENADES = 4;
+const RECOIL_HOLD = 0.06, RECOIL_RETURN = 18;   // s before the climb starts to come back, return rate (1/s): ~0.2 s to 90% on every gun
+const SHAKE_DECAY = 22, SHAKE_MAX = 0.02;      // screen shake: camera-only roll/pitch wobble per shot (rad), never fed into aim
 const DEFAULT_PRIMARY = 'm4a1', DEFAULT_SECONDARY = 'm9';
 
 // Weapon registry: id → { spec, build(mats) }. Optional weapons (sniper/SMG/AK/heavy pistol) are dynamically imported below so a broken file never takes the arsenal down.
@@ -118,7 +120,7 @@ export async function init(ctx) {
     lookX: 0, lookY: 0, bobX: 0, bobY: 0, spreadExtra: 0, recPitch: 0, recYaw: 0, swayPitch: 0, swayYaw: 0,
     flashT: 9, flashLife: 0.045, triggerHeld: false, triggerPressed: false, dryLatch: false,
     grenadeCount: GRENADES, wallPull: 0, lastFov: -1, scaleFov: -1, time: 0, envCheck: 0, dead: false,
-    fired: 0, arsenal: buildArsenal(), kickP: 0, kickY: 0, stowed: false, sensAds: false, vmScale: -1,
+    fired: 0, arsenal: buildArsenal(), kickP: 0, kickY: 0, shakeAmp: 0, shakeX: 0, shakeZ: 0, shakePost: null, stowed: false, sensAds: false, vmScale: -1,
   };
   S._ensureEnv = ensureEnv;
   ctx.bus.on('shot', (d) => { if (d && d.who === 'enemy' && d.origin && d.dir) { const o = d.origin.isVector3 ? d.origin : _v.set(d.origin[0] ?? d.origin.x, d.origin[1] ?? d.origin.y, d.origin[2] ?? d.origin.z); const dir = d.dir.isVector3 ? d.dir : _v2.set(d.dir[0] ?? d.dir.x, d.dir[1] ?? d.dir.y, d.dir[2] ?? d.dir.z); fx.enemyShot(o.clone(), dir.clone()); } });
@@ -416,8 +418,8 @@ function fireShot(w, opts = {}) {
     if (n.dot(d) > 0) n.negate();
     const ud = hit.object.userData || {};
     if (typeof ud.onHit === 'function') {   // map NPCs (coney chill mode thugs): they resolve their own damage
-      const head = ud.part === 'head'; try { ud.onHit(sp.damage * (head ? sp.headMul : 1) * falloff(dist), head, hit.point.clone(), d.clone()); } catch (e) { console.warn('[weapons] onHit', e); }
-      S.fx.impact(hit.point, n, 'flesh', d); ctx.bus.emit('hit', { damage: sp.damage, headshot: head, point: hit.point.clone() });
+      const head = ud.part === 'head', th = ud.thug, alive = !!th && th.st !== 'dead'; try { ud.onHit(sp.damage * (head ? sp.headMul : 1) * falloff(dist), head, hit.point.clone(), d.clone()); } catch (e) { console.warn('[weapons] onHit', e); }
+      S.fx.impact(hit.point, n, 'flesh', d); ctx.bus.emit('hit', { damage: sp.damage, headshot: head, point: hit.point.clone(), npc: true, kill: alive && th.st === 'dead' });   // kill: this round dropped him (kill marker + sound)
     } else if (ud.remote) {   // another online player (net.js hitbox): accumulate like a soldier, resolved by the victim's client
       const head = ud.part === 'head';
       let acc = remoteHits.get(ud.remote); if (!acc) { acc = { dmg: 0, head: 0, n: 0, point: hit.point.clone() }; remoteHits.set(ud.remote, acc); }
@@ -442,7 +444,7 @@ function fireShot(w, opts = {}) {
     const dmg = Math.round(acc.dmg); if (dmg <= 0) continue;
     try { ctx.ai?.damage?.(soldier, dmg, acc.point.clone(), headshot); } catch (e) { console.warn('[weapons] ai.damage', e); }
     if (sp.melee && soldier.dead) { const pk = ctx.ai?.lootGun?.(soldier); if (pk && collectGun(pk.id, pk.reserve)) pk.take(); }   // stabbed him: his gun is yours
-    ctx.bus.emit('hit', { soldier, damage: dmg, headshot, point: acc.point.clone(), pellets: acc.n });
+    ctx.bus.emit('hit', { soldier, damage: dmg, headshot, point: acc.point.clone(), pellets: acc.n, kill: !!soldier.dead });   // ai.damage already sent enemyKilled: keep its kill marker up
   }
   for (const [peer, acc] of remoteHits) {
     const headshot = rays > 1 ? acc.head * 2 >= rays : acc.head > 0; const dmg = Math.round(acc.dmg); if (dmg <= 0) continue;
@@ -476,11 +478,48 @@ function fireShot(w, opts = {}) {
     const n = w.shots; const patternYaw = n < 4 ? 0.3 : n < 9 ? -0.7 : Math.sin(n * 1.7) * 0.8;
     const kp = sp.recoilPitch * DEG * (0.85 + rng() * 0.3) * (n === 1 ? 1.15 : 1) * lerp(1, 0.85, S.ads);
     const ky = sp.recoilYaw * DEG * (patternYaw + (rng() - 0.5) * 1.2) * lerp(1, 0.85, S.ads);
+    S.shakeAmp = Math.min(SHAKE_MAX, S.shakeAmp + (sp.shake ?? 0.0025 + sp.recoilPitch * DEG * 0.35));   // big bores rattle the view more
     S.kickP += kp; S.kickY += ky; // applied over ~50 ms in update() (exp-smoothed, dt-independent) so the climb reads as a push, not a teleport
   }
   ctx.bus.emit('shot', { origin, dir, weapon: sp.name, id: sp.id, who: 'player', muzzle, hit: firstHit ? firstHit.point.clone() : null, pellets: rays });
   w.cur.ammo = w.ammo;
   return firstHit ? firstHit.point.clone() : null;
+}
+
+// ------------------------------------------------------------------ touch aim assist: slowdown over a target + a gentle pull while aiming / firing
+const ASSIST_CONE = 5 * DEG, ASSIST_CONE_ADS = 8 * DEG, ASSIST_RANGE = 45, ASSIST_FRICTION = 0.45, ASSIST_PULL = 5, ASSIST_PULL_HIP = 2.5, ASSIST_MAX_RATE = 30 * DEG;
+const _aimPt = new THREE.Vector3();
+/** hostile things worth helping onto: live mercs/cops and crew thugs (passers-by only once they fight). Refreshed twice a second. */
+function assistTargets(ctx) {
+  if (S.assistList && S.time - S.assistT < 0.5) return S.assistList;
+  S.assistT = S.time; const out = S.assistList = []; const seen = new Set();
+  for (const s of ctx.ai?.soldiers || []) if (!s.dead && s.chest) out.push({ s });
+  for (const h of ctx.raycastTargets || []) { const t = h.userData?.thug; if (t && !seen.has(t)) { seen.add(t); out.push({ t }); } }
+  return out;
+}
+function aimAssist(dt, ctx, p, cam, input) {
+  const eye = cam.getWorldPosition(_v3); cam.getWorldDirection(_fwd); const cone = lerp(ASSIST_CONE, ASSIST_CONE_ADS, S.ads);
+  let best = null, bestA = cone;
+  for (const c of assistTargets(ctx)) {
+    if (c.s) { if (c.s.dead) continue; c.s.chest(_aimPt); }
+    else { const t = c.t; if (t.st === 'dead' || (t.type === 'mk' && t.intent !== 'fight')) continue; _aimPt.set(t.pos.x, t.pos.y + 1.15, t.pos.z); }
+    const d = _aimPt.distanceTo(eye); if (d > ASSIST_RANGE || d < 0.5) continue;
+    const a = Math.acos(clamp(_v.subVectors(_aimPt, eye).divideScalar(d).dot(_fwd), -1, 1)); if (a < bestA) { bestA = a; best = c; S.assistPt = (S.assistPt || new THREE.Vector3()).copy(_aimPt); }
+  }
+  if (best !== S.assistOn) { S.assistOn = best; S.assistLos = null; }
+  if (!best) return;
+  // line of sight to the chosen one (box colliders, every few frames): no help through walls
+  if (S.assistLos === null || ctx.time.frame % 6 === 0) { const d = S.assistPt.distanceTo(eye); _ray.set(eye, _v.subVectors(S.assistPt, eye).divideScalar(d)); let clear = true; for (const b of ctx.colliders || []) { if (b?.min && _ray.intersectBox(b, _v2) && _v2.distanceTo(eye) < d - 0.6) { clear = false; break; } } S.assistLos = clear; }
+  if (!S.assistLos) return;
+  // slowdown: the finger drags slower across a target
+  const mdx = input?.mouse?.dx ?? 0, mdy = input?.mouse?.dy ?? 0;
+  if (mdx || mdy) { const base = (ctx.settings.sensitivity ?? 0.0022) * Math.tan(cam.fov * DEG / 2) / Math.tan((ctx.settings.fov || 75) * DEG / 2) * ASSIST_FRICTION; const dy = mdx * base, dp = clamp(p.pitch + mdy * base, -89 * DEG, 89 * DEG) - p.pitch; p.yaw += dy; p.pitch += dp; cam.rotation.y += dy; cam.rotation.x += dp; }
+  // magnetism: only while aiming or firing, a capped fraction of the error per frame
+  const pull = S.adsTarget ? ASSIST_PULL : (input?.fire ? ASSIST_PULL_HIP : 0); if (!pull) return;
+  const dx = S.assistPt.x - eye.x, dz = S.assistPt.z - eye.z; let ey = Math.atan2(-dx, -dz) - p.yaw; ey = Math.atan2(Math.sin(ey), Math.cos(ey));
+  const ep = Math.atan2(S.assistPt.y - eye.y, Math.hypot(dx, dz)) - p.pitch;
+  const k = 1 - Math.exp(-dt * pull), cap = ASSIST_MAX_RATE * dt;
+  const ry = clamp(ey * k, -cap, cap), rp = clamp(ep * k * 0.6, -cap, cap); p.yaw += ry; p.pitch += rp; cam.rotation.y += ry; cam.rotation.x += rp;
 }
 
 /** Weapons are put away while riding an elevator / sitting as a passenger / driving a car (hands on the wheel). Bikes keep the sidearm live. */
@@ -493,6 +532,9 @@ export function update(dt, ctx) {
   const p = ctx.player, input = ctx.input, cam = ctx.camera, aim = ctx.xrAim || cam; const playing = ctx.state === 'playing';
   const w = S.weapons[S.cur], sp = w.spec;
   S.time += dt;
+  // screen shake from last frame: take it back off unless the player/vehicle already rebuilt the camera rotation this frame
+  if (S.shakePost && cam.rotation.x === S.shakePost[0] && cam.rotation.z === S.shakePost[1]) { cam.rotation.x -= S.shakeX; cam.rotation.z -= S.shakeZ; }
+  S.shakeX = S.shakeZ = 0; S.shakePost = null;
   if ((S.envCheck += dt) > 1) { S.envCheck = 0; S._ensureEnv(); }
   const actionBusy = !!sp.action && w.needsAction; // pump/bolt cycling (or waiting to start)
   // elevator / passenger / car driver: weapon goes down and stays inert (vehicles.js may also swap slots on mount — tolerated)
@@ -562,6 +604,8 @@ export function update(dt, ctx) {
     }
   }
 
+  if (ctx.isTouch && p && !p.mounted && playing && dt > 0 && !S.dead && !sp.melee) aimAssist(dt, ctx, p, cam, input);
+
   // ---------- sprint / lowered blends ----------
   const wantSprint = !!(p?.sprinting) && !S.triggerHeld && !S.reload && !S.throwing && S.adsTarget === 0;
   S.sprint = damp(S.sprint, wantSprint ? 1 : 0, wantSprint ? 9 : 14, dt);
@@ -606,8 +650,8 @@ export function update(dt, ctx) {
     const pitch0 = p.pitch; p.pitch = clamp(p.pitch + kp, -89 * DEG, 89 * DEG); kp = p.pitch - pitch0; p.yaw += ky; cam.rotation.x += kp; cam.rotation.y += ky;
     const rec = sp.recoilRecover ?? 0.55; S.recPitch += kp * rec; S.recYaw += ky * (sp.recoilRecover ?? 0.4);
   } else if (!p) { S.kickP = S.kickY = 0; }
-  if (p && S.time - w.lastShot > 0.09 && !S.kickP) {
-    const kr = 1 - Math.exp(-dt * 11);
+  if (p && S.time - w.lastShot > RECOIL_HOLD) {   // the kick's tail may still be landing: the debt it adds is paid back in the same pass
+    const kr = 1 - Math.exp(-dt * (sp.recoilReturn ?? RECOIL_RETURN));
     const rp = S.recPitch * kr, ry = S.recYaw * kr; S.recPitch -= rp; S.recYaw -= ry; p.pitch -= rp; p.yaw -= ry; cam.rotation.x -= rp; cam.rotation.y -= ry;
     if (Math.abs(S.recPitch) < 1e-4) S.recPitch = 0; if (Math.abs(S.recYaw) < 1e-4) S.recYaw = 0;
   }
@@ -809,6 +853,13 @@ export function update(dt, ctx) {
   // muzzle flash lifetime
   if (S.flashW) { S.flashT += dt; const fl = S.flashW; if (S.flashT >= S.flashLife) { fl.flash.visible = false; S.flashW = null; } else { const k = S.flashT / S.flashLife; fl.flashMat.opacity = k < 0.5 ? 1 : 1 - (k - 0.5) * 2; fl.flash.scale.setScalar(fl.flash.scale.x * (1 + dt * 4)); } }
 
+  // ---------- screen shake: a quick camera-only wobble on top of the aim (removed again next frame, so it never drifts the aim) ----------
+  if (S.shakeAmp > 1e-5 && dt > 0 && !ctx.xr?.presenting) {
+    S.shakeAmp *= Math.exp(-dt * SHAKE_DECAY); const a = S.shakeAmp * (1 - S.ads * 0.5);
+    S.shakeZ = a * Math.sin(S.time * 83); S.shakeX = a * 0.5 * Math.sin(S.time * 97 + 1.3);
+    cam.rotation.x += S.shakeX; cam.rotation.z += S.shakeZ; S.shakePost = [cam.rotation.x, cam.rotation.z];
+  } else S.shakeAmp = 0;
+
   // ---------- world FX ----------
   cam.updateMatrixWorld(true);
   S.fx.update(dt, cam); S.grenades.update(dt);
@@ -821,6 +872,6 @@ export function reset(ctx) {
   cancelActions(); S.swap = null; S.cur = 0; S.dead = false;
   S.weapons.forEach((w, i) => { resetWeapon(w); w.group.visible = i === 0; });
   S.adsTarget = 0; S.adsT = 0; S.ads = 0; S.adsOn = false; S.scoped = false; S.scope.rig.visible = false; S.sprint = 0; S.lower = 0; S.rp.set(0, 0, 0); S.rr.set(0, 0, 0); S.rpv.set(0, 0, 0); S.rrv.set(0, 0, 0);
-  S.spreadExtra = 0; S.recPitch = 0; S.recYaw = 0; S.kickP = 0; S.kickY = 0; S.stowed = false; S.swayYaw = 0; S.swayPitch = 0; S.grenadeCount = GRENADES; S.flashW = null; S.wallPull = 0; S.wallTarget = 0;
+  S.spreadExtra = 0; S.recPitch = 0; S.recYaw = 0; S.kickP = 0; S.kickY = 0; S.shakeAmp = 0; S.shakeX = S.shakeZ = 0; S.shakePost = null; S.stowed = false; S.swayYaw = 0; S.swayPitch = 0; S.grenadeCount = GRENADES; S.flashW = null; S.wallPull = 0; S.wallTarget = 0;
   S.fx.reset(); S.grenades.reset();
 }
