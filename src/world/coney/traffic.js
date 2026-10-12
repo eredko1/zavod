@@ -289,7 +289,7 @@ export function buildTraffic(world) {
   try { buildBuses(world); } catch (e) { console.warn('[traffic] buses', e); }
   world.updaters.push((dt) => { try { update(dt); } catch (e) { if ((T.errN = (T.errN || 0) + 1) < 4) console.error('[traffic]', e); } });
   if (typeof window !== 'undefined' && window.__game) window.__game.traffic = trafficQA;
-  W.traffic = { cars: () => T.cars.filter((c) => c.active) };
+  W.traffic = { cars: () => T.cars.filter((c) => c.active), graph: () => T.G };   // graph: the validated lanes (coney/uber.js routes on them)
   return T;
 }
 

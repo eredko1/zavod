@@ -66,7 +66,7 @@ function render() {
   const sect = CATS.map(([k, t]) => {
     const rows = Object.keys(count).filter((it) => (ITEMS[it]?.kind || 'misc') === k).map((it) => {
       const sp = ITEMS[it] || {}, left = sp.cig ? ` · ${K.left?.(it) || sp.cig} left` : '';
-      return `<div class="row"><b>${sp.icon || '?'}</b><span>${esc(sp.name || it)}${count[it] > 1 ? ` ×${count[it]}` : ''}<small>${left}</small></span>${sp.keep ? '' : `<button data-a="use" data-k="${it}">Use</button>`}<button class="ghost" data-a="drop" data-k="${it}">Drop</button></div>`;
+      return `<div class="row"><b>${sp.icon || '?'}</b><span>${esc(sp.name || it)}${count[it] > 1 ? ` ×${count[it]}` : ''}<small>${left}</small></span>${sp.app ? `<button data-a="app" data-k="${it}">Open</button>` : sp.keep ? '' : `<button data-a="use" data-k="${it}">Use</button>`}<button class="ghost" data-a="drop" data-k="${it}">Drop</button></div>`;
     }).join('');
     return rows ? `<h3>${t}</h3>${rows}` : '';
   }).join('');
@@ -80,6 +80,7 @@ function onClick(e) {
   if (a === 'close') return toggle(false);
   if (a === 'gun') { ctx.weapons?.selectBag?.(+t.dataset.i); return toggle(false); }
   if (a === 'use') { K.useItem?.(t.dataset.k); return toggle(false); }
+  if (a === 'app') { toggle(false); ctx.bus.emit(ITEMS[t.dataset.k]?.app || 'phone'); return; }
   if (a === 'drop') { if (K.drop?.(t.dataset.k)) ctx.hud?.toast?.(`Dropped the ${ITEMS[t.dataset.k]?.name || t.dataset.k}`, 1400); render(); }
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);

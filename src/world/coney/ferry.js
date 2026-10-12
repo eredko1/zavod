@@ -68,7 +68,7 @@ export function buildFerry(world) {
   ctx.bus.on('playerDied', () => { if (F.aboard) leave(false); if (F.barge) offBarge(); });
   world.updaters.push((dt) => update(dt));
   // net.js: where you stand on the deck (sent with your state) and a friend's deck spot → the world on our copy of the boat
-  ctx.ferry = { local: () => (F.aboard ? [+F.lx.toFixed(2), +F.lz.toFixed(2)] : null),
+  ctx.ferry = { local: () => (F.aboard ? [+F.lx.toFixed(2), +F.lz.toFixed(2)] : null), toBarge: () => toBarge(),   // toBarge: an Uber to the 69th St landing (coney/uber.js)
     toWorld: (lx, lz, out) => { const w = where(phase().t); if (w.narrows && !F.aboard) return null; F.boat.group.updateMatrixWorld(); return out.set(lx, DECK2, lz).applyMatrix4(F.boat.group.matrixWorld); } };
   // passengers: a few on the benches, two at the stern rail, one by the bar — they ride the boat (children of it); added once the
   // people models are in, animated only while you're near

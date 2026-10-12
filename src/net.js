@@ -130,7 +130,7 @@ function api() {
     get peers() { return S.peers.size; }, get connected() { return anyUp(); }, get room() { return S.room; }, get name() { return S.name; }, get id() { return S.id; },
     hit: (peer, dmg, hs) => { const p = S.peers.get(peer); if (!p || p.dead || p.afk) return; send({ t: 'hit', to: peer, dmg: Math.max(0, Math.min(250, dmg | 0)), hs: !!hs }); },
     scores: () => [...S.score.entries()].filter(([, v]) => !v.gone).map(([k, v]) => ({ id: k, name: S.disp.get(k) || v.name, k: v.k, d: v.d })),
-    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'gunoffer', 'gunpaid', 'shroompaid', 'dk', 'folk', 'juke', 'dt'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
+    send: (t, data = {}) => { const m = { ...data, t }; if (t === 'steal' && int(m.i, 0, 100000) !== null) S.stolen.add(m.i); send(m, ['steal', 'elev', 'red', 'igor', 'goto', 'cash', 'loot', 'thughit', 'rdoor', 'fresh', 'wv', 'wvhit', 'wvshot', 'gunoffer', 'gunpaid', 'shroompaid', 'dk', 'folk', 'juke', 'dt', 'uber'].includes(t) && t !== 'wv'); },   // loop events are re-sent once (receivers dedupe by seq)
     qaPeers: () => [...S.peers.values()].map((p) => ({ veh: p.veh?.k || null, riderVisible: !!p.inst.group.visible, y: +p.inst.group.position.y.toFixed(2) })),
     peer: (id) => { const p = S.peers.get(id); return p ? { id, name: S.disp.get(id) || p.name, pos: p.vehObj ? p.vehObj.position : p.inst.group.position, heading: p.heading || 0, veh: p.veh || null, dead: p.dead, afk: p.afk, seen: p.seen } : null; },
     list: () => [...S.peers.keys()],
@@ -362,7 +362,8 @@ function onState(pid, m, now) {
   let t = ts + p.off; if (last && t <= last.t) t = last.t + 1;
   let fe = null; if (Array.isArray(m.fe) && m.fe.length === 2) { const lx = num(m.fe[0], 5), lz = num(m.fe[1], 14); if (!Number.isNaN(lx) && !Number.isNaN(lz)) fe = [lx, lz]; }   // on the ferry deck (boat-local)
   let tr = null; if (Array.isArray(m.tr) && m.tr.length === 3) { const c = int(m.tr[0], 0, 15), lx = num(m.tr[1], 3), lz = num(m.tr[2], 12); if (c != null && !Number.isNaN(lx) && !Number.isNaN(lz)) tr = [c, lx, lz]; }
-  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tr, fe, tp: false };
+  let ub = null; if (Array.isArray(m.ub) && m.ub.length === 2) { const id = int(m.ub[0], 0, 2147483647), seat = int(m.ub[1], 0, 2); if (id !== null && seat !== null) ub = [id, seat]; }   // in an Uber: [ride, seat]
+  const s = { t, x: v ? v.x : x, y: v ? v.y : y, z: v ? v.z : zz, yaw: v ? v.h : yaw, sp, f: fl, v, tr, fe, ub, tp: false };
   if (last && Math.hypot(s.x - last.x, s.y - last.y, s.z - last.z) > TELEPORT) s.tp = true;
   p.snaps.push(s); if (p.snaps.length > 40) p.snaps.shift();
   const afk = !!(fl & F_AFK); if (afk !== p.afk) { p.afk = afk; UI.refresh(); }
@@ -473,7 +474,7 @@ function sendState(now, force = false) {
   let vi = null;
   try { const mv = ctx.vehicles?.mounted; vi = mv ? { k: mv.spec?.car ? (mv.kind || 'sedan') : mv.spec?.water ? 'jetski' : 'bike', c: mv.color ?? 0, h: +mv.heading.toFixed(3), x: +mv.pos.x.toFixed(2), y: +mv.pos.y.toFixed(2), z: +mv.pos.z.toFixed(2) } : (me.mounted?.passenger ? { k: 'pass' } : null); } catch {}
   const sc = S.score.get(S.id); let tr = null; try { tr = me.mounted?.train ? ctx.subway?.local?.() || null : null; } catch {}   // riding the F: car + spot in the car
-  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, tr, fe: ctx.ferry?.local?.() || undefined, sc: [sc.k, sc.d], w: String(ctx.weapons?.currentId || '').slice(0, 12) || undefined });   // w: what you're holding (friends draw it)
+  pub(S.base + 's/' + S.id, { n: S.name, q: ++S.sseq, z: S.inst, ts: Math.round(now), p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +(me.yaw || 0).toFixed(3), +(me.speed || 0).toFixed(1), flags], v: vi, tr, fe: ctx.ferry?.local?.() || undefined, ub: ctx.uber?.local?.() || undefined, sc: [sc.k, sc.d], w: String(ctx.weapons?.currentId || '').slice(0, 12) || undefined });   // w: what you're holding (friends draw it)
 }
 
 // ---------- per frame ----------
@@ -514,6 +515,8 @@ function renderPeer(p, now, rdt, ctx) {
   // put a rider metres behind a moving train, floating over the el
   // a friend on the ferry: on our copy of the boat (same wall clock), not metres behind a 40 m/s ferry
   if (cur.fe && ctx.ferry?.toWorld) { const q = ctx.ferry.toWorld(cur.fe[0], cur.fe[1], _trV); if (q) { x = q.x; y = q.y; z = q.z; } }
+  // a friend in an Uber: in their seat on our copy of the car (same wall clock), facing the way it drives
+  const ubq = cur.ub && ctx.uber?.toWorld ? ctx.uber.toWorld(cur.ub[0], cur.ub[1]) : null; if (ubq) { x = ubq.x; y = ubq.y; z = ubq.z; yaw = ubq.h; }
   if (cur.tr && ctx.subway?.toWorld) { const a = A.tr, b = B.tr, k = rt > A.t && rt < B.t ? (rt - A.t) / Math.max(1, B.t - A.t) : rt >= B.t ? 1 : 0, same = a && b && a[0] === b[0];
     const q = ctx.subway.toWorld(cur.tr[0], same ? a[1] + (b[1] - a[1]) * k : cur.tr[1], same ? a[2] + (b[2] - a[2]) * k : cur.tr[2], _trV); if (q) { x = q.x; y = q.y; z = q.z; } }
   const g = p.inst.group; g.position.set(x, y, z); g.rotation.y = yaw + Math.PI; p.heading = yaw;
@@ -546,7 +549,7 @@ function renderPeer(p, now, rdt, ctx) {
     } else if (p.inst.hero) {   // a friend driving: sat in the driver's seat, visible through the glass
       const e = carEye(cur.v?.k || 'sedan'); _seat.set(e.z, 0.08, -(e.x - 0.2)).applyAxisAngle(_up, yaw); g.visible = true; g.position.set(x + _seat.x, y + _seat.y, z + _seat.z); g.rotation.set(0, yaw + Math.PI, 0); p.inst.hero.fig.mood = 'sit';
     } else g.visible = false;
-  } else { g.visible = true; if (p.inst.hero) p.inst.hero.fig.mood = nearCar(g.position) ? 'sit' : null; }
+  } else { g.visible = true; if (p.inst.hero) p.inst.hero.fig.mood = ubq || nearCar(g.position) ? 'sit' : null; }
   setTag(p);
   p.tag.visible = !p.dead;
   if (p.vehObj) p.tag.position.set(x, y + 2.1, z); else p.tag.position.set(g.position.x, g.position.y + (crouch ? 1.8 : 2.25), g.position.z);

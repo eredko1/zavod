@@ -25,6 +25,7 @@ import { buildFerry } from '../coney/ferry.js';
 import { buildSubway } from '../coney/subway.js';
 import { buildGreens } from '../coney/greens.js';
 import { buildRadio } from '../coney/radio.js';
+import { buildUber } from '../coney/uber.js';
 import { buildTraffic } from '../coney/traffic.js';
 import { OSM, PLAY } from '../coney/osm.js';
 import { addBusLoop, moveStillwellAve } from '../coney/stillwell.js';
@@ -68,6 +69,7 @@ export async function build(world) {
   Object.defineProperty(W, 'filmGrade', { get: () => (/night|dusk/i.test(W.tod?.get?.() || '') ? null : 'lunafilm'), configurable: true });   // the aerial-photo grade by day (Settings → Film look)
   await breathe(); if (!skip.has('greens')) try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
   await breathe(); try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
+  if (ctx.mode === 'chill') try { buildUber(world); } catch (e) { console.warn('[coney] uber', e); }   // the phone + Uber app; the car, driver and road graphs only on the first ride (coney/uber.js)
   // the map (src/minimap.js): street centrelines, street names, points of interest
   W.mapRoads = OSM.r.map((r) => ({ p: r.p, w: r.w }));
   W.mapLabels = [

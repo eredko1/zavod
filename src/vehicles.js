@@ -792,7 +792,8 @@ export function update(dt, ctx) {
       const dGun = ctx.ai?.nearPickupDist; const gunWins = typeof dGun === 'number' && dGun < dBike;
       // a friend's car closer than this one: F hops in with them (hangkit), it doesn't steal the car parked behind them
       let dFriend = Infinity; const net = ctx.net; if (net?.list) for (const id of net.list()) { const q = net.peer(id); if (q?.veh && q.veh.k !== 'pass' && q.pos) dFriend = Math.min(dFriend, Math.hypot(q.pos.x - p.position.x, q.pos.z - p.position.z)); }
-      const friendWins = dFriend < 3.8 && dFriend < dBike + 0.5;
+      const dUber = ctx.uber?.boardDist?.(p.position) ?? Infinity;   // a waiting Uber (coney/uber.js) at the kerb wins the same way
+      const friendWins = Math.min(dFriend, dUber) < 3.8 && Math.min(dFriend, dUber) < dBike + 0.5;
       if (!gunWins && !friendWins) { S.toastT -= dt; if (S.toastT <= 0) { S.toastT = 0.35; ctx.hud?.toast?.(b.spec.car ? 'F — DRIVE' : 'F — RIDE', 600); } if (fHeld) { input.pressed?.delete?.('KeyF'); mount(b); } }
     }
     updateUI(ctx);
