@@ -83,7 +83,7 @@ export async function init(ctx) {
   if (mapId === 'coney') { try { await loadCarModels(ctx); } catch (e) { console.warn('[world] car models', e); } }   // real GLB cars (world/carmodels.js)   // realistic NPCs (world/people.js)
   // maps built from files (Map Lab tiles, a stand-in GLB) load them first; the authored maps have no load() and build as before
   if (map.load) { try { await map.load(ctx, world); } catch (e) { console.error(`[world] ${mapId} load`, e); ctx.bootErrors = (ctx.bootErrors || []).concat(`map load: ${e.message}`); } }
-  map.build(world);
+  await map.build(world);   // coney builds in steps (async), the rest at once
   try { clampTextures(ctx); setTimeout(() => { try { clampTextures(ctx); } catch {} }, 5000); } catch (e) { console.warn('[world] texclamp', e); }   // phones: textures down to the device budget
   if (!W.poses.spawn && W.playerSpawns[0]) { const s = W.playerSpawns[0]; W.poses.spawn = [s.x, s.y, s.z, 0, 0]; }
   // random-spawn variety: every map offers ≥ 6 player spawn points — borrow ground-level enemy spawns farthest from the map's own player spawns
