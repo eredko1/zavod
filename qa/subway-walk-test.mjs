@@ -18,7 +18,8 @@ const HELPERS = () => {
       const cur = p.position.clone(); if (last && cur.distanceTo(last) < 0.15) { if (stuck === 3 || stuck === 6) await p.qaWalk({ x: stuck === 3 ? 1 : -1, y: 0 }, 0.7, {}); if (++stuck > 9) break; } else stuck = 0; last = cur; }
     return { ok: false, pos: p.position.toArray().map((v) => +v.toFixed(2)) }; };
   window.path = async (pts) => { const res = []; for (const [x, z] of pts) { const r = await window.walkTo(x, z); res.push(r); if (!r.ok) break; } return res; };
-  const P0 = [274.5, -153], P1 = [457, -107.5], L = Math.hypot(P1[0] - P0[0], P1[1] - P0[1]), u = [(P1[0] - P0[0]) / L, (P1[1] - P0[1]) / L];
+  const { P0, P1 } = window.__game.w8stairs;   // the station's axis from the game (a copy here went stale when #151 turned W 8 St)
+  const L = Math.hypot(P1[0] - P0[0], P1[1] - P0[1]), u = [(P1[0] - P0[0]) / L, (P1[1] - P0[1]) / L];
   window.w8at = (a, o) => [P0[0] + u[0] * a - u[1] * o, P0[1] + u[1] * a + u[0] * o];
   window.hudTxt = () => document.querySelector('.zvsub')?.innerText || '';
   // inside the car: face along the car's own axes, push the stick

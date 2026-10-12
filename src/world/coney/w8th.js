@@ -66,7 +66,7 @@ export function buildW8th(world, M) {
   // the street flights start at the W 8th St end and slide west along the platform (the Luna Park side, away from the precinct
   // and the firehouse up W 8th) until their footprint is off the roadway
   const RUN0 = Math.round(S.LO.plat / 0.187) * 0.29, clearAt = (o) => { for (let a = 40; a > -30; a -= 1) { let ok = true; for (let d = -1; d <= RUN0 + 1 && ok; d += 1.5) for (const w of [-1.4, 0, 1.4]) if (inRoad(at(a + d, o + w))) { ok = false; break; } if (ok) return a; } return 40; };
-  const aN0 = clearAt(oN), aS0 = clearAt(oS); S.stairs = { n: aN0, s: aS0, run: RUN0, oN, oS };   // (qa/subway-walk-test walks them)
+  const aN0 = clearAt(oN), aS0 = clearAt(oS); S.stairs = { n: aN0, s: aS0, run: RUN0, oN, oS, P0: [P0.x, P0.y], P1: [P1.x, P1.y] };   // (qa/subway-walk-test walks them, in the station's own a / o frame)
   { const aTop = flight(aN0, oN, 0, S.LO.plat, 1); sbox('w8Plat', aTop, aTop + 3, oN - 1.4, -S.platOut + 0.1, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); }        // street → lower (north side)
   { const aTop = flight(aS0, oS, 0, S.LO.plat, 1); sbox('w8Plat', aTop, aTop + 3, S.platOut - 0.1, oS + 1.4, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); }        // street → lower (south side)
   { const aTop = flight(110, oN, S.LO.plat, S.UP.plat, 1); sbox('w8Plat', 105, 110, oN - 1.4, -S.platOut + 0.1, S.LO.plat - 0.25, S.LO.plat, { walkable: true }); sbox('w8Plat', aTop, aTop + 3, oN - 1.4, -S.platOut + 0.1, S.UP.plat - 0.25, S.UP.plat, { walkable: true }); }   // lower → upper (north)
