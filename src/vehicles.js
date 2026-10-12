@@ -18,6 +18,7 @@ import { buildBus, BUS } from './vehicles/bus.js';
 const DEG = Math.PI / 180;
 const LOOK_PITCH = 35 * DEG, LEAN_MAX = 12 * DEG;
 const VR_LEAN_MAX = 5 * DEG;   // VR: the bike you sit on (and the bars in your hands) leans at most this far; the view never rolls
+const CAM_PROBE = 0.4, TOUCH_CRUISE = 0.45;   // chase cam side-ray half spacing (m); car throttle while steering on the stick
 const FOV_KICK = 9, BOUNCE = 0.28, HIT_LOSS = 0.55, GRAV = 17, MAX_STEP = 1 / 120;
 // ---- per-vehicle handling + rider geometry ----
 // accel: launch acceleration (v = max·tanh(a·t/max)); brake/hard: service brake / handbrake decel; grip: lateral slip decay /s
@@ -38,13 +39,18 @@ const JETSKI_SPEC = {
   eyeH: 1.45, eyeBack: 0.45, eyeSide: 0, reach: 1.6, hx: 0.6, hz: 1.6, boxH: 1.0, lookYaw: 70 * DEG,
   chaseD: 5.2, chaseH: 0.3, chaseLook: 1.3, hitMul: 7, hitSlow: 0.75, engineBrake: 0, draft: 0.12,
 };
+// cars (qa/drive-feel-test.mjs holds the arcade targets): ~5 s to 60 mph, ~80 mph top, 60-0 in ~35 m, a handbrake slide that
+// holds ~50 deg and keeps some pace. aero: v² drag coefficient (bikes 0.0024); steerIn/steerOut: steering filter rate at rest
+// (steerIn eases to steerInHi at top speed so the lock comes on gently on the motorway); wallMu: friction along a wall per unit of
+// impact speed (a glance slides, a head-on stops); climb: fastest kerb / step rise (m/s) at walking pace.
 const CAR_BASE = {
-  car: true, max: 30, revMax: 7, accel: 9, brake: 13, hard: 5.5, hardYaw: 1.3, grip: 13, hardGrip: 1.1, latG: 1.05, steerLow: 0.6,
+  car: true, max: 37, revMax: 7, accel: 7.6, brake: 9.4, hard: 3.6, hardYaw: 0.5, grip: 13, hardGrip: 2.1, latG: 1.05, steerLow: 0.6,
+  aero: 0.0008, steerIn: 13, steerInHi: 8, steerOut: 11, wallMu: 0.3, climb: 3.5,
   band: 0.28, stepUp: 0.36, leanK: -0.2, lookYaw: 110 * DEG, chaseD: 6.8, chaseH: 0.3, chaseLook: 1.6, hitMul: 12, hitSlow: 0.9, engineBrake: 1.4,
 };
 const CAR_SPECS = {};
 // a hijacked MTA bus: slow, heavy, wide; the driver sits high up front on the left
-const BUS_SPEC = { ...CAR_BASE, kind: 'bus', max: 17, revMax: 4, accel: 3.2, brake: 7, hard: 4, hardYaw: 0.5, grip: 9, hardGrip: 2, latG: 0.6, steerLow: 0.62,
+const BUS_SPEC = { ...CAR_BASE, kind: 'bus', max: 17, revMax: 4, accel: 3.2, brake: 7, hard: 4, hardYaw: 0.5, grip: 9, hardGrip: 2, latG: 0.6, steerLow: 0.62, steerIn: 6, steerInHi: 4, steerOut: 7, climb: 2.5,
   wheelbase: BUS.axleF - BUS.axleR, circles: [-4.7, -1.6, 1.6, 4.7], bodyR: 1.28, h: 3.2, eyeH: BUS.eye.y, eyeBack: -BUS.eye.x, eyeSide: BUS.eye.z, reach: 1.9,
   hx: BUS.w / 2, hz: BUS.len / 2, boxH: 3.2, chaseD: 15, chaseH: 0.32, chaseLook: 2.9, hitMul: 18, hitSlow: 0.95, engineBrake: 1.0 };
 function carSpecFor(kind) {
@@ -52,7 +58,7 @@ function carSpecFor(kind) {
   if (CAR_SPECS[kind]) return CAR_SPECS[kind];
   const K = carSpec(kind) || carSpec('sedan'), hw = K.w / 2, hl = K.len / 2, e = carEye(kind);
   return (CAR_SPECS[kind] = { ...CAR_BASE, kind, wheelbase: K.wheels[0] - K.wheels[1], circles: [-(hl - hw), 0, hl - hw], bodyR: hw, h: K.roof,
-    eyeH: e.y, eyeBack: -e.x, eyeSide: e.z, reach: 1.4, hx: hw + 0.05, hz: hl, boxH: K.roof, ...(K.sport ? { max: 46, accel: 13.5, grip: 15, latG: 1.25, revMax: 8.5 } : {}) });   // sports cars: faster, grippier
+    eyeH: e.y, eyeBack: -e.x, eyeSide: e.z, reach: 1.4, hx: hw + 0.05, hz: hl, boxH: K.roof, ...(K.sport ? { max: 46, accel: 10.5, grip: 15, latG: 1.25, revMax: 8.5 } : {}) });   // sports cars: faster, grippier
 }
 // surfaces: sand is slow + slippery, grass/dirt a little
 const SURF = { hard: { max: 1, accel: 1, grip: 1, drag: 0, rumble: 0 }, soft: { max: 0.8, accel: 0.85, grip: 0.75, drag: 0.8, rumble: 0.3 }, sand: { max: 0.5, accel: 0.7, grip: 0.45, drag: 2.2, rumble: 1 } };
@@ -299,7 +305,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
     if (brk > 0) { if (fs > 0.3) fs = Math.max(0, fs - sp.brake * brk * dt); else if (thr === 0) fs = Math.max(-sp.revMax, fs - sp.accel * 0.5 * brk * dt); }
     if (hard) { const d = sp.hard * dt; fs = fs > 0 ? Math.max(0, fs - d) : Math.min(0, fs + d); }
     // passive: air drag + rolling resistance (+ surface drag, + engine braking off-throttle)
-    fs -= fs * Math.abs(fs) * 0.0024 * dt;
+    fs -= fs * Math.abs(fs) * (sp.aero ?? 0.0024) * dt;
     const rf = (0.5 + sf.drag + (thr === 0 && brk === 0 ? sp.engineBrake : 0)) * dt; fs -= Math.sign(fs) * Math.min(Math.abs(fs), rf);
     if (fs > max) fs = damp(fs, max, 1.2, dt);   // entering sand at speed bleeds off instead of hitting a wall
   }
@@ -310,7 +316,8 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
   v.skid = damp(v.skid, sliding ? 1 : 0, sliding ? 6 : 3, dt);
   const latMax = sp.latG * 9.81 * sf.grip * (1 + 1.5 * v.skid);
   let steerMax = sp.steerLow; if (af > 1) steerMax = Math.min(steerMax, Math.atan(latMax * sp.wheelbase / (af * af)));
-  v.steer = damp(v.steer, steer * Math.max(0.02, steerMax), steer !== 0 ? 6 : 8, dt);
+  const steerRate = !sp.car ? (steer !== 0 ? 6 : 8) : steer !== 0 ? sp.steerIn + (sp.steerInHi - sp.steerIn) * clamp(af / sp.max, 0, 1) : sp.steerOut;
+  v.steer = damp(v.steer, steer * Math.max(0.02, steerMax), steerRate, dt);
   // yaw (bicycle model; reverse steers the other way like a real vehicle); handbrake → rear steps out
   let yawRate = (grounded && af > 0.05) ? -fs / sp.wheelbase * Math.tan(v.steer) : 0;
   yawRate *= 1 + sp.hardYaw * v.skid;
@@ -333,11 +340,21 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
     const vn = vel.x * hitN.nx + vel.z * hitN.nz;
     if (vn < 0) {
       const severity = clamp(-vn / 8, 0, 1);
-      vel.x -= hitN.nx * vn * (1 + BOUNCE); vel.z -= hitN.nz * vn * (1 + BOUNCE);
-      vel.multiplyScalar(1 - HIT_LOSS * severity);
+      if (sp.car) {
+        // cars: the wall takes the normal part (small bounce, less the harder the hit) and rubs the tangential part in proportion
+        // to the impact, so a glance scrapes along the wall at most of its speed and only a square hit stops it dead
+        const tx = vel.x - hitN.nx * vn, tz = vel.z - hitN.nz * vn, vt = Math.hypot(tx, tz), keep = vt > 1e-4 ? Math.max(0, 1 - sp.wallMu * -vn / vt) : 0;
+        const e = BOUNCE * (1 - 0.6 * severity);
+        vel.set(tx * keep - hitN.nx * vn * e, 0, tz * keep - hitN.nz * vn * e);
+        // swing the nose along the wall (the way it's sliding), not into it or off it
+        if (fs > 2 && vt * keep > 2) { const along = Math.atan2(-tx, -tz), d = wrap(along - v.heading); if (Math.abs(d) < Math.PI / 2) v.heading += d * clamp(0.6 * severity, 0, 0.12); }
+      } else {
+        vel.x -= hitN.nx * vn * (1 + BOUNCE); vel.z -= hitN.nz * vn * (1 + BOUNCE);
+        vel.multiplyScalar(1 - HIT_LOSS * severity);
+        const away = Math.atan2(-hitN.nx, -hitN.nz); v.heading += wrap(away - v.heading) * 0.15 * severity;
+      }
       v.suspV -= 1.5 * severity; v.hitT = Math.max(v.hitT, 0.25 * severity + 0.05);
       if (severity > 0.25 && v === S.mounted) { try { C.audio?.play?.('impact', { position: p, volume: severity }); } catch {} }
-      const away = Math.atan2(-hitN.nx, -hitN.nz); v.heading += wrap(away - v.heading) * 0.15 * severity * (sp.car ? 0.4 : 1);
     }
   }
   // the play area's outer edge (seams between the map and its zones are open): put back inside, bounce off it
@@ -348,7 +365,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
   // ground: climb kerbs smoothly, stick to downhill slopes, leave the ground off a crest/ledge (keeping the ramp's vertical speed)
   const gy = floorAt(px, pz, p.y, v.box, sp.stepUp), dy = gy - p.y, y00 = p.y;
   if (!v.air) {
-    if (dy >= 0) { p.y = dy > 0.03 ? damp(p.y, gy, 22, dt) : gy; if (dy > 0.03) v.suspV -= dy * 2.5; }
+    if (dy >= 0) { p.y = dy > 0.03 ? damp(p.y, gy, 22, dt) : gy; if (sp.climb) p.y = Math.min(p.y, y00 + Math.max(sp.climb, Math.abs(fs) * 0.3) * dt); if (dy > 0.03) v.suspV -= dy * 2.5; }   // cars: a kerb rolls up, it doesn't pop
     else if (dy > -Math.max(0.04, Math.abs(fs) * dt * 0.35) && v.groundVy > -2.5 * Math.max(1, Math.abs(fs) / 10)) p.y = gy;
     else { v.air = true; v.vy = Math.max(0, v.groundVy) * 0.9; }
     if (!v.air) v.groundVy = damp(v.groundVy, (p.y - y00) / dt, 12, dt);
@@ -568,7 +585,11 @@ function applyChase(v, dt) {
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const D = sp.chaseD * (1 + clamp(v.speed / sp.max, 0, 1) * 0.12);
   const cx = tx - fx * Math.cos(elev) * D, cy = ty + Math.sin(elev) * D, cz = tz - fz * Math.cos(elev) * D;
-  const t = segmentHit(S.grid, tx, ty, tz, cx, cy, cz, v.box, v.pos.y + 0.25);
+  // cars: two more rays parallel to the centre one, a near plane's half width either side (they start inside the car's own
+  // footprint), so a wall running just beside the camera's line pulls it in short of the wall instead of letting it scrape
+  const sx = -fz * CAM_PROBE, sz = fx * CAM_PROBE;
+  let t = segmentHit(S.grid, tx, ty, tz, cx, cy, cz, v.box, v.pos.y + 0.25);
+  if (sp.car) t = Math.min(t, segmentHit(S.grid, tx + sx, ty, tz + sz, cx + sx, cy, cz + sz, v.box, v.pos.y + 0.25), segmentHit(S.grid, tx - sx, ty, tz - sz, cx - sx, cy, cz - sz, v.box, v.pos.y + 0.25));
   const want = Math.max(1.2, t * D - 0.3);
   S.chaseD = want < S.chaseD ? want : damp(S.chaseD, want, 3, k);   // snap in, ease out
   const d = S.chaseD;
@@ -687,6 +708,26 @@ export async function init(ctx) {
     qaJump(charge = 0.6) { const b = S.mounted; if (!b || b.spec?.car || b.air) return false; b.air = true; b.vy = 4.2 + 3.8 * Math.min(1, charge / 0.6) + Math.min(1, Math.abs(b.fwdSpeed || 0) / 22) * 1.8; return true; },
     qaDrive(throttle = 1, steer = 0, seconds = 3, opts = {}) { if (!S.mounted) api.qaMount(); if (!S.mounted) return Promise.resolve(false); if (S.qa) S.qa.res(false); return new Promise((res) => { S.qa = { thr: throttle, steer, t: seconds, hard: !!opts.hard, res }; }); },
     qaState() { const b = S.mounted; return b ? { x: b.pos.x, y: b.pos.y, z: b.pos.z, heading: b.heading, speed: b.speed, fwd: b.fwdSpeed, lean: b.lean, steer: b.steer, skid: b.skid, air: b.air, surf: Object.keys(SURF).find((k) => SURF[k] === b.surf), car: !!b.spec.car, chase: S.chase, kind: b.spec.kind, pitch: b.tPitch, roll: b.tRoll, water: b.surfY ?? null, depth: b.depth ?? null, beached: !!b.beached } : null; },
+    /** Driving-feel lab (qa/drive-feel-test.mjs): drive the mounted vehicle step by step in a sealed world of test boxes only
+     *  (flat ground at y, hard surface), with the chase camera + speed FOV running, then put everything back. */
+    qaTouch: (ax, ay, car = true, fwd = 0) => touchDrive(ax, ay, car, fwd),
+    qaLab: {
+      begin(boxes = [], x, z, heading = 0, speed = 0, ground = []) { const v = S.mounted; if (!v) return false;
+        S.lab = { grid: S.grid, chase: S.chase, fov: C.settings.fov, fovBase: S.fovBase, fovWritten: S.fovWritten, pos: v.pos.clone(), heading: v.heading, gh: C.world.groundHeight, clamp: C.world.playClamp, surfaceAt: C.world.surfaceAt };
+        const g = new BoxGrid(4); g.build(boxes.map((b) => new THREE.Box3(new THREE.Vector3(b[0], b[1], b[2]), new THREE.Vector3(b[3], b[4], b[5])))); S.grid = g;
+        C.world.groundHeight = (gx, gz) => { let h = 0; for (const r of ground) if (gx >= r[0] && gx <= r[2] && gz >= r[1] && gz <= r[3]) h = Math.max(h, r[4]); return h; };   // ground: [x0, z0, x1, z1, height] kerb / pavement slabs C.world.playClamp = null; C.world.surfaceAt = () => 'concrete';
+        v.pos.set(x, 0, z); v.heading = heading; fwdOf(heading, _f); v.vel.copy(_f).multiplyScalar(speed); v.fwdSpeed = v.speed = speed;
+        Object.assign(v, { steer: 0, skid: 0, vy: 0, air: false, susp: 0, suspV: 0, throttle: 0, groundVy: 0, aLong: 0, yawRate: 0, boost: 0, hitT: 0, surf: SURF.hard, surfT: 0 });
+        setChase(true); S.chaseYaw = heading; S.chaseY = 0; S.lookYaw = S.lookPitch = 0; S.idleT = 99; S.fovBase = S.lab.fov; S.fovWritten = -1; return true; },
+      step(dt, thr = 0, brk = 0, hard = false, steer = 0) { const v = S.mounted; if (!v || !S.lab) return null;
+        simulate(v, dt, thr, brk, hard, steer); speedFov(v); applyView(dt);
+        fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x); const cam = C.camera.position;
+        return { x: v.pos.x, y: v.pos.y, z: v.pos.z, heading: v.heading, fwd: v.fwdSpeed, lat: v.vel.x * _r.x + v.vel.z * _r.z, speed: v.speed, yawRate: v.yawRate, steer: v.steer, skid: v.skid, air: v.air,
+          camYaw: Math.atan2(v.pos.x - cam.x, v.pos.z - cam.z) + Math.PI, camDist: Math.hypot(cam.x - v.pos.x, cam.z - v.pos.z), camY: cam.y - v.pos.y, camX: cam.x, camZ: cam.z, fov: C.settings.fov }; },
+      end() { const v = S.mounted, L = S.lab; if (!L) return; S.grid = L.grid; C.world.groundHeight = L.gh; C.world.playClamp = L.clamp; C.world.surfaceAt = L.surfaceAt;
+        if (v) { v.pos.copy(L.pos); v.heading = L.heading; v.vel.set(0, 0, 0); v.speed = v.fwdSpeed = 0; }
+        C.settings.fov = L.fov; S.fovBase = L.fovBase; S.fovWritten = L.fovWritten; setChase(L.chase); S.lab = null; },
+    },
     /** Deterministic replay at a fixed frame rate from the current state (restored afterwards): {fps, seconds, thr, steer, hard} → end pose + max per-frame pos jerk. */
     qaSim({ fps = 60, seconds = 3, thr = 1, steer = 0, hard = false } = {}) {
       const v = S.mounted; if (!v) return null;
@@ -707,6 +748,22 @@ export async function init(ctx) {
   S.api = api; return api;
 }
 
+/** Touch stick → {steer, thr, brake}: up = gas, down = brake / reverse, sideways = steer. Cars get a softer centre (fine
+ *  corrections at speed) and cruise throttle while the stick is held sideways and rolling forward, so steering never coasts you
+ *  to a stop; bikes keep their own curve. */
+function touchDrive(ax, ay, car, fwd) {
+  const dz = car ? 0.1 : 0.12, span = car ? 0.72 : 0.7, curve = car ? 1.6 : 1.2;
+  const steer = Math.abs(ax) > dz ? Math.sign(ax) * clamp((Math.abs(ax) - dz) / span, 0, 1) ** curve : 0;
+  let thr = ay < -0.15 ? clamp((-ay - 0.15) / 0.55, 0, 1) : 0; const brake = ay > 0.2 ? clamp((ay - 0.2) / 0.55, 0, 1) : 0;
+  if (car && !brake && Math.abs(ax) > 0.3 && fwd > 1) thr = Math.max(thr, TOUCH_CRUISE);
+  return { steer, thr, brake };
+}
+/** speed FOV kick: written through settings.fov so weapons' ADS fov logic composes with it */
+function speedFov(bike) {
+  if (S.fovWritten > 0 && Math.abs(C.settings.fov - S.fovWritten) > 1e-6) S.fovBase = C.settings.fov; // user moved the slider while riding
+  const kick = FOV_KICK * clamp(Math.abs(bike.fwdSpeed) / bike.spec.max, 0, 1.4) ** 1.3 + (bike.boost || 0) * 8;
+  S.fovWritten = S.fovBase + kick; C.settings.fov = S.fovWritten;
+}
 export function update(dt, ctx) {
   try { updateDamage(ctx, S.bikes, dt); } catch (e) { if (!S.dmgErr) { S.dmgErr = 1; console.error('[vehicles] damage', e); } }
   const p = ctx.player; if (!p) return;
@@ -752,9 +809,7 @@ export function update(dt, ctx) {
     thr = key('KeyW') || key('ArrowUp') ? 1 : 0; brake = key('KeyS') || key('ArrowDown') ? 1 : 0; hard = !!input.jump;
     steer = (key('KeyD') || key('ArrowRight') ? 1 : 0) - (key('KeyA') || key('ArrowLeft') ? 1 : 0);
     const ax = input.touch?.axis?.x || 0, ay = input.touch?.axis?.y || 0;
-    if (Math.abs(ax) > 0.12) steer = Math.sign(ax) * clamp((Math.abs(ax) - 0.12) / 0.7, 0, 1) ** 1.2;
-    if (ay < -0.15) thr = Math.max(thr, clamp((-ay - 0.15) / 0.55, 0, 1));
-    if (ay > 0.2) brake = Math.max(brake, clamp((ay - 0.2) / 0.55, 0, 1));
+    if (ax || ay) { const t = touchDrive(ax, ay, sp.car, bike.fwdSpeed); if (t.steer) steer = t.steer; thr = Math.max(thr, t.thr); brake = Math.max(brake, t.brake); }
     // VR: your hands on the wheel / the bars (src/vr/physical.js) steer, and with tracked hands push / pull is gas / brake
     if (input.xrSteer != null) steer = clamp(input.xrSteer, -1, 1);
     if (input.xrThrottle != null) { const t = input.xrThrottle; if (t > 0) thr = Math.max(thr, t); else if (t < 0) brake = Math.max(brake, -t); }
@@ -779,12 +834,7 @@ export function update(dt, ctx) {
       const p = C.player; if (p) { p.pitch += (Math.random() - 0.3) * 0.12 * k; p.yaw += (Math.random() - 0.5) * 0.1 * k; } bike.suspV -= 2 * k; bike.hitT = Math.max(bike.hitT || 0, 0.25);
       if (!bike.spec.car && drop > 12) C.hud?.toast?.('*CRUNCH* …you ate the bumper', 1400);
       if (bike.spec.car) try { damageHit(C, bike, drop); } catch (e) { console.warn('[vehicles] damage', e); } } }   // dents, lights out, smoke, fire, boom (vehicledamage.js)
-  // speed FOV kick: written through settings.fov so weapons' ADS fov logic composes with it
-  {
-    if (S.fovWritten > 0 && Math.abs(ctx.settings.fov - S.fovWritten) > 1e-6) S.fovBase = ctx.settings.fov; // user moved the slider while riding
-    const kick = FOV_KICK * clamp(Math.abs(bike.fwdSpeed) / sp.max, 0, 1.4) ** 1.3 + (bike.boost || 0) * 8;
-    S.fovWritten = S.fovBase + kick; ctx.settings.fov = S.fovWritten;
-  }
+  speedFov(bike);
   S.revT -= dt;
   if (thr > 0 && S.revT <= 0) { S.revT = 1.6; if (!sp.car) try { ctx.audio?.play?.('bike_rev', { position: bike.pos, volume: 0.5 + 0.5 * clamp(bike.speed / sp.max, 0, 1) }); } catch {} }
   applyView(dt);
