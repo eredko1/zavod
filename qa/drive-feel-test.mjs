@@ -44,10 +44,11 @@ try {
   const cam = await run((lab) => { const v0 = 40 * 0.44704; lab.begin([], 0, 0, 0, v0); let s, lag = 0, dists = [], fov0 = null;
     for (let i = 0; i < 60 * 3; i++) { s = lab.step(lab.DT, s && s.fwd < v0 ? 1 : 0, 0, false, 1); if (i > 90) lag = Math.max(lag, Math.abs(((s.camYaw - s.heading + 9 * Math.PI) % (2 * Math.PI)) - Math.PI) * 57.3); }
     lab.begin([], 0, 0, 0, 0); s = lab.step(lab.DT); fov0 = s.fov; const d0 = s.camDist;
-    for (let i = 0; i < 60 * 2; i++) s = lab.step(lab.DT); const dRest = s.camDist;
-    lab.begin([], 0, 0, 0, 26.8224); for (let i = 0; i < 60 * 1.5; i++) s = lab.step(lab.DT, 1, 0, false, 0); const fov60 = s.fov, dCruise = s.camDist;
-    let dMin = 99, dMax = 0, jerk = 0, prev = null; for (let i = 0; i < 60 * 1.2; i++) { s = lab.step(lab.DT, 0, 1, false, 0); dMin = Math.min(dMin, s.camDist); dMax = Math.max(dMax, s.camDist); if (prev != null) jerk = Math.max(jerk, Math.abs(s.camDist - prev)); prev = s.camDist; }
-    return { lag, fov0, fov60, dRest, dCruise, brakeShift: dCruise - dMin, camStepMax: jerk }; });
+    for (let i = 0; i < 60 * 2; i++) s = lab.step(lab.DT); const dRest = s.camDist, yRest = s.camY; let yLaunch = -99;
+    for (let i = 0; i < 60 * 0.8; i++) { s = lab.step(lab.DT, 1, 0, false, 0); yLaunch = Math.max(yLaunch, s.camY); }
+    lab.begin([], 0, 0, 0, 26.8224); for (let i = 0; i < 60 * 1.5; i++) s = lab.step(lab.DT, 1, 0, false, 0); const fov60 = s.fov, dCruise = s.camDist, yCruise = s.camY;
+    let yBrake = 99, dMin = 99, dMax = 0, jerk = 0, prev = null; for (let i = 0; i < 60 * 1.2; i++) { s = lab.step(lab.DT, 0, 1, false, 0); yBrake = Math.min(yBrake, s.camY); dMin = Math.min(dMin, s.camDist); dMax = Math.max(dMax, s.camDist); if (prev != null) jerk = Math.max(jerk, Math.abs(s.camDist - prev)); prev = s.camDist; }
+    return { lag, fov0, fov60, dRest, dCruise, brakeShift: dCruise - dMin, camStepMax: jerk, brakeDip: yCruise - yBrake, launchLift: yLaunch - yRest }; });
   // ---- handbrake: 40 mph, full lock + handbrake 0.8 s, release + straighten, gas ----
   const hand = await run((lab) => { const v0 = 40 * 0.44704; lab.begin([], 0, 0, 0, v0); let s, slip = 0, rec = null, t = 0, h0 = 0;
     for (let i = 0; i < 48; i++) { s = lab.step(lab.DT, 0, 0, true, 1); slip = Math.max(slip, Math.abs(Math.atan2(s.lat, Math.abs(s.fwd) + 1e-3)) * 57.3); }
@@ -99,6 +100,31 @@ try {
   for (const [k, v] of Object.entries(kerb)) console.log(`kerb ${k}: on ${f(v.on)} s · vMin ${f(v.vMin)} · vEnd ${f(v.vEnd)} · max dy ${f(v.dyMaxPerFrame, 3)} m/frame · air ${f(v.airT)} s`);
   console.log(`camera clip: ${camClip.bad}/${camClip.n} frames inside a box · closest ${f(camClip.dMin)} m · touch: ${JSON.stringify(touch)}`);
   console.log('');
+  // ---- the bus: its own targets at bus speeds (slow but controllable, never cornering hard enough to look like it tips) ----
+  if (kind === 'bus') {
+    const B = await run((lab) => { const MPH = 0.44704, out = {}; let s, t = 0;
+      lab.begin([], 0, 0, 0, 0); out.t30 = null; out.top = 0; for (let i = 0; i < 60 * 25; i++) { s = lab.step(lab.DT, 1, 0, false, 0); t += lab.DT; if (out.t30 == null && s.fwd >= 30 * MPH) out.t30 = t; out.top = Math.max(out.top, s.fwd); }
+      lab.begin([], 0, 0, 0, 30 * MPH); const x0 = lab.X, z0 = lab.Z; t = 0; out.stop = null; for (let i = 0; i < 60 * 6; i++) { s = lab.step(lab.DT, 0, 1, false, 0); t += lab.DT; if (out.stop == null && s.fwd <= 0.05) out.stop = { d: Math.hypot(s.x - x0, s.z - z0), t }; }
+      out.steer = {}; for (const mph of [10, 20, 30]) { const v0 = mph * MPH; lab.begin([], 0, 0, 0, v0); let yaw = [], t90 = null, slip = 0, roll = 0, lat = 0; t = 0;
+        for (let i = 0; i < 60 * 3; i++) { const f0 = i ? s.fwd : v0; s = lab.step(lab.DT, f0 < v0 ? 1 : 0, 0, false, 1); t += lab.DT; if (t > 1.5) { yaw.push(Math.abs(s.yawRate)); lat = Math.max(lat, Math.abs(s.yawRate * s.fwd) / 9.81); } slip = Math.max(slip, Math.abs(Math.atan2(s.lat, Math.abs(s.fwd))) * 57.3); roll = Math.max(roll, Math.abs(s.roll) * 57.3); }
+        const ss = yaw.reduce((a, b) => a + b, 0) / yaw.length; lab.begin([], 0, 0, 0, v0); t = 0; for (let i = 0; i < 60 * 3; i++) { s = lab.step(lab.DT, 0.4, 0, false, 1); t += lab.DT; if (t90 == null && Math.abs(s.yawRate) >= 0.9 * ss) t90 = t; }
+        out.steer[mph] = { yawDeg: ss * 57.3, latG: lat, t90, slip, roll }; }
+      return out; });
+    console.log(`bus: 0-30 ${f(B.t30)} s · top ${f(B.top * 2.237, 0)} mph · 30-0 ${f(B.stop?.d, 1)} m in ${f(B.stop?.t)} s`);
+    for (const m of [10, 20, 30]) console.log(`bus steer @${m} mph: ${f(B.steer[m].yawDeg, 1)} deg/s · ${f(B.steer[m].latG)} g · 90% in ${f(B.steer[m].t90)} s · slip ${f(B.steer[m].slip, 1)} deg · roll ${f(B.steer[m].roll, 1)} deg`);
+    check(B.t30 != null && B.t30 >= 6 && B.t30 <= 12, `bus 0-30 mph slow but usable, 6-12 s (${f(B.t30)} s)`);
+    check(B.top >= 30 * 0.44704 && B.top <= 45 * 0.44704, `bus top speed 30-45 mph (${f(B.top * 2.237, 0)} mph)`);
+    check(B.stop && B.stop.d >= 9 && B.stop.d <= 24, `bus 30-0 in 9-24 m (${f(B.stop?.d, 1)} m)`);
+    check(B.steer[10].yawDeg >= 18, `bus turns tight at walking pace for corners (${f(B.steer[10].yawDeg, 0)} deg/s at 10 mph)`);
+    check([10, 20, 30].every((m) => B.steer[m].latG <= 0.62), `bus never corners harder than ~0.6 g, no tipping look (${[10, 20, 30].map((m) => f(B.steer[m].latG)).join('/')} g)`);
+    check([10, 20, 30].every((m) => B.steer[m].roll <= 6), `bus body roll stays small (${[10, 20, 30].map((m) => f(B.steer[m].roll, 1)).join('/')} deg)`);
+    check([10, 20, 30].every((m) => B.steer[m].t90 != null && B.steer[m].t90 <= 1.0), `bus steering heavy but responds within 1 s (${[10, 20, 30].map((m) => f(B.steer[m].t90)).join('/')} s)`);
+    check([10, 20, 30].every((m) => B.steer[m].slip <= 8), `bus grips through a full-lock corner (${[10, 20, 30].map((m) => f(B.steer[m].slip, 1)).join('/')} deg slip)`);
+    check(brake.tRev != null && brake.tRev <= 2.5 && brake.tFwd != null && brake.tFwd <= 2.5, `bus reverses / pulls away within 2.5 s (${f(brake.tRev)} / ${f(brake.tFwd)} s)`);
+    check(!headOn.through && tunnel.every((t) => !t.through), 'bus: no driving through walls');
+    check(camClip.bad === 0, `bus chase cam never inside a building (${camClip.bad}/${camClip.n} frames)`);
+    check(errors.length === 0, `no page errors ${errors.slice(0, 3).join(' | ')}`);
+  } else {
   // ---- targets ----
   check(accel.t60 != null && accel.t60 >= 4 && accel.t60 <= 6.2, `0-60 mph about 5 s (${f(accel.t60)} s)`);
   check(accel.top >= 30 && accel.top <= 45, `top speed 67-100 mph (${f(accel.top * 2.237, 0)} mph)`);
@@ -114,6 +140,7 @@ try {
   check(hand.recover != null && hand.recover <= 1.5, `slide recovers after release (${f(hand.recover)} s)`);
   check(cam.lag >= 2 && cam.lag <= 15, `chase cam trails the turn a little (${f(cam.lag, 1)} deg)`);
   check(cam.brakeShift >= 0.15 && cam.brakeShift <= 1.2, `chase cam weight-transfer on braking (${f(cam.brakeShift)} m)`);
+  check(cam.brakeDip >= 0.08 && cam.brakeDip <= 0.5 && cam.launchLift >= 0.03 && cam.launchLift <= 0.3, `chase cam dips on hard braking, lifts on launch (${f(cam.brakeDip)} m down / ${f(cam.launchLift)} m up)`);
   check(cam.camStepMax <= 0.08, `chase cam distance moves smoothly (${f(cam.camStepMax, 3)} m/frame)`);
   check(cam.fov60 - cam.fov0 >= 3 && cam.fov60 - cam.fov0 <= 10, `FOV kick at 60 mph (+${f(cam.fov60 - cam.fov0, 1)} deg)`);
   check(glance.hit && glance.keep >= 0.6, `15 deg wall glance slides along, keeps speed (${f(glance.keep * 100, 0)} %)`);
@@ -128,6 +155,7 @@ try {
   check(touch.small > 0 && touch.small < 0.12 && touch.full === 1, `touch steering: soft centre, full lock at the edge (${f(touch.small, 3)} at 25 %)`);
   check(touch.cruise > 0.3 && touch.cruiseStill === 0 && touch.gas > 0.8 && touch.brake.thr === 0 && touch.brake.brake > 0.5, 'touch: cruise throttle while steering on the move, none from rest, stick down brakes');
   check(errors.length === 0, `no page errors ${errors.slice(0, 3).join(' | ')}`);
+  }
 } catch (e) { console.error(e); fails.push(String(e)); }
 await browser.close();
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nALL PASS');

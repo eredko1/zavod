@@ -78,6 +78,10 @@
 #hud .xh.ads { opacity: 0; }
 
 /* hit marker */
+#hud .dmgnums { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 3; }
+#hud .dmgnums span { position: absolute; left: 0; top: 0; opacity: 0; font: 700 calc(11px + 6px * var(--hs, 1))/1 var(--fb); color: #f2f2f2; text-shadow: 0 1px 2px rgba(0,0,0,.9); will-change: transform, opacity; white-space: nowrap; }
+#hud .dmgnums span.head { color: #ffd27a; font-size: calc(13px + 7px * var(--hs, 1)); }
+#hud .dmgnums span.kill { color: #ff5a4a; font-size: calc(14px + 7px * var(--hs, 1)); }
 #hud .hm { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; --c: #fff; --g: 5px; --l: 9px; }
 #hud .hm i { position: absolute; left: 0; top: 0; width: 2px; height: var(--l); background: var(--c); margin-left: -1px; transform-origin: 1px 0; box-shadow: 0 0 2px rgba(0,0,0,.9); }
 #hud .hm i:nth-child(1) { transform: rotate(45deg) translateY(calc(-1 * (var(--g) + var(--l)))); }

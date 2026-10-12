@@ -66,6 +66,7 @@ export function createCtx() {
       // audio mix (persisted per device, see saveAudio): effects = weapons/enemies/UI, footsteps = the foley bus (quieter by
       // default so the radio carries), ambience; radio = coney's Luna Park Radio: 'off' | 'car' | 'always'
       ...loadAudio(),
+      ...loadPlay(),   // aim assist ('off' | 'low' = phones only | 'high' = every input), floating damage numbers
     },
     input: null,     // main
     world: null,     // world.js
@@ -94,6 +95,15 @@ function loadAudio() {
 }
 export function saveAudio(S) {
   try { localStorage.setItem('zavod.audio', JSON.stringify({ master: S.masterVolume, sfx: S.sfxVolume, foot: S.footVolume, amb: S.ambVolume, radio: S.radio, radioVol: S.radioVolume })); } catch {}
+}
+
+export const AIM_ASSIST = ['off', 'low', 'high'];
+function loadPlay() {
+  let A = {}; try { A = JSON.parse(localStorage.getItem('zavod.play') || '{}') || {}; } catch {}
+  return { aimAssist: AIM_ASSIST.includes(A.aim) ? A.aim : 'low', dmgNumbers: A.dmg !== false };
+}
+export function savePlay(S) {
+  try { localStorage.setItem('zavod.play', JSON.stringify({ aim: S.aimAssist, dmg: S.dmgNumbers })); } catch {}
 }
 
 /** integrated / software GPUs that choke on the full desktop path */

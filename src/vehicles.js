@@ -18,7 +18,8 @@ import { buildBus, BUS } from './vehicles/bus.js';
 const DEG = Math.PI / 180;
 const LOOK_PITCH = 35 * DEG, LEAN_MAX = 12 * DEG;
 const VR_LEAN_MAX = 5 * DEG;   // VR: the bike you sit on (and the bars in your hands) leans at most this far; the view never rolls
-const CAM_PROBE = 0.4, TOUCH_CRUISE = 0.45;   // chase cam side-ray half spacing (m); car throttle while steering on the stick
+const CAM_PROBE = 0.4, TOUCH_CRUISE = 0.45;
+const CHASE_DIP_ACC = 10, CHASE_DIP_H = 0.15, CHASE_DIP_LOOK = 0.4;   // chase cam: nose-down dip on hard braking, a lift on launch (m per 10 m/s^2 of aLong, capped)   // chase cam side-ray half spacing (m); car throttle while steering on the stick
 const FOV_KICK = 9, BOUNCE = 0.28, HIT_LOSS = 0.55, GRAV = 17, MAX_STEP = 1 / 120;
 // ---- per-vehicle handling + rider geometry ----
 // accel: launch acceleration (v = max·tanh(a·t/max)); brake/hard: service brake / handbrake decel; grip: lateral slip decay /s
@@ -210,7 +211,7 @@ function mount(bike) {
   setRaycastable(bike, false);   // your own vehicle never eats your bullets (chase cam rays pass through it)
   bike.headlight.visible = true; bike.headlight.intensity = 260; bike.lens.material.emissiveIntensity = bike.spec.car ? 1.2 : 3.5;
   S.lookYaw = clamp(wrap(p.yaw - bike.heading), -bike.spec.lookYaw, bike.spec.lookYaw); S.lookPitch = clamp(p.pitch, -LOOK_PITCH, LOOK_PITCH);
-  S.idleT = 0; S.roll = 0; S.mountT = 0; S.vib = 0; S.chaseYaw = bike.heading; S.chaseY = bike.pos.y; S.chaseD = bike.spec.chaseD;
+  S.idleT = 0; S.roll = 0; S.mountT = 0; S.vib = 0; S.chaseDip = 0; S.chaseYaw = bike.heading; S.chaseY = bike.pos.y; S.chaseD = bike.spec.chaseD;
   S.fovBase = C.settings.fov; S.fovWritten = -1;
   if (S.chase) setChase(true);
   const w = C.weapons; S.prevSlot = null;
@@ -594,11 +595,13 @@ function applyChase(v, dt) {
   S.chaseD = want < S.chaseD ? want : damp(S.chaseD, want, 3, k);   // snap in, ease out
   const d = S.chaseD;
   _v.set(tx - fx * Math.cos(elev) * d, ty + Math.sin(elev) * d, tz - fz * Math.cos(elev) * d);
+  // weight transfer: the camera dips with the nose under hard braking and rises a touch as the car squats on launch
+  S.chaseDip = damp(S.chaseDip || 0, sp.car ? clamp(v.aLong / CHASE_DIP_ACC, -1, 0.6) : 0, 5, k); _v.y += S.chaseDip * CHASE_DIP_H;
   { let gy = groundY(_v.x, _v.z); if (v.spec.water && C.world?.ocean) gy = Math.max(gy, C.world.ocean.waveHeight(_v.x, _v.z)); if (_v.y < gy + 0.4) _v.y = gy + 0.4; }
   const shake = v.hitT * 0.15;
   if (shake) { _v.x += (Math.random() - 0.5) * shake; _v.y += (Math.random() - 0.5) * shake; }
   // aim a little above and ahead of the vehicle so the crosshair sits over the roof, not on it
-  const lx = tx + fx * 4 - _v.x, ly = ty + 0.1 - _v.y, lz = tz + fz * 4 - _v.z;
+  const lx = tx + fx * 4 - _v.x, ly = ty + 0.1 + S.chaseDip * CHASE_DIP_LOOK - _v.y, lz = tz + fz * 4 - _v.z;
   const cyaw = Math.atan2(-lx, -lz), cpitch = Math.atan2(ly, Math.hypot(lx, lz));
   p.yaw = cyaw; p.pitch = cpitch; S.wroteYaw = cyaw; S.wrotePitch = cpitch;
   S.roll = damp(S.roll, 0, 8, k);
@@ -715,14 +718,15 @@ export async function init(ctx) {
       begin(boxes = [], x, z, heading = 0, speed = 0, ground = []) { const v = S.mounted; if (!v) return false;
         S.lab = { grid: S.grid, chase: S.chase, fov: C.settings.fov, fovBase: S.fovBase, fovWritten: S.fovWritten, pos: v.pos.clone(), heading: v.heading, gh: C.world.groundHeight, clamp: C.world.playClamp, surfaceAt: C.world.surfaceAt };
         const g = new BoxGrid(4); g.build(boxes.map((b) => new THREE.Box3(new THREE.Vector3(b[0], b[1], b[2]), new THREE.Vector3(b[3], b[4], b[5])))); S.grid = g;
-        C.world.groundHeight = (gx, gz) => { let h = 0; for (const r of ground) if (gx >= r[0] && gx <= r[2] && gz >= r[1] && gz <= r[3]) h = Math.max(h, r[4]); return h; };   // ground: [x0, z0, x1, z1, height] kerb / pavement slabs C.world.playClamp = null; C.world.surfaceAt = () => 'concrete';
+        C.world.groundHeight = (gx, gz) => { let h = 0; for (const r of ground) if (gx >= r[0] && gx <= r[2] && gz >= r[1] && gz <= r[3]) h = Math.max(h, r[4]); return h; };   // ground: [x0, z0, x1, z1, height] kerb / pavement slabs
+        C.world.playClamp = null; C.world.surfaceAt = () => 'concrete';   // was swallowed by the comment above: the lab ran on whatever surface the spawn had
         v.pos.set(x, 0, z); v.heading = heading; fwdOf(heading, _f); v.vel.copy(_f).multiplyScalar(speed); v.fwdSpeed = v.speed = speed;
         Object.assign(v, { steer: 0, skid: 0, vy: 0, air: false, susp: 0, suspV: 0, throttle: 0, groundVy: 0, aLong: 0, yawRate: 0, boost: 0, hitT: 0, surf: SURF.hard, surfT: 0 });
         setChase(true); S.chaseYaw = heading; S.chaseY = 0; S.lookYaw = S.lookPitch = 0; S.idleT = 99; S.fovBase = S.lab.fov; S.fovWritten = -1; return true; },
       step(dt, thr = 0, brk = 0, hard = false, steer = 0) { const v = S.mounted; if (!v || !S.lab) return null;
         simulate(v, dt, thr, brk, hard, steer); speedFov(v); applyView(dt);
         fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x); const cam = C.camera.position;
-        return { x: v.pos.x, y: v.pos.y, z: v.pos.z, heading: v.heading, fwd: v.fwdSpeed, lat: v.vel.x * _r.x + v.vel.z * _r.z, speed: v.speed, yawRate: v.yawRate, steer: v.steer, skid: v.skid, air: v.air,
+        return { x: v.pos.x, y: v.pos.y, z: v.pos.z, heading: v.heading, fwd: v.fwdSpeed, lat: v.vel.x * _r.x + v.vel.z * _r.z, speed: v.speed, yawRate: v.yawRate, steer: v.steer, skid: v.skid, air: v.air, roll: v.lean + v.tRoll,
           camYaw: Math.atan2(v.pos.x - cam.x, v.pos.z - cam.z) + Math.PI, camDist: Math.hypot(cam.x - v.pos.x, cam.z - v.pos.z), camY: cam.y - v.pos.y, camX: cam.x, camZ: cam.z, fov: C.settings.fov }; },
       end() { const v = S.mounted, L = S.lab; if (!L) return; S.grid = L.grid; C.world.groundHeight = L.gh; C.world.playClamp = L.clamp; C.world.surfaceAt = L.surfaceAt;
         if (v) { v.pos.copy(L.pos); v.heading = L.heading; v.vel.set(0, 0, 0); v.speed = v.fwdSpeed = 0; }

@@ -418,8 +418,8 @@ function fireShot(w, opts = {}) {
     if (n.dot(d) > 0) n.negate();
     const ud = hit.object.userData || {};
     if (typeof ud.onHit === 'function') {   // map NPCs (coney chill mode thugs): they resolve their own damage
-      const head = ud.part === 'head', th = ud.thug, alive = !!th && th.st !== 'dead'; try { ud.onHit(sp.damage * (head ? sp.headMul : 1) * falloff(dist), head, hit.point.clone(), d.clone()); } catch (e) { console.warn('[weapons] onHit', e); }
-      S.fx.impact(hit.point, n, 'flesh', d); ctx.bus.emit('hit', { damage: sp.damage, headshot: head, point: hit.point.clone(), npc: true, kill: alive && th.st === 'dead' });   // kill: this round dropped him (kill marker + sound)
+      const head = ud.part === 'head', th = ud.thug, alive = !!th && th.st !== 'dead', dealt = sp.damage * (head ? sp.headMul : 1) * falloff(dist); try { ud.onHit(dealt, head, hit.point.clone(), d.clone()); } catch (e) { console.warn('[weapons] onHit', e); }
+      S.fx.impact(hit.point, n, 'flesh', d); ctx.bus.emit('hit', { damage: dealt, headshot: head, point: hit.point.clone(), npc: true, kill: alive && th.st === 'dead' });   // kill: this round dropped him (kill marker + sound)
     } else if (ud.remote) {   // another online player (net.js hitbox): accumulate like a soldier, resolved by the victim's client
       const head = ud.part === 'head';
       let acc = remoteHits.get(ud.remote); if (!acc) { acc = { dmg: 0, head: 0, n: 0, point: hit.point.clone() }; remoteHits.set(ud.remote, acc); }
@@ -497,8 +497,9 @@ function assistTargets(ctx) {
   for (const h of ctx.raycastTargets || []) { const t = h.userData?.thug; if (t && !seen.has(t)) { seen.add(t); out.push({ t }); } }
   return out;
 }
-function aimAssist(dt, ctx, p, cam, input) {
-  const eye = cam.getWorldPosition(_v3); cam.getWorldDirection(_fwd); const cone = lerp(ASSIST_CONE, ASSIST_CONE_ADS, S.ads);
+const ASSIST_HIGH = { cone: 1.5, friction: 1.6, pull: 1.8 };   // Settings → Aim assist HIGH vs LOW (the phone default)
+function aimAssist(dt, ctx, p, cam, input, hi) {
+  const eye = cam.getWorldPosition(_v3); cam.getWorldDirection(_fwd); const cone = lerp(ASSIST_CONE, ASSIST_CONE_ADS, S.ads) * (hi ? ASSIST_HIGH.cone : 1);
   let best = null, bestA = cone;
   for (const c of assistTargets(ctx)) {
     if (c.s) { if (c.s.dead) continue; c.s.chest(_aimPt); }
@@ -513,9 +514,9 @@ function aimAssist(dt, ctx, p, cam, input) {
   if (!S.assistLos) return;
   // slowdown: the finger drags slower across a target
   const mdx = input?.mouse?.dx ?? 0, mdy = input?.mouse?.dy ?? 0;
-  if (mdx || mdy) { const base = (ctx.settings.sensitivity ?? 0.0022) * Math.tan(cam.fov * DEG / 2) / Math.tan((ctx.settings.fov || 75) * DEG / 2) * ASSIST_FRICTION; const dy = mdx * base, dp = clamp(p.pitch + mdy * base, -89 * DEG, 89 * DEG) - p.pitch; p.yaw += dy; p.pitch += dp; cam.rotation.y += dy; cam.rotation.x += dp; }
+  if (mdx || mdy) { const base = (ctx.settings.sensitivity ?? 0.0022) * Math.tan(cam.fov * DEG / 2) / Math.tan((ctx.settings.fov || 75) * DEG / 2) * ASSIST_FRICTION * (hi ? ASSIST_HIGH.friction : 1); const dy = mdx * base, dp = clamp(p.pitch + mdy * base, -89 * DEG, 89 * DEG) - p.pitch; p.yaw += dy; p.pitch += dp; cam.rotation.y += dy; cam.rotation.x += dp; }
   // magnetism: only while aiming or firing, a capped fraction of the error per frame
-  const pull = S.adsTarget ? ASSIST_PULL : (input?.fire ? ASSIST_PULL_HIP : 0); if (!pull) return;
+  const pull = (S.adsTarget ? ASSIST_PULL : (input?.fire ? ASSIST_PULL_HIP : 0)) * (hi ? ASSIST_HIGH.pull : 1); if (!pull) return;
   const dx = S.assistPt.x - eye.x, dz = S.assistPt.z - eye.z; let ey = Math.atan2(-dx, -dz) - p.yaw; ey = Math.atan2(Math.sin(ey), Math.cos(ey));
   const ep = Math.atan2(S.assistPt.y - eye.y, Math.hypot(dx, dz)) - p.pitch;
   const k = 1 - Math.exp(-dt * pull), cap = ASSIST_MAX_RATE * dt;
@@ -604,7 +605,9 @@ export function update(dt, ctx) {
     }
   }
 
-  if (ctx.isTouch && p && !p.mounted && playing && dt > 0 && !S.dead && !sp.melee) aimAssist(dt, ctx, p, cam, input);
+  // aim assist: LOW helps thumbs only (phones), HIGH every stick and mouse too; never in VR (the gun is in your hand)
+  const assist = ctx.settings.aimAssist ?? 'low';
+  if ((assist === 'high' || (assist === 'low' && ctx.isTouch)) && !ctx.xrAim && p && !p.mounted && playing && dt > 0 && !S.dead && !sp.melee) aimAssist(dt, ctx, p, cam, input, assist === 'high');
 
   // ---------- sprint / lowered blends ----------
   const wantSprint = !!(p?.sprinting) && !S.triggerHeld && !S.reload && !S.throwing && S.adsTarget === 0;
