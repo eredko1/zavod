@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import { OSM } from './osm.js';
 import { YARD } from './yard.js';
+import { inCreek } from './realism.js';
 
 const D2R = Math.PI / 180;
 const LAT0 = 40.5745, LON0 = -73.98, KX = 111320 * Math.cos(LAT0 * D2R), KY = 110540, CT = Math.cos(8.33 * D2R), ST_ = Math.sin(8.33 * D2R);
@@ -43,7 +44,7 @@ const CORR = { x0: 880, x1: 2420, z0: -100, z1: 470 };
 const inCorr = (x, z, m = 0) => x > CORR.x0 - m && x < CORR.x1 + m && z > CORR.z0 - m && z < CORR.z1 + m;
 // Coney Island Yard (coney/yard.js lays it out past the OSM plan): ballast and laid-up trains, no houses
 const inYard = (x, z, m = 0) => x > YARD.x0 - m && x < YARD.x1 + m && z > YARD.z0 - m && z < YARD.z1 + m;
-const inExcl = (x, z, m = 0) => (inRect(x, z, m) && !(z < ZCUT(x) - m)) || inCorr(x, z, m) || inYard(x, z, m);
+const inExcl = (x, z, m = 0) => (inRect(x, z, m) && !(z < ZCUT(x) - m)) || inCorr(x, z, m) || inYard(x, z, m) || inCreek(x, z, m);   // + Coney Island Creek and its field (coney/realism.js)
 // OSM streets inside the rect (the scene draws them): sprawl boxes keep off them
 const ROADS = []; for (const r of OSM.r) for (let i = 0; i + 1 < r.p.length; i++) { const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1]; ROADS.push({ ax, az, bx, bz, w: r.w / 2 + 3, x0: Math.min(ax, bx) - r.w, x1: Math.max(ax, bx) + r.w, z0: Math.min(az, bz) - r.w, z1: Math.max(az, bz) + r.w }); }
 function onRoad(x0, z0, x1, z1) {
@@ -141,21 +142,6 @@ function facadeTex(R) {
   g.fillStyle = '#8c8680'; g.fillRect(0, 0, S, 0.25 * m);
   return dataTex(c, (x, y) => mask[y * S + x]);
 }
-/** flat roofs, 24 x 24 m: 6 m house lots split by low parapets, tar or silver coating, vents, hatches, skylights, AC boxes */
-function roofTex(R) {
-  const S = 256, [c, g] = cnv(S, S), m = S / 24;
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
-    const x = i * 6 * m, y = j * 12 * m, v = R(); g.fillStyle = v < 0.45 ? '#9d9fa1' : v < 0.8 ? '#5a5856' : '#7e7a73'; g.fillRect(x, y, 6 * m, 12 * m);
-    for (let k = 0; k < 120; k++) { const q = R() * 40 - 20; g.fillStyle = `rgba(${128 + q},${128 + q},${128 + q},0.15)`; g.fillRect(x + R() * 6 * m, y + R() * 12 * m, 2 + R() * 8, 1 + R() * 4); }
-    g.fillStyle = 'rgba(40,40,40,0.5)'; g.fillRect(x + (1 + R() * 3.5) * m, y + (2 + R() * 7) * m, 0.8 * m, 0.8 * m);                 // hatch
-    if (R() < 0.5) { g.fillStyle = '#c9d4da'; g.fillRect(x + (1 + R() * 3) * m, y + (3 + R() * 6) * m, 1.1 * m, 0.7 * m); }       // skylight
-    if (R() < 0.6) { g.fillStyle = '#d8d6d0'; g.fillRect(x + (0.5 + R() * 4) * m, y + (1 + R() * 9) * m, 1.0 * m, 0.7 * m); g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x + (0.5 + R() * 4) * m, y + (1.7 + R() * 9) * m, 1.0 * m, 0.2 * m); }
-    g.fillStyle = 'rgba(30,30,30,0.6)'; for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(x + R() * 6 * m, y + R() * 12 * m, 0.18 * m, 0, 7); g.fill(); }  // vent stacks
-  }
-  g.fillStyle = '#b8b0a4'; for (let i = 0; i <= 4; i++) g.fillRect(i * 6 * m - 0.15 * m, 0, 0.3 * m, S);                              // parapets between houses
-  g.fillStyle = '#a8a092'; g.fillRect(0, 12 * m - 0.15 * m, S, 0.3 * m);
-  return dataTex(c, null);
-}
 function treeTex(R) {
   const S = 128, [c, g] = cnv(S, S); g.clearRect(0, 0, S, S);
   g.fillStyle = '#4a3a2a'; g.fillRect(S / 2 - 3, S * 0.55, 6, S * 0.45);
@@ -170,11 +156,11 @@ export function buildHorizon(world) {
   const t0 = performance.now();
   ctx.camera.far = CAM_FAR; ctx.camera.updateProjectionMatrix();
   const stats = { dc: 0, tris: 0 }; const count = (m) => { stats.dc++; const g = m.geometry; stats.tris += (g.index ? g.index.count : g.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); };
-  const texF = facadeTex(R), texR = roofTex(R);
+  const texF = facadeTex(R);
 
   const ocean = buildOcean(world); count(ocean);
   const land = buildLand(world, R); land.forEach(count);
-  const sprawl = buildSprawl(world, R, texF, texR); sprawl.meshes.forEach(count);
+  const sprawl = buildSprawl(world, R, texF); sprawl.meshes.forEach(count);
   const sky = buildSkyline(world, R); sky.meshes.forEach(count);
   // lights sample the rides' struts and the scene's lamp meshes: those are built after us (landmarks, park), so defer to frame 1
   // (or at the pre-warm, whichever comes first: on phones / the headset the pre-warm frees those meshes' vertex arrays before frame 1)
@@ -306,17 +292,23 @@ function buildLand(world) {
 
 // ---- sprawl: row-house strips / walk-ups / towers on the 250 x 80 m frame grid, near ring (depth) + far (painter's) ------------
 const boxVert = /* glsl */`
-  attribute vec3 aTint; attribute float aSeed; varying vec3 vW, vN, vTint; varying float vSeed, vD, vBase;
+  attribute vec3 aTint; attribute float aSeed; varying vec3 vW, vN, vTint; varying float vSeed, vD, vBase; varying vec2 vEdge;
   void main() {
+    vEdge = (0.5 - abs(position.xz)) * vec2(length(instanceMatrix[0].xyz), length(instanceMatrix[2].xyz));   // metres in from the roof edge
     vec4 w = modelMatrix * instanceMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(instanceMatrix) * normal); vTint = aTint; vSeed = aSeed;
     vBase = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).y; vD = distance(w.xyz, cameraPosition); gl_Position = farProj(w);
   }`;
 const boxFrag = /* glsl */`
-  uniform sampler2D tFac, tRoof; varying vec3 vW, vN, vTint; varying float vSeed, vD, vBase;
+  uniform sampler2D tFac; varying vec3 vW, vN, vTint; varying float vSeed, vD, vBase; varying vec2 vEdge;
   void main() {
     vec3 n = normalize(vN); vec3 alb; vec3 emi = vec3(0.0);
-    if (n.y > 0.5) alb = texture2D(tRoof, vW.xz / 24.0 + vSeed * 3.1).rgb * mix(vec3(1.0), vTint, 0.2);
-    else {
+    if (vSeed < -0.5) alb = vSeed < -1.5 ? vTint * 0.85 : vec3(0.6, 0.61, 0.6) * (n.y > 0.5 ? 1.1 : 0.9);   // roof kit: stair bulkhead (brick) / HVAC (galvanised)
+    else if (n.y > 0.5) {   // flat roof: tar, silver coating or gravel ballast per building; coping on the parapet, its shadow line inside
+      float k = fract(vSeed * 13.7), e = min(vEdge.x, vEdge.y);
+      alb = k < 0.45 ? vec3(0.27, 0.27, 0.28) : k < 0.8 ? vec3(0.55, 0.56, 0.56) : vec3(0.43, 0.41, 0.38);
+      float blot = h12(floor(vW.xz / 2.5) + vSeed * 9.0); blot = mix(blot, 0.5, smoothstep(0.3, 1.0, length(fwidth(vW.xz / 2.5)))); alb *= 0.94 + 0.1 * blot;
+      float fe = fwidth(e); alb = mix(mix(vTint, vec3(0.62, 0.6, 0.56), 0.5) * 0.8, mix(alb * 0.72, alb, smoothstep(0.9 - fe, 0.9 + fe, e)), smoothstep(0.35 - fe, 0.35 + fe, e));
+    } else {
       vec2 uv = vec2((abs(n.x) > 0.5 ? vW.z : vW.x) / 12.0 + vSeed * 7.0, (vW.y - vBase) / 12.0);
       vec4 f = texture2D(tFac, uv); alb = f.rgb * vTint;
       float bottom = smoothstep(0.0, 1.2, vW.y - vBase); alb *= 0.75 + 0.25 * bottom;
@@ -328,7 +320,7 @@ const boxFrag = /* glsl */`
     float hz = hazeF(vD); col = mix(col, uFogCol, hz) + emi * (1.0 - hz * 0.6);
     gl_FragColor = vec4(col, 1.0);${OUT}
   }`;
-function buildSprawl(world, R, texF, texR) {
+function buildSprawl(world, R, texF) {
   const TINTS = [[0.78, 0.42, 0.32], [0.72, 0.5, 0.38], [0.86, 0.78, 0.66], [0.92, 0.9, 0.86], [0.66, 0.36, 0.28], [0.8, 0.68, 0.52], [0.7, 0.72, 0.74], [0.9, 0.84, 0.72]];
   const near = [], far = [], tanks = [], trees = [];
   const bad = (x0, z0, x1, z1) => onRoad(x0, z0, x1, z1) || inExcl(x0, z0, 6) || inExcl(x1, z1, 6) || inExcl(x0, z1, 6) || inExcl(x1, z0, 6) || inExcl((x0 + x1) / 2, (z0 + z1) / 2, 6);
@@ -363,19 +355,26 @@ function buildSprawl(world, R, texF, texR) {
     }
     if (isNear) for (let x = x0 + 6; x < x1; x += 14 + R() * 10) for (const z of [z0 - 3.2, z1 + 3.2]) if (R() < 0.75 && !onRoad(x - 1, z - 1, x + 1, z + 1)) trees.push([x, z, 0.8 + R() * 0.5]);
   }
+  // roof kit on the near ring's flat roofs: HVAC boxes and a stair bulkhead, as more instances of the same box (aSeed < 0 tells
+  // the shader; no extra draw call). Phones get it only close in.
+  const kit = []; { const KIT_R = world.ctx.lite ? 700 : 1300;
+    for (const b of near) { const w = b.x1 - b.x0, d = b.z1 - b.z0; if (w < 8 || d < 8 || b.d > KIT_R) continue;
+      const n = 1 + (R() < 0.5 ? 1 : 0); for (let k = 0; k < n; k++) { const s = 1.6 + R() * 1.2, x = b.x0 + 1.5 + R() * (w - 3 - s), z = b.z0 + 1.5 + R() * (d - 3 - s); kit.push({ x0: x, x1: x + s, z0: z, z1: z + s * 0.7, y0: b.h, h: 0.9 + R() * 0.6, tint: b.tint, seed: -1 }); }
+      if (R() < (b.h > 14 ? 0.6 : 0.25)) { const x = b.x0 + 2 + R() * (w - 6.4), z = b.z0 + 2 + R() * (d - 6.4); kit.push({ x0: x, x1: x + 2.4, z0: z, z1: z + 2.4, y0: b.h, h: 2.5, tint: b.tint, seed: -2 }); } }
+  }
   // near: unsorted, depth-tested. far: sorted far → near for painter's order
   far.sort((a, b) => b.d - a.d);
   const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, 0.5, 0); box.deleteAttribute('uv');
   { const nz = box.attributes.normal; const keep = []; const idx = box.index.array; for (let t = 0; t < idx.length; t += 3) if (nz.getY(idx[t]) > -0.5) keep.push(idx[t], idx[t + 1], idx[t + 2]); box.setIndex(keep); }   // no bottoms
   const meshes = [];
   const inst = (list, isFar, name) => {
-    const m = mat(boxVert, boxFrag, { far: isFar, uniforms: { tFac: { value: texF }, tRoof: { value: texR } } });
+    const m = mat(boxVert, boxFrag, { far: isFar, uniforms: { tFac: { value: texF } } });
     const im = new THREE.InstancedMesh(box, m, list.length); const tint = new Float32Array(list.length * 3), seed = new Float32Array(list.length); const M4 = new THREE.Matrix4();
-    list.forEach((b, k) => { M4.makeScale(b.x1 - b.x0, b.h, b.z1 - b.z0).setPosition((b.x0 + b.x1) / 2, 0, (b.z0 + b.z1) / 2); im.setMatrixAt(k, M4); tint.set(b.tint, k * 3); seed[k] = b.seed; });
+    list.forEach((b, k) => { M4.makeScale(b.x1 - b.x0, b.h, b.z1 - b.z0).setPosition((b.x0 + b.x1) / 2, b.y0 || 0, (b.z0 + b.z1) / 2); im.setMatrixAt(k, M4); tint.set(b.tint, k * 3); seed[k] = b.seed; });
     const g = box.clone(); g.setAttribute('aTint', new THREE.InstancedBufferAttribute(tint, 3)); g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1)); im.geometry = g;
     im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); meshes.push(addMesh(world, null, m, { far: isFar, order: isFar ? -985 : 0, name, instanced: im }));
   };
-  inst(near, false, 'sprawlNear'); inst(far, true, 'sprawlFar');
+  inst(near.concat(kit), false, 'sprawlNear'); inst(far, true, 'sprawlFar');
   // water tanks on the walk-ups and towers (near ring): wooden barrel + conical cap on a steel stand
   if (tanks.length) {
     const parts = [new THREE.CylinderGeometry(1.5, 1.5, 3.2, 10, 1, true).translate(0, 3.6, 0), new THREE.ConeGeometry(1.7, 1.2, 10).translate(0, 5.8, 0), new THREE.BoxGeometry(2.4, 2.0, 2.4).translate(0, 1.0, 0)];

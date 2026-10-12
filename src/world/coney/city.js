@@ -11,6 +11,7 @@ import { ribbon, walk, footprint, footprintAngle, decompose, segDist, segDist1, 
 import { placeCars, parkedCarBoxes } from '../carkit.js';
 import { BUS_STOPS } from './traffic.js';
 import { SURF_HH, stationClear } from './stillwell.js';
+import { w8Lots, inW8Site } from './realism.js';
 import { isSchool, buildSchool } from './school.js';   // no parking at the bus stops
 
 
@@ -67,7 +68,11 @@ export function buildCity(world, M) {
   // ---- parked cars along the residential streets and in the lots ------------------------------------------------------
   const cars = [];
   for (const r of OSM.r) { if (r.w < 9 || r.w > 16) continue; walk(r.p, 6.5, (x, z, dx, dz) => { if (R() < 0.6) return; if (BUS_STOPS.some((b) => Math.hypot(b[1] - x, b[2] - z) < 18)) return; if (!(x > PLAY.x0 && x < PLAY.x1 && z > PLAY.z0 && z < BW.z0 - 5)) return; for (const s of [-1, 1]) { if (R() < 0.4) continue; const off = r.w / 2 - 1.3, c = { x: x - dz * s * off, z: z + dx * s * off, ry: Math.atan2(dx, dz) - Math.PI / 2 + (s > 0 ? 0 : Math.PI), kind: ['sedan', world.ctx.lite ? 'sedan' : 'e34', 'suv', 'hatch', 'van', 'cab', 'coupe', 'muscle'][(R() * 8) | 0] }; if (!cars.some((o) => carsOverlap(o, c))) cars.push(c); } }); }   // two streets meeting (or one OSM way drawn twice) put kerb cars 2.4 m apart
-  for (const p of OSM.l) { const q = bbox(p); if (!(q.x1 > PLAY.x0 && q.x0 < PLAY.x1 && q.z1 > PLAY.z0 && q.z0 < PLAY.z1)) continue; for (let x = q.x0 + 3; x < q.x1 - 3; x += 2.8) for (let z = q.z0 + 4; z < q.z1 - 3; z += 7) if (pip(x, z, p) && R() < 0.25) cars.push({ x, z, ry: Math.PI / 2 * (R() < 0.5 ? 1 : -1), kind: ['sedan', 'suv', 'hatch', 'van', 'muscle', 'coupe'][(R() * 6) | 0] }); }
+  const w8 = new Set(w8Lots());   // the W 8 St lots round the DMV and the firehouse (coney/realism.js): busy, even outside PLAY
+  for (const p of OSM.l) { const q = bbox(p), busy = w8.has(p); if (!busy && !(q.x1 > PLAY.x0 && q.x0 < PLAY.x1 && q.z1 > PLAY.z0 && q.z0 < PLAY.z1)) continue;
+    // a lot polygon can run under a building OSM maps separately (or one housing.js / school.js builds): no car inside its walls
+    const walls = ctx.colliders.filter((b) => b.max.y - b.min.y > 1.4 && b.min.y < 1 && b.max.x > q.x0 && b.min.x < q.x1 && b.max.z > q.z0 && b.min.z < q.z1), inWall = (x, z) => walls.some((b) => x > b.min.x - 1.5 && x < b.max.x + 1.5 && z > b.min.z - 3 && z < b.max.z + 3);   // ry = ±90°: long axis along z
+    for (let x = q.x0 + 3; x < q.x1 - 3; x += 2.8) for (let z = q.z0 + 4; z < q.z1 - 3; z += 7) if (pip(x, z, p) && !(busy && inW8Site(x, z, 3)) && R() < (busy ? 0.4 : 0.25) && !inWall(x, z)) cars.push({ x, z, ry: Math.PI / 2 * (R() < 0.5 ? 1 : -1), kind: ['sedan', 'suv', 'hatch', 'van', 'muscle', 'coupe'][(R() * 6) | 0] }); }
   placeCars(world, cars, { raycast: false });
   for (const c of cars) { parkedCarBoxes(world, c); if (R() < 0.12) world.cover(c.x, c.z + 2, 0, 1); }
 }

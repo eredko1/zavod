@@ -24,6 +24,7 @@ import { buildBelt } from '../coney/belt.js';
 import { buildFerry } from '../coney/ferry.js';
 import { buildSubway } from '../coney/subway.js';
 import { buildGreens } from '../coney/greens.js';
+import { buildRealism } from '../coney/realism.js';
 import { buildRadio } from '../coney/radio.js';
 import { buildUber } from '../coney/uber.js';
 import { buildTraffic } from '../coney/traffic.js';
@@ -67,6 +68,7 @@ export async function build(world) {
   await breathe(); if (!skip.has('ferry')) try { buildFerry(world); } catch (e) { console.warn('[coney] ferry', e); }   // the NYC Ferry from the pier to the Verrazzano and back (coney/ferry.js)
   await breathe(); if (!skip.has('subway')) try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
   Object.defineProperty(W, 'filmGrade', { get: () => (/night|dusk/i.test(W.tod?.get?.() || '') ? null : 'lunafilm'), configurable: true });   // the aerial-photo grade by day (Settings → Film look)
+  await breathe(); if (!skip.has('realism')) try { buildRealism(world, M); } catch (e) { console.warn('[coney] realism', e); }   // W 8 St DMV + firehouse lots, Coney Island Creek, Asser Levy playground, street furniture (coney/realism.js)
   await breathe(); if (!skip.has('greens')) try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
   await breathe(); try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
   if (ctx.mode === 'chill') try { buildUber(world); } catch (e) { console.warn('[coney] uber', e); }   // the phone + Uber app; the car, driver and road graphs only on the first ride (coney/uber.js)
