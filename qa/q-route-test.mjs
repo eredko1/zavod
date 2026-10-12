@@ -43,6 +43,12 @@ await pg.evaluate(async (LINE) => {
         const cx = (x0 + x1) / 2 - px, cz = (z0 + z1) / 2 - pz, ex = (x1 - x0) / 2, ez = (z1 - z0) / 2;
         const sep = (u, h) => Math.abs(cx * u.x + cz * u.y) > h + ex * Math.abs(u.x) + ez * Math.abs(u.y);
         if (sep(ax, Q.HX) || sep(az, Q.HZ)) continue;
+        if (bx.quad) {   // a rotated building's AABB bulges past its walls: the car must also cut the drawn rect inside it
+          const P = bx.quad.map(([x, z]) => [x - px, z - pz]), proj = (u) => P.map(([x, z]) => x * u.x + z * u.y);
+          const out = (u, h) => { const v = proj(u); return Math.min(...v) > h || Math.max(...v) < -h; };
+          const e0 = new THREE.Vector2(P[1][0] - P[0][0], P[1][1] - P[0][1]).normalize(), e1 = new THREE.Vector2(P[2][0] - P[1][0], P[2][1] - P[1][1]).normalize();
+          const rh = (u) => Math.abs(ax.x * u.x + ax.y * u.y) * Q.HX + Math.abs(az.x * u.x + az.y * u.y) * Q.HZ, sepQ = (u) => { const v = proj(u); return Math.min(...v) > rh(u) || Math.max(...v) < -rh(u); };
+          if (out(ax, Q.HX) || out(az, Q.HZ) || sepQ(e0) || sepQ(e1)) continue; }
         hits.push({ kind: 'collider', c, at: [+px.toFixed(1), +py.toFixed(1), +pz.toFixed(1)], box: [mn.x, mn.y, mn.z, mx.x, mx.y, mx.z].map((v) => +v.toFixed(1)) }); }
       // tree crowns: sphere vs the car's box
       for (const [tx, ty, tz, r, name] of Q.trees) { const dx = tx - px, dz = tz - pz; if (dx * dx + dz * dz > (Q.HZ + r + 2) ** 2) continue;

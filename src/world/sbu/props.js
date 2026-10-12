@@ -290,9 +290,9 @@ export function buildProps(world, M) {
   car(-108, 112, Math.PI / 2); car(-108, 118.5, Math.PI / 2);
   for (let z = -880; z < 880; z += 26) { if (R() < 0.6) car(-705 + (R() < 0.5 ? 3.2 : -3.2), z, Math.PI / 2); if (R() < 0.6) car(-683 + (R() < 0.5 ? 3.2 : -3.2), z + 13, -Math.PI / 2); }   // Nicolls Road traffic
   for (let z = -240; z < 250; z += 22) if (R() < 0.5) car(-257 + (R() < 0.5 ? 2.4 : -2.4), z, R() < 0.5 ? Math.PI / 2 : -Math.PI / 2);   // Circle Road
-  { // lofted car kit (shared with City Square / Central Station): 4 body styles, per-instance paint
-    const CM = carMaterials(); const byKind = { sedan: [], hatch: [], suv: [], van: [] }; const ks = Object.keys(byKind);
-    for (const c of cars) { const r = R(); byKind[r < 0.4 ? 'sedan' : r < 0.62 ? 'suv' : r < 0.88 ? 'hatch' : 'van'].push(c); }
+  { // lofted car kit (shared with City Square / Central Station): 5 body styles, per-instance paint
+    const CM = carMaterials(); const byKind = { sedan: [], e34: [], hatch: [], suv: [], van: [] }; const ks = Object.keys(byKind);
+    for (const c of cars) { const r = R(); byKind[r < 0.3 ? 'sedan' : r < 0.4 ? 'e34' : r < 0.62 ? 'suv' : r < 0.88 ? 'hatch' : 'van'].push(c); }
     for (const k of ks) {
       const P = byKind[k]; if (!P.length) continue; const G = carGeometries(k).geos;
       inst(world, G.paint, CM.paint, P, 'metal', { name: 'cars_' + k });

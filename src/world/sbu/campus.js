@@ -74,7 +74,7 @@ export function buildCampus(world, M) {
         const [x, z] = alongX ? [a, row + 2.75] : [row + 2.75, a];
         if (!pip(x, z, p)) continue;
         const st = alongX ? boxGeo([a - 0.05, 0.035, row], [a + 0.05, 0.04, row + 5.5]) : boxGeo([row, 0.035, a - 0.05], [row + 5.5, 0.04, a + 0.05]); S.add('paint', st, { uv: false });
-        if (play && R() < 0.3) cars.push({ x: x + (alongX ? 1.35 : 0), z: z + (alongX ? 0 : 1.35), ry: (alongX ? Math.PI / 2 : 0) + (side ? Math.PI : 0) + (R() - 0.5) * 0.06, kind: ['sedan', 'sedan', 'suv', 'hatch', 'suv', 'van'][(R() * 6) | 0] });
+        if (play && R() < 0.3) cars.push({ x: x + (alongX ? 1.35 : 0), z: z + (alongX ? 0 : 1.35), ry: (alongX ? Math.PI / 2 : 0) + (side ? Math.PI : 0) + (R() - 0.5) * 0.06, kind: ['sedan', 'e34', 'suv', 'hatch', 'suv', 'van'][(R() * 6) | 0] });
       }
     }
   }

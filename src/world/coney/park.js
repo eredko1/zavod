@@ -23,11 +23,12 @@ export function buildPark(world, M) {
     if (Math.hypot(x - LM.wheel.x, z - LM.wheel.z) < 16 || Math.hypot(x - LM.pj.x, z - LM.pj.z) < 12) return false;
     return !taken.some(([tx, tz, tr]) => Math.hypot(tx - x, tz - z) < tr + r);
   };
+  const onWalk = (x, z, r) => OSM.w.some((p) => segDist(x, z, p.p) < p.w / 2 + r);   // a booth never stands on a paved path (pedestrian Stillwell Ave)
   // ---- kiosks / booths: counter box, striped awning, banner sign, lit counter window ---------------------------------------
   let n = 0;
   for (let i = 0; i < 2500 && n < 95; i++) {
     const x = ZONE.x0 + R() * (ZONE.x1 - ZONE.x0), z = ZONE.z0 + R() * (ZONE.z1 - ZONE.z0);
-    const w = 3 + R() * 3.5, d = 2.4 + R() * 1.4; if (!clear(x, z, Math.max(w, d) / 2 + 1.5)) continue;
+    const w = 3 + R() * 3.5, d = 2.4 + R() * 1.4; if (!clear(x, z, Math.max(w, d) / 2 + 1.5) || onWalk(x, z, Math.max(w, d) / 2)) continue;
     taken.push([x, z, Math.max(w, d) / 2 + 1.5]); n++;
     const ry = [0, Math.PI / 2, Math.PI, -Math.PI / 2][(R() * 4) | 0]; const cs = Math.cos(ry), sn = Math.sin(ry);
     const P = (lx, ly, lz) => [x + lx * cs + lz * sn, ly, z - lx * sn + lz * cs];

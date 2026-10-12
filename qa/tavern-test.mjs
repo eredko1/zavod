@@ -45,8 +45,8 @@ if (parts.includes('travel')) {
   ok(N.aboard, 'boarded the N at Stillwell', JSON.stringify(N));
   if (N.aboard) { let arrived = false; for (let i = 0; i < 40 && !arrived; i++) { await pg.waitForTimeout(1000); arrived = (await T(pg)).inZone; } ok(arrived, 'the N express → 8 Av, Sunset Park'); await pg.screenshot({ path: `${out}/tavern-arrive-n.png` }); }
   // ---- the Belt: a car on the loop, right lane through EXIT 7B → 8th Ave in the car ----
-  await pg.evaluate(() => { const B = window.__game.belt; const a = B.at(B.exitB - 60, 3.8); window.__game.teleport(a[0], a[1], a[2], a[3], 0); }); await pg.waitForTimeout(600);
-  await pg.evaluate(() => { const V = window.__ctx.vehicles; const p = window.__ctx.player.position; const B = window.__game.belt; const a = B.at(B.exitB - 30, 3.8); const c = V.spawnCar(a[0], a[2], a[3], 'sedan', 0x2b3f73, a[1]); V.mount(c); }); await pg.waitForTimeout(600);
+  await pg.evaluate(() => { const B = window.__game.belt, s7B = B.exits.find((e) => e.id === '7B').s; const a = B.at(s7B - 60, B.lane(2)); window.__game.teleport(a[0], a[1], a[2], a[3], 0); }); await pg.waitForTimeout(600);
+  await pg.evaluate(() => { const V = window.__ctx.vehicles; const p = window.__ctx.player.position; const B = window.__game.belt, s7B = B.exits.find((e) => e.id === '7B').s; const a = B.at(s7B - 30, B.lane(2)); const c = V.spawnCar(a[0], a[2], a[3], 'sedan', 0x2b3f73, a[1]); V.mount(c); }); await pg.waitForTimeout(600);
   pg.evaluate(() => window.__ctx.vehicles.qaDrive(1, 0, 6)).catch(() => {}); let inCar = null;
   for (let i = 0; i < 16; i++) { await pg.waitForTimeout(700); inCar = await pg.evaluate(() => { const v = window.__ctx.vehicles.mounted; return v ? [+v.pos.x.toFixed(1), +v.pos.y.toFixed(1), +v.pos.z.toFixed(1)] : null; }); if (inCar && Math.abs(inCar[2] + 12000) < 60) break; }
   ok(inCar && Math.abs(inCar[2] + 12000) < 60, 'EXIT 7B off the Belt → 8th Ave, still in the car', JSON.stringify(inCar));

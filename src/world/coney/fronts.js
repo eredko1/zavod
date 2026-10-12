@@ -192,6 +192,8 @@ function carve(ctx, cuts) {
   for (const C of ctx.colliders) {
     if (!hit(C, all)) { out.push(C); continue; }
     let parts = [C]; for (const B of cuts) { const next = []; for (const q of parts) { if (hit(q, B)) sub(q, B, next); else next.push(q); } parts = next; }
+    if (C.quad) for (const q of parts) q.quad = C.quad;   // a rotated building's remnant is still inside the same drawn rect
+    if (ctx.colliders.colliderSrc) for (const q of parts) if (q !== C) q.carvedFrom = C.carvedFrom || C;   // ?colsrc=1: trace a remnant to the box it was cut from
     out.push(...parts);
   }
   ctx.colliders.length = 0; ctx.colliders.push(...out);

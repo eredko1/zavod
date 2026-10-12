@@ -272,7 +272,9 @@ export function carMaterials() {
   if (MATS) return MATS;
   MATS = {
     paint: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.32, metalness: 0.45, clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 0.9 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: 0x0c1216, roughness: 0.04, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4, reflectivity: 0.9 }),
+    // tinted glass: near-black body, a sharp mirror reflection dimmed and cooled by the tint (one specular layer: a clearcoat on top
+    // of a high-ior base doubled the sky and washed the side windows out to white at a glance)
+    glass: new THREE.MeshPhysicalMaterial({ color: 0x04070a, roughness: 0.015, metalness: 0.0, ior: 1.5, specularIntensity: 1, specularColor: 0xb4c2cc, envMapIntensity: 1.2 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.93 }),
     rim: new THREE.MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.35, metalness: 0.9 }),
     trim: new THREE.MeshStandardMaterial({ color: 0x121314, roughness: 0.6, metalness: 0.2 }),
@@ -283,7 +285,7 @@ export function carMaterials() {
     shadow: new THREE.MeshBasicMaterial({ map: shadowTex(), transparent: true, depthWrite: false, opacity: 0.85 }),
   };
   MATS.lampW.emissive.setHex(0x8a9298); MATS.lampR.emissive.setHex(0x6a0808);
-  MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x1c262c, roughness: 0.04, transparent: true, opacity: 0.62, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4 });   // driven cars: see who's inside
+  MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x10171c, roughness: 0.015, transparent: true, opacity: 0.68, depthWrite: false, ior: 1.5, specularIntensity: 1, specularColor: 0xb4c2cc, envMapIntensity: 1.2 });   // driven cars: see who's inside
   if (typeof window !== 'undefined' && window.__zavodLite) { for (const k of ['paint', 'glass', 'glassSee']) { const o = MATS[k]; const n = new THREE.MeshStandardMaterial({ color: o.color, roughness: o.roughness, metalness: o.metalness, transparent: o.transparent, opacity: o.opacity, depthWrite: o.depthWrite }); MATS[k] = n; } }   // phones: no clearcoat
   for (const k in MATS) MATS[k].name = 'car_' + k;
   return MATS;
