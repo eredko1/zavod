@@ -21,6 +21,13 @@ const HELPERS = () => {
   const { P0, P1 } = window.__game.w8stairs;   // the station's axis from the game (a copy here went stale when #151 turned W 8 St)
   const L = Math.hypot(P1[0] - P0[0], P1[1] - P0[1]), u = [(P1[0] - P0[0]) / L, (P1[1] - P0[1]) / L];
   window.w8at = (a, o) => [P0[0] + u[0] * a - u[1] * o, P0[1] + u[1] * a + u[0] * o];
+  // GET OFF has to leave you standing ON a platform: a collider top at your feet under you, the platform's top face found by a
+  // ray straight down (an inside-out box only shows a ray its underside), and still there a second later (not between the tracks)
+  window.floorCheck = async () => { const THREE = await import('three'), ctx = window.__ctx, p = ctx.player.position, y0 = p.y;
+    const box = ctx.colliders.some((c) => c && p.x > c.min.x - 0.05 && p.x < c.max.x + 0.05 && p.z > c.min.z - 0.05 && p.z < c.max.z + 0.05 && Math.abs(c.max.y - y0) < 0.15);
+    const ray = new THREE.Raycaster(p.clone().setY(y0 + 1), new THREE.Vector3(0, -1, 0), 0, 3), hit = ray.intersectObjects(ctx.raycastTargets.filter((o) => o.isMesh && !o.isInstancedMesh), false)[0];
+    const top = !!hit && Math.abs(hit.point.y - y0) < 0.15 && hit.face.normal.clone().transformDirection(hit.object.matrixWorld).y > 0.5;
+    await window.sleep(1000); const y1 = ctx.player.position.y; return { box, top, hitY: hit ? +hit.point.y.toFixed(2) : null, y0: +y0.toFixed(2), y1: +y1.toFixed(2), ok: box && top && Math.abs(y1 - y0) < 0.1 }; };
   window.hudTxt = () => document.querySelector('.zvsub')?.innerText || '';
   // inside the car: face along the car's own axes, push the stick
   window.carFace = (lx, lz) => { const c = window.__ctx.subway.local()[0]; const g = window.__ctx.scene.getObjectsByProperty('name', 'fTrainCar')[c]; const e = g.matrixWorld.elements; const h = Math.atan2(e[8], e[10]);
@@ -68,6 +75,7 @@ const S = (pg) => pg.evaluate(() => window.__game.subway.state());
   // 4) W 8 St: walk out of the doors, down both flights, out to the street
   await pg.evaluate(() => { const U = window.__game.subway; U.skew(U.until('W8') + 3.5); }); await pg.waitForTimeout(400);
   s = await pg.evaluate(() => window.walkOut()); ok(!s.aboard && Math.abs(s.pos[1] - 14.6) < 0.3, 'walked out onto the W 8 St upper platform', JSON.stringify(s.pos));
+  { const f = await pg.evaluate(() => window.floorCheck()); ok(f.ok, 'W 8 St: walked out onto the platform floor (not between the tracks)', JSON.stringify(f)); }
   const w8 = await pg.evaluate(() => { const T = window.__game.w8stairs, top = T.n + T.run + 1.5; return window.path([[120.8, -5.5], [120.8, -9.5], [109.5, -9.5], [107, -9.5], [107, -5.5], [top, -5.5], [top, -9.5], [T.n - 2, -9.5], [T.n - 5, -14]].map(([a, o]) => window.w8at(a, o))); });
   const wl = w8[w8.length - 1]; ok(w8.every((q) => q.ok) && wl.pos[1] < 0.3, 'W 8 St: upper platform → lower level → street, on foot', JSON.stringify(wl.pos));
   ok((await pg.evaluate(() => window.__ctx.player.health)) > 90, 'no fall on the way down');
@@ -79,6 +87,13 @@ const S = (pg) => pg.evaluate(() => window.__game.subway.state());
   await pg.keyboard.press('KeyF'); await pg.waitForTimeout(700); s = await S(pg); ok(!s.aboard && s.pos[1] > 8.4 && s.pos[0] > 440, 'F gets you off at Neptune Av', JSON.stringify(s.pos));
   const nep = await pg.evaluate(async () => { const st = window.__game.subway.nepStairs(); const me = window.__ctx.player.position; const side = st.reduce((m, q) => (Math.hypot(q[0][0] - me.x, q[0][1] - me.z) < Math.hypot(m[0][0] - me.x, m[0][1] - me.z) ? q : m)); return window.path(side); });
   const nl = nep[nep.length - 1]; ok(nep.every((q) => q.ok) && nl.pos[1] < 0.3, 'Neptune Av: platform → stairs → Shell Rd', JSON.stringify(nl.pos));
+  // 6) GET OFF at W 8 St both ways: the F heading back to Stillwell stops on the other track, so its platform is the other side
+  for (const dir of [1, -1]) {
+    await pg.evaluate(async (dir) => { const U = window.__game.subway; const [x, z] = window.w8at(102.9, dir > 0 ? -4.5 : 4.5); window.__game.teleport(x, 14.65, z, 0, 0); U.skew(U.until('W8', dir) + 4); await window.sleep(800); const st = U.state(); if (st.door) window.__game.teleport(st.door[0], st.door[1] + 0.02, st.door[2], 0, 0); await window.sleep(400); }, dir);
+    await pg.keyboard.press('KeyF'); await pg.waitForTimeout(500); s = await S(pg); ok(s.aboard, `F boards at W 8 St (${dir > 0 ? 'to Neptune Av' : 'to Stillwell'})`, JSON.stringify(s));
+    await pg.keyboard.press('KeyF'); await pg.waitForTimeout(500); s = await S(pg);
+    const f = await pg.evaluate(() => window.floorCheck()); ok(!s.aboard && f.ok && Math.abs(f.y1 - 14.6) < 0.1, `GET OFF at W 8 St (${dir > 0 ? 'to Neptune Av' : 'to Stillwell'}) lands on the platform floor`, JSON.stringify({ pos: s.pos, ...f }));
+  }
   await pg.close();
 }
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -95,6 +110,7 @@ const S = (pg) => pg.evaluate(() => window.__game.subway.state());
   const act = await pg.evaluate(() => { const e = document.querySelector('#touch .act'); return { show: e.classList.contains('show'), t: e.textContent }; }); ok(act.show && act.t === 'GET OFF', 'touch: GET OFF button at a stop', JSON.stringify(act));
   await pg.evaluate(() => document.querySelector('#touch .act').dispatchEvent(new Event('touchstart', { cancelable: true }))); await pg.waitForTimeout(600);
   s = await S(pg); ok(!s.aboard && Math.abs(s.pos[1] - 14.6) < 0.3, 'touch: tap gets you off at W 8 St', JSON.stringify(s.pos));
+  { const f = await pg.evaluate(() => window.floorCheck()); ok(f.ok, 'touch: GET OFF at W 8 St lands on the platform floor', JSON.stringify(f)); }
   await pg.screenshot({ path: `${out}/subw-touch.png` });
   await pg.close();
 }

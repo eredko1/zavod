@@ -199,7 +199,7 @@ function carve(ctx, cuts) {
 const DOOR_CLEAR = 2.5;   // m out from the facade kept free of building colliders in front of a walk-in's door
 const SLICE = 0.4;   // a room on a face that isn't square to the grid is carved as AABB strips this wide (≤ 0.4·tan θ over-cut at its edges)
 /** the AABB strips covering the quad pts ([[x, z] x4]) in y0..y1: one box when it's square-on, else slices across its long axis */
-function strips(pts, y0, y1) {
+export function strips(pts, y0, y1) {
   const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]), bx = [Math.min(...xs), Math.max(...xs)], bz = [Math.min(...zs), Math.max(...zs)];
   const e = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]), square = Math.abs(pts[1][0] - pts[0][0]) / e > 0.995 || Math.abs(pts[1][1] - pts[0][1]) / e > 0.995;
   const B = (x0, x1, z0, z1) => new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));

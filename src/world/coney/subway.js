@@ -77,8 +77,8 @@ export function buildSubway(world) {
     return {
       state: w(() => ({ line: L.id, aboard: !!L.aboard, leg: legNow().kind, stop: legNow().stop?.id || null, head: +headS().toFixed(1), cycle: +L.cycle.toFixed(1), L: +L.L.toFixed(1), door: L.boardable ? L.doorPos.toArray().map((v) => +v.toFixed(2)) : null, pos: ctx.player.position.toArray().map((v) => +v.toFixed(2)) })),
       stops: w(() => L.stops.map((q) => ({ id: q.id, s: +q.s.toFixed(1), hidden: !!q.hidden, at: ptAt(q.s - LEN / 2).toArray().map((v) => +v.toFixed(1)) }))),
-      until: w((id) => { const t = now() % L.cycle; const l = L.legs.find((g) => g.kind === 'dwell' && g.stop.id === id); return l ? ((l.t0 - t) % L.cycle + L.cycle) % L.cycle : null; }),
-      debug: w(() => ({ side: L.stops.map((q) => q.sideCache || null), cars: L.cars.map((g) => g.position.toArray().map((v) => +v.toFixed(1))), open: L.lastOpen })),
+      until: w((id, dir) => { const t = now() % L.cycle; const l = L.legs.find((g) => g.kind === 'dwell' && g.stop.id === id && (dir == null || g.dir === dir)); return l ? ((l.t0 - t) % L.cycle + L.cycle) % L.cycle : null; }),
+      debug: w(() => ({ side: { ...L.sideCache }, cars: L.cars.map((g) => g.position.toArray().map((v) => +v.toFixed(1))), open: L.lastOpen })),
       carMatrices: () => L.cars.map((g) => { g.updateMatrixWorld(true); return g.matrixWorld.toArray(); }),   // qa/q-route-test.mjs: each car's world pose
       nepStairs: () => STN.NEP?.stairs, stnStairs: (id) => STN[id] && { stairs: STN[id].stairs, plat: STN[id].plat }, stnAt: (id, a, o) => { const S = STN[id]; if (!S) return null; const p = S.at(a, o, S.plat); return [p.x, p.y, p.z, S.ang]; }, board: w(() => board()), alight: w(() => alight()), skew: (sec) => { SKEW += sec; },
       drive: w((dir) => takeControls(dir ?? 1)), driving: w(() => L.drive && { s: +L.drive.s.toFixed(1), v: +L.drive.v.toFixed(2), lever: +L.drive.lever.toFixed(2), doors: +L.drive.doors.toFixed(2), at: L.drive.at?.id || null, tripped: L.drive.tripped, limit: L.drive.limit, dir: L.drive.dir, yk: L.drive.yk, ysJ: L.drive.ysJ, up: L.drive.yUp, L: +L.L.toFixed(1) }),
@@ -280,8 +280,8 @@ function update(dt) {
   R.curveNow = curve; trackSound(speed, Math.abs(curve)); R.acc = (R.acc || 0) + ((speed - (R.lastV ?? speed)) / Math.max(1e-3, dt) - (R.acc || 0)) * Math.min(1, dt * 3); R.lastV = speed;
   // doors: open 2 s into a dwell, close (chime) 4 s before it ends
   const open = R.drive ? R.drive.doors : l.kind === 'dwell' && !l.stop.hidden ? Math.max(0, Math.min(1, (t - l.t0 - 1.5) / 1.2, (l.t1 - 3 - t) / 1.2)) : 0;
-  const dwellSide = l.kind === 'dwell' && !l.stop.hidden ? sideAt(l.stop) : 0; R.lastOpen = [+open.toFixed(2), dwellSide];
-  const cam = ctx.camera.position, far = ctx.lite ? 320 : 900, lat0 = R.drive ? 0 : lateralAt(t) * R.sideSign;
+  const lat0 = R.drive ? 0 : lateralAt(t) * R.sideSign; R.latNow = R.drive ? driveLatAt(h - 2.5 * CAR) : lat0;   // latNow: this train's own offset (m) off the line's track, mid-train
+  const cam = ctx.camera.position, far = ctx.lite ? 320 : 900;
   if (!R.drive) holdForDriver(dt);
   R.cars.forEach((g, c) => {
     const sm = h - (c + 0.5) * CAR; ptAt(sm + CAR / 2 - 2.6, _a); ptAt(sm - CAR / 2 + 2.6, _b);   // the two trucks sit on the rails; the body hangs between them
@@ -296,8 +296,10 @@ function update(dt) {
     const lead = c === 0 ? moving > 0 || (l.kind === 'dwell' && l.next.s > l.stop.s) : moving < 0 || (l.kind === 'dwell' && l.next.s < l.stop.s);
     if (g.userData.head) { g.userData.head.emissiveIntensity = lead ? 2.4 : 0.1; g.userData.mark.emissive.setHex(lead ? 0xffb030 : 0xff1a10); g.userData.mark.emissiveIntensity = 1.8; }
     g.visible = !!R.aboard || g.position.distanceTo(cam) < far;
-    for (const d of g.userData.doors) d.position.z = d.userData.z + (d.userData.sx === dwellSide || dwellSide === 2 ? d.userData.dir * 0.62 * open : 0);
   });
+  // the platform side, probed from where the cars are THIS frame (a skip onto the other track probed last frame's pose)
+  const dwellSide = l.kind === 'dwell' && !l.stop.hidden ? sideAt(l.stop) : 0; R.lastOpen = [+open.toFixed(2), dwellSide];
+  for (const g of R.cars) for (const d of g.userData.doors) d.position.z = d.userData.z + (d.userData.sx === dwellSide || dwellSide === 2 ? d.userData.dir * 0.62 * open : 0);
   cabin(dt, l, t, open, speed, curve);
   // announcements
   const annKey = l.kind + (l.stop?.id || l.a?.id) + (l.b?.id || l.next?.id || '') + Math.floor(t / R.cycle);
@@ -412,8 +414,8 @@ function thruRoute() {
   let s = 0; P.forEach((p, i) => { if (i) s += Math.hypot(p.x - P[i - 1].x, p.z - P[i - 1].z); p.s = s; });
   const prefix = P[seg.length].s;
   // its stops, then the partner's (a train berthed at the partner's stop: its head is LEN further along, the line runs backwards)
-  const stops = R.stops.map((q) => ({ ...q, s: q.s + prefix, sideCache: undefined }));
-  for (const q of Y.stops) { if (q.id === 'STW') continue; const sd = prefix - (q.s - yExit) + LEN; if (sd > LEN + 4) stops.push({ ...q, s: sd, sideCache: undefined }); }
+  const stops = R.stops.map((q) => ({ ...q, s: q.s + prefix }));
+  for (const q of Y.stops) { if (q.id === 'STW') continue; const sd = prefix - (q.s - yExit) + LEN; if (sd > LEN + 4) stops.push({ ...q, s: sd }); }
   R.thru = { P, L: s, stops, prefix, via: Y.id };
   console.log(`[subway] ${R.id} through route via the ${Y.id}:`, Math.round(s), 'm ·', stops.map((q) => `${q.id}@${Math.round(q.s)}`).join(' '));
   return R.thru;
@@ -436,7 +438,7 @@ function setThroat(k) {
     const P = info.up ? [...B.P.slice(0, info.iJ + 1), ...Y.slice(1)].map((p) => p.clone()) : [...Y.slice(1).reverse(), ...B.P.slice(info.iJ)].map((p) => p.clone());
     let s = 0; P.forEach((p, i) => { if (i) s += Math.hypot(p.x - P[i - 1].x, p.z - P[i - 1].z); p.s = s; });
     const sJ = info.up ? info.sJ : P[Y.length - 1].s; shift = sJ - info.sJ;
-    const stops = B.stops.filter((q) => !q.hidden && (info.up ? q.s < info.sJ - 1 : q.s - LEN > info.sJ + 1)).map((q) => ({ ...q, s: q.s + shift, sideCache: undefined }));
+    const stops = B.stops.filter((q) => !q.hidden && (info.up ? q.s < info.sJ - 1 : q.s - LEN > info.sJ + 1)).map((q) => ({ ...q, s: q.s + shift }));
     stops.push({ id: 'YRD', name: `Coney Island Yard track ${k + 1}`, speak: 'Coney Island Yard', s: info.up ? s - 6 : LEN + 6, hidden: true, yard: true });
     R.P = P; R.L = s; R.stops = stops; D.ysJ = sJ; }
   D.s = s0 + shift; D.shift = shift; D.yk = k; D.yUp = info.up; R.stopsSorted = null; R.lastH = null;
@@ -651,16 +653,19 @@ function stationLife() {
     if (d.boarding && d.leave > 12 && G.paKey2 !== k2 && !G.said?.[k2]) { G.paKey2 = k2; (G.said ||= {})[k2] = 1; const txt = `This is ${NAMES[st.id][1]}. This is a ${bound} train.`; K.toast(txt, 4200); pa(ctx, txt); }
   }
 }
-/** which side the platform is on at a stop (+1 = the car's right / −1 left, 2 = both) — measured, not assumed */
+/** which side the platform is on at a stop (+1 = the car's right / −1 left, 2 = both) for THIS train on the track it is on now:
+ *  measured, not assumed, and cached per train per stop per track (one answer per stop flipped trains on the other track) */
 function sideAt(stop) {
-  // the two-track stations out on the line: a side platform beside each track. A car's local +x is the right of the way out, the
-  // line's own platform is on the side away from the other track (+sideSign), the other track's on the far side (−sideSign)
-  if (stop.both) { const t = now() % R.cycle; return R.drive ? R.sideSign || 1 : lateralAt(t) > 2 ? -(R.sideSign || 1) : R.sideSign || 1; }
-  if (stop.sideCache) return stop.sideCache;
+  const trk = Math.abs(R.latNow || 0) > TRACK_GAP / 2 ? Math.sign(R.latNow) : 0;
+  // the two-track stations out on the line: a side platform beside each track. A car's local +x is the right of the way out and a
+  // positive lateral offset moves the car to its local −x: on its own track the platform is away from the other track (+sideSign),
+  // on the other track it is further over, beyond that track (−trk)
+  if (stop.both) return trk ? -trk : R.sideSign || 1;
+  const key = `${stop.id}@${Math.round(stop.s)}|${trk}`, C = (R.sideCache ||= {}); if (C[key]) return C[key];
   const g = R.cars[2]; g.updateMatrixWorld(true);
   const probe = (sx) => { _a.set(sx * 2.4, FLOOR + 0.5, 0).applyMatrix4(g.matrixWorld); const ray = new THREE.Raycaster(new THREE.Vector3(_a.x, _a.y + 1, _a.z), new THREE.Vector3(0, -1, 0), 0, 3); const fy = _a.y - 0.5; return ray.intersectObjects(R.ctx.raycastTargets.filter((o) => o.isMesh && !o.isInstancedMesh), false).filter((h) => Math.abs(h.point.y - fy) < 0.35).length; };   // only a floor at door-sill height counts (a passing Stillwell shuttle flipped the side)
   const r = probe(1), l = probe(-1); if (!r && !l) return 1;   // nothing measured (yet): don't cache a guess
-  const side = r >= l ? 1 : -1; stop.sideCache = side; return side;
+  const side = r >= l ? 1 : -1; C[key] = side; return side;
 }
 function board(lx, lz, c) {
   const b = R.boardable; if (!b || R.aboard) return;
