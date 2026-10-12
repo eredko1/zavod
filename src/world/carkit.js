@@ -14,8 +14,9 @@ const KINDS = {
   cab:   { len: 4.9, w: 1.84, clr: 0.2, belt: 0.95, roof: 1.5, hood: 0.88, ws: [0.86, 0.22], rs: [-0.92, -1.38], wheels: [1.47, -1.45], b: [0.0], trunk: 1.0, sign: true },   // Crown Vic-style formal roof, long trunk
   hatch: { len: 4.2, w: 1.76, clr: 0.19, belt: 0.95, roof: 1.46, hood: 0.84, ws: [0.9, 0.18], rs: [-1.25, -1.85], wheels: [1.3, -1.28], b: [0.1], trunk: 1.0 },
   suv:   { len: 4.8, w: 1.92, clr: 0.28, belt: 1.13, roof: 1.78, hood: 1.06, ws: [1.1, 0.42], rs: [-2.02, -2.2], wheels: [1.47, -1.44], b: [0.2, -0.95], trunk: 1.14, square: true, rack: true, clad: true },   // two-box, upright tail, roof rack, black arch cladding
-  // BMW E34-style saloon: long hood, low belt, tall thin-pillared glasshouse, upright flat trunk, kidney grille, quad round lamps
-  e34:   { len: 4.72, w: 1.75, clr: 0.17, belt: 0.86, roof: 1.41, hood: 0.8, ws: [0.72, 0.16], rs: [-0.86, -1.36], wheels: [1.42, -1.34], b: [-0.17], trunk: 0.9, square: true, kidney: true },
+  // BMW E34 (4.72 x 1.75 m, 2.76 m wheelbase): long hood, short overhangs, upright thin-pillared glasshouse with the Hofmeister
+  // kink, flat upright trunk; shark nose with twin kidneys and quad round lamps under the hood's lip (kidney: the E34 extras)
+  e34:   { len: 4.72, w: 1.75, clr: 0.17, belt: 0.86, roof: 1.42, hood: 0.82, ws: [0.76, 0.16], rs: [-1.0, -1.42], wheels: [1.44, -1.32], b: [-0.2], trunk: 0.9, square: true, kidney: true },
   coupe: { len: 4.45, w: 1.94, clr: 0.14, belt: 0.78, roof: 1.22, hood: 0.72, ws: [0.55, -0.35], rs: [-0.95, -1.7], wheels: [1.33, -1.3], b: [-0.35], trunk: 0.84, sport: true, eye: { x: 0.05, y: 1.02, z: -0.36 } },   // mid-engine supercar (Ferrari model: cockpit ahead of the engine)
   muscle: { len: 4.8, w: 1.9, clr: 0.16, belt: 0.86, roof: 1.33, hood: 0.84, ws: [0.75, -0.1], rs: [-0.75, -1.6], wheels: [1.45, -1.4], b: [-0.1], trunk: 0.88, sport: true },   // Camaro-ish
   // Soviet classics: boxy three-box sedans, narrow track, chrome bumpers
@@ -25,11 +26,36 @@ const KINDS = {
   van:   { len: 5.2, w: 1.98, clr: 0.24, belt: 1.12, roof: 2.08, hood: 1.02, ws: [1.72, 1.2], rs: [-2.5, -2.58], wheels: [1.68, -1.72], b: [0.7], trunk: 1.12, panel: true },
 };
 export const CAR_KINDS = Object.keys(KINDS);
+/** Coney's parked mix: two E34s in 13 (~15%). Phones swap the muscle car for a sedan, so the E34 costs no extra kind (each kind
+ *  in a placeCars call is its own set of instanced draws). pick(R) draws one kind. */
+const PARK_MIX = ['sedan', 'e34', 'suv', 'hatch', 'van', 'cab', 'coupe', 'muscle', 'sedan', 'e34', 'suv', 'hatch', 'sedan'];
+export function parkMix(ctx, mix = PARK_MIX) { const m = mix.map((k) => (ctx?.lite && k === 'muscle' ? 'sedan' : k)); return (R) => m[(R() * m.length) | 0]; }
 export function carSpec(kind) { return KINDS[kind]; }
 
 // plan-view half width at x: boxy / square bodies keep square corners, the rest taper at nose and tail
 const halfWOf = (K) => { const HW = K.w / 2, xf = K.len / 2, xr = -xf; return (x) => { const u = x > 0 ? x / xf : x / xr; return K.boxy || K.square ? HW * (1 - 0.04 * Math.pow(u, 12)) : HW * (1 - 0.1 * Math.pow(u, 6)); }; };
 const smooth = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
+
+// The plate material's texture is a small atlas (plateTex): the NY plate on top; chrome, an amber lens and the BMW roundel below.
+// The E34's brightwork rides the plate slot, so it costs no draw call. Geometry with no uv samples (0, 0): chrome.
+const ATLAS = { plate: [0, 0.505, 1, 0.995], chrome: [0.02, 0.02, 0.22, 0.47], amber: [0.28, 0.03, 0.47, 0.22], roundel: [0.5, 0, 1, 0.5] };
+function atlas(g, [u0, v0, u1, v1]) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + (u1 - u0) * uv.getX(i), v0 + (v1 - v0) * uv.getY(i)); return g; }
+// Panel seams: door shut lines, handles and the shoulder crease are drawn in one shared texture (seamTex) instead of geometry.
+// seamUV maps each kind's side faces onto it: x through its C / B / A shut lines to fixed u (SEAM_U), y from above the sill to
+// the belt to SEAM_V; every other face (hood, roof, ends) samples the blank margin.
+const SEAM_U = [0.02, 0.25, 0.5, 0.75, 0.98], SEAM_V = [0.1, 0.9], SEAM_BLANK = [0.01, 0.99], SEAM_SIDE = 0.5, SEAM_BUMP = 1.5;   // SEAM_SIDE: |normal.z| above which a face is a side panel; SEAM_BUMP: desktop bump depth of the lines
+function seamUV(K, g) {
+  const xf = K.len / 2, X = [-xf, K.rs[1] + 0.35, K.b[0], K.ws[0] - 0.08, xf], y0 = K.clr + 0.1;
+  const u = (x) => { let i = 1; while (i < X.length - 1 && x > X[i]) i++; return SEAM_U[i - 1] + (SEAM_U[i] - SEAM_U[i - 1]) * (x - X[i - 1]) / (X[i] - X[i - 1]); };
+  const v = (y) => SEAM_V[0] + (SEAM_V[1] - SEAM_V[0]) * (y - y0) / (K.belt - y0);
+  const p = g.attributes.position.array, uv = new Float32Array(p.length / 3 * 2);
+  for (let t = 0; t < p.length; t += 9) {   // per triangle (non-indexed), so a face never straddles the two mappings
+    const ax = p[t + 3] - p[t], ay = p[t + 4] - p[t + 1], az = p[t + 5] - p[t + 2], bx = p[t + 6] - p[t], by = p[t + 7] - p[t + 1], bz = p[t + 8] - p[t + 2];
+    const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx, side = Math.abs(nz) > SEAM_SIDE * Math.hypot(nx, ny, nz);
+    for (let k = 0; k < 3; k++) { const o = (t / 3 + k) * 2, q = t + k * 3; uv[o] = side ? u(p[q]) : SEAM_BLANK[0]; uv[o + 1] = side ? v(p[q + 1]) : SEAM_BLANK[1]; }
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
 
 export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   const K = KINDS[kind]; const L = K.len, HW = K.w / 2, xf = L / 2, xr = -L / 2;
@@ -39,7 +65,7 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   const archR = 0.43, wheelR = K.clr > 0.25 ? 0.37 : 0.33;
   // side profile
   const beltAt = (x) => { // top of the lower body: hood at the front, rising to the belt at the windshield base, trunk deck behind
-    if (x > wsBase) return K.hood + (K.belt - K.hood) * (1 - smooth(wsBase, xf, x)) - 0.12 * smooth(xf - 0.35, xf, x);
+    if (x > wsBase) return K.hood + (K.belt - K.hood) * (1 - smooth(wsBase, xf, x)) - (K.kidney ? 0.04 : 0.12) * smooth(xf - 0.35, xf, x);   // E34: shark nose, the hood runs out flat over the lamps
     if (x < rsBase) return K.trunk - 0.1 * smooth(xr + 0.3, xr, x);
     return K.belt;
   };
@@ -76,9 +102,9 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
       }
       if (!inGH && (k === 'g1' || k === 'g2' || k === 'R')) { y = be + (k === 'g1' ? 0.008 : k === 'g2' ? 0.016 : 0.022); z = Math.sign(zk) * hw * (k === 'g1' ? 0.955 : k === 'g2' ? 0.9 : 0.8); }
       // nose/tail round-over in elevation: pull the extreme stations' top in and down
-      const endK = Math.max(smooth(xf - 0.12, xf, x), smooth(xr + 0.12, xr, x));
-      if (endK > 0) { y = y - (y - (b + be) / 2) * 0.35 * endK; z *= 1 - 0.12 * endK; }
-      if (k === 'b') { const b0 = K.clr + 0.02; floorPos.push(x, endK > 0 ? b0 - (b0 - (b0 + be) / 2) * 0.35 * endK : b0, z); }
+      const endK = Math.max(smooth(xf - 0.12, xf, x), smooth(xr + 0.12, xr, x)), pull = K.kidney ? 0.12 : 0.35;   // E34: a tall flat nose and tail
+      if (endK > 0) { y = y - (y - (b + be) / 2) * pull * endK; z *= 1 - 0.12 * endK; }
+      if (k === 'b') { const b0 = K.clr + 0.02; floorPos.push(x, endK > 0 ? b0 - (b0 - (b0 + be) / 2) * pull * endK : b0, z); }
       pos.push(x, y, z);
     }
   }
@@ -86,6 +112,8 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   const segOf = (j) => { const k = full[j][1], k2 = full[(j + 1) % M][1]; return k + '>' + k2; };
   const glassSide = new Set(['e>g1', 'g1>g2', 'g2>R', 'R>g2', 'g2>g1', 'g1>e']);
   const glassTop = new Set(['R>C', 'C>C0', 'C0>C', 'C>R']);
+  // E34: glazed down to the belt, and the Hofmeister kink: the C-pillar's foot sweeps forward, each side band ending further forward the lower it is
+  const kink = K.kidney ? { 'g2>R': 0, 'R>g2': 0, 'g1>g2': 0.07, 'g2>g1': 0.07, 'e>g1': 0.17, 'g1>e': 0.17 } : null;
   const pillar = (x) => { const bs = K.b; for (const bx of bs) if (Math.abs(x - bx) < 0.07) return true; return x > wsBase - 0.12 || x < rsBase + 0.1 || (x > wsTop - 0.02 && x < wsTop + 0.12) || (x < rsTop + 0.02 && x > rsTop - 0.14); };
   for (let i = 0; i < NS; i++) {
     const xm = (xs[i] + xs[i + 1]) / 2, inGH = roofAt(xm) > beltAt(xm) + 0.05;
@@ -93,10 +121,11 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
       const a = i * M + j, b = a + 1, c = a + M, d = c + 1;
       const s = segOf(j);
       let g = false;
-      if (inGH && glassSide.has(s) && s !== 'e>g1' && s !== 'g1>e' && !pillar(xm) && !(K.panel && xm < K.b[0] - 0.1)) g = true;   // side windows (panel van: blind rear)
+      if (inGH && glassSide.has(s) && (kink || (s !== 'e>g1' && s !== 'g1>e')) && !pillar(xm) && !(K.panel && xm < K.b[0] - 0.1)) g = true;   // side windows (panel van: blind rear)
+      if (g && kink && kink[s] != null && xm < rsTop + 0.02 + kink[s]) g = false;
       if (inGH && glassTop.has(s) && (xm > wsTop + 0.05 || (xm < rsTop - 0.05 && !K.panel))) g = true;                         // windshield / backlight
       // dark rocker along the sills (grounds the body, reads lower) and a black seal under the side glass: the belt line
-      const dark = (!K.boxy && (s === 'b>r' || s === 'r>b')) || (!g && inGH && (s === 'e>g1' || s === 'g1>e') && !pillar(xm));
+      const dark = (!K.boxy && (s === 'b>r' || s === 'r>b')) || (!kink && !g && inGH && (s === 'e>g1' || s === 'g1>e') && !pillar(xm));
       (g ? idxGlass : dark ? idxDark : idxPaint).push(a, c, b, b, c, d);
     }
   }
@@ -112,7 +141,7 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   // the glass shares the body's edges exactly: pushing it in (for a frame line) opened a crack all round every window
 
   const parts = { rubber: [], rim: [], trim: [darkSkin], lampW: [], lampR: [], plate: [], paintX: [], caliper: [] };
-  const box = (arr, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); arr.push(g); };
+  const box = (arr, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); arr.push(g); return g; };
   // closed underside + wheel wells. The loft is a shell open at the bottom and its inside faces are culled, so anything that
   // looked in (into an arch, under a sill, through the nose cap) saw straight through the car. Floor: both windings (dark
   // from below, and the cabin floor from inside). Each well: a liner strip over the arch and down its two legs to the floor,
@@ -146,12 +175,13 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
     const hub = new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10); hub.rotateX(Math.PI / 2); hub.translate(wx, wheelR, zc + sz * 0.12); parts.rim.push(hub);
   }
   // lamps: headlamps wrap the nose corners, tail lamps across the tail corners
-  const hlY = K.hood - 0.13, tlY = K.trunk - 0.12;
+  const hlY = K.hood - (K.kidney ? 0.165 : 0.13), tlY = K.trunk - (K.kidney ? 0.16 : 0.12);
   for (const sz of [1, -1]) {
-    if (K.kidney) {   // E34: a black panel across the nose carrying two round lamps a side, wide wrap-around tail clusters
-      box(parts.trim, 0.04, 0.17, 0.5, xf - 0.03, hlY, sz * 0.43);
-      for (const lz of [0.31, 0.53]) { const l = new THREE.CylinderGeometry(0.068, 0.068, 0.04, 14); l.rotateZ(Math.PI / 2); l.translate(xf - 0.005, hlY, sz * lz); parts.lampW.push(l); }
-      box(parts.lampR, 0.035, 0.13, 0.46, xr + 0.03, tlY, sz * (halfW(xr + 0.1) - 0.24), 0, -sz * 0.1);
+    if (K.kidney) {   // E34: two round lamps a side in the black nose band (below), an amber corner lamp wrapping round, wide tail clusters
+      for (const lz of [0.32, 0.53]) { const l = new THREE.CylinderGeometry(0.072, 0.072, 0.03, 16); l.rotateZ(Math.PI / 2); l.translate(xf + 0.02, hlY, sz * lz); parts.lampW.push(l); }
+      atlas(box(parts.plate, 0.03, 0.11, 0.1, xf + 0.008, hlY, sz * 0.66, 0, sz * 0.4), ATLAS.amber);
+      box(parts.lampR, 0.035, 0.13, 0.46, xr - 0.006, tlY, sz * (halfW(xr + 0.1) - 0.26), 0, -sz * 0.06);   // proud of the flat tail panel
+      atlas(box(parts.plate, 0.036, 0.04, 0.3, xr - 0.01, tlY - 0.045, sz * (halfW(xr + 0.1) - 0.29), 0, -sz * 0.06), ATLAS.amber);   // indicator strip under the red
     } else {
       const hz = sz * (halfW(xf - 0.1) - 0.3);
       box(parts.trim, 0.05, 0.13, 0.42, xf - 0.045, hlY, hz, 0, sz * 0.22);   // dark housing: the lens reads as a cluster, not a sticker
@@ -164,41 +194,48 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
     }
     // mirrors (paint) on a dark stalk
     const mx = wsBase - 0.2; box(parts.paintX, 0.1, 0.12, 0.2, mx, K.belt + 0.08, sz * (HW + 0.1)); box(parts.trim, 0.05, 0.04, 0.12, mx, K.belt + 0.04, sz * (HW + 0.02));
-    // door handles + shut lines
-    const doors = [K.b[0] + 0.55, K.b[0] - 0.5];
-    for (const dx of doors) box(parts.trim, 0.18, 0.035, 0.03, dx, K.belt - 0.1, sz * (halfW(dx) + 0.005));
-    for (const bx of [wsBase - 0.08, ...K.b, K.panel ? null : (rsBase + 0.35)].filter(v => v !== null)) box(parts.trim, 0.012, K.belt - K.clr - 0.25, 0.012, bx, (K.belt + K.clr) / 2 + 0.05, sz * (halfW(bx) + 0.003));
+    // door handles, shut lines and the shoulder crease are in the paint's seam texture (seamUV / seamTex), not geometry
     // black window surround / B-pillar applique
     for (const bx of K.b) box(parts.trim, 0.12, (roofAt(bx) - K.belt) * 0.8, 0.012, bx, (roofAt(bx) + K.belt) / 2, sz * (halfW(bx) * 0.88 + 0.004), sz * 0.14);
   }
-  // wheel-arch flares (black cladding on the SUV), a shoulder crease, the drip rail round the glasshouse, bumpers, kind extras
+  // wheel-arch flares (black cladding on the SUV), the drip rail round the glasshouse, bumpers, kind extras
   for (const wx of K.wheels) for (const sz of [1, -1]) { const f = new THREE.TorusGeometry(archR + 0.012, K.clad ? 0.05 : 0.03, 5, 14, Math.PI); f.scale(1, 1, 0.7); f.translate(wx, 0.33, sz * (halfW(wx) - 0.006)); (K.clad ? parts.trim : parts.paintX).push(f); }
   { const T = [], tri = (a, b, c, o) => { const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)), m = new THREE.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3).sub(o); for (const v of n.dot(m) >= 0 ? [a, b, c] : [a, c, b]) T.push(v.x, v.y, v.z); };
     // strip: rows of 3-point profiles along x, swept into an open ridge, wound both ways (seen through the glass from the cabin too)
     const strip = (rows) => { for (let i = 0; i < rows.length - 1; i++) { const A = rows[i], B = rows[i + 1]; for (let k = 0; k < 2; k++) for (const s of [1, -1]) { const o = new THREE.Vector3().subVectors(A[k + 1], A[k]).cross(new THREE.Vector3().subVectors(B[k], A[k])).multiplyScalar(-1e3 * s).add(A[k]); tri(A[k], B[k], A[k + 1], o); tri(B[k], B[k + 1], A[k + 1], o); } } };
     const flush = () => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(T.splice(0), 3)); g.computeVertexNormals(); return g; };
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    for (const sz of [1, -1]) {   // shoulder crease: a 1 cm ridge below the belt, broken where it would cross an arch
-      let run = []; const end = () => { if (run.length > 1) strip(run); run = []; };
-      for (const x of xs) { const y = Math.min(K.belt - 0.14, beltAt(x) - 0.11), hw = halfW(x);
-        if (x < xr + 0.22 || x > xf - 0.28 || y - 0.03 < bottomAt(x)) { end(); continue; }
-        run.push([V(x, y + 0.022, sz * hw), V(x, y, sz * (hw + 0.011)), V(x, y - 0.022, sz * hw)]); }
-      end(); }
-    parts.paintX.push(flush());
     const jR = full.findIndex((r) => r[1] === 'R'), jG = full.findIndex((r) => r[1] === 'g2');   // +z side; the -z side mirrors
     for (const [jr, jg] of [[jR, jG], [M - 1 - jR, M - 1 - jG]]) {   // drip rail / dark window frame along the roof edge, A to C pillar
       const rows = []; xs.forEach((x, i) => { if (roofAt(x) <= beltAt(x) + 0.05) return; const P = (j) => V(pos[(i * M + j) * 3], pos[(i * M + j) * 3 + 1], pos[(i * M + j) * 3 + 2]), r = P(jr), g = P(jg), mid = r.clone().lerp(g, 0.14);
         mid.z += Math.sign(r.z) * 0.008; rows.push([r.clone().lerp(V(r.x, r.y + 0.02, r.z * 0.97), 0.5), mid, r.clone().lerp(g, 0.28)]); });
       strip(rows); }
-    parts.trim.push(flush()); }
+    if (K.kidney) {   // E34 chrome window line: the drip rail above plus a sill moulding along the belt under the glass (uv 0 = the atlas chrome)
+      const jE = full.findIndex((r) => r[1] === 'e'), jG1 = full.findIndex((r) => r[1] === 'g1');
+      for (const [je, jg] of [[jE, jG1], [M - 1 - jE, M - 1 - jG1]]) {
+        const rows = []; xs.forEach((x, i) => { if (roofAt(x) <= beltAt(x) + 0.05 || x > wsBase - 0.1 || x < rsTop + 0.02) return; const P = (j) => V(pos[(i * M + j) * 3], pos[(i * M + j) * 3 + 1], pos[(i * M + j) * 3 + 2]), e = P(je), gp = P(jg);
+          rows.push([e.clone().lerp(gp, 0.12), V(e.x, e.y + 0.006, e.z + Math.sign(e.z) * 0.008), V(e.x, e.y - 0.014, e.z)]); });
+        strip(rows); }
+      parts.plate.push(flush());
+    } else parts.trim.push(flush()); }
   const bw = 2 * halfW(xf - 0.08) * 0.96, bwr = 2 * halfW(xr + 0.08) * 0.96;
   if (!K.boxy) {   // bumpers: a full-width bar wrapping the nose / tail, body colour (black plastic on the SUV), lower intake in it
-    const bm = K.clad ? parts.trim : parts.paintX;
-    box(bm, 0.12, 0.2, bw, xf - 0.02, K.clr + 0.33, 0); box(bm, 0.12, 0.22, bwr, xr + 0.02, K.clr + 0.34, 0);
-    box(parts.trim, 0.02, 0.08, K.w * 0.46, xf + 0.045, K.clr + 0.29, 0);
+    const bm = K.clad || K.kidney ? parts.trim : parts.paintX, fy = K.clr + (K.kidney ? 0.28 : 0.33);   // E34: dark bumpers, set low under the nose band
+    box(bm, 0.12, 0.2, bw, xf - 0.02, fy, 0); box(bm, 0.12, 0.22, bwr, xr + 0.02, K.clr + 0.34, 0);
+    box(parts.trim, 0.02, 0.08, K.w * 0.46, xf + 0.045, fy - 0.04, 0);
+    if (K.kidney) for (const [x, y, w] of [[xf + 0.042, fy + 0.06, bw], [xr - 0.042, K.clr + 0.41, bwr]]) atlas(box(parts.plate, 0.012, 0.022, w * 0.98, x, y, 0), ATLAS.chrome);   // chrome rub strip
     if (K.clad) { box(parts.rim, 0.05, 0.07, K.w * 0.5, xf + 0.03, K.clr + 0.17, 0); box(parts.rim, 0.05, 0.07, K.w * 0.5, xr - 0.03, K.clr + 0.17, 0); }   // skid plates
   }
-  if (K.kidney) for (const kz of [0.085, -0.085]) { box(parts.rim, 0.03, 0.2, 0.15, xf - 0.0, hlY - 0.005, kz); box(parts.trim, 0.03, 0.17, 0.12, xf + 0.006, hlY - 0.005, kz); }   // twin kidneys, chrome surround
+  if (K.kidney) {   // E34 face: black band across the nose under the hood's lip (body colour, overhanging the lamps), twin chrome kidneys, roundels
+    const nw = 2 * halfW(xf) * 0.86;   // the nose cap is pulled in 12% at the very front
+    box(parts.trim, 0.03, 0.2, nw, xf + 0.004, hlY, 0);
+    box(parts.paintX, 0.1, 0.035, nw * 0.99, xf - 0.015, hlY + 0.118, 0, 0, 0, -0.12);
+    for (const kz of [0.1, -0.1]) { atlas(box(parts.plate, 0.03, 0.21, 0.15, xf + 0.022, hlY - 0.005, kz), ATLAS.chrome); box(parts.trim, 0.03, 0.175, 0.118, xf + 0.03, hlY - 0.005, kz);
+      for (const d of [-0.035, 0, 0.035]) atlas(box(parts.plate, 0.01, 0.17, 0.008, xf + 0.047, hlY - 0.005, kz + d), ATLAS.chrome); }
+    const hx = xf - 0.16, slope = (beltAt(hx - 0.05) - beltAt(hx + 0.05)) / 0.1, disc = (r) => new THREE.CylinderGeometry(r, r, 0.006, 20);
+    let g = disc(0.04); g.rotateZ(-Math.atan(slope)); g.translate(hx, beltAt(hx) + 0.035 + 0.004, 0); parts.plate.push(atlas(g, ATLAS.roundel));   // hood (on the crown)
+    g = disc(0.038); g.rotateZ(Math.PI / 2); g.translate(xr - 0.006, tlY - 0.11, 0); parts.plate.push(atlas(g, ATLAS.roundel));   // trunk lid
+  }
   else box(parts.trim, 0.05, 0.16, K.w * 0.5, xf - 0.02, hlY - 0.02, 0);   // grille
   if (K.kidney || K.sign) for (const sz of [1, -1]) box(parts.trim, Math.abs(K.wheels[0] - K.wheels[1]) - 2 * archR - 0.12, 0.045, 0.02, (K.wheels[0] + K.wheels[1]) / 2, K.clr + 0.33, sz * (halfW(0) + 0.006));   // side rub strips
   if (K.rack) { const rx = (wsTop + rsTop) / 2, rl = wsTop - rsTop + 0.3;
@@ -210,12 +247,12 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   if (K.boxy) { box(parts.rim, 0.07, 0.09, K.w * 0.98, xf + 0.02, K.clr + 0.3, 0); box(parts.rim, 0.07, 0.09, K.w * 0.98, xr - 0.02, K.clr + 0.34, 0); box(parts.rim, 0.03, 0.14, K.w * 0.52, xf - 0.01, hlY - 0.01, 0); }   // chrome bumpers + grille
   else box(parts.lampR, 0.02, 0.022, K.w * 0.55, xr + 0.012, tlY + 0.045, 0);   // light bar across the tail
   if (K.sport) { box(parts.trim, 0.3, 0.03, K.w * 0.82, xr + 0.25, K.trunk + 0.09, 0); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, 0.55); box(parts.trim, 0.04, 0.09, 0.05, xr + 0.3, K.trunk + 0.04, -0.55); }   // spoiler
-  box(parts.plate, 0.012, 0.11, 0.36, K.boxy ? xf + 0.005 : xf + 0.062, K.clr + 0.3, 0);   // kit bumpers stand 4 cm proud of the nose
-  box(parts.plate, 0.012, 0.11, 0.36, xr - 0.005, tlY - 0.2, 0);
+  atlas(box(parts.plate, 0.012, 0.11, 0.36, K.boxy ? xf + 0.005 : xf + 0.062, K.clr + 0.3, 0), ATLAS.plate);   // kit bumpers stand 4 cm proud of the nose
+  atlas(box(parts.plate, 0.012, 0.11, 0.36, xr - 0.005, tlY - 0.2, 0), ATLAS.plate);
   if (K.sign) { box(parts.trim, 0.2, 0.05, 0.5, 0.1, K.roof + 0.03, 0); box(parts.lampW, 0.16, 0.16, 0.48, 0.1, K.roof + 0.13, 0); }
   const merge = (arr) => arr.length ? mergeGeometries(arr.map(g => g.index ? g.toNonIndexed() : g).map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g; }), false) : null;
-  // paint gets a uv so per-map materials with maps do not break
-  for (const g of [paint, glass]) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+  // paint: uv into the seam texture (the paintX extras get uv 0: its blank margin); glass: a zero uv so materials with maps do not break
+  seamUV(K, paint); glass.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(glass.attributes.position.count * 2), 2));
   const paintAll = merge([paint, ...parts.paintX]); paintAll.userData.darkSkin = darkSkin;   // carInterior lines the cabin with both
   return {
     geos: { paint: paintAll, glass, rubber: merge(parts.rubber), rim: merge(parts.rim), trim: merge(parts.trim), lampW: merge(parts.lampW), lampR: merge(parts.lampR), plate: merge(parts.plate), caliper: merge(parts.caliper), shadow: (() => { const g = new THREE.PlaneGeometry(L * 1.08, K.w * 1.25); g.rotateX(-Math.PI / 2); g.translate(0, 0.012, 0); return g; })() },
@@ -260,21 +297,41 @@ function shadowTex() {   // soft contact shadow under the car (ambient occlusion
   const c = document.createElement('canvas'); c.width = 128; c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 32, 4, 64, 32, 62); gr.addColorStop(0, 'rgba(0,0,0,0.75)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   g.save(); g.scale(1, 0.55); g.fillStyle = gr; g.fillRect(0, 0, 128, 117); g.restore(); const t = new THREE.CanvasTexture(c); return t;
 }
-function plateTex() {   // New York 'Excelsior' plate: gold with navy lettering
-  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#f1c83a'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#12264f'; g.fillRect(0, 0, 256, 26); g.fillRect(0, 110, 256, 18);
+function plateTex() {   // the plate atlas (ATLAS): New York 'Excelsior' plate (gold, navy lettering) on top; chrome, amber, the BMW roundel below
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d');
+  const ch = g.createLinearGradient(0, 128, 0, 256); for (const [o, col] of [[0, '#f4f6f8'], [0.3, '#9aa1a8'], [0.5, '#5d646b'], [0.62, '#d8dde2'], [1, '#7c838a']]) ch.addColorStop(o, col);
+  g.fillStyle = ch; g.fillRect(0, 128, 128, 128);   // chrome: a bright sky / dark horizon / ground band, read as a reflection
+  const am = g.createLinearGradient(0, 192, 0, 256); am.addColorStop(0, '#ffb43a'); am.addColorStop(1, '#d86a06'); g.fillStyle = am; g.fillRect(64, 192, 64, 64);
+  { const cx = 192, cy = 192; g.fillStyle = '#c9ced3'; g.beginPath(); g.arc(cx, cy, 63, 0, Math.PI * 2); g.fill(); g.fillStyle = '#0c0c0e'; g.beginPath(); g.arc(cx, cy, 59, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#e8eaec'; g.font = 'bold 20px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    [['B', -0.62], ['M', 0], ['W', 0.62]].forEach(([l, a]) => { g.save(); g.translate(cx + Math.sin(a) * 47, cy - Math.cos(a) * 47); g.rotate(a); g.fillText(l, 0, 0); g.restore(); });
+    g.fillStyle = '#c9ced3'; g.beginPath(); g.arc(cx, cy, 37, 0, Math.PI * 2); g.fill();
+    for (let q = 0; q < 4; q++) { g.fillStyle = q % 2 ? '#f4f6f8' : '#1c69d4'; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, 34, -Math.PI / 2 + q * Math.PI / 2, q * Math.PI / 2); g.fill(); } }
+  g.textBaseline = 'alphabetic'; g.fillStyle = '#f1c83a'; g.fillRect(0, 0, 256, 128); g.fillStyle = '#12264f'; g.fillRect(0, 0, 256, 26); g.fillRect(0, 110, 256, 18);
   g.fillStyle = '#f1c83a'; g.font = 'bold 20px Arial'; g.textAlign = 'center'; g.fillText('NEW YORK', 128, 20); g.font = 'bold 13px Arial'; g.fillText('EXCELSIOR', 128, 124);
   g.fillStyle = '#12264f'; g.font = 'bold 54px Arial'; const L = 'ABCDEFGHJKLMNPRSTUVWXYZ'; let s = ''; for (let i = 0; i < 3; i++) s += L[(Math.random() * L.length) | 0]; s += '-'; for (let i = 0; i < 4; i++) s += (Math.random() * 10) | 0; g.fillText(s, 128, 88);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function seamTex() {   // the paint's panel detail (seamUV): white = bare paint; shut lines, handle recesses and the crease's shade darken it
+  const W = 256, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), X = (u) => u * W, Y = (v) => (1 - v) * H;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#d4d4d4'; g.fillRect(X(0.04), Y(0.705), X(0.92), 2);   // shoulder crease: the shaded underside of the ridge
+  g.strokeStyle = '#3c3c3c'; g.lineWidth = 1.5; g.beginPath();
+  for (const [u, v0] of [[SEAM_U[1], 0.3], [SEAM_U[2], 0.14], [SEAM_U[3], 0.14]]) { g.moveTo(X(u), Y(v0)); g.lineTo(X(u), Y(SEAM_V[1])); }   // C (stops over the rear arch) / B / A shut lines
+  g.moveTo(X(SEAM_U[1]), Y(0.14)); g.lineTo(X(SEAM_U[3]), Y(0.14)); g.stroke();   // door bottoms
+  for (const u of [0.31, 0.56]) { g.fillStyle = '#4e4e4e'; g.fillRect(X(u) - 7, Y(0.77) - 3, 14, 5); g.fillStyle = '#a8a8a8'; g.fillRect(X(u) - 6, Y(0.77) + 2, 12, 1); }   // handle recesses (near each door's rear edge), lit lower lip
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 /** Default materials for the kit (maps may substitute their own). Paint is white so instanceColor tints it. */
 let MATS = null;
 export function carMaterials() {
   if (MATS) return MATS;
+  const seams = seamTex();
   MATS = {
-    paint: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.32, metalness: 0.45, clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 0.9 }),
-    // tinted glass: near-black body, a sharp mirror reflection dimmed and cooled by the tint (one specular layer: a clearcoat on top
+    paint: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.32, metalness: 0.45, clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 0.9, map: seams, bumpMap: seams, bumpScale: SEAM_BUMP }),
+    // tinted glass: a dark green-grey body (pure black read as a hole), a sharp mirror reflection dimmed and cooled by the tint (one specular layer: a clearcoat on top
     // of a high-ior base doubled the sky and washed the side windows out to white at a glance)
-    glass: new THREE.MeshPhysicalMaterial({ color: 0x04070a, roughness: 0.015, metalness: 0.0, ior: 1.5, specularIntensity: 1, specularColor: 0xb4c2cc, envMapIntensity: 1.2 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: 0x0a1215, roughness: 0.015, metalness: 0.0, ior: 1.5, specularIntensity: 1, specularColor: 0xb4c2cc, envMapIntensity: 1.0 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.93 }),
     rim: new THREE.MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.35, metalness: 0.9 }),
     trim: new THREE.MeshStandardMaterial({ color: 0x121314, roughness: 0.6, metalness: 0.2 }),
@@ -285,8 +342,8 @@ export function carMaterials() {
     shadow: new THREE.MeshBasicMaterial({ map: shadowTex(), transparent: true, depthWrite: false, opacity: 0.85 }),
   };
   MATS.lampW.emissive.setHex(0x8a9298); MATS.lampR.emissive.setHex(0x6a0808);
-  MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x10171c, roughness: 0.015, transparent: true, opacity: 0.68, depthWrite: false, ior: 1.5, specularIntensity: 1, specularColor: 0xb4c2cc, envMapIntensity: 1.2 });   // driven cars: see who's inside
-  if (typeof window !== 'undefined' && window.__zavodLite) { for (const k of ['paint', 'glass', 'glassSee']) { const o = MATS[k]; const n = new THREE.MeshStandardMaterial({ color: o.color, roughness: o.roughness, metalness: o.metalness, transparent: o.transparent, opacity: o.opacity, depthWrite: o.depthWrite }); MATS[k] = n; } }   // phones: no clearcoat
+  MATS.glassSee = new THREE.MeshPhysicalMaterial({ color: 0x0f1a1d, roughness: 0.015, transparent: true, opacity: 0.72, depthWrite: false, ior: 1.5, specularIntensity: 1, specularColor: 0xb4c2cc, envMapIntensity: 1.2 });   // driven cars: see who's inside
+  if (typeof window !== 'undefined' && window.__zavodLite) { for (const k of ['paint', 'glass', 'glassSee']) { const o = MATS[k]; const n = new THREE.MeshStandardMaterial({ color: o.color, roughness: o.roughness, metalness: o.metalness, transparent: o.transparent, opacity: o.opacity, depthWrite: o.depthWrite, map: o.map }); MATS[k] = n; } }   // phones: no clearcoat, no bump (the seams stay in the map)
   for (const k in MATS) MATS[k].name = 'car_' + k;
   return MATS;
 }
