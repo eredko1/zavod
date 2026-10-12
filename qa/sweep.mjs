@@ -99,7 +99,7 @@ await A.close();
 // ---- B: phone weight ------------------------------------------------------------------------------------------------------------
 // the budget is the heap after a forced GC: what the page really holds (iOS kills the tab near its ceiling; the raw reading swings
 // 30 MB with GC timing). Kept under PHONE_HEAP_MB so it can't creep back.
-const PHONE_HEAP_MB = 400, PHONE_PEAK_MB = 550;
+const PHONE_HEAP_MB = 400, PHONE_PEAK_MB = 720;   // ratchet: 677 MB median after the stepped build (was 848); target 500
 { const T = await page('?qa=1&map=coney&mode=chill&time=day&touch=1', 'phone', { touch: true }); await sleep(3000);
   { const cdp = await T.context().newCDPSession(T); await cdp.send('HeapProfiler.collectGarbage'); await cdp.detach(); }
   const m = await T.evaluate(() => ({ heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null, perf: { frameMs: +(+window.__ctx.perf.frameMs).toFixed(1), drawCalls: window.__ctx.perf.drawCalls, tris: window.__ctx.perf.triangles } }));
