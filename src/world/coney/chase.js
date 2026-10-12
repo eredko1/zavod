@@ -11,6 +11,7 @@ import { OSM } from './osm.js';
 import { carGeometries, carMaterials } from '../carkit.js';
 import { buildBike } from '../../vehicles/bike.js';
 import { hangkit as HK } from '../hangkit.js';
+import { pushOut } from '../../player/collision.js';
 
 const EVADE_BASE = 20, EVADE_PER_STAR = 2, EVADE_MAX = 30, SEARCH_OUT = 8;   // SEARCH_OUT: s outside the search circle, unseen, before the stars clear
 const searchR = () => 50 + 25 * K.stars;
@@ -244,6 +245,7 @@ function update(dt) {
   if (playing) spawnLogic(dt);
   updateCars(dt);
   for (const u of K.units) if (u.bike) syncBike(u, dt);
+  { const G = ctx.player?.solids?.(); if (G) for (const u of K.units) if (!u.bike && !u.s.dead) pushOut(G, u.s.position); }   // on foot: out of benches / stalls / parked cars, like folk (ai.js steering alone can clip a low bench)
   // leaving units / cars go away once out of sight (or far, or after a while)
   if (check) {
     updateFrustum();

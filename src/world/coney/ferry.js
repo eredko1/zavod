@@ -7,7 +7,9 @@
 // St landing in Bay Ridge, waits, and comes back to the pier. Both landings: a canopy, the blue signs, a gangway, bollards, a ticket
 // machine, a queue rail, a second boat laid up at the other berth, and a countdown board ticking off the timetable below.
 // F (or the big VR / phone button) on the barge while it's in: board (you stand at the stern rail, look around freely; you turn with
-// the boat); F when it's tied up again: off. The Narrows are built the first time anyone rides (nothing to load until then). CONEY agent.
+// the boat); F when it's tied up again: off. The Narrows are built the first time anyone rides (nothing to load until then). Off at
+// Bay Ridge you're on foot on the barge (it bobs on the swell, the boat with it): up the gangway to Shore Pkwy for Soc Tav, and back
+// from Soc Tav's B70 stop to board at the gate. CONEY agent.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hangkit as K } from '../hangkit.js';
@@ -32,6 +34,11 @@ const LANDING_R = 40, SEA_W = 40;   // LANDING_R (QA): a boat within this of a b
 // landing on the deck from the air: feet within the deck (± LAND_PAD), LAND_BELOW under to LAND_ABOVE over it, not rising faster than
 // LAND_VY. Jumping off: HOP_VY up, and HOP_COOL s before either can happen again
 const LAND_PAD = 0.3, LAND_BELOW = 0.6, LAND_ABOVE = 1.2, LAND_VY = 0.5, HOP_VY = 5.5, HOP_COOL = 0.6;
+// the Bay Ridge barge on foot: BOB_* the swell it (and the boat tied to it) rides on; BR_NEAR: the landing is drawn within this of you;
+// GATE_R: how close to the boarding gate you board; SHORE_R: how close to the top of the gangway the TO SOC TAV prompt shows; TP_JUMP:
+// a jump bigger than this between frames means something else teleported you off the barge
+const BOB_A = 0.07, BOB_A2 = 0.03, BOB_T = 1900, BOB_T2 = 1130, BR_NEAR = 450, GATE_R = 2.6, SHORE_R = 3.5, TP_JUMP = 3;
+const bobAt = (ms) => Math.sin(ms / BOB_T) * BOB_A + Math.sin(ms / BOB_T2) * BOB_A2;
 let F = null;
 
 export function buildFerry(world) {
@@ -56,9 +63,9 @@ export function buildFerry(world) {
   const mmss = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
   K.spot({ pos: F.spotPos, r: SPOT_R, dy: 2.5, when: () => !F.aboard, prompt: () => phase().docked ? `F — BOARD THE FERRY  · Bay Ridge / Soc Tav, leaves in ${mmss(untilLeave(DOCK_UNTIL))}` : `F — NEXT FERRY ${mmss(untilLeave(DOCK_UNTIL))}`, act: () => { if (phase().docked) board(); else ctx.hud?.toast?.(`Next NYC Ferry to Bay Ridge in ${mmss(untilLeave(DOCK_UNTIL))} — wait on the barge`, 1800); } });
   // 8th Ave & 60th (Soc Tav's B70 stop): the way back — the bus down to 69th St and the ferry home
-  K.spot({ pos: new THREE.Vector3(-12, 0.15, TZ.oz + 7.6), r: 3.5, dy: 2, prompt: 'F — B70 + NYC FERRY BACK TO CONEY ISLAND', act: () => { fade('69 ST · BAY RIDGE → CONEY ISLAND', true); setTimeout(() => { fade('', false); ctx.player.teleport(F.spotPos.x, F.spotPos.y, F.spotPos.z, Math.PI / 2, 0); ctx.hud?.toast?.('NYC Ferry from Bay Ridge — Coney Island, Steeplechase Pier', 2600); }, 400); } });
+  K.spot({ pos: new THREE.Vector3(-12, 0.15, TZ.oz + 7.6), r: 3.5, dy: 2, prompt: 'F · B70 TO THE 69TH ST FERRY · BACK TO CONEY ISLAND', act: () => toBarge() });
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'NYC FERRY', x: dock.x, z: dock.z, kind: 'transit' });
-  ctx.bus.on('playerDied', () => { if (F.aboard) leave(false); });
+  ctx.bus.on('playerDied', () => { if (F.aboard) leave(false); if (F.barge) offBarge(); });
   world.updaters.push((dt) => update(dt));
   // net.js: where you stand on the deck (sent with your state) and a friend's deck spot → the world on our copy of the boat
   ctx.ferry = { local: () => (F.aboard ? [+F.lx.toFixed(2), +F.lz.toFixed(2)] : null),
@@ -70,7 +77,9 @@ export function buildFerry(world) {
   world.updaters.push((dt) => { addCrew(); const P = ctx.player?.position; if (!crew.length || !P || !F.boat.group.visible || F.boat.group.position.distanceTo(P) > 90) return; for (const f of crew) f.update(dt, 0); });
   if (typeof window !== 'undefined' && window.__game) window.__game.ferry = { state: () => ({ ...phase(), aboard: F.aboard, pos: F.boat.group.position.toArray().map((v) => +v.toFixed(1)), deck: [+F.lx.toFixed(2), +F.lz.toFixed(2)], bayRidge: !!where(phase().t).bayRidge, label: ctx.actionLabel || null, big: !!ctx.actionBig }),
     skew: (t) => { F.skew = t - ((Date.now() / 1000) % CYCLE); }, board: () => board(), leave: () => leave(true), dock, spot: F.spotPos.toArray(), bar: [BAR.x, BAR.z],
-    clock: () => F.boards.map((b) => b.text), boats: () => boatsAt(), clearance: () => clearance(), paint: () => paintBoards(true) };
+    clock: () => F.boards.map((b) => b.text), boats: () => boatsAt(), clearance: () => clearance(), paint: () => paintBoards(true),
+    barge: () => (F.barge ? { on: true, x: +F.barge.x.toFixed(2), z: +F.barge.z.toFixed(2), y: +ctx.player.position.y.toFixed(3), wz: +(ctx.player.position.z - NZ).toFixed(2), shore: [BR_SHORE, BR.z], gate: [GATE.x, GATE.z], visible: !!F.narrows?.visible } : { on: false }),
+    bargeAt: (x, z) => { if (F.barge) { F.barge.x = x; F.barge.z = z; F.barge.last = null; } }, toBarge: () => toBarge() };
 }
 
 // ---- the timetable -------------------------------------------------------------------------------------------------------------
@@ -117,13 +126,16 @@ function boatsAt() {
 const _e = new THREE.Euler(0, 0, 0, 'YXZ'), _fw = new THREE.Vector3();
 function update(dt) {
   const { ctx, W } = F, p = ctx.player; if (!p) return; const ph = phase(), w = where(ph.t), g = F.boat.group;
-  const inNarrows = !!w.narrows && F.aboard;
-  if (inNarrows && !F.narrows) { F.narrows = buildNarrows(F.world); }
-  if (F.narrows) F.narrows.visible = inNarrows;
-  if (inNarrows !== !!F.faded) fade(inNarrows ? 'THE NARROWS · VERRAZZANO-NARROWS BRIDGE' : 'CONEY ISLAND · STEEPLECHASE PIER', inNarrows);
+  const inNarrows = !!w.narrows && F.aboard, here = inNarrows || !!F.barge;   // here: you're in the Narrows (riding, or on foot at Bay Ridge)
+  if (here && !F.narrows) { F.narrows = buildNarrows(F.world); }
+  if (F.narrows) F.narrows.visible = here;
+  if (here !== !!F.faded) fade(here ? 'THE NARROWS · VERRAZZANO-NARROWS BRIDGE' : 'CONEY ISLAND · STEEPLECHASE PIER', here);
+  // the swell at Bay Ridge: the barge rides it, and so does the boat while she's up the Narrows (tied up alongside, she bobs with it)
+  const bob = bobAt(Date.now());
+  if (F.brTerm) { F.brTerm.root.position.y = BR.y + bob; const P = p.position; F.brTerm.root.visible = F.narrows.userData.parked.visible = here && Math.hypot(P.x - BR.x, P.z - NZ - BR.z) < BR_NEAR; }
   // out at sea with nobody aboard: out of sight (it's 500 m off and going away)
-  const x = w.x, z = inNarrows ? NZ + w.z : w.z, oy = !inNarrows && W.ocean ? W.ocean.waveHeight(x, z) : 0;
-  g.visible = inNarrows || !w.narrows; g.position.set(x, oy + 0.45, z);   // the hulls draw ~0.5 m
+  const inN = here && !!w.narrows, x = w.x, z = inN ? NZ + w.z : w.z, oy = inN ? bob : !w.narrows && W.ocean ? W.ocean.waveHeight(x, z) : 0;
+  g.visible = inN || !w.narrows; g.position.set(x, oy + 0.45, z);   // the hulls draw ~0.5 m
   const roll = Math.sin(Date.now() / 1700) * 0.02, pitch = Math.sin(Date.now() / 2300) * 0.012; g.rotation.set(pitch, w.h, roll, 'YXZ');
   // the wake: foam off the stern while she's making way ahead (none tied up or backing off)
   if (dt > 0) { _fw.set(x - F.last.x, 0, z - F.last.z); const ahead = -(_fw.x * Math.sin(w.h) + _fw.z * Math.cos(w.h)) / dt; F.spd += ((Math.abs(ahead) < 60 ? Math.max(0, ahead) : 0) - F.spd) * Math.min(1, dt * 2); if (Math.abs(ahead) < 60) F.vel.copy(_fw).divideScalar(dt); }
@@ -162,9 +174,10 @@ function update(dt) {
     if (ph.t >= IN_UNTIL && F.phaseName !== 'd') { F.phaseName = 'd'; ctx.hud?.toast?.('Coney Island landing — F to get off', 2600); }
     if (w.bayRidge && F.phaseName !== 'b') { F.phaseName = 'b'; ctx.hud?.toast?.('69th St, Bay Ridge — F to get off for Soc Tav (the B70 up 8th Ave)', 3600); }
   }
+  if (F.barge) label = bargeWalk(dt, w, bob);
   // the action button (VR pill, phone button) names getting off / the bar; it's big while it's the ferry's (a wide target in a headset)
   if (label) { ctx.actionLabel = label; F.ownLabel = true; } else if (F.ownLabel) { ctx.actionLabel = null; F.ownLabel = false; }
-  ctx.actionBig = F.aboard ? label === 'GET OFF · CONEY ISLAND' || label === 'GET OFF · BAY RIDGE' : ph.docked && Math.hypot(p.position.x - F.spotPos.x, p.position.z - F.spotPos.z) < SPOT_R;
+  ctx.actionBig = F.barge ? !!label : F.aboard ? label === 'GET OFF · CONEY ISLAND' || label === 'GET OFF · BAY RIDGE' : ph.docked && Math.hypot(p.position.x - F.spotPos.x, p.position.z - F.spotPos.z) < SPOT_R;
 }
 /** one step on the upper deck (boat-local metres): each axis on its own, so a bench in the way slides you along it instead of stopping you */
 function stepDeck(dx, dz) {
@@ -189,12 +202,49 @@ function hopOff() {
   const { ctx } = F, p = ctx.player; leave(false); F.hopT = HOP_COOL;
   p.velocity?.set?.(F.vel.x + F.walk.x, HOP_VY, F.vel.z + F.walk.z); p.onGround = false; ctx.hud?.toast?.('Over the side!', 1200);
 }
-/** off at 69th St: up the B70 to 8th Ave and Soc Tav */
-function bayRidge() { const { ctx, W } = F; leave(false); if (W.tavern?.arrive) W.tavern.arrive('ferry'); else ctx.hud?.toast?.('Bay Ridge', 1200); }
-function leave(toPier) {
-  const { ctx } = F, p = ctx.player; F.aboard = false; if (p.mounted?.ferry) p.mounted = null; if (F.faded) fade('', false);
+/** off at 69th St: down the gangway onto the barge, just inside the gate, facing the shore */
+function bayRidge() { leave(false, true); onBarge(GATE.x, GATE.z - 2.2, -Math.PI / 2); F.ctx.hud?.toast?.('69th St, Bay Ridge. Up the gangway at the shore end for Soc Tav (the B70 up 8th Ave)', 3600); }
+function leave(toPier, keepFade) {
+  const { ctx } = F, p = ctx.player; F.aboard = false; if (p.mounted?.ferry) p.mounted = null; if (F.faded && !keepFade) fade('', false);
   if (F.ownLabel) { ctx.actionLabel = null; F.ownLabel = false; } ctx.actionBig = false;
   if (toPier) p.teleport(F.spotPos.x, F.spotPos.y, F.spotPos.z, Math.PI / 2, 0);
+}
+// ---- on foot at Bay Ridge (Narrows-local x, z): the barge, the gangway up to the Shore Pkwy bulkhead, the top of it ----------------
+const BX0 = BR.x - BR.L / 2, BX1 = BR.x + BR.L / 2, GATE = { x: BR.x + 6, z: BR.z + BW / 2 - 0.4 };   // the boarding gate (terminal: local gate z −6, berth side)
+const WALK = [[BX0 + 0.35, BR.z - BW / 2 + 0.35, BX1, BR.z + BW / 2 - 0.35], [BX1 - 0.2, BR.z - 0.9, BR_SHORE + 0.2, BR.z + 0.9], [BR_SHORE, BR.z - 5, BR_SHORE + 3, BR.z + 5]];
+const onWalk = (x, z) => WALK.some((r) => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]);
+const bargeY = (x, bob) => (x <= BX1 ? BR.y + bob : x >= BR_SHORE ? BR_TOP : BR.y + bob + (BR_TOP - BR.y - bob) * (x - BX1) / (BR_SHORE - BX1));
+/** standing on the Bay Ridge landing at (x, z): you walk it like the boat's deck (it bobs; you go with it) */
+function onBarge(x, z, yaw) {
+  const { ctx } = F, p = ctx.player; if (!F.narrows) F.narrows = buildNarrows(F.world);
+  F.barge = { x, z, last: null }; p.mounted = { ferry: true, barge: true, speed: 0 }; p.yaw = yaw; p.pitch = 0; F.faded = true;   // the Narrows are up already (you came off the boat, or faded in)
+}
+function offBarge() { const p = F.ctx.player; F.barge = null; if (p.mounted?.barge) p.mounted = null; if (F.ownLabel) { F.ctx.actionLabel = null; F.ownLabel = false; } F.ctx.actionBig = false; }
+/** Soc Tav → the B70 down to 69th St: on the bulkhead at the top of the gangway, facing the barge */
+function toBarge() {
+  const { ctx } = F; if (F.aboard || ctx.vehicles?.mounted) return; const z = BR.z;
+  ctx.player.teleport(BR_SHORE + 0.8, BR_TOP, NZ + z, Math.PI / 2, 0); onBarge(BR_SHORE + 0.8, z, Math.PI / 2); fade('THE B70 · 69 ST · BAY RIDGE', true);
+  const s = ((BR_ARRIVE - phase().t) % CYCLE + CYCLE) % CYCLE; ctx.hud?.toast?.(`69th St ferry landing, Bay Ridge. ${phase().t >= BR_ARRIVE && phase().t < BR_LEAVE ? 'She\'s in: board at the gate' : `Next boat to Coney in ${Math.floor(s / 60)}:${String(Math.ceil(s % 60)).padStart(2, '0')}, board at the gate`}`, 3600);
+}
+/** up the gangway and off the landing: the B70 to 8th Ave and Soc Tav */
+function toSocTav() { const { ctx, W } = F; offBarge(); F.faded = false; if (W.tavern?.arrive) W.tavern.arrive('ferry'); else ctx.hud?.toast?.('Bay Ridge', 1200); }
+/** a frame on foot at the landing; returns the action button's label */
+function bargeWalk(dt, w, bob) {
+  const { ctx } = F, p = ctx.player, B = F.barge, inp = ctx.input, playing = ctx.state === 'playing';
+  if (p.dead || (B.last && p.position.distanceTo(B.last) > TP_JUMP)) { offBarge(); return null; }   // something else moved you (a teleport, a respawn)
+  let walkYaw = p.yaw; if (ctx.xr?.presenting) { _e.setFromQuaternion(ctx.camera.quaternion, 'YXZ'); walkYaw = _e.y; }
+  let ix = (inp?.right ? 1 : 0) - (inp?.left ? 1 : 0), iy = (inp?.forward ? 1 : 0) - (inp?.back ? 1 : 0); if (inp?.xrMove) { ix = inp.xrMove.x; iy = inp.xrMove.y; } else if (inp?.touch?.axis && (inp.touch.axis.x || inp.touch.axis.y)) { ix = inp.touch.axis.x; iy = -inp.touch.axis.y; }
+  if (playing && (ix || iy)) { const sp = (inp?.sprint ? 4.5 : 2.6) * dt / Math.max(1, Math.hypot(ix, iy)), wx = (-Math.sin(walkYaw) * iy + Math.cos(walkYaw) * ix) * sp, wz = (-Math.cos(walkYaw) * iy - Math.sin(walkYaw) * ix) * sp;
+    if (onWalk(B.x + wx, B.z)) B.x += wx; if (onWalk(B.x, B.z + wz)) B.z += wz; }   // each axis on its own: slide along the rails
+  if (B.x > BR_SHORE + 1.5) { toSocTav(); return null; }   // walked off the top of the gangway onto Shore Pkwy
+  p.position.set(B.x, bargeY(B.x, bob), NZ + B.z); p.velocity?.set?.(0, 0, 0); B.last = (B.last || new THREE.Vector3()).copy(p.position);
+  const cam = ctx.camera; cam.position.set(p.position.x, p.position.y + 1.62, p.position.z); cam.rotation.set(p.pitch, p.yaw, 0, 'YXZ'); p.cameraPosition?.copy?.(cam.position);
+  const atShore = B.x > BR_SHORE - SHORE_R, atGate = Math.hypot(B.x - GATE.x, B.z - GATE.z) < GATE_R, docked = !!w.bayRidge;
+  if (playing && inp?.pressed?.has?.('KeyF')) { inp.pressed.delete('KeyF');
+    if (atShore) { toSocTav(); return null; }
+    if (atGate && docked) { offBarge(); mount(0, 8.5); F.ctx.hud?.toast?.('Aboard for Coney Island. F at the Coney landing to get off', 2600); return null; }
+    ctx.hud?.toast?.(atGate ? `Next boat to Coney in ${untilLeave(BR_ARRIVE)} s` : 'Soc Tav: up the gangway at the shore end · the boat: at the gate', 1800); }
+  return atShore ? 'TO SOC TAV · 69TH ST' : atGate && docked ? 'BOARD · CONEY ISLAND' : null;
 }
 function fade(text, on) {
   F.faded = on; const f = document.querySelector('.hgfade'), fl = document.querySelector('.hgfloor'); if (!f) return;
@@ -336,7 +386,7 @@ function terminal(parent, o) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const n = new THREE.Mesh(new THREE.PlaneGeometry(BW - 0.8, 0.8), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); n.rotation.y = Math.PI; n.position.set(0, 3.85, -cH - 0.1); root.add(n);
     const n2 = n.clone(); n2.rotation.y = 0; n2.position.z = -cH - 0.05; root.add(n2); box(C.navy, -w + 0.4, 3.4, -cH - 0.09, w - 0.4, 4.3, -cH - 0.06); }
   k.flush(root, o.lite);
-  // walkable: the deck, the gangway as shallow steps, rails as colliders (Coney only: nobody walks the Bay Ridge one)
+  // walkable: the deck, the gangway as shallow steps, rails as colliders (Coney only: the Bay Ridge one is walked by bargeWalk)
   if (o.world) { const X = o.x, Y = o.y, Z = o.z, wd = o.world;
     wd.walkable([X - w, Y - 1.3, Z - H], [X + w, Y, Z + H]);
     const n = 8; for (let i = 0; i < n; i++) { const z0 = Z - H - S.len + i * S.len / n, top = Y + S.rise * (1 - (i + 0.5) / n); wd.walkable([X - 1.1, top - 1.5, z0], [X + 1.1, top, z0 + S.len / n + 0.01]); }
@@ -387,7 +437,7 @@ function buildNarrows(world) {
   for (const ax of [-1170, 1170]) box(M.concrete, ax - 30, 0, -DW / 2 - 12, ax + 30, 60, DW / 2 + 12);
   // the 69th St landing in Bay Ridge: the barge off the Shore Pkwy bulkhead (a gangway up to it), the boat at its north berth, a spare
   // laid up further along, the ferry shed with its sign on the bulkhead
-  F.boards.push(terminal(root, { x: BR.x, y: BR.y, z: BR.z, ry: -Math.PI / 2, L: BR.L, shore: { len: BR_SHORE - (BR.x + BR.L / 2), rise: BR_TOP - BR.y }, name: '69 ST · BAY RIDGE', dest: 'CONEY ISLAND', leave: BR_LEAVE, lite }));
+  F.brTerm = terminal(root, { x: BR.x, y: BR.y, z: BR.z, ry: -Math.PI / 2, L: BR.L, shore: { len: BR_SHORE - (BR.x + BR.L / 2), rise: BR_TOP - BR.y }, name: '69 ST · BAY RIDGE', dest: 'CONEY ISLAND', leave: BR_LEAVE, lite }); F.boards.push(F.brTerm);
   const spare = F.coney.parked.clone(); spare.position.set(BR.parkX, 0.45, BR.boatZ); spare.rotation.set(0, -Math.PI / 2, 0); root.add(spare); root.userData.parked = spare;
   box(M.bldg, BR_SHORE + 4, BR_TOP, -906, BR_SHORE + 18, BR_TOP + 4, -894); box(M.steel, BR_SHORE + 3, BR_TOP + 4, -907, BR_SHORE + 19, BR_TOP + 4.4, -893);
   { const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d'); g.fillStyle = '#1f4fa0'; g.fillRect(0, 0, 512, 96); g.fillStyle = '#fff'; g.font = '900 44px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('NYC FERRY · BAY RIDGE', 256, 50);

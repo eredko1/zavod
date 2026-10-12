@@ -28,6 +28,7 @@ import { buildBus, BUS } from '../../vehicles/bus.js';
 const RM = 8;                    // max corner radius (m)
 const CYC = 34;                  // signal cycle (s): A green 0-14, amber 14-17, all red 17-18, B green 18-30, amber 30-33, all red
 const A_MAX = 1.9, B_COMF = 2.6, T_HEAD = 1.25, S0 = 2.2;   // IDM
+const JAM_MAX = 25, BUS_JAM = 12;   // s stuck behind a stopped car (in view) before slipping through it: anyone / the bus you ride
 const NAMES = ['SAL', 'VINNIE', 'DMITRI', 'TONY', 'MARISOL', 'OKSANA', 'DESHAWN', 'LUIS', 'FRANKIE', 'IRINA', 'BORIS', 'KEISHA', 'ANGELO', 'SVETA', 'RAY'];
 const SIGNALS = [[-86, -132], [46, -109], [297, -47], [-87, -290], [-87, -536]];
 const YELL = ['MOVE IT, BUDDY!', 'Yo! You wanna get run over?!', 'Get outta the road!', 'Нашёл где стоять!', 'C\'mon, c\'mon, c\'mon…', 'I\'m WALKIN\' here? No — I\'m DRIVIN\' here!'];
@@ -405,8 +406,8 @@ function drive(c, dt, now) {
     if (d < -0.5) c.cleared = q[2];
     else if (jn.ctrl === 'signal') {
       const st = signalFor(jn, q[1], now);
-      const boxed = st === 'G' && d < 3 && c.v < 1 && boxJammed(c, q[2]);   // don't block the box: green, but a stopped car is still in the junction
-      if (boxed) { c.boxT = (c.boxT || 0) + dt; }
+      const boxed = st === 'G' && ((d < 3 && c.v < 1 && boxJammed(c, q[2])) || (d > 0 && d < 12 && exitFull(c)));   // don't block the box: green, but a stopped car is still in the junction, or no room past it
+      if (boxed && c.v < 1) { c.boxT = (c.boxT || 0) + dt; }
       if ((st === 'G' || (st === 'Y' && c.v * c.v / (2 * 3.5) > d)) && (!boxed || c.boxT > 5)) { if (d < 1) { c.cleared = q[2]; c.boxT = 0; } }
       else if (boxed) { const ai = idm(c.v, v0, Math.max(0.05, d), c.v, AM); if (ai < a) { a = ai; lim = 'box'; } }
       else { const ai = idm(c.v, v0, d, c.v, AM); if (ai < a) { a = ai; lim = 'signal'; } }
@@ -448,8 +449,10 @@ function drive(c, dt, now) {
   if (c.avoid) { c.avoidT -= dt; if (c.avoidT <= 0 || (!obst && c.v > 3 && c.blockT === 0 && c.avoidT < 4)) { c.avoid = null; c.shiftT = 0; } }
   // stuck behind a car that is itself stuck (a gridlocked junction): after a while, nudge through
   if (lim === 'obst' && obst?.ped && c.v < 0.5) { c.pedT = (c.pedT || 0) + dt; if (c.pedT > 3 && c.hornT <= 0) { honk(c); c.hornT = 3 + c.rng() * 3; } } else c.pedT = 0;   // held up by someone in the road: lean on the horn
-  // stuck behind a car for 9 s: slip through it (a deadlock breaker), but never where you can see it happen — in view it waits on
-  if (lim === 'car' && c.v < 0.1) { c.waitT += dt; if (c.waitT > 9) { const P = T.ctx.player?.position, far = !P || Math.hypot(c.x - P.x, c.z - P.z) > 60; if (far || !inView(c.x, c.y, c.z, 6)) { c.ghostT = 2.5; c.waitT = 0; } else c.waitT = 7; } } else if (c.v > 1) c.waitT = 0;
+  // stuck behind a car for 9 s: slip through it (a deadlock breaker) where you can't see it happen. In view it waits on, up to JAM_MAX s (a queue locked behind a car blocking the box at a signal never clears by itself); a bus
+  // you're riding gets priority and creeps through after BUS_JAM s (you're aboard to get somewhere, not to sit at Surf and W 12th)
+  if (lim === 'car' && c.v < 0.1) { c.waitT += dt; c.jamT = (c.jamT || 0) + dt; if (c.waitT > 9) { const P = T.ctx.player?.position, far = !P || Math.hypot(c.x - P.x, c.z - P.z) > 60;
+    if (far || !inView(c.x, c.y, c.z, 6) || c.jamT > JAM_MAX || (c.bus && T.ride?.c === c && c.jamT > BUS_JAM)) { c.ghostT = 2.5; c.waitT = 0; c.jamT = 0; } else c.waitT = 7; } } else if (c.v > 1) { c.waitT = 0; c.jamT = 0; }
   c.lim = lim;
   // integrate
   a = clamp(a, -9, AM); c.a = damp(c.a, a, 6, dt); c.v = Math.max(0, c.v + a * dt);
@@ -461,6 +464,8 @@ function drive(c, dt, now) {
 }
 function laneFreeLeft(c) { for (const o of T.cars) { if (!o.active || o === c) continue; const dx = o.x - c.x, dz = o.z - c.z, f = dx * c.dx + dz * c.dz; if (f < -6 || f > 35) continue; const l = dx * -c.dz + dz * c.dx; if (l < -1 && l > -7) return false; } return true; }
 function boxJammed(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v > 0.6 || o.cleared !== n) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 9) return true; } return false; }   // only cars that are in the junction (past their line), not ones waiting at it
+/** the street I turn into has a stopped car just past the junction: going now would leave me stuck across the box */
+function exitFull(c) { const q = c.q; if (q[3] < 0) return false; for (const o of T.cars) { if (!o.active || o === c || o.v > 1 || o.q[1] !== q[2] || o.q[2] !== q[3]) continue; if (o.s < o.hl + c.hl * 2 + S0) return true; } return false; }
 function junctionClear(c, n) { const N = T.G.nodes[n]; for (const o of T.cars) { if (!o.active || o === c || o.v < 0.5) continue; if (Math.hypot(o.x - N.x, o.z - N.z) < 11) return false; } return true; }
 /** world pose from the path (+ lateral avoidance shift + crash knock-off) */
 function pose(c, dt) {
