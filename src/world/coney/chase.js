@@ -12,6 +12,7 @@ import { carGeometries, carMaterials } from '../carkit.js';
 import { buildBike } from '../../vehicles/bike.js';
 import { hangkit as HK } from '../hangkit.js';
 import { pushOut } from '../../player/collision.js';
+const SPAWN_LO = 0.05;   // m over the feet: what counts as solid when a unit is placed
 
 const EVADE_BASE = 20, EVADE_PER_STAR = 2, EVADE_MAX = 30, SEARCH_OUT = 8;   // SEARCH_OUT: s outside the search circle, unseen, before the stars clear
 const searchR = () => 50 + 25 * K.stars;
@@ -319,6 +320,7 @@ function spawnUnit(kind, at, car = null) {
   const u = { kind, uid: K.uid++, car, seenT: K.t - 3, leaving: false, loiter: null, wander: null, goalT: 0 };
   const s = ai.spawnChaser(at, Math.atan2(p.x - at.x, p.z - at.z), { look: sp.look, name: sp.name, health: sp.health, speed: sp.speed, dmgMul: sp.dmgMul, tag: kind === 'cop' ? 'cop' : 'crew', noGo, brain: (s, vis, t) => brain(u, s, vis) });
   u.s = s; s.lastKnown.copy(p); s.lastSeen = K.ctx.time.elapsed - 2;
+  { const G = K.ctx.player?.solids?.(); if (G) pushOut(G, s.position, 0.28, SPAWN_LO); }   // a spawn point by a low planter: out of it from the ankles up (the per-frame push only counts boxes over a step)
   if (kind === 'biker') { u.bike = makeBikeMesh(); s.riding = { seat: 0.2 }; s.crouch = s.crouchTarget = 0.62; }
   K.units.push(u); return u;
 }

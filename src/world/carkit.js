@@ -297,8 +297,12 @@ export const CAR_COLORS = [0x1a1a1c, 0x9a9ea3, 0x5f656b, 0x22305c, 0x6a1c1c, 0xb
 const DARK_SLOTS = ['rubber', 'trim', 'caliper'];
 let DARK = null;
 const darkMat = () => DARK || (DARK = new THREE.MeshStandardMaterial({ name: 'car_dark', vertexColors: true, roughness: 0.85, metalness: 0.15 }));
+/** One read-only set of carGeometries(kind) per kind for every user that only instances it (parked cars, the Uber): a sedan's
+ *  geometry is a few MB, building it again per user doubled that. Callers that transform geometry use carGeometries(). */
+const _shared = new Map();
+export function sharedCarGeometries(kind) { let k = _shared.get(kind); if (!k) _shared.set(kind, (k = carGeometries(kind))); return k; }
 function parkedGeos(ctx, kind) {
-  const G = { ...carGeometries(kind).geos }; if (!ctx?.lite) return G;
+  const G = { ...sharedCarGeometries(kind).geos }; if (!ctx?.lite) return G;
   const CM = carMaterials(), parts = [];
   for (const s of DARK_SLOTS) { const g0 = G[s]; delete G[s]; if (!g0) continue; const g = g0.index ? g0.toNonIndexed() : g0.clone();
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
