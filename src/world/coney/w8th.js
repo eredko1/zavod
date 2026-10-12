@@ -15,12 +15,15 @@ export function buildW8th(world, M) {
   const { scene, ctx, W } = world; const S = W8, B = new Batch(world, M, 'w8th');
   const u = P1.clone().sub(P0).normalize(), n = new THREE.Vector2(-u.y, u.x), ang = Math.atan2(u.x, u.y);   // n: +z side (Surf Ave / the Aquarium)
   const at = (a, o, y = 0) => new THREE.Vector3(P0.x + u.x * a + n.x * o, y, P0.y + u.y * a + n.y * o);
+  // station frame -> world: local x = -o, y up, z = a. A right-handed basis (x = -n): x = +n with z = u is a mirror, which turned every
+  // box inside out (front faces inward, so a ray down onto a platform only hit its underside)
+  const BASIS = new THREE.Matrix4().makeBasis(new THREE.Vector3(-n.x, 0, -n.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(u.x, 0, u.y));
   if (!M.w8Plat) { M.w8Plat = new THREE.MeshStandardMaterial({ color: 0xa6a59e, roughness: 0.93 }); M.surface.w8Plat = 'concrete'; }
   if (!M.edgeYellow) { M.edgeYellow = new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.7 }); M.surface.edgeYellow = 'concrete'; }
   // a box in station coordinates (a along the platforms, o across, y up): one rotated mesh + axis-aligned collider cells
   const sbox = (key, a0, a1, o0, o1, y0, y1, { collide = true, walkable = false, cell = 1.6 } = {}) => {
-    const g = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0); g.translate((o0 + o1) / 2, (y0 + y1) / 2, (a0 + a1) / 2);
-    g.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(n.x, 0, n.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(u.x, 0, u.y))); g.translate(P0.x, 0, P0.y); B.add(key, g);
+    const g = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0); g.translate(-(o0 + o1) / 2, (y0 + y1) / 2, (a0 + a1) / 2);
+    g.applyMatrix4(BASIS); g.translate(P0.x, 0, P0.y); B.add(key, g);
     if (!collide) return;
     const na = Math.max(1, Math.ceil((a1 - a0) / cell)), no = Math.max(1, Math.ceil((o1 - o0) / cell));
     for (let i = 0; i < na; i++) for (let k = 0; k < no; k++) {
@@ -146,7 +149,7 @@ function wayfinding(world, M, S, u, n, at, B) {
   const m = new THREE.Mesh(mergeGeos(geos), new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.4, roughness: 0.6 })); m.name = 'w8Signs'; scene.add(m);
   // lamps: fluorescent fixtures under the upper canopies and the upper deck (over the Q platforms)
   if (!M.w8Lamp) { M.w8Lamp = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff6e2, emissiveIntensity: 1.3 }); M.surface.w8Lamp = 'metal'; }
-  const sb = (a0, a1, o0, o1, y0, y1) => { const bx = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0); bx.translate((o0 + o1) / 2, (y0 + y1) / 2, (a0 + a1) / 2); bx.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(n.x, 0, n.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(u.x, 0, u.y))); bx.translate(S.L * 0 + at(0, 0).x, 0, at(0, 0).z); B.add('w8Lamp', bx); };
+  const sb = (a0, a1, o0, o1, y0, y1) => { const bx = new THREE.BoxGeometry(o1 - o0, y1 - y0, a1 - a0); bx.translate(-(o0 + o1) / 2, (y0 + y1) / 2, (a0 + a1) / 2); bx.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(-n.x, 0, -n.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(u.x, 0, u.y))); bx.translate(S.L * 0 + at(0, 0).x, 0, at(0, 0).z); B.add('w8Lamp', bx); };
   for (const sd of [-1, 1]) for (let a = 4; a < S.L - 2; a += 9) { sb(a, a + 1.4, oc(sd) - 0.12, oc(sd) + 0.12, S.UP.plat + 3.08, S.UP.plat + 3.16); sb(a + 4, a + 5.4, oc(sd) - 0.12, oc(sd) + 0.12, S.UP.bot - 0.12, S.UP.bot - 0.04); }
   B.flush({ shadow: false });
 }
