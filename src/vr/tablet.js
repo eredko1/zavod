@@ -47,6 +47,7 @@ export function createTablet(host) {
     } else if (T.tab === 'set') {
       out.push({ t: '⟲ TURN LEFT', sub: `${prefs.snap}° (hands: no turn stick)`, act: () => doAct(ctx, 'turnL') }, { t: '⟳ TURN RIGHT', sub: `${prefs.snap}°`, act: () => doAct(ctx, 'turnR') });
       out.push({ t: prefs.smooth ? '↻ TURN: SMOOTH' : '↻ TURN: SNAP', act: () => setPref('smooth', !prefs.smooth) });
+      out.push({ t: prefs.thumb ? '👍 THUMB TURN: ON' : '👍 THUMB TURN: OFF', sub: 'left thumb along your index', act: () => setPref('thumb', !prefs.thumb), on: prefs.thumb });
       out.push({ t: `∠ SNAP ${prefs.snap}°`, act: () => setPref('snap', prefs.snap === 30 ? 45 : prefs.snap === 45 ? 90 : 30) });
       out.push({ t: prefs.vignette ? '◎ TUNNEL: ON' : '◎ TUNNEL: OFF', act: () => setPref('vignette', !prefs.vignette) });
       out.push({ t: prefs.hud ? '▤ HUD: ON' : '▤ HUD: OFF', act: () => setPref('hud', !prefs.hud) });
@@ -211,7 +212,7 @@ const STEPS = [
   { title: 'Walk', pads: ['Push the LEFT stick to walk where you look.', 'Click it (or hold the left trigger) to run.'],
     hands: ['Pinch your LEFT thumb and index finger and hold it,', 'then move that hand the way you want to walk.', 'Lift the pinched hand to jump.'], done: moved },
   { title: 'Turn', pads: ['Flick the RIGHT stick left or right to turn.', 'Smooth turning: ⚙ SET on your tablet.'],
-    hands: ['Just turn your head and walk where you look.', 'Snap turns are on your tablet (⚡ ACT).'], done: ({ V, tut, hands }) => Math.abs(V.turn - tut.turn0) > 0.3 || (hands && tut.t > 6) },
+    hands: ['Just turn your head and walk where you look.', 'Snap turn: slide your LEFT thumb along your index finger.'], done: ({ V, tut, hands }) => Math.abs(V.turn - tut.turn0) > 0.3 || (hands && tut.t > 6) },
   { title: 'Draw a gun', pads: ['Squeeze the RIGHT grip at your right hip: pistol.', 'Over your right shoulder: rifle. At your chest: knife.', 'Squeeze there again to put it away.'],
     hands: ['Make a finger gun with your RIGHT hand: your gun comes up.', 'Or make a fist at your hip (pistol) / over your shoulder (rifle).', 'A fist anywhere else: fists, for a fight.'], done: ({ ctx }) => { const id = ctx.weapons?.currentId; return !!id && id !== 'fists' && id !== 'knife'; } },
   { title: 'Shoot', pads: ['Pull the RIGHT trigger. The red dot is where it lands.', 'B reloads.'],
@@ -228,7 +229,7 @@ const HELP_PADS = [
   ['Other headsets', 'Vive wands: touch the left pad to walk; press it in the middle: tablet.', 'Right pad: press the edges to turn, the top to jump, the bottom to reload.', 'No A / B / X / Y? Right stick click jumps, left stick click', '(standing still) opens this tablet. Everything else is here.'],
 ];
 const HELP_HANDS = [
-  ['Hands', 'Left pinch + move the hand: walk (lift it: jump)', 'Right finger gun: draw · right pinch: fire', 'Right fist: fists up · punch for real, faster = harder', 'Left palm to your face: this tablet · poke with your right index'],
+  ['Hands', 'Left pinch + move the hand: walk (lift it: jump)', 'Right finger gun: draw · right pinch: fire', 'Right fist: fists up · punch for real, faster = harder', 'Left palm to your face: this tablet · poke with your right index', 'Left thumb along your index: snap turn (to the tip: right)'],
   ['Driving', 'Make fists on the steering wheel or the bars and turn them.', 'Push the wheel away from you: gas. Pull it back: brake.', 'The big yellow button: get out (point + pinch, or poke it).'],
   ['Things', 'BAG tab: take a drink, smoke or snack into your left hand,', 'then bring it to your mouth.', 'Elevators: poke the glowing call button by the door.'],
 ];

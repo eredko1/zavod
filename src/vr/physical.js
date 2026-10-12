@@ -10,8 +10,9 @@
 //  · darts: at the oche (darts.js's ctx.darts) a dart sits in your gun hand; hold the trigger (or pinch), swing and let go. It flies with
 //    your hand's speed under (softened) gravity and scores where it meets the board on the wall.
 import * as THREE from 'three';
+import { RIDE, rideState, shapeRide } from './ride.js';
 
-const GRAB_WHEEL = 0.3, GRAB_BARS = 0.2, WHEEL_TURN = 2.6, BARS_TURN = 0.55, PUSH_DEAD = 0.03, PUSH_FULL = 0.1;
+const GRAB_WHEEL = 0.3, GRAB_BARS = 0.2, WHEEL_TURN = 2.6, PUSH_DEAD = 0.03, PUSH_FULL = 0.1;   // the car's wheel (a bike's bars: ride.js)
 const MOUTH_R = 0.12, USE_SHOW_S = 1.4, SMOKE_SHOW_S = 8;
 const GUARD_R = 0.38, GUARD_K = 0.35, BUTTON_R = 0.07, BUTTON_NEAR = 12;
 const DART_G = 9.81 * 0.6, DART_VK = 1.1, DART_MIN_V = 1.2, DART_EMA = 0.45, STUCK_KEEP_S = 2.5;
@@ -29,37 +30,51 @@ export function createPhysical(host) {
     if (v.fork && v.fork.children?.length) return { kind: 'bars', obj: v.fork, v };
     return null;
   }
-  /** a hand's angle around the steering axis, in the steering part's parent frame */
-  function angleOf(S, pos) {
+  /** a hand's angle around the steering axis. A car's wheel: in the wheel's parent frame (pos in the world). A bike's bars: about the
+   *  vertical through the pivot, in the rig (pos rig-local): the bike's heading frame without its lean (read in the leaning body,
+   *  the bike's own lean fed back into the steering) */
+  function angleOf(S, pos, W) {
+    if (S.kind === 'bars') return Math.atan2(pos.x - W.pivot.x, pos.z - W.pivot.z);
     const par = S.obj.parent; _v.copy(pos); par.worldToLocal(_v); _v.sub(S.obj.position);
-    return S.kind === 'wheel' ? Math.atan2(_v.z, _v.y) : Math.atan2(_v.x, _v.z);
+    return Math.atan2(_v.z, _v.y);
   }
   function grabbing(H) { if (!H) return false; if (H.src?.hand) return host.handPose(H.hand) === 'fist'; return !!H.src?.gamepad?.buttons?.[1]?.pressed; }
+  /** the bike's forward in the rig: push / pull goes along the bike, not where you happen to look */
+  const bikeFwd = (v, out) => out.set(-Math.sin(v.heading), 0, -Math.cos(v.heading)).applyQuaternion(_q.copy(V.rig.quaternion).invert());
   function steer(ctx, dt) {
     const inp = ctx.input, S = steerable(ctx);
     if (!S) { if (P.wheel) release(ctx); return; }
-    if (!P.wheel || P.wheel.obj !== S.obj) P.wheel = { ...S, hands: [], angle: 0 };
-    const W = P.wheel; S.obj.updateWorldMatrix(true, false);
+    if (!P.wheel || P.wheel.obj !== S.obj) P.wheel = { ...S, hands: [], angle: 0, ride: rideState(), pivot: new THREE.Vector3() };   // just got on: neutral
+    const W = P.wheel, bars = S.kind === 'bars'; S.obj.updateWorldMatrix(true, false);
     const centre = S.obj.getWorldPosition(new THREE.Vector3());
     for (const H of [host.offHand(), host.mainHand()]) {
       if (!H) continue; const loc = host.handPos(H, new THREE.Vector3()); if (!loc) continue; const pos = V.rig.localToWorld(loc.clone());   // hands live in the rig; the wheel in the world
       const g = grabbing(H), i = W.hands.findIndex((h) => h.H === H);
-      if (g && i < 0 && pos.distanceTo(centre) < (S.kind === 'wheel' ? GRAB_WHEEL : GRAB_BARS + 0.25)) { W.hands.push({ H, a0: angleOf(S, pos), w0: W.angle, p0: loc }); host.pulse(H, 0.4, 30); }
+      if (g && i < 0 && pos.distanceTo(centre) < (S.kind === 'wheel' ? GRAB_WHEEL : GRAB_BARS + 0.25)) {
+        if (bars && !W.hands.length) { V.rig.updateMatrixWorld(); W.pivot.copy(centre).applyMatrix4(_m.copy(V.rig.matrixWorld).invert()); }   // taking hold: the pivot, fixed in the rig
+        W.hands.push({ H, a0: angleOf(S, bars ? loc : pos, W), w0: W.angle, p0: loc }); host.pulse(H, 0.4, 30); }
       else if (!g && i >= 0) W.hands.splice(i, 1);
     }
     V.wheelL = W.hands.some((h) => h.H === host.offHand()); V.wheelR = W.hands.some((h) => h.H === host.mainHand());
-    if (!W.hands.length) { W.angle *= Math.max(0, 1 - dt * 3); inp.xrSteer = null; inp.xrThrottle = null; return; }   // let go: it self-centres, the stick has it again
+    if (!W.hands.length) {   // let go: it self-centres, the stick has it again (on a bike the pinch stick goes through the same shaping)
+      W.angle *= Math.max(0, 1 - dt * 3);
+      if (bars && V.rideStick) { const o = shapeRide(W.ride, V.rideStick.x / RIDE.BAR_R, -V.rideStick.z, S.v.fwdSpeed || 0, S.v.spec.max, dt); inp.xrSteer = o.steer; inp.xrThrottle = o.thr; inp.touch.axis.x = inp.touch.axis.y = 0; }
+      else { W.ride = rideState(); inp.xrSteer = null; inp.xrThrottle = null; }
+      return;
+    }
     // the wheel follows the hands (the mean of how far each one turned since it took hold)
-    let d = 0; for (const h of W.hands) { const pos = host.handPos(h.H, _v2); if (!pos) continue; V.rig.localToWorld(pos); let da = angleOf(S, pos) - h.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); d += h.w0 + da; }
-    const lim = S.kind === 'wheel' ? WHEEL_TURN : BARS_TURN; W.angle = Math.max(-lim, Math.min(lim, d / W.hands.length));
-    inp.xrSteer = S.kind === 'wheel' ? W.angle / lim : -W.angle / lim;
-    // tracked hands: push away = gas, pull back = brake (along where you're looking, flat)
-    if (W.hands.every((h) => h.H.src?.hand)) {
-      const e = new THREE.Euler().setFromQuaternion(V.headQ, 'YXZ'), fx = -Math.sin(e.y), fz = -Math.cos(e.y); let push = 0;
-      for (const h of W.hands) { const pos = host.handPos(h.H, _v2); if (pos) push += (pos.x - h.p0.x) * fx + (pos.z - h.p0.z) * fz; }
-      push /= W.hands.length; const a = Math.abs(push);
-      inp.xrThrottle = a < PUSH_DEAD ? 0 : Math.sign(push) * Math.min(1, (a - PUSH_DEAD) / (PUSH_FULL - PUSH_DEAD));
-    } else inp.xrThrottle = null;
+    let d = 0; for (const h of W.hands) { const pos = host.handPos(h.H, _v2); if (!pos) continue; if (!bars) V.rig.localToWorld(pos); let da = angleOf(S, pos, W) - h.a0; da = Math.atan2(Math.sin(da), Math.cos(da)); d += h.w0 + da; }
+    const lim = bars ? RIDE.FULL : WHEEL_TURN; W.angle = Math.max(-lim, Math.min(lim, d / W.hands.length));
+    // tracked hands: push away = gas, pull back = brake, along where you look in a car and along the bike on a bike
+    const tracked = W.hands.every((h) => h.H.src?.hand); let push = 0;
+    if (tracked) {
+      const e = new THREE.Euler().setFromQuaternion(V.headQ, 'YXZ'), f = bars ? bikeFwd(S.v, _v) : _v.set(-Math.sin(e.y), 0, -Math.cos(e.y));
+      for (const h of W.hands) { const pos = host.handPos(h.H, _v2); if (pos) push += (pos.x - h.p0.x) * f.x + (pos.z - h.p0.z) * f.z; }
+      push /= W.hands.length;
+    }
+    if (bars) { const o = shapeRide(W.ride, -W.angle, push, S.v.fwdSpeed || 0, S.v.spec.max, dt); inp.xrSteer = o.steer; inp.xrThrottle = tracked ? o.thr : null; return; }
+    inp.xrSteer = W.angle / lim;
+    const a = Math.abs(push); inp.xrThrottle = !tracked ? null : a < PUSH_DEAD ? 0 : Math.sign(push) * Math.min(1, (a - PUSH_DEAD) / (PUSH_FULL - PUSH_DEAD));
   }
   function release(ctx) { P.wheel = null; V.wheelL = V.wheelR = false; ctx.input.xrSteer = null; ctx.input.xrThrottle = null; }
 
