@@ -8,9 +8,10 @@
 // the windows, Luna Park Radio plays (radio.js: mounted.passenger). A small phone card shows the driver, the ETA and distance and a
 // turn-by-turn mini map (one 200 px canvas, also drawn onto the VR tablet). Nothing is built until the first request. CONEY agent.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { hangkit as K } from '../hangkit.js';
-import { carGeometries, carMaterials, carInterior, carEye, carSpec } from '../carkit.js';
-import { buildPerson, peopleReady } from '../people.js';
+import { sharedCarGeometries, carMaterials, carInterior, carEye, carSpec, parkedCarBoxes, dropParkedCarBoxes } from '../carkit.js';
+import { buildPerson, peopleReady, avatarInUse } from '../people.js';
 import { OSM } from './osm.js';
 import { laneOff } from './traffic.js';
 import { TZ, AVE8 } from './tavern.js';
@@ -21,10 +22,10 @@ const VMAX = 12, A_LON = 2.2, A_LAT = 2.4, STEP = 1.5, RM = 7;        // m/s cru
 const APPROACH_D = 200, APPROACH_MIN = 60, MAX_WALK = 140;            // the car starts ~200 m of road away; you must be this close to a road
 const DEPART = 4, WAIT_MAX = 150, DROP_HOLD = 1.2, LEAVE_T = 7;       // s: after the booker gets in / how long it waits / out at the kerb / then gone
 const BOARD_R = 3.6, SPEED_STILL = 0.4, FEET_Y = 0.3;                   // F reach to the car; getting out only below this speed; your feet over the car's floor
-const BLACK = 0x0c0c0d, MAP_PX = 200, UI_HZ = 5;
+const BLACK = 0x0c0c0d, MAP_PX = 200, UI_HZ = 5, CLOTH_PX = 128, CLOTH_GLOW = 0.18;
 const SED = carSpec('sedan'), EYE = carEye('sedan');
 // seats in the kit frame (x forward, z right): 0 front passenger (the booker), 1 rear right, 2 rear left. y: eye height over the road
-const SEATS = [{ x: EYE.x, z: -EYE.z, eye: EYE.y }, { x: -0.95, z: 0.55, eye: 1.12 }, { x: -0.95, z: -0.55, eye: 1.12 }];
+const SEATS = [{ x: EYE.x, z: -EYE.z, eye: EYE.y }, { x: -1.12, z: 0.5, eye: 1.08 }, { x: -1.12, z: -0.5, eye: 1.08 }];   // the back row as far back as the sloped roof allows (legroom behind the front seats)
 const DRIVERS = [['Dmitri', 'ru'], ['Sergei', 'ru'], ['Anatoly', 'ru'], ['Oksana', 'ru'], ['Wei', 'cn'], ['Jun', 'cn'], ['Li Na', 'cn'], ['Zhang', 'cn']];
 const HOPS = { 'coney>tav': ['BELT PKWY', 'GOWANUS EXPWY · EXIT 7B', '8 AV · SUNSET PARK'], 'coney>ferry': ['BELT PKWY', 'SHORE PKWY', '69 ST · BAY RIDGE FERRY'],
   'tav>coney': ['8 AV', 'GOWANUS EXPWY · BELT PKWY', 'CONEY ISLAND'], 'tav>ferry': ['8 AV', '69 ST · BAY RIDGE FERRY'], 'coney>bri': ['SURF AVE · OCEAN PKWY', 'BRIGHTON BEACH AVE'],
@@ -261,25 +262,81 @@ function remaining(r, st) {   // { t: s, d: m } to the end of this phase (the pi
 // ---- the car (built on the first ride; later cars share its geometry) ------------------------------------------------------------
 function template() {
   if (U.tpl) return U.tpl;
-  const G = carGeometries('sedan').geos, CM = carMaterials(), paint = CM.paint.clone(); paint.color.setHex(BLACK); paint.name = 'uber_paint';
+  const G = sharedCarGeometries('sedan').geos, CM = carMaterials(), paint = CM.paint.clone(); paint.color.setHex(BLACK); paint.name = 'uber_paint';
   const body = new THREE.Group(); body.name = 'uberBody'; body.rotation.y = Math.PI / 2;
   for (const [slot, g] of Object.entries(G)) { if (!g || !CM[slot]) continue; const m = new THREE.Mesh(g, slot === 'paint' ? paint : slot === 'glass' ? (CM.glassSee || CM.glass) : CM[slot]); m.castShadow = slot === 'paint' && !U.ctx.lite; m.userData.surface = 'metal'; body.add(m); }
-  const cab = carInterior('sedan', G); body.add(cab.group);
+  const cab = carInterior('sedan', G); body.add(cab.group); cab.wheel.name = 'uberWheel';
   // the sedan's cabin has no rear bench (it sits behind its fast backlight): ours does, ahead of the rear axle where the back seats sit
   const seatMat = cab.group.children.find((o) => o.material?.color?.getHex?.() === 0x3b3029)?.material || CM.trim, rx = SEATS[1].x;
   const bench = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, SED.w * 0.76), seatMat); bench.position.set(rx - 0.02, SED.clr + 0.3, 0); cab.group.add(bench);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, SED.w * 0.76), seatMat); back.position.set(rx - 0.33, SED.clr + 0.6, 0); back.rotation.z = 0.24; cab.group.add(back);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, SED.w * 0.76), seatMat); back.position.set(rx - 0.33, SED.clr + 0.6, 0); back.rotation.z = 0.24; cab.group.add(back); bench.name = back.name = 'uberBench';
   U.tpl = body; return body;
 }
+// ---- the Camry's rear cabin, built the first time you sit in the back (5 merged meshes, one 128 px cloth texture) -------------------
+// grey woven bench (two contoured cushions + a centre section, bolstered backs, headrests), belts with orange buckle tabs, the front
+// seats' backs with map pockets, the console's rear vents and USB ports, black carpet mats, dark door cards with armrests and handles
+function clothTex() {
+  const c = document.createElement('canvas'); c.width = c.height = CLOTH_PX; const g = c.getContext('2d'); g.fillStyle = '#85878b'; g.fillRect(0, 0, CLOTH_PX, CLOTH_PX);
+  for (let y = 0; y < CLOTH_PX; y += 2) for (let x = 0; x < CLOTH_PX; x += 2) { const k = ((x >> 1) + (y >> 1)) % 2, n = (Math.sin(x * 12.9898 + y * 78.233) * 43758.5) % 1; g.fillStyle = `rgba(${k ? '255,255,255' : '0,0,0'},${0.06 + Math.abs(n) * 0.06})`; g.fillRect(x, y, 2, 1 + k); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function rearCabin() {
+  if (U.rear) return U.rear;
+  const parts = { cloth: [], dark: [], carpet: [], silver: [], tab: [] };
+  const box = (slot, w, h, d, x, y, z, rz = 0, rx = 0) => { const g = new THREE.BoxGeometry(w, h, d); if (rx) g.rotateX(rx); if (rz) g.rotateZ(rz); g.translate(x, y, z); parts[slot].push(g); };
+  const rx = SEATS[1].x + 0.1, y0 = SED.clr, HW = SED.w / 2;   // the cushion a little ahead of the rider's eye (hips under it, back behind)
+  for (const s of [1, -1]) { const z = s * 0.36;
+    box('cloth', 0.5, 0.12, 0.44, rx - 0.02, y0 + 0.33, z);                                               // cushion
+    for (const e of [0.21, -0.21]) box('cloth', 0.46, 0.06, 0.06, rx - 0.02, y0 + 0.41, z + e);          // its contour rolls
+    box('cloth', 0.12, 0.56, 0.42, rx - 0.33, y0 + 0.68, z, 0.24);                                         // back
+    for (const e of [0.2, -0.2]) box('cloth', 0.08, 0.5, 0.07, rx - 0.27, y0 + 0.68, z + e, 0.24);        // back bolsters
+    box('cloth', 0.1, 0.15, 0.24, rx - 0.44, y0 + 1.06, z, 0.24);                                          // headrest
+    box('dark', 0.012, 0.62, 0.05, rx - 0.25, y0 + 0.74, s * 0.6, 0.24, s * 0.55);                         // belt across the shoulder
+    box('tab', 0.03, 0.06, 0.03, rx - 0.22, y0 + 0.42, s * 0.14);                                          // buckle tab
+    box('dark', 0.04, 0.48, 0.44, EYE.x - 0.45, y0 + 0.66, z, 0.2);                                        // the front seat's back
+    box('dark', 0.03, 0.2, 0.38, EYE.x - 0.5, y0 + 0.5, z, 0.2);                                           // its map pocket
+    box('carpet', 0.36, 0.012, 0.42, EYE.x - 0.62, y0 + 0.07, z);                                          // floor mat
+    box('dark', 0.8, 0.48, 0.035, rx - 0.1, y0 + 0.62, s * (HW - 0.13));                                   // door card
+    box('dark', 0.42, 0.05, 0.09, rx + 0.02, y0 + 0.58, s * (HW - 0.18));                                  // armrest
+    box('silver', 0.12, 0.025, 0.02, rx + 0.25, y0 + 0.78, s * (HW - 0.16)); }                            // door handle
+  box('cloth', 0.48, 0.1, 0.22, rx - 0.02, y0 + 0.31, 0); box('cloth', 0.1, 0.52, 0.22, rx - 0.33, y0 + 0.64, 0, 0.24);   // centre section
+  box('dark', 0.03, 0.18, 0.2, EYE.x - 0.58, y0 + 0.42, 0);                                                // rear of the console
+  for (const dz of [-0.05, 0.05]) for (const dy of [0.46, 0.49]) box('silver', 0.006, 0.008, 0.07, EYE.x - 0.6, y0 + dy, dz);   // two vents' slats
+  for (const dz of [-0.03, 0.03]) box('silver', 0.006, 0.01, 0.025, EYE.x - 0.6, y0 + 0.37, dz);           // USB ports
+  const tex = clothTex();   // a touch of self-light: the cabin under the roof gets little of the sun, and the weave should still read
+  const M = { cloth: new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: CLOTH_GLOW, roughness: 0.95, name: 'uber_cloth' }), dark: new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.8, name: 'uber_rear_dark' }),
+    carpet: new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 1, name: 'uber_carpet' }), silver: new THREE.MeshStandardMaterial({ color: 0xb9bdc3, metalness: 0.8, roughness: 0.3, name: 'uber_silver' }),
+    tab: new THREE.MeshStandardMaterial({ color: 0xe0501c, roughness: 0.6, name: 'uber_buckle' }) };
+  const g = new THREE.Group(); g.name = 'uberRear';
+  for (const [k, list] of Object.entries(parts)) { const m = new THREE.Mesh(mergeGeometries(list), M[k]); list.forEach((q) => q.dispose()); m.castShadow = false; m.receiveShadow = true; g.add(m); }
+  U.rear = g; return g;
+}
+/** you sit in the back: this car gets the rear cabin (the plain bench under it hides) */
+function showRear(r) {
+  const body = r.car?.children[0]; if (!body || r.rearOn) return; r.rearOn = true;
+  body.traverse((o) => { if (o.name === 'uberBench') o.visible = false; }); body.add(rearCabin().clone());
+}
 function buildCar(r) {
-  const g = new THREE.Group(); g.name = 'uber'; g.add(template().clone());   // shares the template's geometry and materials
-  // the driver: seated at the wheel (feet just over the floor, a little behind the eye like net.js seats a friend at the wheel)
-  if (peopleReady()) { try { const f = buildPerson({ seed: 700 + (Math.abs(r.id) % 97), pose: 'sit', female: r.drv[0] === 'Oksana' || r.drv[0] === 'Li Na' }); kitToLocal(EYE.x - 0.2, 0.08, EYE.z, f.group.position); f.group.rotation.y = Math.PI; f.update(0.016); g.add(f.group); r.driver = f; } catch (e) { console.warn('[uber] driver', e?.message || e); } }
-  r.car = g; U.world.scene.add(g);
+  const g = new THREE.Group(); g.name = 'uber'; g.add(template().clone()); r.car = g;   // shares the template's geometry and materials
+  // the driver: seated at the wheel (feet just over the floor, DRV_FWD ahead of the eye so the arms reach the rim), hands on it (driverGrip)
+  if (peopleReady()) { try { const seed = 700 + (Math.abs(r.id) % 97), female = r.drv[0] === 'Oksana' || r.drv[0] === 'Li Na', f = buildPerson({ seed, pose: 'sit', female, avatar: avatarInUse(female, seed) }); kitToLocal(EYE.x + DRV_FWD, 0.08, EYE.z, f.group.position); f.group.rotation.y = Math.PI; g.add(f.group); r.driver = f; r.wheel = g.getObjectByName('uberWheel'); driverGrip(r); f.update(0.016); } catch (e) { console.warn('[uber] driver', e?.message || e); } }
+  U.world.scene.add(g);
 }
 const kitToLocal = (kx, ky, kz, out) => out.set(kz, ky, -kx);
+// the driver's hands at ten to two on the wheel's rim (carkit's rim: radius RIM_R in the wheel group's y-z plane, z to the right)
+const DRV_FWD = 0.1, RIM_R = 0.18, GRIP = [[0, 0.07, -0.166], [0, 0.07, 0.166]];
+function driverGrip(r) {
+  const f = r.driver, w = r.wheel; if (!f || !w) return; r.car.updateMatrixWorld(true);
+  f.grip = f.grip || [new THREE.Vector3(), new THREE.Vector3()]; GRIP.forEach((q, i) => w.localToWorld(f.grip[i].set(q[0], q[1], q[2])));
+}
+/** the parked / waiting car is solid (carkit cells, like a parked car); moving, it has no colliders (the grid rebuilds on each change) */
+function carSolid(r, on) {
+  if (!!r.solid === on) return; const ctx = U.ctx;
+  if (on) { r.solid = { kind: 'sedan', x: r.st.x, z: r.st.z, ry: r.st.h + Math.PI / 2 }; parkedCarBoxes(U.world, r.solid); }
+  else { dropParkedCarBoxes(ctx, r.solid); r.solid = null; }
+}
 function dropRide(r, msg) {
-  if (r.gone) return; r.gone = true; if (r.car) U.world.scene.remove(r.car); U.rides.delete(r.id);
+  if (r.gone) return; r.gone = true; carSolid(r, false); if (r.car) U.world.scene.remove(r.car); U.rides.delete(r.id);
   if (U.cur === r) { if (U.seat >= 0) getOut(false); U.cur = null; showApp(false); if (msg) K.toast(msg, 2400); }
 }
 const _w = new THREE.Vector3();
@@ -296,10 +353,10 @@ function boardable() {
   return null;
 }
 function boardDist(p) { const r = boardable(); return r ? Math.hypot(r.st.x - p.x, r.st.z - p.z) - 1.2 : Infinity; }
-function board(r) {
+function board(r, want = -1) {
   const { ctx } = U, p = ctx.player, me = ctx.net?.id || 'me', mine = r.owner === me;
-  const used = new Set(r.riders.values()); const seat = mine && !used.has(0) ? 0 : [1, 2, 0].find((s) => !used.has(s)); if (seat == null) { K.toast('The Uber is full', 1400); return; }
-  r.riders.set(me, seat); U.cur = r; U.seat = seat; U.yawPrev = r.st.h; U.lastPhase = '';
+  const used = new Set(r.riders.values()); const seat = want >= 0 && !used.has(want) ? want : mine && !used.has(0) ? 0 : [1, 2, 0].find((s) => !used.has(s)); if (seat == null) { K.toast('The Uber is full', 1400); return; }
+  r.riders.set(me, seat); U.cur = r; U.seat = seat; U.yawPrev = r.st.h; U.lastPhase = ''; if (seat >= 1) showRear(r);
   p.mounted = { passenger: true, uber: true, speed: 0 }; p.yaw = r.st.h; p.pitch = -0.05;
   ctx.net?.send?.('uber', { a: 'in', id: r.id, s: seat });
   if (mine && r.tg == null) { r.tg = Date.now() + DEPART * 1000; ctx.net?.send?.('uber', { a: 'go', id: r.id, tg: r.tg }); }
@@ -328,7 +385,8 @@ function update(dt) {
     if (r.tg == null && now > r.t0 + (r.appr.T + WAIT_MAX) * 1000) { dropRide(r, `${r.drv[0]} couldn't wait any longer and left`); continue; }
     if (st.phase === 'arrived' && st.since > LEAVE_T && !(U.cur === r && U.seat >= 0)) { if (U.cur === r) { U.cur = null; showApp(false); } dropRide(r, null); continue; }
     const g = r.car; if (!g) continue; g.visible = st.vis; g.position.set(st.x, 0, st.z); g.rotation.y = st.h;
-    if (r.driver && p && st.vis && Math.hypot(st.x - p.position.x, st.z - p.position.z) < 60) r.driver.update(dt, 0);
+    carSolid(r, st.vis && st.v < SPEED_STILL && (st.phase === 'waiting' || st.phase === 'arrived'));
+    if (r.driver && p && st.vis && Math.hypot(st.x - p.position.x, st.z - p.position.z) < 60) { driverGrip(r); r.driver.update(dt, 0); }
     if (r === U.cur && U.seat < 0 && st.phase === 'waiting' && U.lastPhase !== 'waiting' && r.owner === (ctx.net?.id || 'me')) K.toast(`${r.drv[0]} is here: black Camry, plate ${r.plate}. F at the car to get in`, 3000);
     if (r === U.cur && U.seat < 0) U.lastPhase = st.phase;
   }
@@ -366,7 +424,7 @@ function buildUI() {
   const el = document.createElement('div'); el.className = 'uber-app' + (U.ctx.isTouch ? ' touch' : ''); el.style.display = 'none';
   el.innerHTML = '<header><b>Uber</b><span class="cash"></span><button data-u="close">✕</button></header><div class="ub-body"></div><canvas width="' + MAP_PX + '" height="' + MAP_PX + '"></canvas><div class="ub-foot"></div>';
   document.body.appendChild(el); U.el = el; U.body = el.querySelector('.ub-body'); U.foot = el.querySelector('.ub-foot'); U.cv = el.querySelector('canvas'); U.g = U.cv.getContext('2d');
-  const tap = (e) => { const t = e.target.closest('[data-u]'); if (!t) return; e.preventDefault(); e.stopPropagation(); const a = t.dataset.u;
+  const tap = (e) => { const t = e.target.closest('[data-u]'); if (!t) { if (!U.picking && U.cur) { e.preventDefault(); U.big = !U.big; showApp(true, false); } return; }   // the trip card: tap to expand / collapse e.preventDefault(); e.stopPropagation(); const a = t.dataset.u;
     if (a === 'close') showApp(false); else if (a === 'cancel') action(); else if (a.startsWith('go:')) request(a.slice(3)); };
   el.addEventListener('click', tap); el.addEventListener('touchend', tap);
 }
@@ -379,6 +437,7 @@ function toggleApp() { if (!K.has('phone')) { K.toast('No phone on you', 1200); 
 /** show the card: picking a destination (pointer free for the buttons) or the trip status (doesn't take the mouse) */
 function showApp(on, pick = false) {
   U.picking = on && pick && !U.cur; U.el.style.display = on ? 'block' : 'none'; U.el.classList.toggle('pick', U.picking); U.uiT = 0;
+  if (!U.cur) U.big = false; U.el.classList.toggle('mini', !U.picking && !!U.cur && !U.big);   // booked: a small corner card (driver, ETA, map) until tapped
   if (U.picking) { try { document.exitPointerLock?.(); } catch {} } else if (on === false && U.ctx.state === 'playing' && !U.ctx.isTouch && !document.pointerLockElement) { try { U.ctx.requestPointerLock?.(); } catch {} }
   renderApp();
 }
@@ -440,15 +499,25 @@ function drawMap(r) {
 function qa() {
   return {
     state: () => { const r = U.cur, p = U.ctx.player, st = r?.st; return { cash: K.cash, phone: K.has('phone'), open: U.el.style.display !== 'none', picking: !!U.picking, seat: U.seat, mounted: !!p.mounted?.uber, rides: U.rides.size,
-      cur: r ? { id: r.id, phase: st.phase, zone: st.zone, dest: r.dest.id, driver: r.drv[0], car: [+st.x.toFixed(1), +st.z.toFixed(1), +st.h.toFixed(2)], v: +st.v.toFixed(1), riders: [...r.riders.values()], tg: r.tg, approachT: +r.appr.T.toFixed(1), approachL: +r.appr.L.toFixed(0), legs: r.legs.map((l) => [l.z, +l.P.L.toFixed(0), +l.P.T.toFixed(1)]), driverModel: !!r.driver, lines: statusLines() } : null,
+      cur: r ? { id: r.id, phase: st.phase, zone: st.zone, dest: r.dest.id, driver: r.drv[0], car: [+st.x.toFixed(1), +st.z.toFixed(1), +st.h.toFixed(2)], v: +st.v.toFixed(1), riders: [...r.riders.values()], tg: r.tg, approachT: +r.appr.T.toFixed(1), approachL: +r.appr.L.toFixed(0), legs: r.legs.map((l) => [l.z, +l.P.L.toFixed(0), +l.P.T.toFixed(1)]), driverModel: !!r.driver, avatar: r.driver?.avatar, lines: statusLines() } : null,
       eyeOverRoad: +(U.ctx.camera.position.y).toFixed(2), pos: p.position.toArray().map((v) => +v.toFixed(1)), ui: U.el.textContent }; },
-    request: (id) => request(id), open: () => toggleApp(), board: () => { const r = boardable(); if (r) board(r); return !!r; }, out: () => getOut(false),
+    card: () => { const b = U.el.getBoundingClientRect(); return { mini: U.el.classList.contains('mini'), w: Math.round(b.width), h: Math.round(b.height), x: Math.round(b.x), y: Math.round(b.y), vw: innerWidth, vh: innerHeight }; }, tapCard: () => U.el.querySelector('.ub-body').click(),
+    request: (id) => request(id), open: () => toggleApp(), board: (seat = -1) => { const r = boardable(); if (r) board(r, seat); return !!r; }, out: () => getOut(false),
     broke: () => { K.pay(K.cash); return K.cash; }, cash: (n) => { K.pay(K.cash); K.earn(n); return K.cash; },
     // QA: fast-forward the current ride's clock by s seconds (moves its start times back; this client only)
     ff: (s) => { const r = U.cur; if (!r) return false; r.t0 -= s * 1000; if (r.tg != null) r.tg -= s * 1000; return true; },
     remote: () => [...U.rides.values()].map((r) => ({ id: r.id, owner: r.owner, phase: r.st.phase, car: [r.st.x, r.st.z], riders: [...r.riders.entries()] })),
     kerb: () => { const r = U.cur; return r ? [r.appr.x[r.appr.x.length - 1], r.appr.z[r.appr.z.length - 1], r.appr.h[r.appr.h.length - 1]] : null; },
     walkDist: () => { const G = graphs(), p = U.ctx.player.position, z = zoneAt(p.x, p.z); const e = z && nearestEdge(G[z], p.x, p.z); return e ? +e.d.toFixed(1) : null; },
+    // QA: the driver's wrists to the wheel rim (m): the distance from each wrist to the nearest point of the rim circle
+    hands: () => { const r = U.cur, f = r?.driver, w = r?.wheel; if (!f || !w) return null; r.car.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(w.matrixWorld).invert(), ws = w.getWorldScale(new THREE.Vector3()).x;
+      return f.wrists().map((b) => { const q = b.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv), rr = Math.hypot(q.y, q.z); return +(Math.hypot(q.x, rr - RIM_R) * ws).toFixed(3); }); },
+    // QA: geometry bytes the current car holds of its own (not the parked sedans' shared set), and that shared set's size
+    geoBytes: () => { const r = U.cur; if (!r?.car) return null; const shared = new Set(Object.values(sharedCarGeometries('sedan').geos)), seen = new Set(); let own = 0, sh = 0;
+      const sz = (g) => Object.values(g.attributes).reduce((a, x) => a + x.array.byteLength, 0) + (g.index ? g.index.array.byteLength : 0);
+      r.car.traverse((o) => { const g = o.geometry; if (!g || seen.has(g)) return; seen.add(g); if (shared.has(g)) sh += sz(g); else if (!o.isSkinnedMesh) own += sz(g); });
+      return { own: +(own / 1048576).toFixed(2), shared: +(sh / 1048576).toFixed(2) }; },
+    solid: () => { const r = U.cur; return r?.solid ? r.solid.boxes.length : 0; },
     destDist: () => { const G = graphs(); return DESTS.filter((d) => d.zone !== 'ferry').map((d) => { const a = d.at(), e = nearestEdge(G[d.zone], a[0], a[1]); return [d.id, +e.d.toFixed(1)]; }); },
   };
 }
@@ -463,5 +532,9 @@ const CSS = `
 .uber-app .ub-body button{display:flex;align-items:center;gap:8px;width:100%;margin:4px 0;padding:9px 10px;border:0;border-radius:10px;background:#1d1e20;color:#fff;font:600 13px system-ui;text-align:left;cursor:pointer}
 .uber-app .ub-body button b{color:#7ea8ff;width:12px}.uber-app .ub-body button em{margin-left:auto;font-style:normal;opacity:.6}.uber-app .ub-body button:hover{background:#2b2d31}
 .uber-app canvas{display:block;width:100%;aspect-ratio:1;border-radius:14px;margin-top:6px}
+.uber-app.mini{width:150px;padding:6px 8px 8px;border-radius:14px;border-width:2px;font-size:10.5px;pointer-events:auto;cursor:pointer}
+.uber-app.mini.touch{width:min(30vw,140px)}
+.uber-app.mini header{margin-bottom:2px}.uber-app.mini header b{font-size:13px}.uber-app.mini header .cash,.uber-app.mini header button,.uber-app.mini .ub-body p.l2,.uber-app.mini .ub-foot{display:none}
+.uber-app.mini .ub-body p{margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.uber-app.mini .ub-body p.l1{font-size:1em;white-space:normal}.uber-app.mini canvas{margin-top:4px;border-radius:8px}
 .uber-app .ub-foot{margin-top:6px;text-align:center}.uber-app .ub-foot small{opacity:.5}.uber-app .ub-foot button{width:100%;padding:7px;border:0;border-radius:10px;background:#2a2b2e;color:#fff;font:600 12px system-ui;cursor:pointer}
 `;

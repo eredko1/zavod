@@ -69,15 +69,32 @@ async function rideTo(pg, dest, { realWait = false } = {}) {
   const c0 = (await U(pg)).cash; await pg.evaluate(() => window.__game.timeScale(0)); await sleep(1500); await heap(); const h0 = await heap();
   ok(await pg.evaluate(() => window.__game.uber.request('soctav')), 'booked a ride to Soc Tav');
   await sleep(300); await heap(); const hBuilt = await heap(); await pg.evaluate(() => window.__game.timeScale(1)); console.log(`heap after GC: before the first request ${h0.toFixed(1)} MB, with the car, driver and road graphs built ${hBuilt.toFixed(1)} MB (delta ${(hBuilt - h0).toFixed(1)} MB)`);
-  ok(hBuilt - h0 < 5, 'building the Uber adds under 5 MB of heap', `${(hBuilt - h0).toFixed(1)} MB`);
+  const geo = await pg.evaluate(() => window.__game.uber.geoBytes());
+  ok(hBuilt - h0 < 5, 'building the Uber adds under 5 MB of heap', JSON.stringify({ heap: +(hBuilt - h0).toFixed(1), driver: (await U(pg)).cur?.avatar }));
+  ok(geo && geo.own < 1 && geo.shared > 0.3, 'the Uber reuses the parked sedan geometry (under 1 MB of its own)', JSON.stringify(geo));
   st = await U(pg); ok(st.cash === c0 - 5 && st.cur?.phase === 'coming' && st.cur.driverModel, 'paid $5, car coming with a driver', JSON.stringify({ cash: st.cash, cur: st.cur }));
   ok(st.cur.approachT > 5 && st.cur.approachT < 60, 'approach ETA is sane (Coney)', `${st.cur.approachT} s over ${st.cur.approachL} m`);
   ok(/Arriving in/.test(st.ui), 'phone card shows the driver and ETA', st.cur.lines.join(' | '));
+  // booked: a compact corner card (under 30% of the width, clear of the crosshair), tap to expand, tap again to collapse
+  const card = await pg.evaluate(() => window.__game.uber.card());
+  const clear = (c) => c.x > c.vw / 2 + 60 || c.y + c.h < c.vh / 2 - 60;
+  ok(card.mini && card.w <= card.vw * 0.3 && clear(card), 'booked: the phone collapses to a small corner card', JSON.stringify(card));
+  const big = await pg.evaluate(() => { window.__game.uber.tapCard(); return window.__game.uber.card(); }), small = await pg.evaluate(() => { window.__game.uber.tapCard(); return window.__game.uber.card(); });
+  ok(!big.mini && big.w > card.w && small.mini, 'tap expands the card, tap again collapses it', JSON.stringify({ big: big.w, small: small.w }));
   await sleep(2500); await pg.screenshot({ path: `${out}/uber-coming.png` });
   const t0 = Date.now(); await pg.waitForFunction(() => window.__game.uber.state().cur?.phase === 'waiting', null, { timeout: 90000 });
   const arr = (Date.now() - t0) / 1000 + 2.5; ok(arr < 60, 'the car pulled up at the kerb', `${arr.toFixed(1)} s`);
   const walk = await pg.evaluate(([x, , z]) => Math.hypot(window.__game.uber.kerb()[0] - x, window.__game.uber.kerb()[1] - z), SPAWN);
   ok(walk < 25, 'the kerb is a few metres from where you booked', `${walk.toFixed(1)} m`);
+  // the waiting car is solid: walk straight at it from the kerb side for 1.5 s, you stop at its flank
+  const solidN = await pg.evaluate(() => window.__game.uber.solid());
+  await pg.evaluate(() => { const k = window.__game.uber.kerb(), c = Math.cos(k[2]), s = Math.sin(k[2]); window.__game.teleport(k[0] + c * 3, 0, k[1] - s * 3, k[2] + Math.PI / 2, 0); });
+  await sleep(300); await pg.keyboard.down('KeyW'); await sleep(1500); await pg.keyboard.up('KeyW'); await sleep(200);
+  const side = await pg.evaluate(() => { const k = window.__game.uber.kerb(), p = window.__ctx.player.position; return +((p.x - k[0]) * Math.cos(k[2]) - (p.z - k[1]) * Math.sin(k[2])).toFixed(2); });
+  ok(solidN > 0 && side > 0.85, 'you can\'t walk through the waiting car', JSON.stringify({ boxes: solidN, offsetFromCentre: side }));
+  // the driver's hands on the wheel rim
+  const hands = await pg.evaluate(() => window.__game.uber.hands());
+  ok(hands && hands.every((d) => d < 0.1), 'the driver\'s hands are within 10 cm of the wheel rim', JSON.stringify(hands));
   st = await boardF(pg);
   ok(st.seat === 0 && st.mounted, 'F gets you in, front passenger seat', JSON.stringify({ seat: st.seat }));
   ok(st.eyeOverRoad > 1.08 && st.eyeOverRoad < 1.3, 'seated eye height', `${st.eyeOverRoad} m`);
@@ -153,6 +170,8 @@ async function rideTo(pg, dest, { realWait = false } = {}) {
   const ab = await see(A, ids.b), ba = await see(B, ids.a);
   ok(ab && ab.d < 2 && ba && ba.d < 2, 'each sees the other sitting in the moving car', JSON.stringify({ ab, ba }));
   await B.evaluate(() => { const p = window.__ctx.player, h = window.__game.uber.state().cur.car[2]; p.yaw = h + 0.5; p.pitch = -0.1; }); await sleep(400); await B.screenshot({ path: `${out}/uber-mp-back-seat.png` });
+  await B.evaluate(() => { const p = window.__ctx.player, h = window.__game.uber.state().cur.car[2]; p.yaw = h + 0.9; p.pitch = -0.45; }); await sleep(400); await B.screenshot({ path: `${out}/uber-rear-seat.png` });
+  ok(await B.evaluate(() => { let n = 0; window.__ctx.scene?.traverse?.((o) => { if (o.name === 'uberRear') n++; }); return n; }) === 1, 'the back-seat rider gets the Camry rear cabin');
   const total = (await U(A)).cur.legs.reduce((s, l) => s + l[2], 0) + 12;
   await Promise.all([A.evaluate((s) => window.__game.uber.ff(s), total), B.evaluate((s) => window.__game.uber.ff(s), total)]); await sleep(1500);
   a = await U(A); bs = await U(B);

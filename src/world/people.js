@@ -73,6 +73,10 @@ function prepAvatar(gltf, ctx) {
 
 // ------------------------------------------------------------------------------------------------------------------------
 /** pick an avatar from buildFigure-style options (explicit o.avatar wins) */
+// avatars already built at least once: the first person of an avatar costs ~4-5 MB of heap, more of one costs ~0.3 MB
+const USED = new Set();
+/** an avatar some person already wears (female or not), picked by seed, or null: late extras (the Uber driver) add no new avatar */
+export function avatarInUse(female, seed = 0) { const l = [...USED].filter((id) => AVATARS[id].g === (female ? 'f' : 'm') && !AVATARS[id].solo); return l.length ? l[Math.abs(seed) % l.length] : null; }
 function pickAvatar(o, seed) {
   const have = Object.keys(P.av); if (o.avatar && P.av[o.avatar]) return o.avatar;
   const lum = (c) => (((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11) / 255;
@@ -121,7 +125,7 @@ export function wearHat(F, kind, col = 0x1a2a5a) {
 
 export function buildPerson(o = {}) {
   const seed = o.seed ?? Math.floor(Math.random() * 1000);
-  const id = pickAvatar(o, seed), A = P.av[id], g = AVATARS[id].g;
+  const id = pickAvatar(o, seed), A = P.av[id], g = AVATARS[id].g; USED.add(id);
   const group = new THREE.Group(); group.name = 'person';
   const inner = new THREE.Group(); inner.rotation.y = -A.yawFix; inner.position.y = -A.footY; group.add(inner);
   const model = SkeletonUtils.clone(A.root); inner.add(model);
@@ -147,11 +151,11 @@ export function buildPerson(o = {}) {
   if (act[base]) act[base].setEffectiveWeight(1);
   const limbs = { arms: [{ sh: L.up, fore: handR, s: -1 }, { sh: R.up, fore: handR, s: 1 }], legs: [] };
   const F = {
-    group, head, body: inner, limbs, handR, avatar: id, mood: null,   // mood: 'talk' | 'drunk' | 'angry' swaps the idle loop
+    group, head, body: inner, limbs, handR, avatar: id, mood: null, grip: null, wrists: () => [L.hand, R.hand],   // mood: 'talk' | 'drunk' | 'angry' swaps the idle loop
     guard: false, hands: false, phone: false, act: null,
     play(name, dur = name === 'punch' ? 0.34 : name === 'hit' ? 0.42 : 0.5) { F.act = { name, t: 0, dur, side: Math.random() < 0.5 ? 1 : 0 }; },
     update(dt, speed = 0) {
-      if (base === 'sit') { mixer.update(dt); return; }
+      if (base === 'sit') { mixer.update(dt); grip(); return; }
       const sp = F.guard || F.hands ? 0 : speed, idleK = o.mood || F.mood;
       const wWalk = sp > 0.05 ? Math.min(1, sp / 1.2) * (sp > 2.6 ? Math.max(0, 1 - (sp - 2.6) / 1.2) : 1) : 0, wRun = sp > 2.6 ? Math.min(1, (sp - 2.6) / 1.2) : 0, wIdle = Math.max(0, 1 - wWalk - wRun);
       for (const [k, a] of Object.entries(act)) { const want = k === 'walk' ? wWalk : k === 'run' ? wRun : k === (idleK && act[idleK] ? idleK : 'idle') ? wIdle : 0; a.setEffectiveWeight(THREE.MathUtils.lerp(a.getEffectiveWeight(), want, Math.min(1, dt * 8))); }
@@ -173,6 +177,26 @@ export function buildPerson(o = {}) {
     b.updateWorldMatrix(false, true);
   }
   function lean(b, ax, ang) { if (!b || !ang) return; const axis = dirW(...ax); const wq = b.getWorldQuaternion(new THREE.Quaternion()); const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert(); b.quaternion.copy(pq.multiply(_q.setFromAxisAngle(axis, ang).multiply(wq))); b.updateWorldMatrix(false, true); }
+  // two-bone reach: the shoulder → elbow → wrist chain bent so the wrist lands on a world point, the elbow out and down
+  const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _H = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3(), _A = new THREE.Vector3(), _C = new THREE.Vector3();
+  function aimW(b, child, want) {
+    b.updateWorldMatrix(true, false); child.updateWorldMatrix(false, false);
+    const cur = _v2.copy(child.getWorldPosition(_C)).sub(b.getWorldPosition(_P)).normalize(); const d = _q.setFromUnitVectors(cur, want);
+    const wq = b.getWorldQuaternion(new THREE.Quaternion()); const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+    b.quaternion.copy(pq.multiply(d.multiply(wq))); b.updateWorldMatrix(false, true);
+  }
+  function reach(a, s, target) {
+    if (!a.up || !a.fore || !a.hand) return;
+    a.up.updateWorldMatrix(true, true); a.up.getWorldPosition(_S); a.fore.getWorldPosition(_E); a.hand.getWorldPosition(_H);
+    const la = _S.distanceTo(_E), lb = _E.distanceTo(_H); _T.copy(target).sub(_S); const d = Math.min(_T.length(), (la + lb) * 0.999), dir = _T.normalize();
+    const pole = dirW(s * 0.7, -1, -0.2); pole.addScaledVector(dir, -pole.dot(dir)).normalize();   // elbow out to the side and down
+    const x = (la * la - lb * lb + d * d) / (2 * d), y = Math.sqrt(Math.max(0, la * la - x * x));
+    _E.copy(_S).addScaledVector(dir, x).addScaledVector(pole, y);
+    aimW(a.up, a.fore, _A.copy(_E).sub(_S).normalize());
+    a.fore.getWorldPosition(_E); aimW(a.fore, a.hand, _A.copy(_S).addScaledVector(dir, d).sub(_E).normalize());
+  }
+  /** F.grip = [left, right] world points (a steering wheel's rim): the seated driver's wrists go there after the sit loop */
+  function grip() { const g = F.grip; if (!g) return; if (g[0]) reach(L, 1, g[0]); if (g[1]) reach(R, -1, g[1]); }
   // character frame: +Z forward, +Y up; the right arm is on −X
   const side = { R: -1, L: 1 };
   function overlay(dt) {
