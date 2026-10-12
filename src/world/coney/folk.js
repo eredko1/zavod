@@ -425,7 +425,7 @@ function tick() {
   // muggers: now and then one of the locals near you decides you look rich
   F.mugT -= 0.25 * (1 + 0.67 * (F.world.W.night ?? 0));   // more muggings after dark
   nightPeople();
-  if (F.mugT <= 0) { F.mugT = (ctx.mode === 'chill' ? 70 : 150) + Math.random() * 70; if (!crewCalm() && !st.dialog && !ctx.vehicles?.mounted) mugger(10, 30); }
+  if (F.mugT <= 0) { F.mugT = (ctx.mode === 'chill' ? 70 : 150) + Math.random() * 70; if (!crewCalm() && !st.dialog && !ctx.vehicles?.mounted && !F.world.W.tavern?.inZone?.(ctx.player.position)) mugger(10, 30); }   // not on 8th Ave: Soc Tav's block is the regulars' turf (a stick-up cut into the bar talk)
 }
 function mugger(dmin, dmax) {
   const P = F.ctx.player.position; let best = null, bd = Infinity;

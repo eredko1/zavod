@@ -56,9 +56,29 @@ st = await S(); ok(st.bayRidge && st.label === 'GET OFF · BAY RIDGE' && st.big,
 const n2 = await pg.evaluate(() => window.__game.ferry.boats()); ok(n2.bayRidge === 2, 'two boats at the Bay Ridge landing', JSON.stringify(n2));
 const c3 = await pg.evaluate(() => { window.__game.ferry.paint(); return window.__game.ferry.clock()[1]; }); ok(/^NEXT FERRY TO CONEY ISLAND {2}0:1\d$/.test(c3), 'Bay Ridge board', c3);
 await pg.evaluate(() => { window.__ctx.player.yaw += Math.PI / 2; }); await wait(800); await pg.screenshot({ path: `${out}/ferry-bayridge.png` });
+await pg.keyboard.press('KeyF'); await wait(800);
+const BG = () => pg.evaluate(() => window.__game.ferry.barge());
+st = await S(); let br = await BG();
+ok(!st.aboard && br.on && br.visible, 'got off at Bay Ridge onto the barge', JSON.stringify(br));
+await wait(1500); const br1 = await BG();
+ok(br1.on && Math.abs(br1.y - 0.9) < 0.2 && Math.abs(br1.wz - br1.z) < 0.01, 'standing on the barge deck (riding the swell)', JSON.stringify({ y0: br.y, y1: br1.y }));
+await pg.screenshot({ path: `${out}/ferry-bayridge-barge.png` });
+// up the barge and the gangway to the shore end: the TO SOC TAV prompt, F → the fade to Soc Tav
+let lab = null; await pg.evaluate(() => { const b = window.__game.ferry.barge(), p = window.__ctx.player; p.yaw = Math.atan2(-(b.shore[0] - b.x), -(b.shore[1] - b.z)); p.pitch = 0; });
+await pg.keyboard.down('KeyW'); for (let i = 0; i < 70 && lab !== 'TO SOC TAV · 69TH ST'; i++) { await wait(300); lab = (await S()).label; } await pg.keyboard.up('KeyW');
+br = await BG(); ok(lab === 'TO SOC TAV · 69TH ST' && br.on && br.y > 1.5, 'walked up the gangway to the shore end: TO SOC TAV prompt', JSON.stringify({ lab, br }));
+await pg.screenshot({ path: `${out}/ferry-bayridge-gangway.png` });
 await pg.keyboard.press('KeyF'); await wait(3500);
-st = await S(); const inTav = await pg.evaluate(() => window.__game.tavern?.state?.().inZone);
-ok(!st.aboard && inTav, 'got off at Bay Ridge (up the B70 to Soc Tav)', JSON.stringify({ aboard: st.aboard, inTav }));
+st = await S(); let inTav = await pg.evaluate(() => window.__game.tavern?.state?.().inZone);
+ok(!st.aboard && !(await BG()).on && inTav, 'F at the top: the fade up the B70 to Soc Tav', JSON.stringify({ aboard: st.aboard, inTav }));
+// and back: the B70 stop by Soc Tav → the barge; board on foot at the gate when she's in
+await pg.evaluate(() => window.__game.ferry.toBarge()); await wait(1200);
+br = await BG(); ok(br.on && br.x > br.shore[0] - 1, 'from Soc Tav: the B70 down to the 69th St landing', JSON.stringify(br));
+await pg.evaluate(() => window.__game.ferry.skew(121)); await pg.evaluate(() => { const b = window.__game.ferry.barge(); window.__game.ferry.bargeAt(b.gate[0], b.gate[1] - 1); }); await wait(800);
+st = await S(); ok(st.label === 'BOARD · CONEY ISLAND' && st.big, 'at the gate with her in: big BOARD button', JSON.stringify(st));
+await pg.keyboard.press('KeyF'); await wait(800);
+st = await S(); ok(st.aboard && !(await BG()).on, 'boarded on foot at Bay Ridge', JSON.stringify(st));
+await pg.evaluate(() => window.__game.ferry.leave()); await wait(500);
 
 // ---- land on her at sea from the air, ride along, jump off ----
 await pg.evaluate(() => window.__game.ferry.skew(64)); await wait(1500);
