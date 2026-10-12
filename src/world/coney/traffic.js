@@ -245,7 +245,7 @@ export function buildTraffic(world) {
   T.shellMat = new THREE.MeshStandardMaterial({ color: 0x3a3733, roughness: 0.9, side: THREE.BackSide }); T.shellMat.name = 'traffic_shell';
   T.cabMat = new THREE.MeshStandardMaterial({ color: 0x232221, roughness: 0.75 }); T.cabMat.name = 'traffic_cabin';
   // the fleet: fixed kinds per pool slot (each slot = one instance in its kind's meshes)
-  const mix = lite ? ['sedan', 'suv', 'cab', 'sedan', 'hatch', 'suv', 'van', 'sedan', 'cab', 'hatch'] : ['sedan', 'suv', 'cab', 'sedan', 'hatch', 'suv', 'van', 'sedan', 'cab', 'muscle', 'sedan', 'suv', 'hatch', 'cab', 'sedan', 'coupe', 'suv', 'van', 'sedan', 'hatch', 'cab', 'muscle', 'suv', 'sedan'];
+  const mix = lite ? ['sedan', 'suv', 'cab', 'sedan', 'hatch', 'suv', 'van', 'sedan', 'cab', 'hatch'] : ['sedan', 'suv', 'cab', 'e34', 'hatch', 'suv', 'van', 'sedan', 'cab', 'muscle', 'sedan', 'suv', 'hatch', 'cab', 'sedan', 'coupe', 'suv', 'van', 'sedan', 'hatch', 'cab', 'muscle', 'suv', 'sedan'];
   const kinds = []; for (let i = 0; i < budget; i++) kinds.push(mix[i % mix.length]);
   const count = {}; for (const k of kinds) count[k] = (count[k] || 0) + 1;
   const model = !lite && hasCarModel('coupe');
