@@ -47,6 +47,7 @@ export const ITEMS = {
   shrooms: { kind: 'trip', icon: '🍄', name: 'Felip\'s mushrooms', trip: 120 },   // 2 minutes, tripping balls
   coke: { kind: 'smoke', icon: '❄️', name: 'bag of coke', rush: 60 },   // B: a bump. Sobers you up some, a minute of speed, then the crash
   zippo: { kind: 'tool', icon: '🔥', name: 'Zippo (brushed chrome)', keep: true },
+  phone: { kind: 'gear', icon: '📱', name: 'iPhone (Uber app)', keep: true, app: 'phone' },   // app: Open in the bag emits this bus event (coney/uber.js)
 };
 
 let V = null;
@@ -78,6 +79,8 @@ const api = {
   pay(n) { if (!V || V.cash < n) return false; V.cash -= n; renderCash(); return true; },
   earn(n) { if (!V) return; V.cash += n; renderCash(); },
   give(item) { if (!V || V.inv.length >= MAX_INV) return false; V.inv.push(item); renderCash(); return true; },
+  /** a map's own starting item (coney chill: the phone): in the bag now and again after START FRESH */
+  starter(item) { if (!V) return; V.starter = V.starter || []; if (!V.starter.includes(item)) V.starter.push(item); if (!V.inv.includes(item)) api.give(item); },
   full: () => !V || V.inv.length >= MAX_INV,
   /** interaction point: { pos: Vector3 (may move), r, dy, prompt: string | () => string, act: () => void, when?: () => bool } */
   spot(s) { V.spots.push({ r: 2, dy: 1.3, ...s }); return s; },
@@ -143,7 +146,7 @@ function bindOnce(ctx) {
   ctx.bus.on('net:fresh', (m) => { if (!V) return; V.ctx.hud?.toast?.(`${V.ctx.net?.peer?.(m.f)?.name || 'A friend'} started everyone fresh`, 2400); V.ctx.bus.emit('worldReset', { by: m.f }); });
   ctx.bus.on('worldReset', () => {
     if (!V) return; const { ctx } = V; closeDialog();
-    V.cash = V.startCash; V.inv.length = 0; V.inv.push('bic', 'cigs', 'drone', 'drone'); V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; V.rushT = 0; if (V.ctx?.player) V.ctx.player.rush = 0; endTrip(); V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
+    V.cash = V.startCash; V.inv.length = 0; V.inv.push('bic', 'cigs', 'drone', 'drone', ...(V.starter || [])); V.drunk = 0; V.drunkT = -1; V.high = 0; V.highT = -1; V.magicT = 0; V.tripT = 0; V.rushT = 0; if (V.ctx?.player) V.ctx.player.rush = 0; endTrip(); V.status = {}; V.iceT = null; V.cigLeft = 0; V.left = {}; renderCash();
     for (const H of V.hurtables) { H.down = false; H.hp = 100; H.k = 0; const b = H.fig.body || H.fig.group; b.rotation.x = 0; if (H.o.vendor) H.o.vendor.off = false; }
     for (const d of V.drops || []) { try { V.world.scene.remove(d.g || d.mesh || d); } catch {} } if (V.drops) V.drops.length = 0;
     for (const m of V.puddles || []) m.visible = false;
@@ -238,7 +241,7 @@ function update(dt) {
   if (ctx.input?.pressed?.has?.('KeyB')) { ctx.input.pressed.delete('KeyB'); useItem(); }   // B = blaze / drink, anywhere
   const pos = p.position; const near = (v, r, dy = 1.3) => Math.hypot(v.x - pos.x, v.z - pos.z) < r && Math.abs(v.y - pos.y) < dy;
   let prompt = null, act = null;
-  if (!ctx.vehicles?.mounted && !p.mounted?.ferry) {   // (on the ferry F is the ferry's: the bar, getting off)
+  if (!ctx.vehicles?.mounted && !p.mounted?.ferry && !p.mounted?.uber) {   // (on the ferry F is the ferry's: the bar, getting off; in an Uber, getting out)
     // the closest vendor / interaction point wins (walkers pass by the mangal, the deli counter, …)
     let bd = Infinity; const dist = (v) => Math.hypot(v.x - pos.x, v.z - pos.z);
     for (const v of V.vendors) if (!v.off && near(v.pos, v.r) && dist(v.pos) < bd) { bd = dist(v.pos); prompt = `F — TALK TO ${v.name}`; act = () => talk(v); }

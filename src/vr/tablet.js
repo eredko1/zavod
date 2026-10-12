@@ -12,7 +12,7 @@ import { savePlay, AIM_ASSIST } from '../ctx.js';
 const CW = 1024, CH = 704, TW = 0.32, TH = TW * CH / CW, TAB_H = 92, PAD = 10, COLS = 4, ROWS = 3;
 const POKE_IN = 0.012, POKE_OUT = 0.025, HOVER_Z = 0.05, BACK_Z = -0.04;
 const MAP_HZ = 4, PALM_FACING = 0.55;
-const TABS = [['act', '⚡ ACT'], ['bag', '🎒 BAG'], ['guns', '🔫 GUNS'], ['map', '🗺 MAP'], ['friends', '👥 CREW'], ['set', '⚙ SET'], ['help', '❔ HELP']];
+const TABS = [['act', '⚡ ACT'], ['bag', '🎒 BAG'], ['guns', '🔫 GUNS'], ['map', '🗺 MAP'], ['uber', '🚕 UBER'], ['friends', '👥 CREW'], ['set', '⚙ SET'], ['help', '❔ HELP']];
 const ACTS = [['⤒ JUMP', 'Space'], ['💬 TALK · F', 'KeyF'], ['🔄 RELOAD', 'KeyR'], ['🧎 CROUCH', 'crouch'], ['💣 GRENADE', 'KeyG'], ['🚀 JET PACK', 'KeyX'],
   ['📯 HORN', 'KeyQ'], ['📻 RADIO', 'KeyL'], ['⏭ NEXT SONG', 'Period'], ['🚽 TAKE A LEAK', 'KeyP'], ['☠ RESPAWN', 'KeyT'], ['⏸ PAUSE MENU', 'pause']];
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
@@ -62,6 +62,11 @@ export function createTablet(host) {
       out.push({ t: '🚪 EXIT VR', act: () => V.session?.end() });
     } else if (T.tab === 'map') {
       out.push({ t: '🗺 FULL MAP', act: () => { host.tap('KeyM'); toggle(false); } });
+    } else if (T.tab === 'uber') {   // coney chill: book a ride ($5), then the trip card (uberCard) with one button
+      const Ub = ctx.uber;
+      if (!Ub) out.push({ t: 'No Uber here', sub: 'Coney Island, chill mode', act: null });
+      else if (Ub.active()) out.push({ t: Ub.label(), act: () => Ub.action() });
+      else for (const d of Ub.dests()) out.push({ t: '🚕 ' + d.name, sub: '$5', act: () => Ub.request(d.id) });
     }
     return out;
   }
@@ -84,12 +89,13 @@ export function createTablet(host) {
       g.fillStyle = T.tab === id ? '#ffd27a' : '#232830'; g.beginPath(); g.roundRect(r.x, r.y, r.w, r.h, 14); g.fill();
       g.fillStyle = T.tab === id ? '#111' : '#e9e2d0'; g.font = '800 26px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, r.x + r.w / 2, r.y + r.h / 2); });
     const top = TAB_H + 4;
-    if (T.tab === 'map') { paintMap(ctx, top); }
+    const card = T.tab === 'map' || (T.tab === 'uber' && !!ctx.uber?.active?.());   // a picture on the left, one button bottom right
+    if (T.tab === 'map') { paintMap(ctx, top); } else if (card) uberCard(ctx, top);
     if (T.tab === 'help') { paintHelp(top); return; }
     // the grid (the map tab: one button under the map)
     const per = items.length > COLS * ROWS ? COLS * ROWS - 1 : COLS * ROWS, show = items.slice(T.page * per, T.page * per + per);
     const cw = (CW - PAD) / COLS, ch = (CH - top - PAD) / ROWS;
-    const at = (i) => T.tab === 'map' ? { x: CW - cw + PAD / 2, y: CH - ch + PAD / 2, w: cw - PAD, h: ch - PAD } : { x: PAD / 2 + (i % COLS) * cw + PAD / 2, y: top + Math.floor(i / COLS) * ch + PAD / 2, w: cw - PAD, h: ch - PAD };
+    const at = (i) => card ? { x: CW - cw + PAD / 2, y: CH - ch + PAD / 2, w: cw - PAD, h: ch - PAD } : { x: PAD / 2 + (i % COLS) * cw + PAD / 2, y: top + Math.floor(i / COLS) * ch + PAD / 2, w: cw - PAD, h: ch - PAD };
     show.forEach((it, i) => { const r = { ...at(i), act: it.act }; T.rects.push(r); button(r, it.t, it.sub, it.on, !it.act); });
     if (pages > 1) { const r = { ...at(COLS * ROWS - 1), act: () => { T.page = (T.page + 1) % pages; T.sig = ''; } }; T.rects.push(r); button(r, `▶ MORE ${T.page + 1}/${pages}`, '', false, false); }
   }
@@ -113,6 +119,12 @@ export function createTablet(host) {
     const p = ctx.player?.position; g.fillStyle = '#e9e2d0'; g.font = '600 24px system-ui'; g.textAlign = 'left'; g.textBaseline = 'top';
     const lines = ['Up is where you face.', 'Yellow: you · red: trouble', 'Orange: friends · blue Ⓜ: subway', p ? `x ${p.x.toFixed(0)}  z ${p.z.toFixed(0)}` : ''];
     lines.forEach((t, i) => g.fillText(t, s + PAD * 3, top + PAD * 2 + i * 36, CW - s - PAD * 5));
+  }
+  function uberCard(ctx, top) {   // the phone's map canvas and its lines (coney/uber.js), redrawn with the map tab's rate
+    const cv = ctx.uber.canvas(), s = CH - top - PAD * 2; g.fillStyle = '#0a0c10'; g.fillRect(PAD, top + PAD, s, s);
+    if (cv?.width) try { g.drawImage(cv, PAD, top + PAD, s, s); } catch {}
+    g.fillStyle = '#e9e2d0'; g.font = '600 25px system-ui'; g.textAlign = 'left'; g.textBaseline = 'top';
+    ctx.uber.lines().forEach((t, i) => g.fillText(t, s + PAD * 3, top + PAD * 2 + i * 40, CW - s - PAD * 5));
   }
   function paintHelp(top) {
     const hands = !!host.offHand()?.src?.hand, pages = hands ? HELP_HANDS : HELP_PADS, pg = pages[T.help % pages.length];
@@ -158,7 +170,7 @@ export function createTablet(host) {
     if (press && hot >= 0) { const r = T.rects[hot]; if (r?.act) { host.pulse(M, 0.35, 25); r.act(); T.sig = ''; } }
     // repaint: on change, the map tab steadily
     T.mapT -= dt; const sig = sigOf(ctx);
-    if (sig !== T.sig || (T.tab === 'map' && T.mapT <= 0)) { T.sig = sig; T.mapT = 1 / MAP_HZ; paint(ctx); tex.needsUpdate = true; }
+    if (sig !== T.sig || ((T.tab === 'map' || T.tab === 'uber') && T.mapT <= 0)) { T.sig = sig; T.mapT = 1 / MAP_HZ; paint(ctx); tex.needsUpdate = true; }
     return T.near || T.over;
   }
   function laserShow(H, d) { const L = H.laser; if (!L) return; L.line.visible = true; L.line.scale.z = d; L.line.material.color.set(0x7dffb0); L.dot.visible = true; L.dot.position.set(0, 0, -d + 0.002); }
