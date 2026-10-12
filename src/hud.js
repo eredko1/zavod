@@ -2,7 +2,7 @@
 // DOM + CSS + two small canvases (compass, damage arcs). Reads ctx.player / ctx.weapons / ctx.ai defensively every frame.
 // Public API (ctx.hud): hitmarker(headshot, kill) · damageFrom(dirOrPos) · killfeed(text) · toast(text, ms) · scorePopup(text, headshot)
 //                       showMenu() · hideMenu() · wave(n, total)
-import { saveAudio } from './ctx.js';
+import { saveAudio, savePlay, AIM_ASSIST } from './ctx.js';
 
 const VERSION = '0.1.0';
 const ICON_HS = '<svg viewBox="0 0 16 16"><path d="M8 1.5a4.6 4.6 0 0 0-4.6 4.6c0 1.9 1 3.3 2.1 4.1v1.6c0 .4.3.7.7.7h3.6c.4 0 .7-.3.7-.7v-1.6c1.1-.8 2.1-2.2 2.1-4.1A4.6 4.6 0 0 0 8 1.5zm-2 5.2a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2zm4 0a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2zM6.2 13.2h3.6v1.3H6.2z"/></svg>';
@@ -68,7 +68,8 @@ export async function init(ctx) {
   // ---- events ----
   const bus = ctx.bus;
   bus.on('state', ({ state, prev }) => { if (state === 'playing' && (prev === 'menu' || prev === 'boot')) { const b = H.root.querySelector('.deploybrief'); if (b && !ctx.qa) { b.classList.add('on'); clearTimeout(H._bt); H._bt = setTimeout(() => b.classList.remove('on'), 6500); } } });
-  bus.on('hit', (d) => { H.shotsHit++; hitmarker(H, !!d?.headshot, !!d?.kill); });   // kill: the round that dropped him keeps the kill marker (enemyKilled fires first)
+  bus.on('hit', (d) => { H.shotsHit++; hitmarker(H, !!d?.headshot, !!d?.kill); });
+  bus.on('hit', (d) => dmgNumber(H, d));   // kill: the round that dropped him keeps the kill marker (enemyKilled fires first)
   bus.on('enemyKilled', (d) => {
     hitmarker(H, !!d?.headshot, true);
     killfeed(H, `<span class="me">YOU</span>${ICON_AR}${d?.headshot ? ICON_HS : ''}<span>${d?.name || 'MERCENARY'}</span>`, true);
@@ -119,8 +120,9 @@ export function update(dt, ctx) {
   const H = ctx.__hud; if (!H) return;
   const rdt = ctx.time.realDt ?? dt;
   const now = performance.now();
-  if (ctx.state !== 'playing') { if (H.dmg.length) { H.dmg.length = 0; H.dmgDirty = true; drawDamage(H, rdt); } return; }
+  if (ctx.state !== 'playing') { if (H.dn?.live) { for (const n of H.dn.pool) { n.t = DN_LIFE; n.el.style.opacity = '0'; } H.dn.live = 0; } if (H.dmg.length) { H.dmg.length = 0; H.dmgDirty = true; drawDamage(H, rdt); } return; }
 
+  if (H.dn?.live) dmgNumbers(H, rdt);
   const p = ctx.player, w = ctx.weapons, ai = ctx.ai, c = H.c;
 
   // ---- heading / compass ----
@@ -316,6 +318,34 @@ function drawDamage(H, dt) {
 // =====================================================================
 // hit marker / feed / popups / toast / wave
 // =====================================================================
+// floating damage numbers: a small pool of spans (fewer on phones) moved with one transform each, the oldest reused when full;
+// hits on the same body inside DN_MERGE add up into one number (a burst, pellets) instead of stacking a column of them
+const DN_LIFE = 0.75, DN_RISE = 0.7, DN_MERGE = 0.25, DN_MAX = 8, DN_MAX_PHONE = 4;
+function dmgNumber(H, d) {
+  const ctx = H.ctx; if (!ctx.settings.dmgNumbers || !d?.point || !(d.damage > 0) || ctx.xrAim) return;
+  const D = H.dn || (H.dn = { pool: [], live: 0, wrap: null, v: d.point.clone() });
+  if (!D.wrap) { D.wrap = document.createElement('div'); D.wrap.className = 'dmgnums'; H.root.appendChild(D.wrap); }
+  const now = performance.now(), key = d.soldier || d.remote || null;
+  let n = D.pool.find((q) => q.t < DN_LIFE && (now - q.at) / 1000 < DN_MERGE && (key ? q.key === key : q.p.distanceTo(d.point) < 0.8));
+  if (n) n.v += d.damage;
+  else { const max = ctx.isTouch ? DN_MAX_PHONE : DN_MAX;
+    n = D.pool.length < max ? null : D.pool.reduce((a, q) => (q.t > a.t ? q : a));
+    if (!n) { const el = document.createElement('span'); D.wrap.appendChild(el); n = { el, p: d.point.clone() }; D.pool.push(n); }
+    n.p.copy(d.point); n.v = d.damage; n.key = key; n.dx = (Math.random() - 0.5) * 24; }
+  n.t = 0; n.at = now; n.el.textContent = String(Math.max(1, Math.round(n.v))); n.el.className = d.kill ? 'kill' : d.headshot ? 'head' : '';
+  D.live = D.pool.filter((q) => q.t < DN_LIFE).length;
+}
+function dmgNumbers(H, dt) {
+  const D = H.dn, cam = H.ctx.camera; if (!cam) return; let live = 0;
+  for (const n of D.pool) {
+    if (n.t >= DN_LIFE) continue; n.t += dt; if (n.t >= DN_LIFE) { n.el.style.opacity = '0'; continue; } live++;
+    const k = n.t / DN_LIFE, v = D.v.copy(n.p); v.y += DN_RISE * Math.sqrt(k); v.project(cam);
+    if (v.z > 1 || v.z < -1) { n.el.style.opacity = '0'; continue; }
+    const x = (v.x * 0.5 + 0.5) * innerWidth + n.dx * k, y = (-v.y * 0.5 + 0.5) * innerHeight;
+    n.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) translate(-50%,-50%) scale(${(1.25 - 0.25 * Math.min(1, k * 4)).toFixed(2)})`; n.el.style.opacity = (k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4).toFixed(2);
+  }
+  D.live = live;
+}
 function hitmarker(H, headshot, kill) {
   H.hm.classList.toggle('kill', kill);
   H.hm.getAnimations().forEach(a => a.cancel());
@@ -491,6 +521,8 @@ function buildSettings(H) {
   h4('Controls');
   slider('Sensitivity', 0.5, 15, 0.1, () => Math.round(S.sensitivity / 0.00044 * 10) / 10, (v) => { S.sensitivity = v * 0.00044; }, (v) => v.toFixed(1));
   slider('ADS sensitivity', 0.2, 1.5, 0.05, () => S.adsSensitivityMul, (v) => { S.adsSensitivityMul = v; }, (v) => `${v.toFixed(2)}×`);
+  cycle('Aim assist', AIM_ASSIST, () => S.aimAssist, (v) => { S.aimAssist = v; savePlay(S); }, false);
+  cycle('Damage numbers', [false, true], () => !!S.dmgNumbers, (v) => { S.dmgNumbers = v; savePlay(S); }, true);
   h4('Graphics');
   for (const [key, label] of [['shadows', 'Shadows'], ['rain', 'Rain'], ['motionBlur', 'Motion blur'], ['ssr', 'Reflections (SSR)'], ['ao', 'Ambient occlusion'], ['bloom', 'Bloom'], ['dof', 'Depth of field'], ['filmGrain', 'Film grain'], ['filmLook', 'Film look (Luna Park)']])
     cycle(label, [false, true], () => (key === 'filmLook' ? S[key] !== false : !!S[key]), (v) => { S[key] = v; ctx.bus.emit('setting', { key, value: v }); }, true);
@@ -505,7 +537,7 @@ function buildSettings(H) {
     vol('Radio volume', 'radioVolume');
   }
   H.panels.settings.querySelector('.reset').addEventListener('click', () => {
-    Object.assign(S, { fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6, shadows: true, rain: true, motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true, masterVolume: 1, sfxVolume: 1, footVolume: 0.45, ambVolume: 0.8, radioVolume: 0.7, quality: 'ultra' }); saveAudio(S);
+    Object.assign(S, { fov: 75, sensitivity: 0.0022, adsSensitivityMul: 0.6, shadows: true, rain: true, motionBlur: true, ssr: true, ao: true, bloom: true, dof: true, filmGrain: true, masterVolume: 1, sfxVolume: 1, footVolume: 0.45, ambVolume: 0.8, radioVolume: 0.7, quality: 'ultra', aimAssist: 'low', dmgNumbers: true }); saveAudio(S); savePlay(S);
     ctx.bus.emit('quality', 'ultra'); ctx.bus.emit('setting', { key: 'shadows', value: S.shadows }); H.syncers.forEach(f => f());
   });
 }

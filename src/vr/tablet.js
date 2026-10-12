@@ -7,6 +7,7 @@
 // do each thing; HELP → TUTORIAL runs it again.
 // Painted on a canvas only when something changed (the MAP tab: 4 times a second).
 import * as THREE from 'three';
+import { savePlay, AIM_ASSIST } from '../ctx.js';
 
 const CW = 1024, CH = 704, TW = 0.32, TH = TW * CH / CW, TAB_H = 92, PAD = 10, COLS = 4, ROWS = 3;
 const POKE_IN = 0.012, POKE_OUT = 0.025, HOVER_Z = 0.05, BACK_Z = -0.04;
@@ -53,6 +54,8 @@ export function createTablet(host) {
       out.push({ t: prefs.hud ? '▤ HUD: ON' : '▤ HUD: OFF', act: () => setPref('hud', !prefs.hud) });
       out.push({ t: prefs.left ? '✋ GUN HAND: LEFT' : '✋ GUN HAND: RIGHT', act: () => setPref('left', !prefs.left) });
       out.push({ t: `↕ EYES ${(+prefs.eye).toFixed(1)} m`, act: () => setPref('eye', prefs.eye >= 2 ? 1.6 : +prefs.eye + 0.2 > 1.95 ? 2 : +(+prefs.eye + 0.2).toFixed(1)) });
+      { const G = ctx.settings, aim = G.aimAssist || 'low'; out.push({ t: `🎯 AIM ASSIST: ${aim.toUpperCase()}`, sub: 'thumbstick / flat-screen aim', act: () => { G.aimAssist = AIM_ASSIST[(AIM_ASSIST.indexOf(aim) + 1) % AIM_ASSIST.length]; savePlay(G); T.sig = ''; } });
+        out.push({ t: G.dmgNumbers ? '💥 DAMAGE NUMBERS: ON' : '💥 DAMAGE NUMBERS: OFF', act: () => { G.dmgNumbers = !G.dmgNumbers; savePlay(G); T.sig = ''; }, on: !!G.dmgNumbers }); }
       out.push({ t: '⟲ RECALIBRATE', sub: 'stand or sit as you play', act: () => { V.seatH0 = V.head.y; ctx.hud?.toast?.('Height set', 900); } });
       out.push({ t: '🎓 TUTORIAL', act: () => { toggle(false); tutorial(true); } });
       out.push({ t: '⏸ PAUSE MENU', act: () => doAct(ctx, 'pause') });

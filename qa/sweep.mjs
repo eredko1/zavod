@@ -36,7 +36,8 @@ const MEASURE = () => {
   const ppl = []; c.scene.traverse((o) => { if (o.name !== 'person' || !o.visible) return; let v = o, vis = true; while (v) { if (!v.visible) { vis = false; break; } v = v.parent; } if (!vis) return;
     const p = o.getWorldPosition(new o.position.constructor()); if (near(p.x, p.z, 60)) ppl.push({ p, o }); });
   out.people = ppl.length;
-  for (let i = 0; i < ppl.length; i++) for (let j = i + 1; j < ppl.length; j++) { const a = ppl[i].p, q = ppl[j].p; if (Math.hypot(a.x - q.x, a.z - q.z) < 0.45 && Math.abs(a.y - q.y) < 1) issue('two people in one spot', a.x, a.y, a.z, `${Math.hypot(a.x - q.x, a.z - q.z).toFixed(2)} m apart`); }
+  // two seated people side by side (bus side seats 0.48 m apart, a bench) is normal; two standing that close is a clip
+  for (let i = 0; i < ppl.length; i++) for (let j = i + 1; j < ppl.length; j++) { const a = ppl[i].p, q = ppl[j].p; if (ppl[i].o.userData?.sit && ppl[j].o.userData?.sit) continue; if (Math.hypot(a.x - q.x, a.z - q.z) < 0.45 && Math.abs(a.y - q.y) < 1) issue('two people in one spot', a.x, a.y, a.z, `${Math.hypot(a.x - q.x, a.z - q.z).toFixed(2)} m apart`); }
   for (const { p, o } of ppl) { const f = floorAt(p.x, p.z, p.y), g = W.groundHeight?.(p.x, p.z) ?? 0; let riding = false; for (let v = o.parent; v; v = v.parent) if (/train|car|bus|ferry|subway|r160|viaduct/i.test(v.name || '')) riding = true; const sitting = riding || o.userData?.sit || /sit/i.test(o.parent?.name || '');
     if (!sitting && p.y - f > 0.55) issue('person floating', p.x, p.y, p.z, `${(p.y - f).toFixed(2)} m above the floor`); else if (g - p.y > 0.3 && g - p.y < 3) issue('person sunk into the ground', p.x, p.y, p.z, `${(g - p.y).toFixed(2)} m under`);
     const b = inside(p.x, p.y, p.z, 0.3); if (b) issue('person inside a wall / box', p.x, p.y, p.z, `box ${[b.min.x, b.min.z, b.max.x, b.max.z].map((v) => v.toFixed(1)).join(',')}`); }
@@ -76,9 +77,15 @@ for (const [name, at] of SPOTS) {
   await A.evaluate(() => window.__game.teleport(-40, 0.3, -124, -Math.PI / 2, 0)); await sleep(800);
   const p0 = await A.evaluate(() => window.__ctx.player.position.toArray()); await A.evaluate(() => window.__ctx.player.qaWalk({ x: 0, y: 1 }, 1.5)); const p1 = await A.evaluate(() => window.__ctx.player.position.toArray());
   g.walk = +Math.hypot(p1[0] - p0[0], p1[2] - p0[2]).toFixed(2); if (g.walk < 3) find('gameplay', 'walking barely moves', 'Surf Ave', `${g.walk} m in 1.5 s`);
-  await A.evaluate(() => { const V = window.__ctx.vehicles, p = window.__ctx.player.position; V.mount(V.spawnCar(p.x, p.z, -Math.PI / 2, 'sedan', 0x2b3f73, 0)); }); await sleep(400);
-  const c0 = await A.evaluate(() => window.__ctx.vehicles.mounted?.pos.toArray()); A.evaluate(() => window.__ctx.vehicles.qaDrive(1, 0, 2.5)).catch(() => {}); await sleep(2800);
-  const c1 = await A.evaluate(() => window.__ctx.vehicles.mounted?.pos.toArray()); g.drive = c0 && c1 ? +Math.hypot(c1[0] - c0[0], c1[2] - c0[2]).toFixed(1) : 0; if (g.drive < 10) find('gameplay', 'car barely drives', 'Surf Ave', `${g.drive} m in 2.5 s`);
+  // drive 2.5 s east; Surf Ave traffic is solid, so a bus or car stopped in the lane ahead blocks a fair test: then redo it on the empty boardwalk
+  const driveTest = async () => { await A.evaluate(() => { const V = window.__ctx.vehicles, p = window.__ctx.player.position; V.mount(V.spawnCar(p.x, p.z, -Math.PI / 2, 'sedan', 0x2b3f73, 0)); }); await sleep(400);
+    const c0 = await A.evaluate(() => window.__ctx.vehicles.mounted?.pos.toArray()); A.evaluate(() => window.__ctx.vehicles.qaDrive(1, 0, 2.5)).catch(() => {}); await sleep(2800);
+    return A.evaluate((c0) => { const v = window.__ctx.vehicles.mounted, c1 = v?.pos; if (!c0 || !c1) return { d: 0, blocker: null };
+      const near = (window.__ctx.world.traffic?.cars?.() || []).map((q) => Math.hypot(q.x - c1.x, q.z - c1.z)).sort((a, b) => a - b)[0];
+      return { d: +Math.hypot(c1.x - c0[0], c1.z - c0[2]).toFixed(1), blocker: near < 8 ? +near.toFixed(1) : null }; }, c0); };
+  let r = await driveTest(); g.drive = r.d;
+  if (r.d < 10 && r.blocker != null) { g.driveBlocked = `traffic ${r.blocker} m away`; await A.evaluate(() => window.__ctx.vehicles.dismount()); await A.evaluate(() => window.__game.teleport(-60, 0.3, 150, -Math.PI / 2, 0)); await sleep(800); r = await driveTest(); g.drive = r.d; }
+  if (g.drive < 10) find('gameplay', 'car barely drives', g.driveBlocked ? 'boardwalk' : 'Surf Ave', `${g.drive} m in 2.5 s`);
   await A.evaluate(() => window.__ctx.vehicles.dismount()); await sleep(300);
   g.shot = await A.evaluate(async () => { const W = window.__ctx.weapons; try { W.swap?.(1); } catch {} const a0 = W.current?.ammo ?? W.ammo; window.__ctx.input.mouse.buttons = 1; await new Promise((r) => setTimeout(r, 400)); window.__ctx.input.mouse.buttons = 0; return { a0, a1: W.current?.ammo ?? W.ammo, id: W.currentId }; });
   report.gameplay = g; console.log('gameplay', JSON.stringify(g));

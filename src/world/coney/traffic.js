@@ -279,7 +279,7 @@ export function buildTraffic(world) {
   if (!lite && peopleReady()) {
     for (let i = 0; i < 8; i++) {
       try { const f = buildPerson({ seed: 101 + i * 37, pose: 'sit', female: i % 3 === 2 }); f.update(0.016); f.group.updateMatrixWorld(true);
-        const hp = f.head.getWorldPosition(new THREE.Vector3()); f.group.visible = false; f.group.matrixAutoUpdate = false; world.scene.add(f.group);
+        const hp = f.head.getWorldPosition(new THREE.Vector3()); f.group.visible = false; f.group.matrixAutoUpdate = false; f.group.userData.sit = true; world.scene.add(f.group);
         T.people.push({ f, car: null, hx: hp.x, hy: hp.y, hz: hp.z }); } catch (e) { console.warn('[traffic] driver', e?.message || e); break; }
     }
   }
@@ -779,7 +779,8 @@ function buildBuses(world) {
     for (const S of r.stops) if (!stopGeo.some((q) => Math.hypot(q.px - S.px, q.pz - S.pz) < 6)) stopGeo.push(S);
   }
   try { busStopProps(world, stopGeo); } catch (e) { console.warn('[traffic] stops', e); }
-  if (!T.lite && peopleReady()) { T.busPeople = []; for (let i = 0; i < 4; i++) { try { const f = buildPerson({ seed: 700 + i * 53, pose: 'sit', female: i === 2 }); f.update(0.016); f.group.updateMatrixWorld(true); const hp = f.head.getWorldPosition(new THREE.Vector3()); f.group.visible = false; f.group.matrixAutoUpdate = false; world.scene.add(f.group); T.busPeople.push({ f, hx: hp.x, hy: hp.y, hz: hp.z }); } catch { break; } } }
+  if (!T.lite && peopleReady()) { T.busPeople = []; for (let i = 0; i < 4; i++) { try { const f = buildPerson({ seed: 700 + i * 53, pose: 'sit', female: i === 2 }); f.update(0.016); f.group.updateMatrixWorld(true); f.group.userData.sit = true;   // seated riders: side seats are 0.48 m apart, shoulder to shoulder (qa/sweep.mjs skips sitters)
+    const hp = f.head.getWorldPosition(new THREE.Vector3()); f.group.visible = false; f.group.matrixAutoUpdate = false; world.scene.add(f.group); T.busPeople.push({ f, hx: hp.x, hy: hp.y, hz: hp.z }); } catch { break; } } }
   try { HK.spot({ pos: T.boardPos, r: 2.4, dy: 1.6, when: () => !!T.board, prompt: () => `F — BOARD THE ${T.board?.route.id} · ${T.board?.route.sign.split('|')[1]}`, act: () => { if (T.board) boardBus(T.board); } }); } catch {}
   try { HK.spot({ pos: T.hijackPos, r: 1.8, dy: 1.6, when: () => !!T.hijack, prompt: () => 'F — HIJACK THE BUS', act: () => { if (T.hijack) jackBus(T.hijack); } }); } catch {}
   console.log('[traffic] buses', T.cars.filter((c) => c.bus).length, '· routes', T.routes.map((r) => `${r.id} ${Math.round(r.Lr)}m ${r.stops.length} stops ${Math.round(r.cycle)}s`).join(' · '));
