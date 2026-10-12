@@ -17,6 +17,7 @@ import { buildBus, BUS } from './vehicles/bus.js';
 
 const DEG = Math.PI / 180;
 const LOOK_PITCH = 35 * DEG, LEAN_MAX = 12 * DEG;
+const VR_LEAN_MAX = 5 * DEG;   // VR: the bike you sit on (and the bars in your hands) leans at most this far; the view never rolls
 const FOV_KICK = 9, BOUNCE = 0.28, HIT_LOSS = 0.55, GRAV = 17, MAX_STEP = 1 / 120;
 // ---- per-vehicle handling + rider geometry ----
 // accel: launch acceleration (v = max·tanh(a·t/max)); brake/hard: service brake / handbrake decel; grip: lateral slip decay /s
@@ -457,7 +458,8 @@ function visuals(v, dt, thr, brk, hard) {
   fwdOf(v.heading, _f); _r.set(-_f.z, 0, _f.x);
   // lean (bikes lean in, cars roll out a little) from lateral acceleration, plus counter-lean from a slide
   const leanT = clamp(-((v.yawRate || 0) * v.fwdSpeed) / 9.81, -1, 1) * LEAN_MAX * 1.35 + v.skid * v.steer * 0.35;
-  v.lean = damp(v.lean, clamp(leanT, -LEAN_MAX * 1.4, LEAN_MAX * 1.4) * sp.leanK, 7, dt);
+  const leanLim = C.xr?.presenting && v === S.mounted && !sp.car ? VR_LEAN_MAX : LEAN_MAX * 1.4 * Math.abs(sp.leanK);
+  v.lean = damp(v.lean, clamp(leanT * sp.leanK, -leanLim, leanLim), 7, dt);
   // terrain under the axles / sides
   const hw = sp.wheelbase / 2, yf = floorAt(p.x + _f.x * hw, p.z + _f.z * hw, p.y + 0.2, v.box, sp.stepUp), yr = floorAt(p.x - _f.x * hw, p.z - _f.z * hw, p.y + 0.2, v.box, sp.stepUp);
   let tp = v.air ? v.tPitch : Math.atan2(yf - yr, sp.wheelbase), tr = 0;
@@ -546,7 +548,7 @@ function applyView(dt) {
   _v.y -= (1 - Math.cos(bike.lean)) * H; _v.y += vy;
   // body pitch moves the eye (seat is behind the axle midpoint on bikes, near it in cars)
   _v.y += Math.sin(bike.tPitch) * (-sp.eyeBack);
-  const rollT = sp.car ? (bike.tRoll * 0.9 - bike.lean * 0.5) : (-bike.lean * 0.8 + bike.skid * bike.steer * 0.15);
+  const rollT = C.xr?.presenting ? 0 : sp.car ? (bike.tRoll * 0.9 - bike.lean * 0.5) : (-bike.lean * 0.8 + bike.skid * bike.steer * 0.15);
   S.roll = damp(S.roll, rollT, 10, dt || 1);
   const yaw = bike.heading + S.lookYaw;
   const pitch = clamp(S.lookPitch + bike.tPitch * 0.9 - bike.suspV * 0.03 + Math.sin(S.vib * 0.9) * vibA * 0.5, -LOOK_PITCH - 0.5, LOOK_PITCH + 0.5);

@@ -20,6 +20,7 @@ import { hangkit as K, ITEMS } from '../world/hangkit.js';
 import { read as readPad, NO_PAD } from './pad.js';
 import { createTablet } from './tablet.js';
 import { createPhysical } from './physical.js';
+import { thumbState, thumbSwipe } from './thumb.js';
 import { createMirror, pointerDown, pointerUp, moveAt, clickable, setGLCanvas, hitAt } from './mirror.js';
 
 const JET_DEAD = 0.03, JET_FULL = 0.15, JET_SMOOTH = 4;   // hand-lift throttle: 3 cm deadzone, full at +18 cm, ~0.25 s smoothing
@@ -38,10 +39,11 @@ const ACT_DIST = 0.55, ACT_DROP = 0.38, WATCH_HZ = 4, SIGHT_FAR = 80;
 // the action pill's poke zone (its local half-width, half-height, depth; the pill is 0.36 × 0.09), and the big one (scaled ACT_BIG)
 const ACT_ZONE = [0.18, 0.05, 0.03], ACT_ZONE_BIG = [0.2, 0.075, 0.07], ACT_BIG = 1.8;
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
-const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
+const V = { presenting: false, thumb: thumbState(), turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
 let T = null, P = null;   // the wrist tablet (tablet.js), hands-on actions (physical.js)
-const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, eye: EYE_DEFAULT, ...load() };
+const THUMB_TURN = 30 * Math.PI / 180;   // a thumb swipe's snap turn (thumb.js)
+const prefs = { snap: SNAP_DEFAULT, vignette: true, hud: true, smooth: false, left: false, eye: EYE_DEFAULT, thumb: true, ...load() };
 function load() { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch { return {}; } }
 function save() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {} }
 const mainHand = () => prefs.left ? V.hands.left : V.hands.right, offHand = () => prefs.left ? V.hands.right : V.hands.left;
@@ -188,9 +190,13 @@ export function update(dt, ctx) {
   // the hand stick: where the pinched hand sits relative to your head, in your body's frame (the torso follows the head, lagging a
   // glance), minus where it sat when you pinched. Turning your whole body (hand and all) isn't input; pushing the hand forward
   // walks the way you're looking (the player's yaw is the head's). Lifting the hand (rig height) is still the jump / jet pack
+  // On a bike the same offset (in metres, V.rideStick) is shaped by ride.js instead: 7 cm to full lock was far too twitchy to ride
+  V.rideStick = null;
   if (LH && !V.wrist.shown) { if (LH.pinch) { const tip = LH.hand.joints['index-finger-tip']; if (tip) { const by = bodyFrame(), rel = _v3.set(tip.position.x - V.head.x, 0, tip.position.z - V.head.z).applyAxisAngle(_up, -by);
       if (!LH.stick0) { LH.stick0 = tip.position.clone(); LH.rel0 = rel.clone(); } V.handLiftY = tip.position.y - LH.stick0.y; V.handLift = V.handLiftY > HAND_LIFT;
+      V.rideStick = { x: rel.x - LH.rel0.x, z: rel.z - LH.rel0.z };
       mx = clamp((rel.x - LH.rel0.x) / HAND_STICK, -1, 1); my = clamp((rel.z - LH.rel0.z) / HAND_STICK, -1, 1); } } else { LH.stick0 = null; V.handLift = false; V.handLiftY = null; } }
+  thumbTurn(ctx, LH, playing);
   // movement: analog to the player, and the touch stick for cars (vehicles.js reads it as analog throttle / steer)
   const moving = Math.hypot(mx, my) > 0.05;
   inp.xrMove = playing && !V.ui && moving ? { x: mx, y: -my } : null;
@@ -342,6 +348,16 @@ function cycleWeapon(ctx) {
   const W = ctx.weapons; if (!W) return; const bag = W.bag || [], cur = W.currentId;
   if (cur === 'fists') { if (bag.length) W.selectBag(0); return; }
   const i = bag.findIndex((b) => (b?.id ?? b) === cur); if (i >= 0 && i + 1 < bag.length) W.selectBag(i + 1); else W.fists();
+}
+/** the off thumb sliding along the index finger: a snap turn (thumb.js). Never while that hand is busy: the pinch stick (walking,
+ *  riding), a fist on the bars, the tablet up */
+function thumbTurn(ctx, LH, playing) {
+  if (!LH || !prefs.thumb) return;
+  if (!prefs.thumbToast && playing) { prefs.thumbToast = true; save(); ctx.hud?.toast?.('New: slide your left thumb along your index finger to snap turn (⚙ SET to switch it off)', 4000); }
+  const J = LH.hand.joints, a = J['thumb-tip'], b = J['index-finger-phalanx-proximal'], c = J['index-finger-tip'];
+  const busy = !playing || V.ui || LH.pinch || !!LH.stick0 || V.wrist.shown || V.wheelL || handPose(LH.hand) === 'fist';
+  const dir = thumbSwipe(V.thumb, a && b && c ? { thumb: a.position.toArray(), prox: b.position.toArray(), tip: c.position.toArray() } : null, performance.now() / 1000, busy);
+  if (dir) { V.turn -= dir * THUMB_TURN; V.vigKick = 1; pulse(LH, 0.25, 15); }   // towards the fingertip: right
 }
 function jointDist(hand, a, b) { const A = hand.joints?.[a], B = hand.joints?.[b]; return A && B ? A.position.distanceTo(B.position) : 1; }
 
