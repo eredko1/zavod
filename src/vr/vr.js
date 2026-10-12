@@ -35,6 +35,8 @@ const PALM_BACK = 0.07, PALM_FWD = 0.07;
 const FINGER_OUT = 0.07, FINGER_CURLED = 0.055, POSE_HOLD = 0.2;   // hand-pose gestures (m, s)   // the model's wrist sits this far behind your palm; a tracked hand's palm is this far ahead of its wrist
 const GRIP_OUT = 0.4;   // s: the right grip held off the wheel to get out of a vehicle
 const ACT_DIST = 0.55, ACT_DROP = 0.38, WATCH_HZ = 4, SIGHT_FAR = 80;
+// the action pill's poke zone (its local half-width, half-height, depth; the pill is 0.36 × 0.09), and the big one (scaled ACT_BIG)
+const ACT_ZONE = [0.18, 0.05, 0.03], ACT_ZONE_BIG = [0.2, 0.075, 0.07], ACT_BIG = 1.8;
 const XR_SCALE = 0.8, RAF_LATE = 50;   // of the Quest 3's ~2064 x 2208 per eye: fill-rate headroom; fixed foveation does the rest
 const V = { presenting: false, turn: 0, rigYaw: 0, wroteYaw: null, mode: 'foot', head: new THREE.Vector3(), headQ: new THREE.Quaternion(), headPrev: null, seatY: 1.2, hands: {}, pads: {}, keys: new Set(), ui: false, uiHold: false };
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YXZ'), _m = new THREE.Matrix4(), _ray = new THREE.Raycaster();
@@ -494,13 +496,15 @@ function actionButton(ctx, R, press) {
   A.mesh.visible = !!label && !V.ui && ctx.state === 'playing'; V.overAction = false;
   if (!A.mesh.visible) { A.prev = press; return; }
   if (label !== A.label) { A.label = label; A.draw(label); }
+  // ctx.actionBig (the ferry: GET OFF / BOARD): a bigger pill with a deeper poke zone, easy to hit with a tracked hand
+  const big = !!ctx.actionBig, Z = big ? ACT_ZONE_BIG : ACT_ZONE; A.mesh.scale.setScalar(big ? ACT_BIG : 1);
   // below and ahead of your gaze, lazily following your head yaw (in the rig, so it rides along in a car)
   _e.setFromQuaternion(V.headQ, 'YXZ'); A.yaw = A.yaw == null ? _e.y : A.yaw + wrap(_e.y - A.yaw) * 0.1;
   A.mesh.position.set(V.head.x - Math.sin(A.yaw) * ACT_DIST, V.head.y - ACT_DROP, V.head.z - Math.cos(A.yaw) * ACT_DIST); A.mesh.rotation.set(-0.35, A.yaw, 0);
   A.mesh.updateMatrixWorld(true);
   let hover = false;
   if (R) { R.ray.updateMatrixWorld(); _m.identity().extractRotation(R.ray.matrixWorld); _ray.ray.origin.setFromMatrixPosition(R.ray.matrixWorld); _ray.ray.direction.set(0, 0, -1).applyMatrix4(_m); hover = !!_ray.intersectObject(A.mesh, false)[0];
-    const tip = R.src?.hand ? R.hand.joints['index-finger-tip'] : null; if (tip) { _v.setFromMatrixPosition(tip.matrixWorld); A.mesh.worldToLocal(_v); if (Math.abs(_v.x) < 0.18 && Math.abs(_v.y) < 0.05 && Math.abs(_v.z) < 0.03) { hover = true; if (!A.poked) { A.poked = true; tap('KeyF'); pulse(R, 0.4, 30); } } else if (_v.z > 0.05) A.poked = false; } }
+    const tip = R.src?.hand ? R.hand.joints['index-finger-tip'] : null; if (tip) { _v.setFromMatrixPosition(tip.matrixWorld); A.mesh.worldToLocal(_v); if (Math.abs(_v.x) < Z[0] && Math.abs(_v.y) < Z[1] && Math.abs(_v.z) < Z[2]) { hover = true; if (!A.poked) { A.poked = true; tap('KeyF'); pulse(R, 0.4, 30); } } else if (_v.z > Z[2] + 0.02) A.poked = false; } }
   V.overAction = hover; A.mesh.material.color.setScalar(hover ? 1 : 0.8);
   if (hover && press && !A.prev) { tap('KeyF'); pulse(R, 0.4, 30); }
   A.prev = press;
