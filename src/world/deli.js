@@ -167,6 +167,7 @@ function kit() {
 }
 const SIGN_ROWS = 8;
 
+const DELI_LOD = 70;   // m: past this a phone draws only the store shell (buildDeli)
 export function buildDeli(world, o) {
   const { scene, ctx } = world; const y0 = o.y || 0;
   const Wd = 8, D = 11, Hh = 4.2, CEIL = 3.2, T = 0.22;
@@ -264,6 +265,11 @@ export function buildDeli(world, o) {
     for (const e of kill) root.remove(e);
     for (const [m, list] of byMat) { const mesh = new THREE.Mesh(mergeGeometries(list, false), m); mesh.castShadow = !m.transparent && m !== M.tube && m !== M.fridge; mesh.receiveShadow = true; root.add(mesh); ctx.raycastTargets?.push(mesh); } }
   world.updaters?.push((dt) => sammy.update(dt));
+  // phones: from the street past DELI_LOD m the stock, fridges and Sammy are specks behind the glass but ~30 draw calls a store
+  // (13 of them in view across the beach drove the spawn view over budget); only the shell (brick, frames, glass) stays. Lights stay
+  // put: toggling one recompiles every shader.
+  if (ctx.lite) { const shell = new Set([M.brick, M.frame, M.glass]), inner = root.children.filter((e) => !e.isLight && !(e.isMesh && shell.has(e.material))); let t = 0, shown = true;
+    world.updaters?.push((dt) => { if ((t -= dt) > 0) return; t = 0.3; const c = ctx.camera?.position; if (!c) return; const s = (c.x - root.position.x) ** 2 + (c.z - root.position.z) ** 2 < DELI_LOD * DELI_LOD; if (s !== shown) { shown = s; for (const e of inner) e.visible = s; } }); }
   return { fig: sammy, sammy: L(3.25, 2.6), counter: L(1.3, 2.6), door: L(0, -1.6), inside: L(0, 1.4), face: o.yaw + Math.PI, group: root };
 }
 

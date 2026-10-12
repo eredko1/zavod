@@ -43,9 +43,10 @@ const S = {
   noFallDamageUntil: 0, physMs: 0,
 };
 
+const SAFE_GRID_CELL = 8;   // m
 export async function init(ctx) {
   ctxRef = ctx;
-  grid = new ColliderGrid(4);
+  grid = new ColliderGrid(ctx.safeMode ? SAFE_GRID_CELL : 4);   // safe mode (ctx.js): coarser cells, fewer grid entries over ~70k colliders
   const p = {
     position: new THREE.Vector3(0, 0, 20), velocity: new THREE.Vector3(), yaw: 0, pitch: 0,
     height: H_STAND, radius: RADIUS, health: 100, maxHealth: 100,

@@ -240,8 +240,9 @@ function buildDoors(world) {
   const frame = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.4, metalness: 0.8 });
   for (const t of H.towers) for (const d of t.lobby.doors) {
     const g = new THREE.Group(); g.position.copy(d.plane); g.rotation.y = Math.atan2(d.along.x, d.along.z) - Math.PI / 2; scene.add(g);
-    const leaves = [-1, 1].map((s2) => { const L = new THREE.Group(); const pane = new THREE.Mesh(new THREE.BoxGeometry(d.half - 0.04, 2.1, 0.03), glass); pane.position.y = 1.05; L.add(pane);
-      for (const [w, h, x, y] of [[d.half, 0.08, 0, 2.1], [d.half, 0.08, 0, 0.04], [0.06, 2.1, s2 * (d.half / 2 - 0.03), 1.05], [0.06, 2.1, -s2 * (d.half / 2 - 0.03), 1.05], [0.04, 0.5, -s2 * (d.half / 2 - 0.2), 1.1]]) { const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.06), frame); f.position.set(x, y, 0); L.add(f); }
+    const leaves = [-1, 1].map((s2) => { const L = new THREE.Group(); const fg = []; const pane = new THREE.Mesh(new THREE.BoxGeometry(d.half - 0.04, 2.1, 0.03), glass); pane.position.y = 1.05; L.add(pane);
+      for (const [w, h, x, y] of [[d.half, 0.08, 0, 2.1], [d.half, 0.08, 0, 0.04], [0.06, 2.1, s2 * (d.half / 2 - 0.03), 1.05], [0.06, 2.1, -s2 * (d.half / 2 - 0.03), 1.05], [0.04, 0.5, -s2 * (d.half / 2 - 0.2), 1.1]]) fg.push(new THREE.BoxGeometry(w, h, 0.06).translate(x, y, 0));
+      L.add(new THREE.Mesh(mergeGeometries(fg), frame));   // the five frame bars as one mesh: one draw call a leaf, not five
       L.position.x = s2 * d.half / 2; g.add(L); return { L, s2 }; });
     const hw = d.half + 0.1, ax = d.along; const box = new THREE.Box3(new THREE.Vector3(d.plane.x - Math.abs(ax.x) * hw - Math.abs(ax.z) * 0.12, 0, d.plane.z - Math.abs(ax.z) * hw - Math.abs(ax.x) * 0.12), new THREE.Vector3(d.plane.x + Math.abs(ax.x) * hw + Math.abs(ax.z) * 0.12, 2.3, d.plane.z + Math.abs(ax.z) * hw + Math.abs(ax.x) * 0.12));
     ctx.colliders.push(box);

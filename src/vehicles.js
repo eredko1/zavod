@@ -71,6 +71,7 @@ const wrap = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI)
 const _v = new THREE.Vector3(), _f = new THREE.Vector3(), _r = new THREE.Vector3(), _res = { x: 0, z: 0, nx: 0, nz: 0, depth: 0, hit: false };
 
 let C = null; // ctx
+const SAFE_GRID_CELL = 8;   // m
 const S = {
   grid: new BoxGrid(4), bikes: [], mounted: null, api: null,
   // rider view
@@ -689,6 +690,7 @@ function waterFrame(dt) {
 // ---------- module ----------
 export async function init(ctx) {
   C = ctx;
+  if (ctx.safeMode) S.grid = new BoxGrid(SAFE_GRID_CELL);   // safe mode (ctx.js): coarser cells, fewer grid entries over ~70k colliders
   try { placeBikes(); } catch (e) { console.error('[vehicles] placement failed', e); }
   ctx.bus.on('ui:mount', () => { S.uiMount = true; });
   try { buildUI(ctx); } catch (e) { console.warn('[vehicles] ui', e); }

@@ -81,7 +81,7 @@ export function buildBrighton(world) {
   // ---- buildings: walk-ups with a shop on the ground floor facing the avenue; apartment blocks behind the south row ----
   const brick = [0x9a5a44, 0x8a4a3a, 0xb07a5a, 0xa8876a, 0x7e4a3a, 0xc2a07a, 0x6f5a4a];
   let si = 0;
-  const units = W.shopUnits || (W.shopUnits = []); let enterN = 0; const ENTER_MAX = lite ? 4 : 10;
+  const units = W.shopUnits || (W.shopUnits = []); let enterN = 0; const ENTER_MAX = ctx.safeMode ? 0 : lite ? 4 : 10;   // safe mode (ctx.js): no walk-in shops
   const walkup = (x0, x1, zFace, sd, depth, floors) => {   // sd: which way the building runs back from its face (-1: the north row, +1: the south row); the street is at -sd
     const h = 4.2 + (floors - 1) * 3.1, zb = zFace + sd * depth, col = brick[Math.floor(rnd() * brick.length)];
     const g = new THREE.BoxGeometry(x1 - x0, h, depth); g.translate((x0 + x1) / 2, SW + h / 2, (zFace + zb) / 2); boxUV(g, x1 - x0, h, depth); tint(g, col); put(M.walls, g);
