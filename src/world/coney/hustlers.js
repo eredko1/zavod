@@ -109,7 +109,7 @@ function robHustler(h, force = null) {
 /** take the vendor hitbox + name tag off a hustler's figure (chill.js gives him his own) */
 function strip(fig) {
   const { ctx } = HU; fig.group.traverse((o) => { if (o.userData?.surface === 'flesh' && o.userData.onHit) { const k = ctx.raycastTargets.indexOf(o); if (k > -1) ctx.raycastTargets.splice(k, 1); o.userData.onHit = null; } });
-  for (const c of [...fig.group.children]) if (c.isSprite) fig.group.remove(c);
+  for (const c of [...fig.group.children]) if (c.isSprite || c.userData.nameTag) fig.group.remove(c);
 }
 function respawn(h) { h.gone = 0; h.pos.copy(h.home); build(h); }
 function update(dt, playing) {

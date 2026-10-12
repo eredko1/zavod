@@ -274,3 +274,31 @@ export function pa(ctx, text) {
     S.cancel(); const u = new SpeechSynthesisUtterance(text.replace(/–/g, ' ').replace(/\bSt\b/g, 'Street').replace(/\bAv\b/g, 'Avenue')); u.rate = 1.02; u.pitch = 0.92; u.volume = Math.min(1, v * 0.9);
     const vs = S.getVoices(), en = vs.find((x) => /en-US/.test(x.lang) && /male|Alex|Fred|Daniel|Google US/i.test(x.name)) || vs.find((x) => /en-US/.test(x.lang)); if (en) u.voice = en; S.speak(u); } catch {}
 }
+
+// ---- far LOD -----------------------------------------------------------------------------------------------------------------
+// a car past LOD_NEAR m is one mesh: its outside (body, trim, doors, glass made opaque) baked to vertex colours sampled from the
+// atlases, no interior. ~17 draw calls a car became 1; 48 running cars and the laid-up yard were a quarter of a frame's calls.
+export const LOD_NEAR = { full: 120, lite: 80 };
+const PROXY_GLASS = new THREE.Color(0x2a333a), _pc = new THREE.Color();
+let PROXY_MAT = null;
+const texels = new Map();   // canvas → its pixels, read once
+function texel(img, u, v, out) {
+  let px = texels.get(img); if (!px) { px = img.getContext('2d').getImageData(0, 0, img.width, img.height).data; texels.set(img, px); }
+  const x = Math.min(img.width - 1, Math.floor((u - Math.floor(u)) * img.width)), y = Math.min(img.height - 1, Math.floor((1 - (v - Math.floor(v))) * img.height)), i = (y * img.width + x) * 4;
+  return out.setRGB(px[i] / 255, px[i + 1] / 255, px[i + 2] / 255, THREE.SRGBColorSpace);
+}
+/** the far stand-in for a baked car group: meshes whose material is in `skip` (interior, lamps, LED, indicators) are left out. Kept
+ *  small (it lives in the JS heap until it's first drawn): positions + 8-bit colours written in one pass, no normals (flat shaded) */
+export function carProxy(g, skip) {
+  const list = g.children.filter((ch) => ch.isMesh && !skip.has(ch.material) && !ch.geometry.index); if (!list.length) return null;
+  const n = list.reduce((a, ch) => a + ch.geometry.attributes.position.count, 0), pos = new Float32Array(n * 3), col = new Uint8Array(n * 3), v = new THREE.Vector3(); let o = 0;
+  for (const ch of list) { const m = ch.material, P = ch.geometry.attributes.position, uv = ch.geometry.attributes.uv, img = m.map?.image, canSample = img?.getContext && uv; ch.updateMatrix();
+    for (let k = 0; k < P.count; k++, o++) { v.fromBufferAttribute(P, k).applyMatrix4(ch.matrix).toArray(pos, o * 3);
+      if (m.transparent) _pc.copy(PROXY_GLASS); else if (canSample) texel(img, uv.getX(k), uv.getY(k), _pc).multiply(m.color); else _pc.copy(m.color);
+      col[o * 3] = Math.round(Math.min(1, _pc.r) * 255); col[o * 3 + 1] = Math.round(Math.min(1, _pc.g) * 255); col[o * 3 + 2] = Math.round(Math.min(1, _pc.b) * 255); } }
+  texels.clear();
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
+  geo.computeBoundingSphere(); for (const a of Object.values(geo.attributes)) a.onUpload(function () { this.array = null; });   // drawn only from here on (never raycast)
+  return geo;
+}
+export function proxyMaterial() { return PROXY_MAT || (PROXY_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.4, metalness: 0.6, name: 'r160:far' })); }

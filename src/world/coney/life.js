@@ -15,10 +15,10 @@ import { streetAt } from './fronts.js';
 // streets by the towers): walkers heading along the street, a few standing on their phones. Instanced like the rest (one draw call
 // per body part for all of them); coney/folk.js brings the nearest ones to life. Their own seeded generator: the world's shared R
 // sequence (and everything placed after this) stays exactly as it was, and every client places the same people.
-const TOWN_N = { full: 850, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6;
+const TOWN_N = { full: 850, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6, PARK_KERB = 0.8;   // PARK_KERB: amusement-area strollers keep this far off the roadway
 function townCrowd(world, blocked) {
   let seed = 90127; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const want = world.ctx.lite ? TOWN_N.lite : TOWN_N.full, out = [], inRoad = (x, z) => OSM.r.some((r) => r.w >= 6 && segNear(x, z, r.p, r.w / 2));
+  const want = world.ctx.lite ? TOWN_N.lite : TOWN_N.full, out = [];
   const roads = OSM.r.filter((r) => r.w >= 6 && r.p.some(([x, z]) => x > PLAY.x0 && x < PLAY.x1 && z > PLAY.z0 && z < BW.z0 - 4));
   const cand = [];
   for (const r of roads) for (let i = 0; i + 1 < r.p.length; i++) {
@@ -40,7 +40,17 @@ function townCrowd(world, blocked) {
   console.log('[life] town crowd', out.length, 'of', cand.length, 'sidewalk spots');
   return out;
 }
+const inRoad = (x, z, pad = 0) => OSM.r.some((r) => r.w >= 6 && segNear(x, z, r.p, r.w / 2 + pad));
 function segNear(x, z, p, w) { for (let i = 0; i + 1 < p.length; i++) { const ax = p[i][0], az = p[i][1], dx = p[i + 1][0] - ax, dz = p[i + 1][1] - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), ex = x - ax - dx * t, ez = z - az - dz * t; if (ex * ex + ez * ez < w * w) return true; } return false; }
+// nobody placed inside someone else: towel families and bathers were drawn at random and two stood 0.39 m apart. Later spots yield.
+const PERSON_GAP = 0.8;
+function spaced(list) {
+  const cell = new Map(), key = (i, k) => i * 73856093 ^ k * 19349663, out = [];
+  for (const c of list) { const i = Math.floor(c.x / PERSON_GAP), k = Math.floor(c.z / PERSON_GAP); let hit = false;
+    for (let a = -1; a <= 1 && !hit; a++) for (let b = -1; b <= 1 && !hit; b++) for (const o of cell.get(key(i + a, k + b)) || []) if (Math.abs((o.y || 0) - (c.y || 0)) < 1 && Math.hypot(o.x - c.x, o.z - c.z) < PERSON_GAP) { hit = true; break; }
+    if (hit) continue; out.push(c); const kk = key(i, k); (cell.get(kk) || cell.set(kk, []).get(kk)).push(c); }
+  return out;
+}
 const hash = (x, z) => { const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - Math.floor(v); };   // extra variety without consuming the seeded rng
 
 export function buildBeachLife(world, M) {
@@ -77,14 +87,15 @@ export function buildBeachLife(world, M) {
   for (let i = 0; i < 40; i++) { const x = PLAY.x0 + R() * (PLAY.x1 - PLAY.x0); crowd.push({ x, y: 0, z: BW.z1 - 0.8, ry: 0 + (R() - 0.5) * 0.6, pose: R() < 0.3 ? 'phone' : 'stand', bag: 0, zone: 'rail' }); }
   // amusement area + streets: walkers on the OSM footpaths/streets south of the avenue, groups at the ride fences
   const blocked = (x, z) => OSM.b.some((b) => { const q = b._bb || (b._bb = bbox(b.p)); return x > q.x0 - 1 && x < q.x1 + 1 && z > q.z0 - 1 && z < q.z1 + 1; });
-  crowd.push(...scatter(R, 160, PLAY.x0 + 40, PLAY.x1 - 20, -140, BW.z0 - 2, 0, blocked, { walk: 0.6, bag: 0.05, gap: 3 }).map((c) => ({ ...c, zone: 'park' })));
+  // not in the roadway: traffic brakes for anyone in the road, so one standing there (Stillwell Av by Surf) jammed the B36 for good
+  crowd.push(...scatter(R, 160, PLAY.x0 + 40, PLAY.x1 - 20, -140, BW.z0 - 2, 0, blocked, { walk: 0.6, bag: 0.05, gap: 3 }).filter((c) => !inRoad(c.x, c.z, PARK_KERB)).map((c) => ({ ...c, zone: 'park' })));
   for (const r of OSM.rd) { if (!(r.x > PLAY.x0 && r.x < PLAY.x1 && r.z > PLAY.z0 && r.z < BW.z0)) continue; const n = 2 + ((R() * 5) | 0); for (let k = 0; k < n; k++) { const a = R() * 6.3, d = 8 + R() * 3; crowd.push({ x: r.x + Math.cos(a) * d, y: 0, z: r.z + Math.sin(a) * d, ry: Math.atan2(-Math.cos(a), -Math.sin(a)), pose: R() < 0.4 ? 'phone' : 'stand', bag: 0, zone: 'queue' }); } }
   crowd.push(...townCrowd(world, blocked));
   // who walks where (coney/folk.js pickArch): decided here so the far instanced figure and the live one agree; kids are kid-sized
   for (const c of crowd) { if (!['town', 'park', 'queue', 'bw'].includes(c.zone)) continue; const st = c.zone === 'bw' ? 'surf' : streetAt(c.x, c.z);
     const v = Math.sin(c.x * 12.9898 + c.z * 78.233 + 22 * 37.719) * 43758.5453; c.arch = pickArch(st, v - Math.floor(v)) || undefined; if (c.arch === 'kid' || c.arch === 'schoolkid') { c.s = 0.66; c.pose = c.pose === 'phone' ? 'stand' : c.pose; } }
   const cams = Object.values(world.W.poses || {});
-  const spots = crowd.filter((c) => !cams.some((p) => Math.hypot(p[0] - c.x, p[2] - c.z) < 3.5));
+  const spots = spaced(crowd.filter((c) => !cams.some((p) => Math.hypot(p[0] - c.x, p[2] - c.z) < 3.5)));
   const handle = buildCrowd(world, spots);
   try { buildFolk(world, spots, handle); } catch (e) { console.warn('[life] folk', e); }   // the near ones are live Rocketbox people you can talk to / rob / fight (coney/folk.js)
   B.flush({ shadow: true });

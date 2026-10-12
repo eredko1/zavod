@@ -249,9 +249,12 @@ function claimSpot(sp) {
   const k = `${gx},${gz}`; (F.taken.get(k) || F.taken.set(k, []).get(k)).push(sp); return true;
 }
 function retireSpot(sp) { sp.gone = performance.now() + 1e12; try { F.crowd.hide(sp, true); } catch {} }
+const SPOT_GAP = 0.8;   // m between two people's spots (life.js PERSON_GAP)
 export function addFolkSpots(world, list) {
   if (!F || F.world !== world) return 0;
-  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; if (s.zone === 'nightlife') { s.nightOff = true; s.gone = performance.now() + 1e12; } if (!claimSpot(s)) s.gone = performance.now() + 1e12; F.spots.push(s); }
+  // one standing in someone already placed there (a crosswalk walker on a town-crowd spot: 0.42 m apart) stays home
+  const taken = (s) => F.spots.some((q) => !q.gone && Math.abs((q.y || 0) - (s.y || 0)) < 1 && Math.abs(q.x - s.x) < SPOT_GAP && Math.abs(q.z - s.z) < SPOT_GAP && Math.hypot(q.x - s.x, q.z - s.z) < SPOT_GAP);
+  for (const s of list) { s.key = s.key || `${s.zone}:${s.x.toFixed(1)},${s.z.toFixed(1)}`; if (s.zone === 'nightlife') { s.nightOff = true; s.gone = performance.now() + 1e12; } if (!claimSpot(s) || taken(s)) s.gone = performance.now() + 1e12; F.spots.push(s); }
   return list.length;
 }
 /** a friend's game promoted the passer-by at this spot (they're fighting / mugging him): ours steps out so there's one of him */

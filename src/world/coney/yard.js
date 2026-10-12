@@ -6,6 +6,7 @@
 // W.zones rect lets you walk it. Parked trains are instanced (one draw per car piece, whatever the number of trains).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { LOD_NEAR } from './r160.js';
 
 export const YARD = { x0: -12, x1: 400, z0: -935, z1: -598 };   // world rect: ballast, no sprawl (horizon.js), a walkable zone
 const NT = 12, GAP = 6.5, TURN_IN = 26, D0 = 160, ZEND = -905, R_LADDER = 30, RAMP0 = 12, RAMP1 = 175, GAUGE = 1.435, GRADE = 0.35;   // GRADE: top of rail on the ballast
@@ -129,14 +130,17 @@ export function buildYard(world, { J, dir, rail, sources, car }) {
   const { CAR, NCAR } = car, free = new Set(tracks.map((P) => P.k)), parked = [];
   const placeCars = (P, sHead, cb) => { for (let c = 0; c < NCAR; c++) { const sm = sHead - (c + 0.5) * CAR; at(P, sm + CAR / 2 - 2.6, _a); at(P, sm - CAR / 2 + 2.6, _b);
     _o.position.copy(_a).add(_b).multiplyScalar(0.5); _o.rotation.set(0, Math.atan2(_a.x - _b.x, _a.z - _b.z), 0); _o.updateMatrix(); cb(c, _o.matrix); } };
+  const nearG = new THREE.Group(), farG = new THREE.Group(); nearG.name = 'yard:near'; farG.name = 'yard:far'; farG.visible = false; root.add(nearG, farG);
   const want = sources.length ? Math.min(NT - 3, lite ? 3 : 8) : 0, pick = []; for (let i = 0; pick.length < want && i < NT * 3; i++) { const k = (i * 5 + 1) % NT; if (!pick.includes(k)) pick.push(k); }
   const bySrc = sources.map(() => []); pick.forEach((k, i) => bySrc[i % sources.length].push(k));
   sources.forEach((cars, si) => { const ks = bySrc[si]; if (!ks.length) return;
-    cars.forEach((g, c) => { for (const ch of g.children) { if (!ch.isMesh) continue;
+    cars.forEach((g, c) => { const pf = g.userData.far; if (pf) { const im = new THREE.InstancedMesh(pf.geometry, pf.material, ks.length); im.receiveShadow = true; im.name = 'yard:far';   // far LOD: one stand-in per car slot
+        ks.forEach((k, i) => placeCars(tracks[k], tracks[k].L - 4, (cc, mx) => { if (cc === c) im.setMatrixAt(i, mx); })); im.computeBoundingSphere(); farG.add(im); }
+      for (const ch of g.userData.lod || g.children) { if (!ch.isMesh) continue;
       let m = ch.material; if (m === g.userData.head || m === g.userData.mark) { m = m.clone(); m.emissiveIntensity = 0.05; }   // headlights / marker lamps off
       const im = new THREE.InstancedMesh(ch.geometry, m, ks.length); im.castShadow = false; im.receiveShadow = true; ch.updateMatrix();
       ks.forEach((k, i) => placeCars(tracks[k], tracks[k].L - 4, (cc, mx) => { if (cc === c) im.setMatrixAt(i, _m.multiplyMatrices(mx, ch.matrix)); }));
-      im.computeBoundingSphere(); root.add(im); } });
+      im.computeBoundingSphere(); nearG.add(im); } });
     for (const k of ks) { free.delete(k); parked.push(k); placeCars(tracks[k], tracks[k].L - 4, (c, mx) => { _a.setFromMatrixPosition(mx); solid(_a.x - 1.6, 0, _a.z - CAR / 2 + 0.3, _a.x + 1.6, 4.2, _a.z + CAR / 2 - 0.3); }); } });   // the tracks run due north here: a box per car
 
   // the whole yard is out past the play rect: walkable, its own zone; a name on the map
@@ -144,7 +148,10 @@ export function buildYard(world, { J, dir, rail, sources, car }) {
   (W.mapPOIs || (W.mapPOIs = [])).push({ name: 'CONEY ISLAND YARD', x: tx + 60, z: tz - 60, kind: 'landmark' });
   // far away: hide it (the horizon draws the land under it)
   const C = new THREE.Vector3((YARD.x0 + YARD.x1) / 2, 0, (YARD.z0 + YARD.z1) / 2);
-  world.updaters.push(() => { const cam = ctx.camera?.position; if (cam) root.visible = Math.hypot(cam.x - C.x, cam.z - C.z) < (lite ? 700 : 1400); });
+  // and the laid-up trains swap to their far stand-ins (r160.js carProxy) when you're not in or by the yard
+  const lodNear = lite ? LOD_NEAR.lite : LOD_NEAR.full;
+  world.updaters.push(() => { const cam = ctx.camera?.position; if (!cam) return; root.visible = Math.hypot(cam.x - C.x, cam.z - C.z) < (lite ? 700 : 1400);
+    const dx = Math.max(YARD.x0 - cam.x, 0, cam.x - YARD.x1), dz = Math.max(YARD.z0 - cam.z, 0, cam.z - YARD.z1), near = Math.hypot(dx, dz) < lodNear || !farG.children.length; nearG.visible = near; farG.visible = !near; });
 
   return {
     tracks, J, free: () => [...free].sort((a, b) => a - b), parked: () => parked.slice(),
