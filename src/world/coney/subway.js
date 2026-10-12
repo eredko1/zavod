@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { OSM } from './osm.js';
 import { W8 } from './w8th.js';
 import { hangkit as K } from '../hangkit.js';
-import { makeR160, drawLED, rideAudio, pa } from './r160.js';
+import { makeR160, drawLED, rideAudio, pa, carProxy, proxyMaterial, LOD_NEAR } from './r160.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch } from '../sbu/geo.js';
 import { buildYard } from './yard.js';
@@ -255,6 +255,10 @@ function buildTrain(scene) {
       for (const { m, list, shadow } of stat.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.receiveShadow = true; g.add(me); }
       for (const { m, list, door, shadow } of doors.values()) { const me = new THREE.Mesh(mergeGeometries(list, false), m); me.castShadow = shadow; me.userData.door = { sx: door.sx, dir: door.dir, z: 0 }; Object.assign(me.userData, me.userData.door); g.add(me); g.userData.doors.push(me); } }
   }
+  // far LOD (r160.js carProxy): the middle cars share one stand-in, each cab car has its own
+  const M = kit.M, skip = new Set([M.int, M.floor, M.lamp, M.led, M.ind]), mid = kit.cars.length > 2 ? carProxy(kit.cars[1], skip) : null;
+  kit.cars.forEach((g, c) => { const geo = c === 0 || c === kit.cars.length - 1 || !mid ? carProxy(g, skip) : mid; if (!geo) return;
+    g.userData.lod = g.children.filter((ch) => ch.isMesh); const far = new THREE.Mesh(geo, proxyMaterial()); far.name = 'r160:far'; far.castShadow = true; far.visible = false; g.add(far); g.userData.far = far; g.userData.near = true; });
   return kit.cars;
 }
 function destTex() {
@@ -281,7 +285,7 @@ function update(dt) {
   // doors: open 2 s into a dwell, close (chime) 4 s before it ends
   const open = R.drive ? R.drive.doors : l.kind === 'dwell' && !l.stop.hidden ? Math.max(0, Math.min(1, (t - l.t0 - 1.5) / 1.2, (l.t1 - 3 - t) / 1.2)) : 0;
   const lat0 = R.drive ? 0 : lateralAt(t) * R.sideSign; R.latNow = R.drive ? driveLatAt(h - 2.5 * CAR) : lat0;   // latNow: this train's own offset (m) off the line's track, mid-train
-  const cam = ctx.camera.position, far = ctx.lite ? 320 : 900;
+  const cam = ctx.camera.position, far = ctx.lite ? 320 : 900, lodNear = ctx.lite ? LOD_NEAR.lite : LOD_NEAR.full;
   if (!R.drive) holdForDriver(dt);
   R.cars.forEach((g, c) => {
     const sm = h - (c + 0.5) * CAR; ptAt(sm + CAR / 2 - 2.6, _a); ptAt(sm - CAR / 2 + 2.6, _b);   // the two trucks sit on the rails; the body hangs between them
@@ -295,7 +299,8 @@ function update(dt) {
       const f = dip(sm + CAR / 2 - 2.6), r = dip(sm - CAR / 2 + 2.6); g.position.y -= (f + r) * 0.006 * jk; g.rotateX((f - r) * 0.0012 * jk); }
     const lead = c === 0 ? moving > 0 || (l.kind === 'dwell' && l.next.s > l.stop.s) : moving < 0 || (l.kind === 'dwell' && l.next.s < l.stop.s);
     if (g.userData.head) { g.userData.head.emissiveIntensity = lead ? 2.4 : 0.1; g.userData.mark.emissive.setHex(lead ? 0xffb030 : 0xff1a10); g.userData.mark.emissiveIntensity = 1.8; }
-    g.visible = !!R.aboard || g.position.distanceTo(cam) < far;
+    const d = g.position.distanceTo(cam); g.visible = !!R.aboard || d < far;
+    if (g.visible && g.userData.far) { const near = !!R.aboard || d < lodNear; if (near !== g.userData.near) { g.userData.near = near; g.userData.far.visible = !near; for (const ch of g.userData.lod) ch.visible = near; } }
   });
   // the platform side, probed from where the cars are THIS frame (a skip onto the other track probed last frame's pose)
   const dwellSide = l.kind === 'dwell' && !l.stop.hidden ? sideAt(l.stop) : 0; R.lastOpen = [+open.toFixed(2), dwellSide];

@@ -438,6 +438,7 @@ function drive(c, dt, now) {
     const l = dx * rx + dz * rz - c.shift; if (Math.abs(l) > c.hw + Math.max(o.hw, 0.35) + 0.35 + (o.foot ? 0.3 : 0)) continue;
     const gap = f - c.hl - (o.foot ? o.hl : Math.max(o.hl, o.hw) * 0.8); if (gap < bg) { bg = gap; best = null; obst = o; bdv = c.v - Math.max(0, o.vx * hx + o.vz * hz); }
   }
+  c.obst = obst;
   if (best || obst) { const ai = idm(c.v, v0, bg, bdv, AM); if (ai < a) { a = ai; lim = obst ? 'obst' : 'car'; } }
   // blocked by you: honk, yell, then go around
   const blockedByMe = lim === 'obst' && obst?.me && bg < 9 && c.v < 1;
@@ -684,7 +685,7 @@ function roadDist(x, z) { let best = 1e9; for (const r of OSM.r) { if (r.w < 9) 
 const r2 = (v) => Math.round(v * 100) / 100;
 export const trafficQA = {
   _T: () => T,
-  buses: () => T ? T.cars.filter((c) => c.bus).map((c) => ({ id: c.id, lim: c.lim || null, lead: c.leader?.id ?? null, route: c.route.id, x: r2(c.x), z: r2(c.z), h: r2(c.h), v: r2(c.v), state: c.state, stop: c.state === 'dwell' ? c.route.stops[c.stopI].name : null, next: c.route.stops[c.nextStop].name, door: r2(c.doorK || 0), road: r2(roadDist(c.x, c.z)), riding: T.ride?.c === c })) : [],
+  buses: () => T ? T.cars.filter((c) => c.bus).map((c) => ({ id: c.id, lim: c.lim || null, ob: c.obst ? { x: r2(c.obst.x), z: r2(c.obst.z), ped: !!c.obst.ped, me: !!c.obst.me, veh: !!c.obst.veh, peer: c.obst.peer || null } : null, lead: c.leader?.id ?? null, route: c.route.id, x: r2(c.x), z: r2(c.z), h: r2(c.h), v: r2(c.v), state: c.state, stop: c.state === 'dwell' ? c.route.stops[c.stopI].name : null, next: c.route.stops[c.nextStop].name, door: r2(c.doorK || 0), road: r2(roadDist(c.x, c.z)), riding: T.ride?.c === c })) : [],
   board: () => (T.board ? (boardBus(T.board), true) : false), toStop(id) { const c = T.cars[id]; if (!c?.bus) return null; const S = c.route.stops[c.nextStop]; T.ctx.player.teleport(S.px, 0, S.pz, 0, 0); return S.name; },
   toBusDoor(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, (BUS.doorF[0] + BUS.doorF[1]) / 2, BUS.w / 2 + 1.0, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h + Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
   toBusDriver(id) { const c = T.cars[id]; if (!c?.bus) return null; c.B.group.updateMatrixWorld(); busPoint(c, BUS.eye.x, -BUS.w / 2 - 0.8, _v); T.ctx.player.teleport(_v.x, c.y, _v.z, c.h - Math.PI / 2, 0); return [r2(_v.x), r2(_v.z)]; },
@@ -717,7 +718,7 @@ export const BUS_STOPS = [
   ['Neptune Av / W 15 St', 20, -536], ['Stillwell Av Terminal', -32.6, -186], ['Surf Av / Stillwell Terminal', -23.4, -186], ['Stillwell Av / Mermaid Av', -87, -330], ['Stillwell Av / Surf Av', -87, -185],
   ['Surf Av / W 17 St', -175, -140], ['Surf Av / W 21 St', -310, -142], ['W 23 St / Mermaid Av', -365, -240], ['Mermaid Av / W 21 St', -300, -291], ['Mermaid Av / W 17 St', -170, -291],
 ];
-const BUS_V = 6.2, DWELL = 10;
+const BUS_V = 6.2, DWELL = 10, PULL_IN = 50;   // PULL_IN: m before a stop where the bus moves over to the kerb
 function dijkstra(s, t) {
   const N = T.G.nodes, n = N.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n); dist[s] = 0; const open = [s];
   while (open.length) { let bi = 0; for (let i = 1; i < open.length; i++) if (dist[open[i]] < dist[open[bi]]) bi = i; const u = open[bi]; open[bi] = open[open.length - 1]; open.pop(); if (done[u]) continue; done[u] = 1; if (u === t) break;
@@ -739,7 +740,9 @@ function buildRoute(R) {
       if (d < 12 && (!best || d < best.d)) { const L = Math.sqrt(L2), e = edge(nodes[i], nodes[(i + 1) % nodes.length]); best = { d, name, rs: cum[i] + t * L, x: px, z: pz, dx: dx / L, dz: dz / L, w: e?.w || 10 }; } }
     if (best) { const kerb = best.w / 2 - 1.6, sh = Math.max(0, kerb - laneOff(best.w, 1)); stops.push({ ...best, shift: sh, px: best.x - best.dz * (best.w / 2 + 1.2), pz: best.z + best.dx * (best.w / 2 + 1.2) }); }
     // the bus pulls in to the kerb here: no car parked in its way (they're placed before the stops are known)
-    if (best) for (const c of T?.world?.parkedCars || []) if (!c.gone && Math.hypot(c.x - best.x, c.z - best.z) < 30) { hideParkedCar(c); c.gone = true; for (const b of carBoxes(c)) { b.min.set(0, -9999, 0); b.max.set(0.001, -9998, 0.001); } }
+    // and none along the kerb it pulls in over (PULL_IN m before the stop): one there was 2 m into the B36 at the terminal
+    const inBusWay = (c) => { const dx = c.x - best.x, dz = c.z - best.z, a = dx * best.dx + dz * best.dz, l = dz * best.dx - dx * best.dz; return a > -PULL_IN - 5 && a < 12 && l > 0 && l < best.w / 2 + 2; };
+    if (best) for (const c of T?.world?.parkedCars || []) if (!c.gone && (Math.hypot(c.x - best.x, c.z - best.z) < 30 || inBusWay(c))) { hideParkedCar(c); c.gone = true; for (const b of carBoxes(c)) { b.min.set(0, -9999, 0); b.max.set(0.001, -9998, 0.001); } }
   }
   stops.sort((a, b) => a.rs - b.rs);
   // timetable: run at BUS_V between stops, DWELL at each → position on the loop at any wall-clock second
@@ -790,7 +793,7 @@ function busPace(c, now) { const r = c.route, sc = schedAt(r, now / 1000 + c.off
 function busStop(c) {
   const r = c.route, S = r.stops[c.nextStop]; let d = ((S.rs - routePos(c)) % r.Lr + r.Lr) % r.Lr;
   if (d > r.Lr - 4) d = 0;
-  if (d < 50) c.shiftT = S.shift; else if (!c.avoid) c.shiftT = 0;
+  if (d < PULL_IN) c.shiftT = S.shift; else if (!c.avoid) c.shiftT = 0;
   if (d < 0.9 && c.v < 0.8) { c.state = 'dwell'; c.stateT = 0; c.stopI = c.nextStop; c.dwellT = DWELL; c.nextStop = (c.nextStop + 1) % r.stops.length; c.v = 0; if (T.ride?.c === c) { const R = T.ride, tav = T.world.W?.tavern; R.stops = (R.stops || 0) + 1;
       // a few stops in, the bus runs on (via the Belt) to 8 Av: Soccer Tavern — stay on for it, F to get off here
       const runOn = R.stops >= 3 || (R.stops >= 2 && performance.now() - (R.t0 || 0) > 120000);   // three stops, or two once you've been on two minutes (signals on the avenues make it slow)

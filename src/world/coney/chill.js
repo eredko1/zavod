@@ -139,6 +139,7 @@ export function buildChill(world, H) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
+const THUG_FAR = 170;
 function thugModel(name, seed, type = 'ru', opt = {}) {
   const T = CREWS[type] || CREWS.ru, cols = T.look[seed % T.look.length];
   const MK = { TOURIST: 'm01', 'FINANCE BRO': 'm08', DENTIST: 'm08', BABUSHKA: 'f09', INFLUENCER: 'f01', 'SUMMER INTERN': 'f17', HIPSTER: 'm05', 'DELIVERY GUY': 'm18' };
@@ -261,13 +262,15 @@ function update(dt, playing) {
     for (const t of C.thugs.values()) { if (t.st === 'dead' || t.st === 'flee' || t.st === 'robbed' || !(t.intent === 'mark' || t.intent === 'talk')) continue;
       const vx = t.pos.x - me.position.x, vz = t.pos.z - me.position.z, dd = Math.hypot(vx, vz); if (dd < bd && (vx * fx + vz * fz) / (dd || 1) > 0.3) { bd = dd; best = t; } }
     C.robT = best; if (best) C.robPos.copy(best.pos); }
-  // Table Park is neutral ground, and there's a breather after every respawn / robbery: robbers who arrive then just talk
-  const os = C.world.W.onlineStart, safe = (os && Math.hypot(me.position.x - os[0], me.position.z - os[2]) < 25) || now < C.calmUntil;
+  // Table Park is neutral ground, and there's a breather after every respawn / robbery: robbers who arrive then just talk; and you're
+  // left alone on a bus
+  const os = C.world.W.onlineStart, safe = (os && Math.hypot(me.position.x - os[0], me.position.z - os[2]) < 25) || now < C.calmUntil || !!me.mounted?.bus;   // on a bus: a mug dialog through the window took you off it (the B36 ride never got to 8 Av)
   const gone = (t) => { removeThug(t); ctx.net?.send?.('thug', { i: t.id, st: 'gone', p: [0, 0, 0] }); };
   for (const t of [...C.thugs.values()]) {
     t.t += dt; const g = t.m.f.group, T = CREWS[t.type] || CREWS.ru;
     if (t.st === 'dead') { t.fallK = Math.min(1, (t.fallK ?? 1) + dt * 2.4); const e = 1 - (1 - t.fallK) ** 2; g.rotation.x = -Math.PI / 2 * e; g.position.set(t.pos.x, t.pos.y + 0.25 * e, t.pos.z); if (t.t > 20) gone(t); continue; }   // crumples, doesn't pop
     const dx = me.position.x - t.pos.x, dz = me.position.z - t.pos.z, d = Math.hypot(dx, dz);
+    g.visible = d < THUG_FAR;   // a crew 200+ m off was 4 draw calls a head for a few pixels (hitboxes still take shots: raycasts ignore visibility)
     let speed = 0, goal = null;
     if (t.st === 'robbed') {   // hands up, then the wallet, then legs
       t.robT += dt; t.yaw = Math.atan2(dx, dz);

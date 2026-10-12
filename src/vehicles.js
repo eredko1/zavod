@@ -145,7 +145,7 @@ function makeCar(x, z, yaw, kind = 'sedan', color = 0x22305c, yRef = 0) {
   const headlight = new THREE.SpotLight(0xfff2d8, 0, 55, 0.5, 0.5, 1.4); headlight.position.set(0, 0.8, -sp.hz + 0.1); headlight.target.position.set(0, 0, -16); group.add(headlight); group.add(headlight.target); headlight.visible = false;
   const lens = { material: lampW };
   const dummy = new THREE.Group();
-  const car = { group, body, fork: dummy, wheelF: dummy, wheelR: dummy, carWheels: wheels, busKit, headlight, lens, lampR, meshes, kind, color, steerWheel: cab.wheel, ...baseState(x, z, yaw, yRef), spec: sp };
+  const car = { group, body, fork: dummy, wheelF: dummy, wheelR: dummy, carWheels: wheels, busKit, headlight, lens, lampR, meshes, kind, color, steerWheel: cab.wheel, cabin: cab.group || null, ...baseState(x, z, yaw, yRef), spec: sp };
   group.position.copy(car.pos); group.rotation.y = yaw;
   for (const m of meshes) { m.userData.vehicle = car; C.raycastTargets.push(m); }
   C.scene.add(group); parkBox(car); C.colliders.push(car.box); S.bikes.push(car); rebuildGrids();
@@ -764,10 +764,14 @@ function speedFov(bike) {
   const kick = FOV_KICK * clamp(Math.abs(bike.fwdSpeed) / bike.spec.max, 0, 1.4) ** 1.3 + (bike.boost || 0) * 8;
   S.fovWritten = S.fovBase + kick; C.settings.fov = S.fovWritten;
 }
+// a parked car's cabin (~20 meshes, carkit.js carInterior) only draws within CABIN_LOD m: past that the tinted glass hides it anyway
+const CABIN_LOD = 35;
+function cabinLod(ctx) { const cam = ctx.camera?.position; if (!cam) return; for (const v of S.bikes) if (v.cabin) v.cabin.visible = v === S.mounted || Math.hypot(v.pos.x - cam.x, v.pos.z - cam.z) < CABIN_LOD; }
 export function update(dt, ctx) {
   try { updateDamage(ctx, S.bikes, dt); } catch (e) { if (!S.dmgErr) { S.dmgErr = 1; console.error('[vehicles] damage', e); } }
   const p = ctx.player; if (!p) return;
   const input = ctx.input;
+  cabinLod(ctx);
   S.grid.sync(ctx.colliders);
   try { waterFrame(dt); } catch (e) { if (!S.wErr) { S.wErr = 1; console.warn('[vehicles] water', e); } }
   const playing = ctx.state === 'playing' && !p.dead;
