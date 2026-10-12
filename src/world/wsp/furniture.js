@@ -369,7 +369,7 @@ function buildStreet(world, T) {
         if (x < BOUNDS.x0 + 4 || x > BOUNDS.x1 - 4 || z < BOUNDS.z0 + 4 || z > BOUNDS.z1 - 4) continue;
         if (Math.abs(x - ARCH.cx) < 22 && z < -70 && z > -100) continue;   // keep the arch axis view clear
         const ry = s.axis === 'x' ? (side ? Math.PI : 0) : (side ? -Math.PI / 2 : Math.PI / 2);
-        const r = R(); const kind = r < 0.16 ? 'cab' : r < 0.26 ? 'van' : r < 0.44 ? 'suv' : r < 0.6 ? 'hatch' : 'sedan';
+        const r = R(); const kind = r < 0.16 ? 'cab' : r < 0.26 ? 'van' : r < 0.44 ? 'suv' : r < 0.6 ? 'hatch' : r < 0.72 ? 'e34' : 'sedan';
         placements[kind].push({ x, z, ry: ry + (R() - 0.5) * 0.04, kind });
       }
     }

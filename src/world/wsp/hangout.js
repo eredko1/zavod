@@ -80,7 +80,7 @@ function parkCars(world) {
         if (!free(x, z, hx, hz)) continue;
         const dd = world.W.deli?.door; if (dd && Math.hypot(x - dd.x, z - dd.z) < 7) continue;   // keep the kerb outside the deli door clear
         const flow = s.oneway || (side ? 1 : -1);   // cars face the traffic direction on their side
-        cars.push({ x, z, ry: s.axis === 'x' ? (flow > 0 ? 0 : Math.PI) : (flow > 0 ? -Math.PI / 2 : Math.PI / 2), kind: ['sedan', 'sedan', 'suv', 'hatch', 'cab', 'van'][(R() * 6) | 0], hx, hz });
+        cars.push({ x, z, ry: s.axis === 'x' ? (flow > 0 ? 0 : Math.PI) : (flow > 0 ? -Math.PI / 2 : Math.PI / 2), kind: ['sedan', 'sedan', 'e34', 'suv', 'hatch', 'cab', 'van'][(R() * 7) | 0], hx, hz });
       }
     }
   }

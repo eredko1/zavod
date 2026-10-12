@@ -92,6 +92,10 @@ function towerWall(x, z) {
   const mix = x > 380 ? [['concreteWhite', 0.45], ['brickRust', 0.3], ['brickBuff', 0.25]] : x < -100 ? [['brickBuff', 0.45], ['brickRust', 0.35], ['concreteWhite', 0.2]] : [['brickBuff', 0.4], ['brickRust', 0.35], ['concreteWhite', 0.25]];
   let acc = 0; for (const [key, p] of mix) { acc += p; if (k < acc) return key; } return mix[0][0];
 }
+// a rotated footprint's rects overshoot its skewed edges (decompose works on a grid): anything tall enough to reach an el car's
+// floor is trimmed back this far from every elevated track centreline, so a train never runs through a wall or cornice
+const EL_CLEAR = 2.1, EL_LOW = 7.5 + 1.1;   // m; the viaduct's rail height + the R160's floor over the rail
+const EL_SEGS = OSM.rl.filter((l) => l.el).flatMap((l) => l.p.slice(1).map((q, i) => [l.p[i], q]));
 function building(T, world, M, b) {
   const R = world.R; const h = Math.max(3, b.h); const s = b.s;
   // local (footprint-aligned) frame -> world, the same transform osmkit.footprint applies to rotated footprints
@@ -106,7 +110,16 @@ function building(T, world, M, b) {
   let sideshow = false; const rs = shopLike ? decompose(loc) : [];
   const inRect = (x, z) => rs.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);   // shared wall with another rect
   if (shopLike && b.play && h >= 3.5) { sideshow = rs.some((r) => fronts((r.x0 + r.x1) / 2, r.z0, 0, -1) || fronts((r.x0 + r.x1) / 2, r.z1, 0, 1) || fronts(r.x0, (r.z0 + r.z1) / 2, -1, 0) || fronts(r.x1, (r.z0 + r.z1) / 2, 1, 0)) && R() < 0.55; }
+  const toLocal = aligned ? (x, z) => [x, z] : (x, z) => [ox + (x - ox) * cl - (z - oz) * sl, oz + (x - ox) * sl + (z - oz) * cl];
+  const q = bbox(b.p), elPts = [];
+  if (h > EL_LOW) for (const [a, c] of EL_SEGS) { if (Math.max(a[0], c[0]) < q.x0 - 5 || Math.min(a[0], c[0]) > q.x1 + 5 || Math.max(a[1], c[1]) < q.z0 - 5 || Math.min(a[1], c[1]) > q.z1 + 5) continue;
+    const A = toLocal(...a), C = toLocal(...c), n = Math.ceil(Math.hypot(C[0] - A[0], C[1] - A[1]) / 0.5); for (let i = 0; i <= n; i++) elPts.push([A[0] + (C[0] - A[0]) * i / n, A[1] + (C[1] - A[1]) * i / n]); }
+  // pull the side of r that loses least back off each track point in reach; false when the rect is left too thin to build
+  const elTrim = (r) => { for (const [x, z] of elPts) { if (x < r.x0 - EL_CLEAR || x > r.x1 + EL_CLEAR || z < r.z0 - EL_CLEAR || z > r.z1 + EL_CLEAR) continue;
+    const [k, v] = [['x1', x - EL_CLEAR, r.x1 - x + EL_CLEAR], ['x0', x + EL_CLEAR, x + EL_CLEAR - r.x0], ['z1', z - EL_CLEAR, r.z1 - z + EL_CLEAR], ['z0', z + EL_CLEAR, z + EL_CLEAR - r.z0]].sort((m, n) => m[2] - n[2])[0]; r[k] = v; }
+    return r.x1 - r.x0 >= 2 && r.z1 - r.z0 >= 2; };
   footprint(T, world, M, b.p, (B, r) => {
+    if (elPts.length && !elTrim(r)) return;
     const w = r.x1 - r.x0, d = r.z1 - r.z0;
     const tw = s === 'tower' || (s === 'apart' && h > 25) ? towerWall(ox, oz) : null;   // the tall ones: the Luna Park palette
     if (w < 3 || d < 3) { block(B, tw || 'brickRed', r.x0, r.z0, r.x1, r.z1, h, { hvac: 0 }); return; }

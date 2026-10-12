@@ -44,7 +44,7 @@ const JETSKI_SPEC = {
 // (steerIn eases to steerInHi at top speed so the lock comes on gently on the motorway); wallMu: friction along a wall per unit of
 // impact speed (a glance slides, a head-on stops); climb: fastest kerb / step rise (m/s) at walking pace.
 const CAR_BASE = {
-  car: true, max: 37, revMax: 7, accel: 7.6, brake: 9.4, hard: 3.6, hardYaw: 0.5, grip: 13, hardGrip: 2.1, latG: 1.05, steerLow: 0.6,
+  car: true, max: 37, revMax: 7, accel: 7.6, brake: 9.4, hard: 1.6, hardYaw: 0.5, grip: 13, hardGrip: 2.1, latG: 1.05, steerLow: 0.6,
   aero: 0.0008, steerIn: 13, steerInHi: 8, steerOut: 11, wallMu: 0.3, climb: 3.5,
   band: 0.28, stepUp: 0.36, leanK: -0.2, lookYaw: 110 * DEG, chaseD: 6.8, chaseH: 0.3, chaseLook: 1.6, hitMul: 12, hitSlow: 0.9, engineBrake: 1.4,
 };
@@ -306,7 +306,7 @@ function stepVeh(v, dt, thr, brk, hard, steer) {
     if (hard) { const d = sp.hard * dt; fs = fs > 0 ? Math.max(0, fs - d) : Math.min(0, fs + d); }
     // passive: air drag + rolling resistance (+ surface drag, + engine braking off-throttle)
     fs -= fs * Math.abs(fs) * (sp.aero ?? 0.0024) * dt;
-    const rf = (0.5 + sf.drag + (thr === 0 && brk === 0 ? sp.engineBrake : 0)) * dt; fs -= Math.sign(fs) * Math.min(Math.abs(fs), rf);
+    const rf = (0.5 + sf.drag + (thr === 0 && brk === 0 && !hard ? sp.engineBrake : 0)) * dt; fs -= Math.sign(fs) * Math.min(Math.abs(fs), rf);
     if (fs > max) fs = damp(fs, max, 1.2, dt);   // entering sand at speed bleeds off instead of hitting a wall
   }
   fs = clamp(fs, -sp.revMax, sp.max * 1.05 * (1 + 0.45 * nb));

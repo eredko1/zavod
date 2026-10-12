@@ -76,7 +76,8 @@ export function footprint(S, world, M, poly, buildRect) {
     T.lists.clear();
     for (const [mn, mx] of T.world._boxes) {
       const pts = [[mn[0], mn[2]], [mx[0], mn[2]], [mn[0], mx[2]], [mx[0], mx[2]]].map(([x, z]) => new THREE.Vector3(x, 0, z).applyMatrix4(m));
-      world.box([Math.min(...pts.map((q) => q.x)), mn[1], Math.min(...pts.map((q) => q.z))], [Math.max(...pts.map((q) => q.x)), mx[1], Math.max(...pts.map((q) => q.z))]);
+      const b = world.box([Math.min(...pts.map((q) => q.x)), mn[1], Math.min(...pts.map((q) => q.z))], [Math.max(...pts.map((q) => q.x)), mx[1], Math.max(...pts.map((q) => q.z))]);
+      if (b) b.quad = [0, 1, 3, 2].map((i) => [pts[i].x, pts[i].z]);   // the drawn rect inside the bulging AABB (qa/q-route-test.mjs tests against it)
     }
     rects.matrix = m;
   }

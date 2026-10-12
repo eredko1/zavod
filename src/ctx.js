@@ -83,7 +83,7 @@ export function createCtx() {
   };
   // ?colsrc=1 (QA): remember where each collider was registered, so a box a test trips over can be traced to the code that made it
   if (qs.get('colsrc') === '1') { const src = new WeakMap(), push = ctx.colliders.push; ctx.colliders.colliderSrc = (b) => src.get(b) || null;
-    ctx.colliders.push = function (...a) { const st = new Error().stack.split('\n').slice(2, 7).map((l) => l.trim().replace(/^at /, '').replace(/https?:\/\/[^/]+\//, '')).join(' < '); for (const b of a) src.set(b, st); return push.apply(this, a); }; }
+    ctx.colliders.push = function (...a) { const st = new Error().stack.split('\n').slice(2, 7).map((l) => l.trim().replace(/^at /, '').replace(/https?:\/\/[^/]+\//, '')).join(' < '); for (const b of a) if (!src.has(b)) src.set(b, st); return push.apply(this, a); }; }
   return ctx;
 }
 
