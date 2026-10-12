@@ -1,0 +1,71 @@
+<!doctype html><meta charset="utf-8"><title>cars view</title>
+<style>html,body{margin:0;background:#3a3f45;overflow:hidden}</style>
+<script type="importmap">{ "imports": { "three": "../vendor/three/build/three.module.js", "three/addons/": "../vendor/three/examples/jsm/" } }</script>
+<script type="module">
+// Car look harness for qa/cars-look-test.mjs: builds one car of a kind the way the game does (parked = placeCars' kit body with
+// wheels; traffic = body without wheels + rolling wheel set; driven = see-through glass + carInterior, like vehicles.js makeCar)
+// and renders it alone. __cars.leak() renders a silhouette mask (every face, both sides, white) and the real render on magenta,
+// and counts magenta pixels inside the mask: background showing through the car.
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { carGeometries, carMaterials, carInterior, carEye, wheelGeometry, wheelLayout, CAR_KINDS } from '../src/world/carkit.js';
+import { buildBus } from '../src/vehicles/bus.js';
+const W = 640, H = 400;
+const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true }); r.setSize(W, H); r.setPixelRatio(1); r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+const cam = new THREE.PerspectiveCamera(50, W / H, 0.03, 200);
+s.add(new THREE.HemisphereLight(0xcfe3ff, 0x4a4030, 1.2)); const sun = new THREE.DirectionalLight(0xfff0dd, 2.5); sun.position.set(4, 8, 5); s.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x55595e, roughness: 0.9 })); ground.rotation.x = -Math.PI / 2; s.add(ground);
+const CM0 = carMaterials(), CM = { ...CM0, paint: CM0.paint.clone(), glass: CM0.glass, glassSee: CM0.glassSee }; CM.paint.color.setHex(0x22305c); CM.shadow = CM0.shadow;   // a paint colour (the game tints white paint per instance)
+let car = null, cur = '';
+function build(kind, mode) {
+  if (car) { s.remove(car); car = null; }
+  const g = new THREE.Group();
+  if (kind === 'bus') { const B = buildBus({ sign: 'B36|SHEEPSHEAD BAY', lite: false }); g.add(B.group); }
+  else if (mode === 'parked') { const G = carGeometries(kind).geos; for (const [k, geo] of Object.entries(G)) if (geo) g.add(new THREE.Mesh(geo, CM[k])); }
+  else {
+    const G = carGeometries(kind, { wheels: false }).geos, see = mode === 'driven';
+    for (const [k, geo] of Object.entries(G)) if (geo) g.add(new THREE.Mesh(geo, k === 'glass' ? (see ? CM.glassSee : CM.glass) : CM[k]));
+    if (see) g.add(carInterior(kind, G).group);
+    const lay = wheelLayout(kind), wg = wheelGeometry(0.33), sc = lay.r / 0.33;
+    for (const w of lay.wheels) { const p = new THREE.Group(); p.position.set(w.x, w.y, w.z); if (w.side < 0) p.rotation.y = Math.PI; p.scale.setScalar(sc); for (const k of ['rubber', 'rim', 'trim']) p.add(new THREE.Mesh(wg[k], CM[k])); g.add(p); }
+  }
+  s.add(g); car = g; cur = kind + mode;
+  const bb = new THREE.Box3().setFromObject(g); return bb;
+}
+let bb = null;
+function view(az, el, dist, inside) {
+  if (inside) { const e = cur.startsWith('bus') ? { x: 5.2, y: 1.74, z: -0.72 } : carEye(cur.replace(/(parked|traffic|driven)$/, '')); cam.fov = 75; cam.position.set(e.x, e.y, e.z); cam.lookAt(e.x + Math.cos(az), e.y + Math.sin(el), e.z + Math.sin(az)); }
+  else { const c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3()), d = dist || Math.max(sz.x, sz.z) * 1.35; cam.fov = 50;
+    cam.position.set(c.x + Math.cos(az) * Math.cos(el) * d, Math.max(0.15, c.y + Math.sin(el) * d), c.z + Math.sin(az) * Math.cos(el) * d); cam.lookAt(c.x, c.y * 0.8, c.z); }
+  cam.updateProjectionMatrix();
+}
+const px = new Uint8Array(W * H * 4), mk = new Uint8Array(W * H * 4);
+const white = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+window.__cars = {
+  kinds: [...CAR_KINDS.filter((k) => k !== 'coupe'), 'bus'],
+  setup(kind, mode) { bb = build(kind, mode); return { tris: (() => { let t = 0; car.traverse((o) => { if (o.isMesh) t += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; }); return Math.round(t); })(), draws: (() => { let n = 0; car.traverse((o) => { if (o.isMesh && o.visible) n++; }); return n; })() }; },
+  pretty(az, el, inside = false) { view(az, el, 0, inside); ground.visible = true; s.background = new THREE.Color(0x8a96a3); r.render(s, cam); },
+  leak(az, el, inside = false) {
+    view(az, el, 0, inside); ground.visible = false;
+    const gl = r.getContext();
+    // mask: every face of every mesh (incl. glass) both sides
+    const saved = []; car.traverse((o) => { if (o.isMesh) { saved.push([o, o.material, o.visible]); o.visible = o.material !== CM.shadow && !o.material.transparent; o.material = white; } });   // not the contact-shadow card; not see-through glass (looking out of a window is not a hole)
+    s.background = new THREE.Color(0x000000); s.overrideMaterial = null; r.toneMapping = THREE.NoToneMapping; r.render(s, cam); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, mk);
+    for (const [o, m, v] of saved) { o.material = m; o.visible = v; }
+    r.toneMapping = THREE.ACESFilmicToneMapping; s.background = new THREE.Color(0xff00ff); r.render(s, cam); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let inMask = 0, leak = 0; const pts = [];
+    for (let i = 0; i < W * H; i++) { if (mk[i * 4] < 128) continue; inMask++; const R = px[i * 4], G = px[i * 4 + 1], B = px[i * 4 + 2]; if (R > 200 && B > 200 && G < 70) { leak++; if (pts.length < 2000) pts.push(i); } }
+    // isolated single pixels are mask/real raster edge disagreements; count pixels with a leaking neighbour
+    const set = new Set(pts); let clustered = 0; for (const i of pts) if (set.has(i + 1) || set.has(i - 1) || set.has(i + W) || set.has(i - W)) clustered++;
+    if (window.__diff) {   // debug: the real render with the leaking pixels painted green, on a 2D canvas over the page
+      const c = document.querySelector('#diff') || Object.assign(document.body.appendChild(document.createElement('canvas')), { id: 'diff', width: W, height: H }); c.style.cssText = 'position:fixed;left:0;top:0';
+      const g = c.getContext('2d'), im = g.createImageData(W, H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (H - 1 - y) * W + x, o = (y * W + x) * 4, lk = mk[i * 4] >= 128 && px[i * 4] > 200 && px[i * 4 + 2] > 200 && px[i * 4 + 1] < 70;
+        const out = mk[i * 4] < 128; im.data[o] = lk ? 0 : out ? 40 : px[i * 4]; im.data[o + 1] = lk ? 255 : out ? 40 : px[i * 4 + 1]; im.data[o + 2] = lk ? 0 : out ? 90 : px[i * 4 + 2]; im.data[o + 3] = 255; }   // outside the silhouette: navy
+      g.putImageData(im, 0, 0); } else document.querySelector('#diff')?.remove();
+    return { inMask, leak, clustered };
+  },
+};
+window.__ready = true;
+</script>
