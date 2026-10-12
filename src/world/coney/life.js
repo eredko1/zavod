@@ -15,7 +15,7 @@ import { streetAt } from './fronts.js';
 // streets by the towers): walkers heading along the street, a few standing on their phones. Instanced like the rest (one draw call
 // per body part for all of them); coney/folk.js brings the nearest ones to life. Their own seeded generator: the world's shared R
 // sequence (and everything placed after this) stays exactly as it was, and every client places the same people.
-const TOWN_N = { full: 850, lite: 280 }, TOWN_STEP = 9, SIDEWALK = 1.6, PARK_KERB = 0.8;   // PARK_KERB: amusement-area strollers keep this far off the roadway
+const TOWN_N = { full: 1000, lite: 320 }, TOWN_STEP = 9, MAIN_W = 14, SIDEWALK = 1.6, PARK_KERB = 0.8;   // PARK_KERB: amusement-area strollers keep this far off the roadway
 function townCrowd(world, blocked) {
   let seed = 90127; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const want = world.ctx.lite ? TOWN_N.lite : TOWN_N.full, out = [];
@@ -24,7 +24,8 @@ function townCrowd(world, blocked) {
   for (const r of roads) for (let i = 0; i + 1 < r.p.length; i++) {
     const [ax, az] = r.p[i], [bx, bz] = r.p[i + 1], L = Math.hypot(bx - ax, bz - az); if (L < 2) continue;
     const ux = (bx - ax) / L, uz = (bz - az) / L, off = r.w / 2 + SIDEWALK;
-    for (let d = TOWN_STEP / 2; d < L; d += TOWN_STEP) for (const side of [-1, 1]) {
+    const step = r.w >= MAIN_W ? TOWN_STEP / 2 : TOWN_STEP;   // Surf, Mermaid, Stillwell: twice the sidewalk spots, so the budget leans on the main streets
+    for (let d = step / 2; d < L; d += step) for (const side of [-1, 1]) {
       const x = ax + ux * d - uz * off * side, z = az + uz * d + ux * off * side;
       if (x < PLAY.x0 || x > PLAY.x1 || z < PLAY.z0 || z > BW.z0 - 4) continue;
       cand.push({ x, z, ry: Math.atan2(ux, uz) + (R() < 0.5 ? 0 : Math.PI) });

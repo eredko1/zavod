@@ -52,7 +52,7 @@ export function buildFolk(world, spots, crowd) {
   if (!peopleReady() || !crowd || !kit() || ctx.qs?.get?.('folk') === '0') return;   // ?folk=0: instanced crowd only (perf A/B)
   const touch = !!ctx.lite;
   F = { world, ctx, crowd, spots: spots.filter((s) => s._refs).concat(subwaySpots(world)), active: new Set(), cache: [], tickT: 0, frame: 0, barkT: 0, mugT: ctx.mode === 'chill' ? 60 + Math.random() * 40 : 140 + Math.random() * 90,
-    N: ctx.safeMode ? 5 : touch ? 10 : 30, R_ON: touch ? 26 : 42, CACHE: ctx.safeMode ? 6 : touch ? 14 : 44, robE: null, robPos: new THREE.Vector3(0, -999, 0), lastP: new THREE.Vector3(), pspeed: 0, stats: { barks: 0, muggers: 0, adopted: 0 } };
+    N: ctx.safeMode ? 5 : touch ? 10 : 34, R_ON: touch ? 26 : 42, CACHE: ctx.safeMode ? 6 : touch ? 14 : 44, robE: null, robPos: new THREE.Vector3(0, -999, 0), lastP: new THREE.Vector3(), pspeed: 0, stats: { barks: 0, muggers: 0, adopted: 0 } };
   W.sandAt = (x, z) => z > BW.z1;
   for (const s of F.spots) if (!s.key) s.key = `${s.x.toFixed(1)},${s.z.toFixed(1)}`;
   F.taken = new Map(); for (const sp of F.spots) if (!claimSpot(sp)) retireSpot(sp);   // one person per spot: none on top of another, none standing in a parked car
