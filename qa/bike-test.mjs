@@ -80,14 +80,17 @@ try {
       const c = window.__ctx; const wait = (ms) => new Promise(r => setTimeout(r, ms));
       c.ai.qaSpawnAt(-6, 10); await wait(300); c.ai.qaKillAll(); await wait(2500);
       let rifle = null; c.scene.traverse(o => { if (!rifle && o.userData?.pickup) rifle = o; }); if (!rifle) return { err: 'no dropped rifle' };
+      // before walking up to it: stepping within 1.25 m collects it on the spot
+      const gid = rifle.userData.pickup.id, had = c.weapons.bag.includes(gid), WS = c.weapons.state, resOf = () => WS.weapons.find((w) => w.id === gid)?.reserve ?? WS.bank?.[gid]?.reserve ?? 0, res0 = resOf();
       const rp = rifle.position; c.player.teleport(rp.x + 0.5, c.world.groundHeight(rp.x, rp.z), rp.z + 0.5, 0, -0.5); await wait(400);
       const before = c.weapons.current.id, nearBike = !!c.vehicles.nearBike;
       c.input.pressed.add('KeyF'); await wait(300);
-      return { before, after: c.weapons.current.id, bag: c.weapons.bag || [], nearBike, nearPickup: !!c.ai.nearPickup, mounted: !!c.player.mounted };
+      return { gid, had, res0, res1: resOf(), before, after: c.weapons.current.id, bag: c.weapons.bag || [], nearBike, nearPickup: !!c.ai.nearPickup, mounted: !!c.player.mounted, left: c.scene.getObjectById(rifle.id) ? 1 : 0 };
     });
     console.log('pickup', JSON.stringify(pk));
     check(pk.nearBike === false && pk.mounted === false, 'no bike near the rifle');
-    check(pk.before !== 'ak74' && (pk.after === 'ak74' || pk.bag.includes('ak74')), `picked up the rifle, drawn or in the bag (${pk.before} -> ${pk.after}; bag ${pk.bag.join(',')})`);   // the weapon bag: walking over a gun collects it
+    // mercs carry a random gun (ai.js gunFor): a new one lands in the bag, one you already carry tops up its ammo
+    check(!pk.left && (pk.had ? pk.res1 > pk.res0 : pk.bag.includes(pk.gid)), `picked up the dropped ${pk.gid}, ${pk.had ? `as ammo (${pk.res0} -> ${pk.res1})` : `into the bag (${pk.bag.join(',')})`}`);   // the weapon bag: walking over a gun collects it
   }
   const perf = await page.evaluate(() => window.__game.stats());
   console.log('stats', JSON.stringify(perf));

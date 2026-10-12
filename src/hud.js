@@ -68,7 +68,7 @@ export async function init(ctx) {
   // ---- events ----
   const bus = ctx.bus;
   bus.on('state', ({ state, prev }) => { if (state === 'playing' && (prev === 'menu' || prev === 'boot')) { const b = H.root.querySelector('.deploybrief'); if (b && !ctx.qa) { b.classList.add('on'); clearTimeout(H._bt); H._bt = setTimeout(() => b.classList.remove('on'), 6500); } } });
-  bus.on('hit', (d) => { H.shotsHit++; hitmarker(H, !!d?.headshot, false); });
+  bus.on('hit', (d) => { H.shotsHit++; hitmarker(H, !!d?.headshot, !!d?.kill); });   // kill: the round that dropped him keeps the kill marker (enemyKilled fires first)
   bus.on('enemyKilled', (d) => {
     hitmarker(H, !!d?.headshot, true);
     killfeed(H, `<span class="me">YOU</span>${ICON_AR}${d?.headshot ? ICON_HS : ''}<span>${d?.name || 'MERCENARY'}</span>`, true);

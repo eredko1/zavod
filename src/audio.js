@@ -19,6 +19,7 @@ let lastState = null;
 let lastVolume = -1;
 let warned = false;
 const qaCache = new Map();
+const qaPlayed = [];     // qa: the last cue names the bus asked for (recorded even while silent)
 
 const warn = (e) => { if (!warned) { warned = true; console.warn('[audio]', e); } };
 
@@ -48,7 +49,7 @@ export async function init(ctx) {
     get engine() { return E; },
     sounds: Object.keys(SOUNDS),
     tinnitus(i) { if (E) E.tinnitus(i); },
-    qaRender, qaSpectrogram,
+    qaRender, qaSpectrogram, qaPlayed: () => qaPlayed.slice(),
   };
   return api;
 }
@@ -56,7 +57,7 @@ export async function init(ctx) {
 // ------------------------------------------------------------------ event bindings
 function bind(ctx) {
   const bus = ctx.bus; if (!bus?.on) return;
-  const P = (n, o) => { if (!silent && E) { try { E.play(n, o || {}); } catch (e) { warn(e); } } };
+  const P = (n, o) => { if (ctx.qa) { qaPlayed.push(n); if (qaPlayed.length > 50) qaPlayed.shift(); } if (!silent && E) { try { E.play(n, o || {}); } catch (e) { warn(e); } } };
   const surf = (s) => (['concrete', 'metal', 'wood', 'water', 'ground', 'flesh'].includes(s) ? s : 'concrete');
   bus.on('shot', (d = {}) => {
     if (d.who === 'enemy') { P('enemy_rifle', { position: d.origin || d.position }); return; }
@@ -66,7 +67,7 @@ function bind(ctx) {
   });
   bus.on('impact', (d = {}) => P('impact_' + surf(d.surface), { position: d.point }));
   bus.on('meleeHit', (d = {}) => P('impact_flesh', { position: d.point, volume: 1.3 }));   // knife going in / a punch landing
-  bus.on('hit', (d = {}) => P('hitmarker', { headshot: !!d.headshot }));
+  bus.on('hit', (d = {}) => { P('hitmarker', { headshot: !!d.headshot }); if (d.kill && d.npc) P('kill'); });   // npc: chill thugs never send enemyKilled, so their kill sound rides on the hit
   bus.on('enemyKilled', () => P('kill'));
   bus.on('playerDamaged', (d = {}) => P('hurt', { volume: Math.min(1.3, 0.55 + (d.amount ?? 20) / 45) }));
   bus.on('playerDied', () => { P('stinger_death'); });
