@@ -53,7 +53,7 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   const ring = [[0.86, 'b'], [0.985, 'r'], [1.0, 's'], [0.975, 'e'], [0.9, 'g1'], [0.8, 'g2'], [0.74, 'R'], [0.4, 'C'], [0.0, 'C0']];
   const RN = ring.length; const full = []; for (let i = 0; i < RN; i++) full.push([ring[i][0], ring[i][1]]); for (let i = RN - 2; i >= 0; i--) full.push([-ring[i][0], ring[i][1]]);
   const M = full.length;
-  const pos = [];
+  const pos = [], floorPos = [];   // floorPos: the 'b' corners per station at sill height (the floor ignores the arches)
   for (const x of xs) {
     const hw = halfW(x), b = bottomAt(x), be = beltAt(x), ro = roofAt(x), inGH = ro > be + 0.02;
     const tumble = inGH ? 1 : 0;
@@ -74,10 +74,11 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
       // nose/tail round-over in elevation: pull the extreme stations' top in and down
       const endK = Math.max(smooth(xf - 0.12, xf, x), smooth(xr + 0.12, xr, x));
       if (endK > 0) { y = y - (y - (b + be) / 2) * 0.35 * endK; z *= 1 - 0.12 * endK; }
+      if (k === 'b') { const b0 = K.clr + 0.02; floorPos.push(x, endK > 0 ? b0 - (b0 - (b0 + be) / 2) * 0.35 * endK : b0, z); }
       pos.push(x, y, z);
     }
   }
-  const idxPaint = [], idxGlass = [];
+  const idxPaint = [], idxGlass = [], idxDark = [];   // idxDark: the rocker cladding and the window seals (trim slot)
   const segOf = (j) => { const k = full[j][1], k2 = full[(j + 1) % M][1]; return k + '>' + k2; };
   const glassSide = new Set(['e>g1', 'g1>g2', 'g2>R', 'R>g2', 'g2>g1', 'g1>e']);
   const glassTop = new Set(['R>C', 'C>C0', 'C0>C', 'C>R']);
@@ -90,23 +91,46 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
       let g = false;
       if (inGH && glassSide.has(s) && s !== 'e>g1' && s !== 'g1>e' && !pillar(xm) && !(K.panel && xm < K.b[0] - 0.1)) g = true;   // side windows (panel van: blind rear)
       if (inGH && glassTop.has(s) && (xm > wsTop + 0.05 || (xm < rsTop - 0.05 && !K.panel))) g = true;                         // windshield / backlight
-      (g ? idxGlass : idxPaint).push(a, c, b, b, c, d);
+      // dark rocker along the sills (grounds the body, reads lower) and a black seal under the side glass: the belt line
+      const dark = (!K.boxy && (s === 'b>r' || s === 'r>b')) || (!g && inGH && (s === 'e>g1' || s === 'g1>e') && !pillar(xm));
+      (g ? idxGlass : dark ? idxDark : idxPaint).push(a, c, b, b, c, d);
     }
   }
   // end caps (fan)
-  const capFan = (st, flip) => { const base = st * M; const cx = pos.length / 3; let sx = 0, sy = 0; for (let j = 0; j < M; j++) { sx += pos[(base + j) * 3 + 1]; } sy = sx / M; pos.push(xs[st], sy, 0); for (let j = 0; j < M - 1; j++) flip ? idxPaint.push(cx, base + j + 1, base + j) : idxPaint.push(cx, base + j, base + j + 1); };
-  capFan(0, true); capFan(NS, false);
+  // (the ring is open across the bottom: the fan's last triangle closes the nose / tail down to the sill chord)
+  // each triangle is wound to face out along the car (dir -1 tail, +1 nose); a fixed winding left the tail panel facing in
+  const capFan = (st, dir) => { const base = st * M; const cx = pos.length / 3; let sy = 0; for (let j = 0; j < M; j++) sy += pos[(base + j) * 3 + 1]; sy /= M; pos.push(xs[st], sy, 0);
+    const P = (i) => new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]), n = new THREE.Vector3();
+    for (let j = 0; j < M; j++) { const a = base + j, b = base + (j + 1) % M, o = P(cx); n.subVectors(P(a), o).cross(new THREE.Vector3().subVectors(P(b), o)); n.x * dir >= 0 ? idxPaint.push(cx, a, b) : idxPaint.push(cx, b, a); } };
+  capFan(0, -1); capFan(NS, 1);
   const mk = (idx) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g.toNonIndexed(); };
-  const paint = mk(idxPaint), glass = mk(idxGlass);
-  // glass sits a hair inside the body so its edges read as a frame
-  { const p = glass.attributes.position, n = glass.attributes.normal; for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) - n.getX(i) * 0.006, p.getY(i) - n.getY(i) * 0.006, p.getZ(i) - n.getZ(i) * 0.006); }
+  const paint = mk(idxPaint), glass = mk(idxGlass), darkSkin = mk(idxDark);
+  // the glass shares the body's edges exactly: pushing it in (for a frame line) opened a crack all round every window
 
-  const parts = { rubber: [], rim: [], trim: [], lampW: [], lampR: [], plate: [], paintX: [], caliper: [] };
+  const parts = { rubber: [], rim: [], trim: [darkSkin], lampW: [], lampR: [], plate: [], paintX: [], caliper: [] };
   const box = (arr, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); arr.push(g); };
-  // wheels: tyre with a rounded shoulder, rim face with 5 spokes, dark hub; dark arch liner behind each wheel
+  // closed underside + wheel wells. The loft is a shell open at the bottom and its inside faces are culled, so anything that
+  // looked in (into an arch, under a sill, through the nose cap) saw straight through the car. Floor: both windings (dark
+  // from below, and the cabin floor from inside). Each well: a liner strip over the arch and down its two legs to the floor,
+  // and an inboard wall (the arch shape), both wound both ways, so an arch reads as a dark pocket from outside and a hump inside.
+  { const T = [], orient = (a, b, c, toward) => { const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)), m = new THREE.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3); return n.dot(toward(m)) >= 0 ? [a, b, c] : [a, c, b]; };
+    const tri = (a, b, c, toward) => { for (const v of orient(a, b, c, toward)) T.push(v.x, v.y, v.z); }, V = (i) => new THREE.Vector3(floorPos[i * 3], floorPos[i * 3 + 1], floorPos[i * 3 + 2]);
+    const down = () => new THREE.Vector3(0, -1, 0), up = () => new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < NS; i++) { const a = V(i * 2), b = V(i * 2 + 1), c = V(i * 2 + 2), d = V(i * 2 + 3); for (const f of [down, up]) { tri(a, b, c, f); tri(b, d, c, f); } }
+    const y0 = K.clr + 0.02, ARC = 12;
+    for (const wx of K.wheels) for (const sz of [1, -1]) {
+      const zo = sz * (halfW(wx) + 0.01), zi = sz * (halfW(wx) - 0.36);   // outer edge just past the skin; inboard wall behind the tyre
+      const prof = [new THREE.Vector2(wx + archR, y0)]; for (let k = 0; k <= ARC; k++) { const a = k / ARC * Math.PI; prof.push(new THREE.Vector2(wx + Math.cos(a) * archR, 0.33 + Math.sin(a) * archR * 0.98)); } prof.push(new THREE.Vector2(wx - archR, y0));
+      for (let k = 0; k < prof.length - 1; k++) { const p = prof[k], q = prof[k + 1], P = (v, z) => new THREE.Vector3(v.x, v.y, z), inward = (m) => new THREE.Vector3(wx - m.x, 0.33 - m.y, 0);
+        const a = P(p, zo), b = P(q, zo), c = P(p, zi), d = P(q, zi), outward = (m) => inward(m).negate(); for (const f of [inward, outward]) { tri(a, b, c, f); tri(b, d, c, f); } }
+      const ctr = new THREE.Vector3(wx, (y0 + 0.33) / 2, zi), out = () => new THREE.Vector3(0, 0, sz), inn = () => new THREE.Vector3(0, 0, -sz);
+      for (let k = 0; k < prof.length - 1; k++) for (const f of [out, inn]) tri(ctr, new THREE.Vector3(prof[k].x, prof[k].y, zi), new THREE.Vector3(prof[k + 1].x, prof[k + 1].y, zi), f);   // both ways: the cabin sees the arch humps
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(T, 3)); g.computeVertexNormals(); parts.trim.push(g); }
+  // wheels: tyre with a rounded shoulder, rim face with 5 spokes, dark hub
   for (const wx of K.wheels) for (const sz of [1, -1]) {
     const zc = sz * (halfW(wx) - 0.13);
-    if (!wheels) { const liner = new THREE.CylinderGeometry(archR - 0.01, archR - 0.01, HW * 1.5, 8, 1, true, -Math.PI / 2, Math.PI); liner.rotateX(Math.PI / 2); liner.translate(wx, 0.33, 0); parts.trim.push(liner); continue; }   // traffic: the wheels are separate instances that spin (wheelGeometry)
+    if (!wheels) continue;   // traffic: the wheels are separate instances that spin (wheelGeometry)
     const tyre = new THREE.LatheGeometry([[0.2, -0.11], [wheelR - 0.035, -0.115], [wheelR, -0.08], [wheelR + 0.004, 0], [wheelR, 0.08], [wheelR - 0.035, 0.115], [0.2, 0.11]].map(([r, y]) => new THREE.Vector2(r, y)), 10);
     tyre.rotateX(Math.PI / 2); tyre.translate(wx, wheelR, zc); parts.rubber.push(tyre);
     const face = new THREE.CylinderGeometry(0.215, 0.215, 0.02, 12); face.rotateX(Math.PI / 2); face.translate(wx, wheelR, zc + sz * 0.1); parts.trim.push(face);
@@ -116,10 +140,7 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
       const disc = new THREE.CylinderGeometry(0.16, 0.16, 0.02, 18); disc.rotateX(Math.PI / 2); disc.translate(wx, wheelR, zc + sz * 0.06); parts.rim.push(disc);
       const cal = new THREE.BoxGeometry(0.1, 0.13, 0.05); cal.translate(wx + (wx > 0 ? -0.12 : 0.12), wheelR + 0.06, zc + sz * 0.075); parts.caliper.push(cal); }
     const hub = new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10); hub.rotateX(Math.PI / 2); hub.translate(wx, wheelR, zc + sz * 0.12); parts.rim.push(hub);
-    const liner = new THREE.CylinderGeometry(archR - 0.01, archR - 0.01, HW * 1.5, 8, 1, true, -Math.PI / 2, Math.PI); liner.rotateX(Math.PI / 2); liner.translate(wx, 0.33, 0); parts.trim.push(liner);
   }
-  // under-tray between the arches so nothing shows through under the sills
-  box(parts.trim, L * 0.92, 0.12, K.w * 0.8, 0, K.clr + 0.08, 0);
   // lamps: headlamps wrap the nose corners, tail lamps across the tail corners
   const hlY = K.hood - 0.13, tlY = K.trunk - 0.12;
   for (const sz of [1, -1]) {
@@ -148,7 +169,7 @@ export function carGeometries(kind = 'sedan', { wheels = true } = {}) {
   const merge = (arr) => arr.length ? mergeGeometries(arr.map(g => g.index ? g.toNonIndexed() : g).map(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g; }), false) : null;
   // paint gets a uv so per-map materials with maps do not break
   for (const g of [paint, glass]) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-  const paintAll = merge([paint, ...parts.paintX]);
+  const paintAll = merge([paint, ...parts.paintX]); paintAll.userData.darkSkin = darkSkin;   // carInterior lines the cabin with both
   return {
     geos: { paint: paintAll, glass, rubber: merge(parts.rubber), rim: merge(parts.rim), trim: merge(parts.trim), lampW: merge(parts.lampW), lampR: merge(parts.lampR), plate: merge(parts.plate), caliper: merge(parts.caliper), shadow: (() => { const g = new THREE.PlaneGeometry(L * 1.08, K.w * 1.25); g.rotateX(-Math.PI / 2); g.translate(0, 0.012, 0); return g; })() },
     len: L, w: K.w + 0.2, h: K.roof,
@@ -324,7 +345,7 @@ export function carInterior(kind = 'sedan', geos = null) {
   const I = interiorMats();
   const g = new THREE.Group(); g.name = 'carInterior';
   const add = (geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = false; m.receiveShadow = true; parent.add(m); return m; };
-  add(G.paint, I.shell); add(G.glass, I.glassIn);
+  add(G.paint, I.shell); if (G.paint.userData.darkSkin) add(G.paint.userData.darkSkin, I.shell); add(G.glass, I.glassIn);
   const eye = carEye(kind), [wsBase, wsTop] = K.ws;
   // dashboard: from under the windshield base back to ~0.5 m ahead of the eye, top just above the belt line
   const dx0 = eye.x + 0.52, dx1 = wsBase + 0.05, dTop = K.belt - 0.03;   // top below the belt so the hood shows over it

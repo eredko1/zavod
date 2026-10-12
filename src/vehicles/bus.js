@@ -79,6 +79,9 @@ const col = new THREE.Color();
 function strip(g) { g = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k); return g; }
 function tint(g, hex) { g = strip(g); col.setHex(hex); const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = col.r; a[i * 3 + 1] = col.g; a[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); if (g.attributes.uv) g.deleteAttribute('uv'); return g; }
 function box(x0, y0, z0, x1, y1, z1) { const g = new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return g; }
+/** the same surface facing the other way (an open shell seen from inside is culled: the driver saw out through the corner posts) */
+function back(g) { g = (g.index ? g.toNonIndexed() : g.clone()); for (const k of Object.keys(g.attributes)) { const a = g.attributes[k], s = a.itemSize; for (let t = 0; t < a.count; t += 3) for (let c = 0; c < s; c++) { const v = a.array[(t + 1) * s + c]; a.array[(t + 1) * s + c] = a.array[(t + 2) * s + c]; a.array[(t + 2) * s + c] = v; } }
+  const n = g.attributes.normal; if (n) for (let i = 0; i < n.array.length; i++) n.array[i] = -n.array[i]; return g; }
 function cyl(r0, r1, h, seg = 12) { return new THREE.CylinderGeometry(r0, r1, h, seg); }
 /** paint UVs: 'r' kerb side livery, 'l' street side, 'w' plain white, 'b' plain blue */
 function uvPaint(g, mode) {
@@ -145,8 +148,8 @@ export function buildBus(o = {}) {
   // front: rounded corners, lower panel, raked windshield, the sign header, bumper, lamps, mirrors, bike rack
   // (theta runs from +z toward +x: front corners bulge to +x, rear ones to -x, each to its own side; the front-left and rear-right
   // quarters used to face into the bus, a white post right in front of the driver)
-  for (const sz of [1, -1]) { const g = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? 0 : Math.PI / 2, Math.PI / 2); g.translate(XF - 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(g, 'w');
-    const r = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? -Math.PI / 2 : Math.PI, Math.PI / 2); r.translate(XR + 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(r, 'w'); }
+  for (const sz of [1, -1]) { const g = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? 0 : Math.PI / 2, Math.PI / 2); g.translate(XF - 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(g, 'w'); paint(back(g), 'w');
+    const r = new THREE.CylinderGeometry(0.16, 0.16, TOP - 0.3, 10, 1, true, sz > 0 ? -Math.PI / 2 : Math.PI, Math.PI / 2); r.translate(XR + 0.16, (TOP + 0.3) / 2, sz * (HW - 0.16)); paint(r, 'w'); paint(back(r), 'w'); }
   paint(box(XF - 0.05, 0.3, -HW + 0.16, XF, 1.02, HW - 0.16), 'b');
   { const g = new THREE.PlaneGeometry(BUS.w - 0.36, 1.62); g.rotateY(Math.PI / 2); g.rotateZ(0.07); g.translate(XF - 0.07, 1.84, 0); P.glass.push(strip(g)); }
   P.trim.push(strip(box(XF - 0.2, 2.62, -HW + 0.14, XF - 0.1, TOP + 0.05, HW - 0.14)), strip(box(XF - 0.08, 1.0, -HW + 0.14, XF + 0.01, 1.08, HW - 0.14)));
@@ -181,7 +184,9 @@ export function buildBus(o = {}) {
     const hub = cyl(0.12, 0.14, 0.08, 12); hub.rotateX(Math.PI / 2); hub.translate(0, 0, sz * (w / 2 + 0.03)); wv(hub, 0x8c9094);
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, nut = cyl(0.018, 0.018, 0.05, 6); nut.rotateX(Math.PI / 2); nut.translate(Math.cos(a) * 0.2, Math.sin(a) * 0.2, sz * (w / 2 + 0.025)); wv(nut, 0x6c7074); }
     WHEELS.push({ ax, zc, front: ax > 0, parts });
-    const liner = new THREE.CylinderGeometry(0.63, 0.63, 0.5, 14, 1, true, -Math.PI / 2 - 1.4, 2.8); liner.rotateX(Math.PI / 2); liner.translate(ax, 0.42, sz * (HW - 0.3)); P.trim.push(strip(liner));
+    const liner = new THREE.CylinderGeometry(0.63, 0.63, 0.5, 14, 1, true, -Math.PI / 2 - 1.4, 2.8); liner.rotateX(Math.PI / 2); liner.translate(ax, 0.42, sz * (HW - 0.3)); P.trim.push(strip(liner), strip(back(liner)));
+    // the liner's outside faced away from anyone looking into the arch (culled), and the well had no inboard side: both showed through
+    { const s = new THREE.Shape(); s.moveTo(ax - 0.63, 0.3); s.absarc(ax, 0.42, 0.63, Math.PI + 0.19, -0.19, true); s.lineTo(ax + 0.63, 0.3); s.closePath(); const wall = new THREE.ShapeGeometry(s, 10); wall.translate(0, 0, sz * (HW - 0.55)); P.trim.push(strip(wall), strip(back(wall))); }
   }
   // ---- interior --------------------------------------------------------------------------------------------------------
   const zi = HW - 0.06, D = BUS.deck, F = BUS.floor, rearX = -1.75;
