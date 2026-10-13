@@ -13,7 +13,7 @@ import { OSM, PLAY } from './osm.js';
 import { BW } from './shore.js';
 import { BUS_STOPS, laneOff } from './traffic.js';
 import { streetAt } from './fronts.js';
-import { placeCars, parkedCarBoxes } from '../carkit.js';
+import { placeCars, parkedCarBoxes, parkMix } from '../carkit.js';
 import { addFolkSpots } from './folk.js';
 import { STREET_NAMES } from './streetnames.js';
 import { Batch, boxGeo } from '../sbu/geo.js';
@@ -267,13 +267,13 @@ export function buildStreet(world) {
   W.stalls = stalls;
 
   // ---- cars parked along both kerbs of Surf Ave -----------------------------------------------------------------------------
-  const cars = [], KINDS = ['sedan', 'sedan', 'suv', 'suv', 'hatch', 'van', 'coupe', 'muscle'], off = Math.min(laneOff(22, 1) + 3.5, 8.8);
+  const cars = [], KIND = parkMix(ctx, ['sedan', 'sedan', 'e34', 'suv', 'suv', 'hatch', 'van', 'coupe', 'muscle', 'e34', 'sedan', 'suv', 'hatch']), off = Math.min(laneOff(22, 1) + 3.5, 8.8);
   const mouths = OSM.r.filter((r) => r.w >= 6 && r.w < 20).flatMap((r) => [r.p[0], r.p[r.p.length - 1]]);
   for (const r of OSM.r) { const nep = r.w >= 14 && r.w < 20 && streetAt(r.p[0][0], r.p[0][1]) === 'neptune'; if (r.w < 20 && !nep) continue; const o = nep ? r.w / 2 - 1.3 : off;   // Surf Ave and Neptune Ave
     walkLine(r.p, 6.4, (x, z, ux, uz) => { for (const s of [1, -1]) {
       if (R() < (nep ? 0.2 : 0.38)) continue; const cx = x - uz * s * o, cz = z + ux * s * o;
       if (!inMap(cx, cz) || corners(cx, cz) || mouths.some(([mx, mz]) => Math.hypot(mx - cx, mz - cz) < 15) || BUS_STOPS.some((b) => Math.hypot(b[1] - cx, b[2] - cz) < 20) || blocked(cx, cz, 1.2)) continue;
-      cars.push({ x: cx, z: cz, ry: Math.atan2(ux, uz) - Math.PI / 2 + (s > 0 ? 0 : Math.PI), kind: KINDS[(R() * KINDS.length) | 0] }); } }, 4); }
+      cars.push({ x: cx, z: cz, ry: Math.atan2(ux, uz) - Math.PI / 2 + (s > 0 ? 0 : Math.PI), kind: KIND(R) }); } }, 4); }
   if (cars.length) { placeCars(world, cars, { raycast: false }); for (const c of cars) parkedCarBoxes(world, c); st.cars = cars.length; }
 
   if (col.length) { const me = new THREE.Mesh(mergeGeometries(col, false), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.2 })); me.name = 'street:kit'; me.castShadow = !lite; me.receiveShadow = true; scene.add(me); }

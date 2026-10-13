@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { carGeometries, carMaterials, carInterior, carEye, wheelGeometry, wheelLayout, CAR_KINDS } from '../src/world/carkit.js';
 import { buildBus } from '../src/vehicles/bus.js';
-const W = 640, H = 400;
+const W = +(new URLSearchParams(location.search).get('w') || 640), H = Math.round(W * 0.625);   // ?w=1280: bigger close-up shots
 const r = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true }); r.setSize(W, H); r.setPixelRatio(1); r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
 const s = new THREE.Scene(); s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
 const cam = new THREE.PerspectiveCamera(50, W / H, 0.03, 200);
