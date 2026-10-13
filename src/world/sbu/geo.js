@@ -1,8 +1,8 @@
 // SBU geometry batching: world-space UVs, one merged Mesh per material, AABB/stair helpers, extruded polygons. SBU agent.
 import * as THREE from 'three';
-import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 
 const _n = new THREE.Vector3();
+const BATCH_CHUNK0 = 64, BATCH_CHUNK_MAX = 65536;   // vertices per chunk of a material key's arrays: each new chunk doubles, up to the max (small first: osmkit makes a scratch batch per rotated building)
 
 /** Rewrite UVs from world positions by dominant normal axis so one texture tiles seamlessly across merged geometry. scale = 1 / metres-per-tile. */
 export function worldUV(geo, scale = 0.5, offset = 0) {
@@ -26,9 +26,9 @@ export function worldUV(geo, scale = 0.5, offset = 0) {
  *  UV layout as BoxGeometry). Written straight into typed arrays: the maps build tens of thousands of these, and BoxGeometry's JS
  *  arrays + index (then Batch's non-indexed copy) were hundreds of MB of garbage during load, which is what iPhones die of. */
 const BOX_FACES = [[0, 2, 1, 1], [0, 2, 1, -1], [0, 1, 2, 1], [0, 1, 2, -1], [0, 1, 2, 0], [0, 1, 2, 0]];
-export function boxGeo(min, max) {
+export function boxGeo(min, max, into = null) {
   const x0 = min[0], y0 = min[1], z0 = min[2], x1 = Math.max(max[0], x0 + 0.001), y1 = Math.max(max[1], y0 + 0.001), z1 = Math.max(max[2], z0 + 0.001);
-  const P = new Float32Array(108), N = new Float32Array(108), U = new Float32Array(72); let p = 0, u = 0;
+  const P = into ? into.attributes.position.array : new Float32Array(108), N = into ? into.attributes.normal.array : new Float32Array(108), U = into ? into.attributes.uv.array : new Float32Array(72); let p = 0, u = 0;
   // each face: 4 corners (as BoxGeometry orders them: top-left, top-right, bottom-left, bottom-right in the face's own u/v), two triangles
   const face = (c, n) => { for (const k of [0, 2, 1, 2, 3, 1]) { const v = c[k]; P[p] = v[0]; P[p + 1] = v[1]; P[p + 2] = v[2]; N[p] = n[0]; N[p + 1] = n[1]; N[p + 2] = n[2]; p += 3; U[u++] = k & 1; U[u++] = k < 2 ? 1 : 0; } };
   face([[x1, y1, z1], [x1, y1, z0], [x1, y0, z1], [x1, y0, z0]], [1, 0, 0]);    // +x
@@ -37,9 +37,14 @@ export function boxGeo(min, max) {
   face([[x0, y0, z1], [x1, y0, z1], [x0, y0, z0], [x1, y0, z0]], [0, -1, 0]);   // -y
   face([[x0, y1, z1], [x1, y1, z1], [x0, y0, z1], [x1, y0, z1]], [0, 0, 1]);    // +z
   face([[x1, y1, z0], [x0, y1, z0], [x1, y0, z0], [x0, y0, z0]], [0, 0, -1]);   // -z
+  if (into) return into;
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2));
   return g;
 }
+
+/** a scratch box geometry, refilled by boxGeo(min, max, it) for a piece that Batch copies straight away (no garbage per box) */
+export const scratchBox = () => boxGeo([0, 0, 0], [1, 1, 1]);
+const BOX_SCRATCH = scratchBox();
 
 /** Extruded polygon (points [[x,z],...] in world XZ) from y0 to y1. */
 export function prismGeo(pts, y0, y1) {
@@ -65,7 +70,10 @@ export function circlePts(cx, cz, r, n = 48, a0 = 0, a1 = Math.PI * 2) {
 }
 
 /**
- * Collects geometry per material key and flushes one merged Mesh per material.
+ * Collects geometry per material key and flushes one merged Mesh per material. Each piece is copied into the key's vertex
+ * chunks as it is added (not kept as its own BufferGeometry until a merge at flush): a map adds tens of thousands of
+ * small pieces, and holding them all (each its own object + arrays) plus the merged copy at flush was the load's memory peak
+ * (iPhones kill the tab there).
  */
 export class Batch {
   constructor(world, M, name = 'sbu') {
@@ -76,14 +84,39 @@ export class Batch {
     if (uv) worldUV(geo, uvScale ?? (this.M.uvScale?.[key] ?? 0.5));
     if (geo.index) geo = geo.toNonIndexed();
     for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
-    (this.lists.get(key) || this.lists.set(key, []).get(key)).push(geo);
+    this.append(key, geo);
     return geo;
   }
+  /** copy a non-indexed geometry's vertices onto key's chunks (no UV rewrite); a piece whose attributes differ from the key's
+   *  first piece can't share its mesh and is left out with a warning. Chunks (not one doubling array): no regrowth copies */
+  append(key, geo) {
+    let acc = this.lists.get(key); const names = Object.keys(geo.attributes).sort();
+    if (!acc) this.lists.set(key, acc = { names, n: 0, chunks: [], spec: names.map((k) => { const a = geo.attributes[k]; return { k, size: a.itemSize, normalized: a.normalized, T: a.array.constructor }; }) });
+    if (names.join() !== acc.names.join() || acc.spec.some((A) => geo.attributes[A.k].itemSize !== A.size)) { if (!acc.warned) { acc.warned = true; console.warn('[sbu] mismatched attributes, piece skipped for', this.name, key); } return; }
+    const count = geo.attributes.position.count; let done = 0;
+    while (done < count) {
+      let c = acc.chunks[acc.chunks.length - 1];
+      if (!c || c.n === c.cap) { const cap = Math.max(count - done, Math.min(BATCH_CHUNK_MAX, BATCH_CHUNK0 << acc.chunks.length)); acc.chunks.push(c = { n: 0, cap, arrs: acc.spec.map((A) => new A.T(cap * A.size)) }); }
+      const k = Math.min(count - done, c.cap - c.n);
+      acc.spec.forEach((A, i) => c.arrs[i].set(geo.attributes[A.k].array.subarray(done * A.size, (done + k) * A.size), c.n * A.size));
+      c.n += k; done += k;
+    }
+    acc.n += count;
+  }
+  /** key's collected vertices as one exact-size geometry (null when empty) */
+  geometry(key) {
+    const acc = this.lists.get(key); if (!acc || !acc.n) return null;
+    const g = new THREE.BufferGeometry();
+    acc.spec.forEach((A, i) => { const out = new A.T(acc.n * A.size); let o = 0; for (const c of acc.chunks) { out.set(c.arrs[i].subarray(0, c.n * A.size), o); o += c.n * A.size; } g.setAttribute(A.k, new THREE.BufferAttribute(out, A.size, A.normalized)); });
+    return g;
+  }
+  /** move everything collected here into batch S, transformed by matrix m (osmkit.footprint's rotated scratch batch) */
+  moveInto(S, m) { for (const key of this.lists.keys()) { const g = this.geometry(key); if (g) S.append(key, g.applyMatrix4(m)); } this.lists.clear(); }
+  /** a box piece (copied in at once from a scratch geometry, so nothing is returned) */
   box(key, min, max, { collide = true, walkable = false, uvScale = null, uv = true } = {}) {
-    const g = this.add(key, boxGeo(min, max), { uvScale, uv });
+    this.add(key, boxGeo(min, max, BOX_SCRATCH), { uvScale, uv });
     if (walkable) this.world.walkable(min, max);
     else if (collide) this.world.box(min, max);
-    return g;
   }
   prism(key, pts, y0, y1, { collide = true, uvScale = null } = {}) {
     const g = this.add(key, prismGeo(pts, y0, y1), { uvScale });
@@ -120,18 +153,15 @@ export class Batch {
   }
   flush({ shadow = true, receive = true } = {}) {
     const { scene, ctx } = this.world;
-    for (const [key, list] of this.lists) {
-      if (!list.length) continue;
-      const merged = BGU.mergeGeometries(list, false);
-      if (!merged) { console.warn('[sbu] merge failed for', key); continue; }
+    for (const key of this.lists.keys()) {
+      const merged = this.geometry(key); if (!merged) continue;
       merged.computeBoundingSphere(); merged.computeBoundingBox();
       const mesh = new THREE.Mesh(merged, this.M[key]);
       mesh.name = `${this.name}:${key}`; mesh.castShadow = shadow && !(this.M.noShadow?.[key]); mesh.receiveShadow = receive;
       mesh.userData.surface = this.M.surface[key] || 'concrete';
       scene.add(mesh); ctx.raycastTargets.push(mesh); this.meshes.push(mesh);
-      for (const g of list) g.dispose();
+      this.lists.delete(key);   // the chunks go now, not when the batch does
     }
-    this.lists.clear();
     return this.meshes;
   }
 }

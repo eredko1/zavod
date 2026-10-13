@@ -72,8 +72,7 @@ export function footprint(S, world, M, poly, buildRect) {
   for (const r of rects) buildRect(T, r);
   if (!aligned) {
     const m = new THREE.Matrix4().makeTranslation(ox, 0, oz).multiply(new THREE.Matrix4().makeRotationY(-ang)).multiply(new THREE.Matrix4().makeTranslation(-ox, 0, -oz));
-    for (const [key, list] of T.lists) for (const g of list) { g.applyMatrix4(m); (S.lists.get(key) || S.lists.set(key, []).get(key)).push(g); }
-    T.lists.clear();
+    T.moveInto(S, m);
     for (const [mn, mx] of T.world._boxes) {
       const pts = [[mn[0], mn[2]], [mx[0], mn[2]], [mn[0], mx[2]], [mx[0], mx[2]]].map(([x, z]) => new THREE.Vector3(x, 0, z).applyMatrix4(m));
       const b = world.box([Math.min(...pts.map((q) => q.x)), mn[1], Math.min(...pts.map((q) => q.z))], [Math.max(...pts.map((q) => q.x)), mx[1], Math.max(...pts.map((q) => q.z))]);
