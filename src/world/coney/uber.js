@@ -424,7 +424,9 @@ function buildUI() {
   const el = document.createElement('div'); el.className = 'uber-app' + (U.ctx.isTouch ? ' touch' : ''); el.style.display = 'none';
   el.innerHTML = '<header><b>Uber</b><span class="cash"></span><button data-u="close">✕</button></header><div class="ub-body"></div><canvas width="' + MAP_PX + '" height="' + MAP_PX + '"></canvas><div class="ub-foot"></div>';
   document.body.appendChild(el); U.el = el; U.body = el.querySelector('.ub-body'); U.foot = el.querySelector('.ub-foot'); U.cv = el.querySelector('canvas'); U.g = U.cv.getContext('2d');
-  const tap = (e) => { const t = e.target.closest('[data-u]'); if (!t) { if (!U.picking && U.cur) { e.preventDefault(); U.big = !U.big; showApp(true, false); } return; }   // the trip card: tap to expand / collapse e.preventDefault(); e.stopPropagation(); const a = t.dataset.u;
+  // the trip card: tap to expand / collapse; a destination / close / cancel button: act on it
+  const tap = (e) => { const t = e.target.closest('[data-u]'); if (!t) { if (!U.picking && U.cur) { e.preventDefault(); U.big = !U.big; showApp(true, false); } return; }
+    e.preventDefault(); e.stopPropagation(); const a = t.dataset.u;
     if (a === 'close') showApp(false); else if (a === 'cancel') action(); else if (a.startsWith('go:')) request(a.slice(3)); };
   el.addEventListener('click', tap); el.addEventListener('touchend', tap);
 }
@@ -463,14 +465,16 @@ function nextTurn(st) {
 function renderApp() {
   if (!U.el || U.el.style.display === 'none') return;
   U.el.querySelector('.cash').textContent = `$${K.cash}`;
+  // buttons are built once, not every UI tick: a finger lifted after a rebuild lands on a detached button and the tap is lost
+  const set = (el, html) => { if (el._html !== html) { el._html = html; el.innerHTML = html; } };
   if (U.picking) {
-    U.body.innerHTML = '<p class="ub-q">Where to? <small>$' + FARE + ' a ride</small></p>' + DESTS.map((d, i) => `<button data-u="go:${d.id}"><b>${i + 1}</b>${d.name}<em>$${FARE}</em></button>`).join('');
-    U.cv.style.display = 'none'; U.foot.innerHTML = U.ctx.isTouch ? '' : '<small>1-5 book · U / Esc close</small>'; return;
+    set(U.body, '<p class="ub-q">Where to? <small>$' + FARE + ' a ride</small></p>' + DESTS.map((d, i) => `<button data-u="go:${d.id}"><b>${i + 1}</b>${d.name}<em>$${FARE}</em></button>`).join(''));
+    U.cv.style.display = 'none'; set(U.foot, U.ctx.isTouch ? '' : '<small>1-5 book · U / Esc close</small>'); return;
   }
-  const r = U.cur; if (!r) { U.body.innerHTML = '<p class="ub-q">No ride. U to book one.</p>'; U.cv.style.display = 'none'; U.foot.innerHTML = ''; return; }
-  const L = statusLines(); U.body.innerHTML = L.map((t, i) => `<p class="l${i}">${esc(t)}</p>`).join('');
+  const r = U.cur; if (!r) { set(U.body, '<p class="ub-q">No ride. U to book one.</p>'); U.cv.style.display = 'none'; set(U.foot, ''); return; }
+  const L = statusLines(); set(U.body, L.map((t, i) => `<p class="l${i}">${esc(t)}</p>`).join(''));
   U.cv.style.display = 'block'; drawMap(r);
-  U.foot.innerHTML = `<button data-u="cancel">${esc(actionLabel())}</button>`;
+  set(U.foot, `<button data-u="cancel">${esc(actionLabel())}</button>`);
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 /** the mini map: heading-up on the car while riding (up = where you look while it's coming), the route ahead, the car, you, the next turn */
