@@ -40,7 +40,8 @@ export const meta = {
 };
 
 // phones: the build yields between steps so the collector can run; one synchronous pass left ~450 MB of build garbage on the
-// heap at once (an 850-900 MB peak just as the menu came up, where iOS kills the tab)
+// heap at once (an 850-900 MB peak just as the menu came up, where iOS kills the tab). Before each yield the building meshes
+// built so far go to the GPU and leave the JS heap (main.js ctx.gpuStream), instead of all waiting for the pre-warm.
 const breathe = () => new Promise((r) => setTimeout(r, 0));
 export async function build(world) {
   const { ctx, W } = world;
@@ -53,24 +54,28 @@ export async function build(world) {
   };
   ctx.progress(0.13, 'coney: sky'); buildSky(world, { shadowHalf: 130, center: [0, 0, 0] });
   const M = makeConeyMats(world); world.mats = M;
+  // kept in JS until the pre-warm: lamp meshes (horizon.js places the night lights from their vertices) and, until greens.js has
+  // raycast the Luna towers' roofs for the water tanks, the towers
+  let roofsDone = false; const keep = (o) => o.material === M.lampLens || o.material === M.lampHead || (!roofsDone && /^luna:/.test(o.name));
+  const step = () => { ctx.gpuStream?.(keep); return breathe(); };
   moveStillwellAve(OSM); addBusLoop(OSM);   // the Stillwell bus loop joins the street network first (city paints it, traffic drives it)
-  await breathe(); ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M);
-  await breathe(); try { buildFronts(world, M); } catch (e) { console.warn('[coney] fronts', e); }
-  await breathe(); try { buildStreetLights(world, M); } catch (e) { console.warn('[coney] street lights', e); }   // NYC cobra-heads on every street (before horizon: it lights the lenses at night)   // real storefronts, walk-up fire escapes + cornices, Surf Ave arches + billboards (coney/fronts.js)
-  await breathe(); ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
-  await breathe(); try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
-  await breathe(); try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)
-  await breathe(); try { buildAirSupport(world); } catch (e) { console.warn('[coney] air support', e); }   // 2 stars: the NYPD chopper, 3: a tank (coney/airsupport.js)
-  await breathe(); ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
+  await step(); ctx.progress(0.15, 'coney: streets + blocks'); buildCity(world, M, () => ctx.gpuStream?.(keep));
+  await step(); try { buildFronts(world, M); } catch (e) { console.warn('[coney] fronts', e); }
+  await step(); try { buildStreetLights(world, M); } catch (e) { console.warn('[coney] street lights', e); }   // NYC cobra-heads on every street (before horizon: it lights the lenses at night)   // real storefronts, walk-up fire escapes + cornices, Surf Ave arches + billboards (coney/fronts.js)
+  await step(); ctx.progress(0.17, 'coney: luna park houses'); buildHousing(world, M);
+  await step(); try { buildHangout(world, M); if (typeof window !== 'undefined' && window.__game) window.__game.hangout = hangoutQA; } catch (e) { console.warn('[coney] hangout', e); }
+  await step(); try { buildChase(world); } catch (e) { console.warn('[coney] chase', e); }   // wanted level (chill too: muggings bring the cops): cops + Luna Park crews (coney/chase.js)
+  await step(); try { buildAirSupport(world); } catch (e) { console.warn('[coney] air support', e); }   // 2 stars: the NYPD chopper, 3: a tank (coney/airsupport.js)
+  await step(); ctx.progress(0.19, 'coney: boardwalk + beach'); buildShore(world, M);
   const skip = new Set(String(ctx.qs?.get?.('skip') || '').split(','));   // ?skip=horizon,belt,subway,greens,crowds,traffic (and tavern, brighton in hangout.js)
-  await breathe(); if (!skip.has('horizon')) try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
-  await breathe(); if (!skip.has('belt')) try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
-  await breathe(); if (!skip.has('ferry')) try { buildFerry(world); } catch (e) { console.warn('[coney] ferry', e); }   // the NYC Ferry from the pier to the Verrazzano and back (coney/ferry.js)
-  await breathe(); if (!skip.has('subway')) try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
+  await step(); if (!skip.has('horizon')) try { buildHorizon(world); } catch (e) { console.warn('[coney] horizon', e); }   // far distance + day→night cycle (coney/horizon.js)
+  await step(); if (!skip.has('belt')) try { buildBelt(world); } catch (e) { console.warn('[coney] belt', e); }
+  await step(); if (!skip.has('ferry')) try { buildFerry(world); } catch (e) { console.warn('[coney] ferry', e); }   // the NYC Ferry from the pier to the Verrazzano and back (coney/ferry.js)
+  await step(); if (!skip.has('subway')) try { buildSubway(world); } catch (e) { console.warn('[coney] subway', e); }
   Object.defineProperty(W, 'filmGrade', { get: () => (/night|dusk/i.test(W.tod?.get?.() || '') ? null : 'lunafilm'), configurable: true });   // the aerial-photo grade by day (Settings → Film look)
-  await breathe(); if (!skip.has('realism')) try { buildRealism(world, M); } catch (e) { console.warn('[coney] realism', e); }   // W 8 St DMV + firehouse lots, Coney Island Creek, Asser Levy playground, street furniture (coney/realism.js)
-  await breathe(); if (!skip.has('greens')) try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); }   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
-  await breathe(); try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
+  await step(); if (!skip.has('realism')) try { buildRealism(world, M); } catch (e) { console.warn('[coney] realism', e); }   // W 8 St DMV + firehouse lots, Coney Island Creek, Asser Levy playground, street furniture (coney/realism.js)
+  await step(); if (!skip.has('greens')) try { buildGreens(world, M); } catch (e) { console.warn('[coney] greens', e); } roofsDone = true;   // playgrounds, the traffic garden, flower beds, roof tanks (coney/greens.js)   // ride the F: Stillwell → W 8 St → Neptune Av (coney/subway.js)
+  await step(); try { buildRadio(world); } catch (e) { console.warn('[coney] radio', e); }   // Luna Park Radio (coney/radio.js)
   if (ctx.mode === 'chill') try { buildUber(world); } catch (e) { console.warn('[coney] uber', e); }   // the phone + Uber app; the car, driver and road graphs only on the first ride (coney/uber.js)
   // the map (src/minimap.js): street centrelines, street names, points of interest
   W.mapRoads = OSM.r.map((r) => ({ p: r.p, w: r.w }));
@@ -84,8 +89,8 @@ export async function build(world) {
     P('WONDER WHEEL', LM.wheel.x, LM.wheel.z, 'ride'); P('CYCLONE', 194, -2, 'ride'); P('PARACHUTE JUMP', LM.pj.x, LM.pj.z, 'ride'); P('THUNDERBOLT', -189, 75, 'ride');
     P('STILLWELL AVE STATION', (LM.terminal.x0 + LM.terminal.x1) / 2, (LM.terminal.z0 + LM.terminal.z1) / 2, 'transit'); P('BALLPARK', (LM.ballpark.x0 + LM.ballpark.x1) / 2, (LM.ballpark.z0 + LM.ballpark.z1) / 2, 'landmark'); P('AQUARIUM', 370, 15, 'landmark');
     P('BELT PKWY LOOP', 407, -548, 'road'); }   // the elevated Belt Parkway loop (its own zone, coney/belt.js)
-  await breathe(); ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
-  await breathe(); ctx.progress(0.23, 'coney: park'); buildPark(world, M);
+  await step(); ctx.progress(0.22, 'coney: rides + landmarks'); buildLandmarks(world, M);
+  await step(); ctx.progress(0.23, 'coney: park'); buildPark(world, M);
 
   // poses by eye point + look-at target (yaw 0 = -z, yaw -pi/2 = +x)
   const look = (x, y, z, tx, ty, tz) => { const dx = tx - x, dy = ty - y, dz = tz - z; return [x, y, z, Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))]; };
@@ -116,14 +121,14 @@ export async function build(world) {
     if (d) { p[0] -= fx * (d + 1.5); p[2] -= fz * (d + 1.5); }
   }
   for (let x = PLAY.x0 + 10; x < PLAY.x1; x += 22) world.cover(x, BW.z1 - 2.8, 0, -1);
-  await breathe(); ctx.progress(0.24, 'coney: crowds'); if (!skip.has('crowds')) try { buildBeachLife(world, M); } catch (e) { console.warn('[coney] life', e); }
-  await breathe(); ctx.progress(0.25, 'coney: spawns + bikes'); placeSpawnsBikesCover(world, M, piers);   // after every collider exists (city, housing, park, shore, life)
-  await breathe(); if (!skip.has('traffic')) try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }
-  await breathe(); if (!skip.has('street')) try { buildStreet(world); } catch (e) { console.warn('[coney] street', e); }
-  await breathe(); if (!skip.has('life')) try { buildStreetLife(world); } catch (e) { console.warn('[coney] street life', e); }
-  await breathe(); if (!skip.has('traffic')) try { buildAveTraffic(world); } catch (e) { console.warn('[coney] 8th Ave traffic', e); }   // cars, cabs, vans and the B70 on 8th Ave by Soc Tav (coney/avetraffic.js)
-  await breathe(); if (!skip.has('events')) try { buildEvents(world); } catch (e) { console.warn('[coney] events', e); }   // muggings, arrests, fights, the ice-cream truck, ambulances (coney/events.js)
-  await breathe(); if (!skip.has('shops')) try { buildShops(world); } catch (e) { console.warn('[coney] shops', e); }   // walk-in shops with people (coney/shops.js; rooms carved by fronts.js)   // pigeons, litter, delivery trucks, working bus stops (coney/streetlife.js)   // signals, poles + wires, bins, Surf Ave parking, vendor tables (coney/street.js), after traffic (it reads the signals)   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
+  await step(); ctx.progress(0.24, 'coney: crowds'); if (!skip.has('crowds')) try { buildBeachLife(world, M); } catch (e) { console.warn('[coney] life', e); }
+  await step(); ctx.progress(0.25, 'coney: spawns + bikes'); placeSpawnsBikesCover(world, M, piers);   // after every collider exists (city, housing, park, shore, life)
+  await step(); if (!skip.has('traffic')) try { buildTraffic(world); } catch (e) { console.warn('[coney] traffic', e); }
+  await step(); if (!skip.has('street')) try { buildStreet(world); } catch (e) { console.warn('[coney] street', e); }
+  await step(); if (!skip.has('life')) try { buildStreetLife(world); } catch (e) { console.warn('[coney] street life', e); }
+  await step(); if (!skip.has('traffic')) try { buildAveTraffic(world); } catch (e) { console.warn('[coney] 8th Ave traffic', e); }   // cars, cabs, vans and the B70 on 8th Ave by Soc Tav (coney/avetraffic.js)
+  await step(); if (!skip.has('events')) try { buildEvents(world); } catch (e) { console.warn('[coney] events', e); }   // muggings, arrests, fights, the ice-cream truck, ambulances (coney/events.js)
+  await step(); if (!skip.has('shops')) try { buildShops(world); } catch (e) { console.warn('[coney] shops', e); }   // walk-in shops with people (coney/shops.js; rooms carved by fronts.js)   // pigeons, litter, delivery trucks, working bus stops (coney/streetlife.js)   // signals, poles + wires, bins, Surf Ave parking, vendor tables (coney/street.js), after traffic (it reads the signals)   // cars + buses on the streets (coney/traffic.js), after the colliders it validates lanes against
 
   W.surfaceAt = (p) => {
     if (p.z > BW.z1 && p.y < -0.5) return 'ground';

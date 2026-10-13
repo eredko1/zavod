@@ -3,7 +3,7 @@
 // painted sign boards, striped awnings and cornices, the Surf Avenue sideshow blocks), the avenue's street kit (cobra-head lights,
 // hydrants, parking signs, zebra crosswalks) and the elevated subway viaducts running into the terminal. CONEY agent.
 import * as THREE from 'three';
-import { Batch, boxGeo } from '../sbu/geo.js';
+import { Batch, boxGeo, scratchBox } from '../sbu/geo.js';
 import { facade, block } from '../sbu/buildings.js';
 import { OSM, PLAY } from './osm.js';
 import { BW } from './shore.js';
@@ -15,7 +15,8 @@ import { w8Lots, inW8Site } from './realism.js';
 import { isSchool, buildSchool } from './school.js';   // no parking at the bus stops
 
 
-export function buildCity(world, M) {
+/** toGPU(): coney.js hands the meshes built so far to the GPU (main.js ctx.gpuStream) once the buildings are flushed */
+export function buildCity(world, M, toGPU = () => 0) {
   const { scene, ctx, R } = world;
   const G = new Batch(world, M, 'cityGround'), S = new Batch(world, M, 'city'), F = new Batch(world, M, 'cityFar');
   if (!M.lunaPaver) {   // Luna Park walks: grey rectangular pavers in running bond (the real ones), not plain concrete
@@ -56,10 +57,7 @@ export function buildCity(world, M) {
     try { building(T, world, M, b); } catch (e) { console.warn('[coney] building', e); }
   }
   S.flush({ shadow: true }); F.flush({ shadow: true });
-  // phones: the far skyline is only ever drawn, so it is not shot at and its vertex arrays are dropped from JS memory once they
-  // are on the GPU (~50 MB of a heap that iOS kills the tab over)
-  if (world.ctx.lite) { const far = new Set(F.meshes); world.ctx.raycastTargets.splice(0, Infinity, ...world.ctx.raycastTargets.filter((m) => !far.has(m)));
-    for (const m of F.meshes) { const g = m.geometry; g.computeBoundingSphere(); g.computeBoundingBox(); for (const k in g.attributes) g.attributes[k].onUpload(function () { this.array = null; }); if (g.index) g.index.onUpload(function () { this.array = null; }); } }
+  toGPU();   // phones: the building meshes leave the JS heap here, before the viaduct, street kit and cars add to it
 
   // ---- elevated subway: steel viaduct (columns + girders + ties + rails) along every elevated OSM rail line ----------------
   viaducts(world, M);
@@ -154,18 +152,19 @@ const pickShutter = (R) => { let c; do c = R() < 0.35 ? (R() * 8) | 0 : 8 + ((R(
 
 /** a +n-facing quad u0..u1 x y0..y1 at depth n, non-indexed (2 triangles), UVs in the atlas rect [a, b, du, dv]. Built directly:
  *  Coney's facades are tens of thousands of these, and PlaneGeometry's JS arrays + index + Batch's non-indexed copy were ~0.7 GB of
- *  garbage while the map loads (iPhones kill the tab near the peak) */
+ *  garbage while the map loads (iPhones kill the tab near the peak). Written into one scratch geometry: Batch copies it at once */
 function quadGeo(u0, u1, y0, y1, n, a, b, du, dv) {
-  const P = new Float32Array([u0, y1, n, u0, y0, n, u1, y1, n, u0, y0, n, u1, y0, n, u1, y1, n]);
-  const U = new Float32Array([a, b + dv, a, b, a + du, b + dv, a, b, a + du, b, a + du, b + dv]);
-  const N = new Float32Array(18); for (let i = 2; i < 18; i += 3) N[i] = 1;
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); return g;
+  const g = QUAD, P = g.attributes.position.array, U = g.attributes.uv.array, N = g.attributes.normal.array;
+  P.set([u0, y1, n, u0, y0, n, u1, y1, n, u0, y0, n, u1, y0, n, u1, y1, n]); U.set([a, b + dv, a, b, a + du, b + dv, a, b, a + du, b, a + du, b + dv]);
+  N.fill(0); for (let i = 2; i < 18; i += 3) N[i] = 1; return g;
 }
+const QUAD = new THREE.BufferGeometry(); for (const [k, n] of [['position', 3], ['normal', 3], ['uv', 2]]) QUAD.setAttribute(k, new THREE.BufferAttribute(new Float32Array(6 * n), n));
+const FACE_BOX = scratchBox();
 /** Face kit: local frame on one wall face — u along the face (centred on its midpoint), y up, n outward from the wall plane. */
 function faceKit(B, alongX, sgn, mid, c) {
   const place = (g) => { if (alongX) { if (sgn < 0) g.rotateY(Math.PI); } else g.rotateY(sgn > 0 ? Math.PI / 2 : -Math.PI / 2); g.translate(alongX ? mid : c, 0, alongX ? c : mid); return g; };
   return {
-    box(key, a, b, o = {}) { B.add(key, place(boxGeo(a, b)), o); },
+    box(key, a, b, o = {}) { B.add(key, place(boxGeo(a, b, FACE_BOX)), o); },
     geo(key, g, o = { uv: false }) { B.add(key, place(g), o); },
     /** outward-facing quad u0..u1 x y0..y1 at n, UVs remapped into the atlas rect [u0, v0, du, dv] */
     quad(key, u0, u1, y0, y1, n, [a, bb, du, dv]) {
